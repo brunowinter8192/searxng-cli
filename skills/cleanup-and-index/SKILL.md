@@ -272,9 +272,21 @@ Stop when:
 
 Identical for both modes. Run as background job with `PYTHONUNBUFFERED=1` so the worker stays responsive (foreground would block on the long-running embed phase) and the log fills line-by-line for post-mortem if needed.
 
-### Pre-run: clean up partial chunks from prior killed runs
+### Skip-Logik (since 2026-05-08)
 
-If a previous `index-dir` run was killed mid-document, the `documents` table contains partial chunks for that document. The next `index-dir` run handles that *for documents whose chunks.json hash changed*, but if the hash is unchanged it sees a "fresh" indexed-files entry and SKIPS — leaving the partial in place forever.
+`workflow.py index-dir` is **skip-by-default**. Per file the SHA256 of the content is compared against the `indexed_files` tracking table:
+
+- **skipped** — hash matches an existing entry → no work, no GPU touch
+- **adopted** — file not in `indexed_files`, but a complete chunk set exists in `documents` (COUNT == MAX(total_chunks)) → register hash without re-embed (one-time bootstrap for collections that pre-date hash tracking)
+- **indexed** — missing, partial, or hash-changed → chunk + embed + insert + register hash
+
+Concretely: re-running `index-dir` on a directory where 14 of 168 files are new now indexes the 14, registers hashes for the 154 unchanged ones, and exits in seconds — not the previous full re-embed of all 168.
+
+GPU servers are only started when there is real work to embed.
+
+### Pre-run: detect partial chunks from prior killed runs
+
+A killed run can still leave partial chunks (e.g. abort happened mid-document insert). The skip-logic does NOT catch this case — partial documents are detected via the `total_chunks` mismatch, but the hash entry was never written for the killed file, so on re-run it lands in the **indexed** bucket and gets cleanly re-done. So the only scenario that needs manual intervention is a partial document whose hash was somehow already registered.
 
 Check first:
 
@@ -282,15 +294,17 @@ Check first:
 rag-cli progress "$COLLECTION"
 ```
 
-Any document showing `done < total` was interrupted mid-write. Delete those before re-running:
+Any document showing `done < total` was interrupted mid-write. If you see one AND its hash is in `indexed_files`, delete the partial chunks so the re-run treats it as missing:
 
 ```bash
 rag-cli delete --collection "$COLLECTION" --document "<doc>.md"
 ```
 
-Don't pass `--remove-source` here — the `.md` is fine, only the partial DB rows need to go.
+Don't pass `--remove-source` — the `.md` is fine, only the partial DB rows need to go. The next `index-dir` will treat the file as missing and re-index from scratch.
 
 ### Run indexing
+
+For multiple files (typical case — directory with N new + M existing):
 
 ```bash
 cd ~/Documents/ai/Meta/ClaudeCode/MCP/RAG && \
@@ -299,7 +313,18 @@ PYTHONUNBUFFERED=1 ./venv/bin/python workflow.py index-dir \
     > /tmp/${COLLECTION}_index.log 2>&1 &
 ```
 
-This handles: server health check → start if needed → chunk → index → summary.
+Skip-logic handles "only re-index new/changed files" automatically.
+
+For an explicit single-file workflow (e.g. recovery of one specific document, or scripted per-file loops):
+
+```bash
+./venv/bin/python workflow.py index-file \
+    --input "$OUTPUT_DIR/specific_paper.md" --collection "$COLLECTION"
+```
+
+`--force` is available on both subcommands and bypasses the skip — use only when the embedding model or chunker config changed and the entire collection genuinely needs re-embedding. Routine indexing should never need `--force`.
+
+This handles: server health check → start if needed → classify (skip/adopt/index) → chunk + embed only the indexed bucket → summary.
 
 ### Wait for indexing to finish — match timer duration to expected wallclock
 
@@ -325,7 +350,7 @@ After indexing completes, run the post-checks:
 
 ```bash
 rag-cli progress "$COLLECTION"          # all docs must show done == total
-tail -30 /tmp/${COLLECTION}_index.log    # confirm "Done: M files, N chunks chunked, N chunks indexed"
+tail -30 /tmp/${COLLECTION}_index.log    # confirm "Done: N files indexed (X chunks), Y skipped, Z adopted"
 ```
 
 **Output shape of `rag-cli progress`:**
@@ -347,7 +372,7 @@ A document is currently being indexed when its row shows `done < total`. Documen
 tail -20 /tmp/${COLLECTION}_index.log
 ```
 
-Confirm `M chunks chunked, M chunks indexed` — numbers must match. Cross-check with `rag-cli progress` — every document should show `done == total`. If a `⚠️  WARNING: ... chunks skipped due to NULL embeddings` block is present, investigate via the indexer log before treating the collection as complete.
+Confirm the summary line `Done: N files indexed (X chunks), Y skipped, Z adopted` — N+Y+Z must equal the total number of `.md` files found. Cross-check with `rag-cli progress` — every document should show `done == total`. NULL-embedding skips are logged at WARNING level in `src/rag/logs/indexer.log` (search for `NULL embedding skipped`); investigate via the indexer log before treating the collection as complete if any are present.
 
 ### Verify
 
