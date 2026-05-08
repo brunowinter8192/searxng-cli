@@ -1,16 +1,19 @@
 #!/usr/bin/env python3
 """
-No-Google concurrent burst smoke — HTTP Scholar probe vs 8 production engines.
+No-Google concurrent burst smoke — production ScholarEngine vs 8 production engines.
 
 Architectural discriminator test: does HTTP Scholar survive the concurrent multi-engine
 burst pattern when Google browser is absent?
 
 Engine set (9 total, no Google):
-  scholar_http (probe), duckduckgo, mojeek, lobsters, crossref, openalex,
+  google_scholar (production HTTP), duckduckgo, mojeek, lobsters, crossref, openalex,
   stack_exchange, semantic_scholar, open_library
 
 Queries: 12 canonical academic queries from ciw_concurrent_block_20260508.md
 (3 bursts × 4), reused for cross-test comparability.
+
+Import switched from ScholarHTTPProbe (dev probe) to ScholarEngine (production) 2026-05-09
+as part of bead searxng-f3i HTTP migration.
 
 Output: JSONL per-query records → dev/search_pipeline/01_reports/no_google_burst_<ts>.jsonl
         Summary table → stderr
@@ -43,8 +46,7 @@ from src.search.engines.openalex import OpenAlexEngine
 from src.search.engines.semantic_scholar import SemanticScholarEngine
 from src.search.engines.stack_exchange import StackExchangeEngine
 
-# Probe lives in dev/ — explicit path import
-from dev.search_pipeline.scholar_http_probe import ScholarHTTPProbe
+from src.search.engines.scholar import ScholarEngine
 
 logging.basicConfig(level=logging.WARNING, format="%(levelname)s %(name)s: %(message)s")
 
@@ -56,7 +58,7 @@ WATCHDOG: dict[str, float] = {
     "open_library": 6.0,
     "semantic_scholar": 5.0,
     "crossref": 6.0,
-    "scholar_http": 6.0,
+    "google_scholar": 6.0,
 }
 DEFAULT_WATCHDOG = 3.6
 
@@ -84,7 +86,7 @@ async def run_smoke() -> None:
     report_path = REPORT_DIR / f"no_google_burst_{ts}.jsonl"
 
     engines = {
-        "scholar_http": ScholarHTTPProbe(),
+        "google_scholar": ScholarEngine(),
         "duckduckgo": DuckDuckGoEngine(),
         "mojeek": MojeekEngine(),
         "lobsters": LobstersEngine(),
@@ -108,10 +110,10 @@ async def run_smoke() -> None:
             print(f"[{qi + 1:02}/{len(QUERIES)}] {label} {query}", file=sys.stderr)
             record = await _run_burst(engines, query, label)
             records.append(record)
-            scholar_status = record["engines"].get("scholar_http", {}).get("status", "?")
-            scholar_ms = record["engines"].get("scholar_http", {}).get("search_ms", 0)
-            scholar_n = record["engines"].get("scholar_http", {}).get("result_count", 0)
-            print(f"         scholar_http={scholar_status} ms={scholar_ms} n={scholar_n}", file=sys.stderr)
+            scholar_status = record["engines"].get("google_scholar", {}).get("status", "?")
+            scholar_ms = record["engines"].get("google_scholar", {}).get("search_ms", 0)
+            scholar_n = record["engines"].get("google_scholar", {}).get("result_count", 0)
+            print(f"         google_scholar={scholar_status} ms={scholar_ms} n={scholar_n}", file=sys.stderr)
             with open(report_path, "a") as f:
                 f.write(json.dumps(record) + "\n")
     finally:
@@ -182,12 +184,12 @@ async def _run_engine(engine, query: str, timeout: float) -> tuple[str, int, int
 
 # Print per-query Scholar status table + aggregate to stderr
 def _print_summary(records: list[dict]) -> None:
-    print("\n=== SCHOLAR HTTP PROBE SUMMARY ===", file=sys.stderr)
+    print("\n=== SCHOLAR HTTP (PRODUCTION) SUMMARY ===", file=sys.stderr)
     print(f"{'#':3} {'Label':7} {'Scholar status':22} {'ms':6} {'n':4} {'query':45}", file=sys.stderr)
     print("-" * 95, file=sys.stderr)
     scholar_statuses = []
     for i, rec in enumerate(records):
-        s = rec["engines"].get("scholar_http", {})
+        s = rec["engines"].get("google_scholar", {})
         status = s.get("status", "?")
         ms = s.get("search_ms", 0)
         n = s.get("result_count", 0)
