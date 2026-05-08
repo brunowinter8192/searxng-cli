@@ -105,13 +105,23 @@ Bead: `searxng-ciw` (extend existing). Contained, scoped — `dev/` probe exists
 
 Prevent Scholar from firing in the same `asyncio.gather` as the Google browser engine. Required because all production default engine sets include `google`. Implementation options:
 
-| Option | Description | Trade-off |
-|---|---|---|
-| (a) Engine-class routing in `_query_engines_concurrent` | Classify `google_scholar` as `GOOGLE_SENSITIVE`; when `google` is in selected set, fire Scholar in a post-gather sequential step | Adds ~700ms tail latency per query where both are active; clean separation, no config |
-| (b) Mutual-exclusion in `_select_engines` | Drop Scholar from selected set when `google` is present | Scholar loses output in all default queries; simplest code change; acceptable if Scholar academic yield is low priority vs Google |
-| (c) Mode-specific engine sets | Redefine `_ACADEMIC_ENGINES` (and `_PDF_ENGINES` etc.) to exclude Scholar when Google is present, include Scholar in a `--scholar` explicit flag | Breaking change to default behavior; cleanest long-term API |
+| Option | Description | Wallclock cost | Trade-off |
+|---|---|---|---|
+| (a) Sequential after gather | When `google` in selected set, fire Scholar in a post-gather sequential step | +700ms unconditional | Reliable. Adds visible latency to every academic-with-google query. |
+| (b) Mutual-exclusion in `_select_engines` | Drop Scholar from selected set when `google` is present | 0ms | Scholar loses output in all default queries (status quo Scholar effectively non-functional, so net zero coverage delta). Simplest code. |
+| (c) Mode-specific engine sets | Define mutually-exclusive sets — `--academic` excludes Scholar (Google in); explicit `--scholar` flag excludes Google (Scholar in) | 0ms | Breaking UX change. Cleanest by-design separation — Google and Scholar never co-occur in any query. |
+| (d) Conditional pre-acquire delay | Scholar's task awaits `asyncio.sleep(N)` (default 1.5s) before acquire when `google` is in selected set; still inside the gather but temporally offset | 0ms IF delay fits in slowest-engine wallclock window | Empirically untested whether 1.5s suffices to escape Google's co-fire detection. With 5–6s timeout engines (open_library, semantic_scholar, crossref) absorbing the delay, no visible cost. May need tuning up if 1.5s insufficient. |
 
-Option (a) is recommended: Scholar fires sequentially after gather (same Chrome already warm), adds minimal latency, preserves Scholar output on all query modes. Bead `searxng-f3i` owns this implementation.
+**No recommendation — decision deferred to the f3i implementation session.** Two candidate paths sit awkwardly:
+
+- **(d) Pre-acquire delay** is the only candidate that satisfies `~/.claude/shared-rules/proj_searxng/fast-by-default.md` "Mitigation-Choice Discipline" Rang-1 (absorbiert in existing wallclock). Trade-off: hypothesis-driven — 1.5s might not be enough to escape Google's co-fire detection. If smoke fails, tune delay up to slowest-engine ceiling (~6s); above that, wallclock becomes visible and the option degrades to Rang-2.
+- **(c) Mode-specific engine sets** is the architecturally cleanest — by-design mutual exclusion, no runtime conditional logic, no timing hypothesis. UX cost: user opts into Scholar via explicit flag. Coverage cost on default `--academic` (no Scholar there) is recoverable via the new flag.
+
+Both are awkward differently: (d) is hacky timing-based with empirical unknowns, (c) is a UX break. The decision is whether to:
+1. Try (d) empirically first (cheap to test — adapt `dev/search_pipeline/no_google_burst_smoke.py` to include `google` + pre-delayed Scholar, measure block rate)
+2. Commit to (c) up-front and design the new `--scholar` flag
+
+Option (a) downgraded to fallback for if (d) fails empirically. Option (b) downgraded to "current production state by explicit code path" — only acceptable if (c) is rejected as too disruptive.
 
 ### 3. `--pdf` mode Scholar re-evaluation
 
