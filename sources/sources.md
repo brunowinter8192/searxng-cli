@@ -101,5 +101,10 @@
 | harzing.com — Publish or Perish Tutorial — Google Scholar CAPTCHAs | Web | ciw | Referenced (HTTP 429 + 24h block, IP-reputation-based anti-bot evidence) |
 | scholarly Python package (PyPI + GitHub issues #131 Tor sustainability) | Repo | ciw | Referenced (open-source Scholar scraper, documents Tor exit shrinkage — Scholar specifically hostile to Tor) |
 | support.google.com — How to solve unusual traffic problem for Google Scholar (official support thread) | Web | ciw | Referenced ("If Google Scholar works on a new network, it strongly indicates your home IP is the problem" — official IP-flag confirmation) |
+| github.com/searxng/searxng (searx/engines/google_scholar.py) | Repo | ciw | Referenced (HTTP architecture reference; CONSENT cookie pattern, lxml `//div[@data-rp]` xpath, /sorry/ redirect detection — basis for dev/scholar_http_probe.py) |
+| github.com/searxng/searxng (searx/search/__init__.py) | Repo | ciw | Referenced (multi-engine orchestration via `threading.Thread` confirmed parallel-fanout pattern matches our `asyncio.gather`) |
+| github.com/searxng/searxng (issue #3615) | Forum | ciw | Referenced (SearXNG core dev confirms 5% Scholar CAPTCHA rate, no programmatic bypass available) |
+| github.com/searxng/searxng (docs/admin/answer-captcha.rst) | Repo | ciw | Referenced (manual SSH-SOCKS-tunnel + browser CAPTCHA-solve workaround — explicit "not a permanent solution") |
+| github.com/scholarly-python-package/scholarly (scholarly/_navigator.py) | Repo | ciw | Referenced (Singleton + dual ProxyGenerator pattern; "without CAPTCHAs" claim depends on paid proxy rotation, free path deprecated) |
 
 Consult via RAG search before making assumptions. Pipeline step references match `decisions/` files.
