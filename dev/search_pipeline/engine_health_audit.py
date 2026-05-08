@@ -95,22 +95,23 @@ def aggregate_engine_stats(records: list[dict]) -> dict[str, dict]:
     for eng, c in counts.items():
         total = sum(c.values())
         ok = c.get("OK", 0)
+        # Sum all sub-statuses per bucket (tolerates EMPTY_*, TIMEOUT_*, ERROR_* sub-statuses)
+        empty_count   = sum(v for k, v in c.items() if k.startswith("EMPTY"))
+        timeout_count = sum(v for k, v in c.items() if k.startswith("TIMEOUT"))
+        error_count   = sum(v for k, v in c.items() if k.startswith("ERROR"))
+        rate_skip_count = c.get("RATE_SKIP", 0)
         silent = total - ok
         avg_ms = int(sum(ok_ms[eng]) / len(ok_ms[eng])) if ok_ms[eng] else 0
         avg_res = round(sum(ok_results[eng]) / len(ok_results[eng]), 1) if ok_results[eng] else 0.0
-        dom_fail = max(
-            {"EMPTY": c.get("EMPTY", 0), "TIMEOUT": c.get("TIMEOUT", 0),
-             "ERROR": c.get("ERROR", 0), "RATE_SKIP": c.get("RATE_SKIP", 0)},
-            key=lambda k: {"EMPTY": c.get("EMPTY", 0), "TIMEOUT": c.get("TIMEOUT", 0),
-                           "ERROR": c.get("ERROR", 0), "RATE_SKIP": c.get("RATE_SKIP", 0)}[k]
-        ) if silent > 0 else None
+        buckets = {"EMPTY": empty_count, "TIMEOUT": timeout_count, "ERROR": error_count, "RATE_SKIP": rate_skip_count}
+        dom_fail = max(buckets, key=buckets.get) if silent > 0 else None
         stats[eng] = {
             "total": total,
             "ok": ok,
-            "empty": c.get("EMPTY", 0),
-            "timeout": c.get("TIMEOUT", 0),
-            "error": c.get("ERROR", 0),
-            "rate_skip": c.get("RATE_SKIP", 0),
+            "empty": empty_count,
+            "timeout": timeout_count,
+            "error": error_count,
+            "rate_skip": rate_skip_count,
             "success_rate": ok / total if total else 0.0,
             "silent_fail_rate": silent / total if total else 0.0,
             "dom_fail": dom_fail,

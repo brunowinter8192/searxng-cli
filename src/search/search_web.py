@@ -1,9 +1,14 @@
 # INFRASTRUCTURE
 import asyncio
+import json
 import logging
 import time
 from collections.abc import Callable
 from datetime import datetime, timezone
+
+import httpx
+import pydoll.exceptions as _pydoll_exc
+import websockets.exceptions as _ws_exc
 from mcp.types import TextContent
 
 from src.search.browser import close_browser
@@ -25,6 +30,8 @@ from src.search.result import SearchResult
 from src.search.snippet import _select_snippet
 # From merge.py: URL-merge and slot allocation
 from src.search.merge import _merge_and_rank
+# From status.py: sub-status string constants
+from src.search import status as S
 # From query_logger.py: append-only JSONL query log
 from src.search.query_logger import log_query
 # From book_whitelist.py: domain whitelist + path rules for --books mode
@@ -322,7 +329,7 @@ async def _engine_with_timing(
         await asyncio.wait_for(get_limiter(engine.name).acquire(), timeout=RATE_WAIT_TIMEOUT)
     except asyncio.TimeoutError:
         rate_wait_ms = round((time.perf_counter() - t_before_acquire) * 1000)
-        return [], rate_wait_ms, 0, "RATE_SKIP", f"rate_wait > {RATE_WAIT_TIMEOUT}s"
+        return [], rate_wait_ms, 0, S.RATE_SKIP, f"rate_wait > {RATE_WAIT_TIMEOUT}s"
     rate_wait_ms = round((time.perf_counter() - t_before_acquire) * 1000)
     effective_query = query
     if query_modifier_map and engine.name in query_modifier_map:
@@ -332,18 +339,40 @@ async def _engine_with_timing(
     t0 = time.perf_counter()
     try:
         if timeout is not None:
-            results = await asyncio.wait_for(engine.search(effective_query, language, effective_max), timeout=timeout)
+            results, empty_reason = await asyncio.wait_for(engine.search_with_reason(effective_query, language, effective_max), timeout=timeout)
         else:
-            results = await engine.search(effective_query, language, effective_max)
+            results, empty_reason = await engine.search_with_reason(effective_query, language, effective_max)
         search_ms = round((time.perf_counter() - t0) * 1000)
-        return results, rate_wait_ms, search_ms, "OK" if results else "EMPTY", None
+        if results:
+            return results, rate_wait_ms, search_ms, S.OK, None
+        return [], rate_wait_ms, search_ms, empty_reason or S.EMPTY, None
     except asyncio.TimeoutError:
         search_ms = round((time.perf_counter() - t0) * 1000)
-        return [], rate_wait_ms, search_ms, "TIMEOUT", f"asyncio.TimeoutError after {timeout}s watchdog"
+        if timeout is not None and search_ms < timeout * 1.2 * 1000:
+            sub = S.TIMEOUT_WATCHDOG
+        else:
+            sub = S.TIMEOUT_NONCOOP
+        return [], rate_wait_ms, search_ms, sub, f"asyncio.TimeoutError after {timeout}s watchdog"
+    except httpx.TimeoutException as e:
+        logger.warning("Engine httpx timeout: %s", e)
+        search_ms = round((time.perf_counter() - t0) * 1000)
+        return [], rate_wait_ms, search_ms, S.TIMEOUT_HTTPX, str(e)
+    except (_pydoll_exc.PydollException, _ws_exc.WebSocketException, ConnectionError) as e:
+        logger.warning("Engine browser error: %s", e)
+        search_ms = round((time.perf_counter() - t0) * 1000)
+        return [], rate_wait_ms, search_ms, S.ERROR_BROWSER, str(e)
+    except httpx.HTTPError as e:
+        logger.warning("Engine HTTP error: %s", e)
+        search_ms = round((time.perf_counter() - t0) * 1000)
+        return [], rate_wait_ms, search_ms, S.ERROR_HTTP, str(e)
+    except (json.JSONDecodeError, KeyError, ValueError, AttributeError) as e:
+        logger.warning("Engine parse error: %s", e)
+        search_ms = round((time.perf_counter() - t0) * 1000)
+        return [], rate_wait_ms, search_ms, S.ERROR_PARSE, str(e)
     except Exception as e:
         logger.warning("Engine error: %s", e)
         search_ms = round((time.perf_counter() - t0) * 1000)
-        return [], rate_wait_ms, search_ms, "ERROR", str(e)
+        return [], rate_wait_ms, search_ms, S.ERROR_OTHER, str(e)
 
 
 # Format merged SearchResult list as plain text numbered list; returns (text, {url: source}, {url: display_text})
