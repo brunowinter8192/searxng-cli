@@ -97,6 +97,13 @@ pydoll-based parallel search pipeline. Replaces the former `src/searxng/` SearXN
 **Output:** Bool. Used by `search_web.search_web_workflow` post-merge filter when `docs=True`.
 **Empirical basis:** `dev/search_pipeline/01_reports/docs_probe_20260507_225321.md` — 12 broad tech queries × 3 general engines × +documentation modifier = 337 URLs; H1-H13 heuristic coverage 39%, miss-set 61% drove the user decision toward blacklist-only.
 
+## filter_modes.py
+
+**Purpose:** Engine restriction and URL filtering for the three CLI filter flags (`--books` / `--pdf` / `--docs`). `apply_filter_mode(selected, books, pdf, docs, query_modifier_map)` resolves the 3-way mutex (`pdf > docs > books`), restricts the engine dict to the active mode's engine subset, sets the effective `query_modifier_map`, and returns `(restricted_selected, qmm, mode_id)` where `mode_id ∈ {"books", "pdf", "docs", None}`. `filter_urls_by_mode(ranked, mode)` applies the post-merge URL filter for the active mode via `is_book_url` / `is_pdf_url` / `is_docs_url`; returns `ranked` unchanged when `mode=None`. Engine subsets: `_BOOKS_ENGINES = {google, duckduckgo, mojeek, open_library}`, `_PDF_ENGINES = {google, duckduckgo, mojeek, google scholar}`, `_DOCS_ENGINES = {google, duckduckgo, mojeek}`. Extracted from `search_web.py` refactor 2026-05-08 — reduces `search_web_workflow` from 125 LOC to ~50 LOC.
+**Public interface:** `apply_filter_mode`, `filter_urls_by_mode`.
+**Input:** Engine dict + bool flags (apply_filter_mode); ranked result list + mode string (filter_urls_by_mode).
+**Output:** `(restricted_selected, effective_qmm, mode_id)` (apply_filter_mode); filtered result list (filter_urls_by_mode). Called from `search_web.search_web_workflow`.
+
 ## engines/
 
 Per-engine parser modules. Each exports an `Engine` class with `search(query, language, max_results)` returning `list[SearchResult]`.

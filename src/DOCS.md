@@ -32,6 +32,6 @@ pane=$(spawn_claude_worker_from_file "workers" "my-task" "/path/to/project" "opu
 
 ## Documentation Tree
 
-- [search/DOCS.md](search/DOCS.md) — multi-engine search pipeline (8 active engines: Google, DuckDuckGo, Mojeek, Lobsters via pydoll; Google Scholar, OpenAlex, CrossRef, Stack Exchange via HTTP; parallel fanout, score-based snippet selection, slot-allocated 12 GENERAL / 6 ACADEMIC / 2 QA)
+- [search/DOCS.md](search/DOCS.md) — multi-engine search pipeline (10 active engines: Google, DuckDuckGo, Mojeek, Lobsters, Google Scholar, Semantic Scholar via pydoll; CrossRef, OpenAlex, Stack Exchange, Open Library via HTTP; parallel fanout, score-based snippet selection, slot-allocated 12 GENERAL / 6 ACADEMIC / 2 QA)
 - [scraper/DOCS.md](scraper/DOCS.md) — URL scraping and site exploration tools
 - [crawler/DOCS.md](crawler/DOCS.md) — Full-site crawl and URL discovery CLI tools (`/crawl-site` pipeline)

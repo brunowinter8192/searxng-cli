@@ -34,12 +34,8 @@ from src.search.merge import _merge_and_rank
 from src.search import status as S
 # From query_logger.py: append-only JSONL query log
 from src.search.query_logger import log_query
-# From book_whitelist.py: domain whitelist + path rules for --books mode
-from src.search.book_whitelist import is_book_url
-# From pdf_filter.py: PDF host whitelist + path rules for --pdf mode
-from src.search.pdf_filter import is_pdf_url
-# From docs_filter.py: noise blacklist for --docs mode
-from src.search.docs_filter import is_docs_url
+# From filter_modes.py: engine restriction, modifier map, and URL filter for --books/--pdf/--docs flags
+from src.search.filter_modes import apply_filter_mode, filter_urls_by_mode
 
 logger = logging.getLogger(__name__)
 
@@ -79,23 +75,6 @@ ENGINES = {
     "open_library": OpenLibraryEngine(),
 }
 
-# --books mode: restrict to general-web engines + Open Library catalog, append '+book' modifier to web engines
-_BOOKS_ENGINES = frozenset({"google", "duckduckgo", "mojeek", "open_library"})
-_BOOKS_MODIFIER: Callable[[str], str] = lambda q: f"{q} book"
-
-# --pdf mode: restrict to PDF-rich engines and append ' pdf' modifier; post-filter via is_pdf_url
-# Engine selection rationale (free_word_injection_probe_20260507_033631.md):
-#   google/ddg/mojeek → surface direct .pdf file URLs; scholar → arxiv.org/abs/ (TIER1 transform)
-#   crossref/openalex dropped: return doi.org-only results, 0 yield after is_pdf_url filter
-_PDF_ENGINES = frozenset({"google", "duckduckgo", "mojeek", "google scholar"})
-_PDF_MODIFIER: Callable[[str], str] = lambda q: f"{q} pdf"
-
-# --docs mode: restrict to general-web engines, append 'documentation' modifier, post-filter via is_docs_url
-# Pure blacklist: blocks known noise (forums, blogs, code-hosting, tutorial sites), passes everything else
-_DOCS_ENGINES = frozenset({"google", "duckduckgo", "mojeek"})
-_DOCS_MODIFIER: Callable[[str], str] = lambda q: f"{q} documentation"
-
-
 # ORCHESTRATOR
 
 # Search all enabled engines concurrently, merge+rank, preview, format, cache, log, return TextContent
@@ -113,81 +92,30 @@ async def search_web_workflow(
     docs: bool = False,
 ) -> list[TextContent] | tuple[list[TextContent], dict]:
     t_total = time.perf_counter()
-    # 3-way mutex: pdf > docs > books (cli enforces mutex; guard here for direct callers)
-    if sum([books, pdf, docs]) > 1:
-        if pdf:
-            logger.warning("Multiple mode flags set — pdf takes precedence; ignoring books/docs")
-            books = False
-            docs = False
-        elif docs:
-            logger.warning("Multiple mode flags set — docs takes precedence; ignoring books")
-            books = False
     logger.info("Searching: %s (language=%s, books=%s, pdf=%s, docs=%s)", query, language, books, pdf, docs)
     selected = _select_engines(engines)
-    if books:
-        selected = {k: v for k, v in selected.items() if k in _BOOKS_ENGINES}
-        # modifier applies only to web engines — Open Library is already a book catalog
-        query_modifier_map = {name: _BOOKS_MODIFIER for name in _BOOKS_ENGINES if name != "open_library"}
-    if pdf:
-        selected = {k: v for k, v in selected.items() if k in _PDF_ENGINES}
-        query_modifier_map = {name: _PDF_MODIFIER for name in _PDF_ENGINES}
-    if docs:
-        selected = {k: v for k, v in selected.items() if k in _DOCS_ENGINES}
-        query_modifier_map = {name: _DOCS_MODIFIER for name in _DOCS_ENGINES}
+    selected, query_modifier_map, mode = apply_filter_mode(selected, books, pdf, docs, query_modifier_map)
     effective_timeout = engine_timeout if engine_timeout is not None else ENGINE_WATCHDOG_TIMEOUT
 
-    # Engine fanout phase
-    raw_results: list = []
-    engine_ms: dict[str, int] = {}
-    engine_stats: dict[str, dict] = {}
-    t_fanout = time.perf_counter()
-    if _with_timings:
-        names_and_engines = list(selected.items())
-        tasks = [_engine_with_timing(eng, query, language, 10, ENGINE_WATCHDOG_OVERRIDE.get(eng.name, effective_timeout), query_modifier_map=query_modifier_map) for _, eng in names_and_engines]
-        timed = await asyncio.gather(*tasks)
-        engine_details: dict[str, dict] = {}
-        for (name, eng), (eng_results, rate_wait_ms, search_ms, status, drop_reason) in zip(names_and_engines, timed):
-            raw_results.extend(eng_results)
-            key = name.replace(' ', '_')
-            engine_ms[f"engine_{key}_ms"] = search_ms
-            engine_details[key] = {"status": status, "ms": search_ms}
-            engine_stats[eng.name] = {
-                "rate_wait_ms": rate_wait_ms,
-                "search_ms": search_ms,
-                "status": status,
-                "result_count": len(eng_results),
-                "drop_reason": drop_reason,
-            }
-    else:
-        raw_results, engine_stats = await _query_engines_concurrent(query, language, 10, selected, query_modifier_map=query_modifier_map)
-    engine_fanout_ms = round((time.perf_counter() - t_fanout) * 1000)
+    raw_results, engine_stats, engine_fanout_ms, engine_ms, engine_details = await _run_engine_fanout(
+        selected, query, language, effective_timeout, query_modifier_map, _with_timings
+    )
 
-    # Merge-rank phase
     t0 = time.perf_counter()
     ranked, slot_counts = _merge_and_rank(raw_results, class_filter=class_filter)
-    if books:
-        ranked = [r for r in ranked if is_book_url(r.url)]
-    if pdf:
-        ranked = [r for r in ranked if is_pdf_url(r.url)]
-    if docs:
-        ranked = [r for r in ranked if is_docs_url(r.url)]
+    ranked = filter_urls_by_mode(ranked, mode)
     merge_rank_ms = round((time.perf_counter() - t0) * 1000)
 
-    # Preview phase (before cache_write so snippet_source is og-aware)
     top20, preview_stats = await fetch_previews(ranked[:20])
     preview_ms = preview_stats["total_ms"]
 
-    # Format + snippet selection phase (collects snippet_source + display text per URL)
     t0 = time.perf_counter()
     formatted_text, snippet_sources, snippet_texts = _format_results(query, top20)
     select_snippet_ms = round((time.perf_counter() - t0) * 1000)
 
-    # Build og/meta index from preview-enriched top20 objects (ranked[:20] still has preview=None)
     og_meta = {r.url: r.preview for r in top20 if r.preview}
 
-    # Cache write phase
-    key = cache_key(query, language, engines, time_range, class_filter=class_filter,
-                    modifier_id="books" if books else ("pdf" if pdf else ("docs" if docs else None)))
+    key = cache_key(query, language, engines, time_range, class_filter=class_filter, modifier_id=mode)
     t0 = time.perf_counter()
     cache_write(key, ranked, query, language, engines, time_range,
                 snippet_sources=snippet_sources, slot_counts=slot_counts,
@@ -195,20 +123,7 @@ async def search_web_workflow(
     cache_write_ms = round((time.perf_counter() - t0) * 1000)
 
     total_ms = round((time.perf_counter() - t_total) * 1000)
-
-    # Query log
-    bottleneck = max(engine_stats, key=lambda k: engine_stats[k]["search_ms"]) if engine_stats else None
-    ts = datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%S.%f")[:-3] + "Z"
-    log_query({
-        "ts": ts,
-        "query": query,
-        "language": language,
-        "engines_requested": [eng.name for eng in selected.values()],
-        "total_wall_ms": total_ms,
-        "bottleneck_engine": bottleneck,
-        "engines": engine_stats,
-        "preview": preview_stats,
-    })
+    _build_query_log_entry(query, language, selected, total_ms, engine_stats, preview_stats)
 
     result = [TextContent(type="text", text=formatted_text)]
 
@@ -285,6 +200,48 @@ def _select_engines(engines: str | None) -> dict:
         return ENGINES
     names = [e.strip().lower() for e in engines.split(",")]
     return {k: v for k, v in ENGINES.items() if k in names}
+
+
+# Execute engine fanout (timed or plain); return (raw_results, engine_stats, fanout_ms, engine_ms, engine_details)
+async def _run_engine_fanout(
+    selected: dict,
+    query: str,
+    language: str,
+    effective_timeout: float,
+    query_modifier_map: dict[str, Callable] | None,
+    with_timings: bool,
+) -> tuple[list, dict, int, dict, dict]:
+    raw_results: list = []
+    engine_ms: dict[str, int] = {}
+    engine_stats: dict[str, dict] = {}
+    t_fanout = time.perf_counter()
+    if with_timings:
+        names_and_engines = list(selected.items())
+        tasks = [
+            _engine_with_timing(eng, query, language, 10, ENGINE_WATCHDOG_OVERRIDE.get(eng.name, effective_timeout), query_modifier_map=query_modifier_map)
+            for _, eng in names_and_engines
+        ]
+        timed = await asyncio.gather(*tasks)
+        engine_details: dict[str, dict] = {}
+        for (name, eng), (eng_results, rate_wait_ms, search_ms, status, drop_reason) in zip(names_and_engines, timed):
+            raw_results.extend(eng_results)
+            key = name.replace(' ', '_')
+            engine_ms[f"engine_{key}_ms"] = search_ms
+            engine_details[key] = {"status": status, "ms": search_ms}
+            engine_stats[eng.name] = {
+                "rate_wait_ms": rate_wait_ms,
+                "search_ms": search_ms,
+                "status": status,
+                "result_count": len(eng_results),
+                "drop_reason": drop_reason,
+            }
+    else:
+        raw_results, engine_stats = await _query_engines_concurrent(
+            query, language, 10, selected, query_modifier_map=query_modifier_map
+        )
+        engine_details = {}
+    engine_fanout_ms = round((time.perf_counter() - t_fanout) * 1000)
+    return raw_results, engine_stats, engine_fanout_ms, engine_ms, engine_details
 
 
 # Query selected engines concurrently; return (combined_results, engine_stats_dict)
@@ -392,3 +349,26 @@ def _format_results(query: str, results: list[SearchResult]) -> tuple[str, dict[
             lines.append(f"   Snippet: {snippet[:SNIPPET_LENGTH]}")
         lines.append("")
     return "\n".join(lines), sources, texts
+
+
+# Build and write query log entry after each search_web_workflow call
+def _build_query_log_entry(
+    query: str,
+    language: str,
+    selected: dict,
+    total_ms: int,
+    engine_stats: dict,
+    preview_stats: dict,
+) -> None:
+    bottleneck = max(engine_stats, key=lambda k: engine_stats[k]["search_ms"]) if engine_stats else None
+    ts = datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%S.%f")[:-3] + "Z"
+    log_query({
+        "ts": ts,
+        "query": query,
+        "language": language,
+        "engines_requested": [eng.name for eng in selected.values()],
+        "total_wall_ms": total_ms,
+        "bottleneck_engine": bottleneck,
+        "engines": engine_stats,
+        "preview": preview_stats,
+    })
