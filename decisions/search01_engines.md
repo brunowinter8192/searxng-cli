@@ -59,7 +59,7 @@ score = Σ(weight / position_i)  # pro Engine-Position
 ## Evidenz
 
 ### Kategorie-Trennung general/plugin
-Plugin-Domains (arxiv.org, github.com, reddit.com) können nicht effektiv gescrapt werden (API-Walls, Rate-Limits, dynamischer Content). Dedizierte MCP Plugins liefern strukturierte Daten. SearXNG-Engines für diese Domains dienen nur der URL-Discovery — der web-research Agent routet sie an die Plugins (→ agent02_routing.md).
+Plugin-Domains (arxiv.org, github.com, reddit.com) können nicht effektiv gescrapt werden (API-Walls, Rate-Limits, dynamischer Content). Dedizierte MCP Plugins liefern strukturierte Daten. SearXNG-Engines für diese Domains dienen nur der URL-Discovery — der web-research Agent routet sie an die Plugins (→ plugin_routing.md).
 
 ### Bing — Neuer eigener Index
 Bing hat den zweitgrößten unabhängigen Web-Index weltweit. DDG basiert auf Bing, hat aber eigenes Ranking. Bing direkt aktivieren diversifiziert die Ergebnisse. Weight 1 zum Start (Qualität unbekannt, Tor-Kompatibilität unklar → proxies: {} als Bypass).

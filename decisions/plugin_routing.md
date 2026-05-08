@@ -1,4 +1,4 @@
-# Agent Step 2: Plugin Routing
+# Plugin Routing
 
 ## Status Quo
 

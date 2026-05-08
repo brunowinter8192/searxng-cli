@@ -19,7 +19,7 @@ See [sources/sources.md](sources/sources.md).
 | **Orchestration** | `asyncio.gather` parallel fetch across engines (rate-limiter token acquired at workflow level via `get_limiter(engine.name).acquire()`), merged-and-ranked via `_merge_and_rank` (overlap-counted within general engines, hard slot allocation 12 general / 6 academic / 2 Q&A → 20 URLs, no overflow). Class-filter flags `--general` / `--academic` / `--qa` restrict allocation to selected classes. Filter-flag trio `--books` / `--pdf` / `--docs` (added 2026-05-07, beads gpk/x4f/8gc closed): each restricts engine set + applies query modifier (+book / +pdf / +documentation) + post-merge URL filter via `book_whitelist.py` / `pdf_filter.py` / `docs_filter.py`. cache_key extended with `modifier_id` for cross-flag cache separation. CLI mutex enforced via `add_mutually_exclusive_group()` on search_web/search_batch (search_more keeps separate flags for cache-key matching). Underfill on filter modes is accepted; pooling-rethink in bead g82. Preview-fetched, snippet-selected per source-priority chain producing `snippet_source` label per URL, formatted as TextContent. `search_web_workflow` for single query; `search_batch_workflow` for N queries sequentially in one warm-Chrome session. Disk cache (`~/.cache/searxng/<key>.json`, 1h TTL) stores `snippet_source`, `og`, `meta`, `snippet_display`, and `slot_counts` per URL alongside core fields, backs the `search_more` pagination subcommand. | `src/search/search_web.py`, `src/search/cache.py`, `src/search/{book_whitelist,pdf_filter,docs_filter}.py`, `decisions/search07_ranking_format.md` |
 | **Preview** | httpx + lxml fetch of og:description / meta:description for top-20 results, async parallel (concurrency=8, timeout=3.6s via httpx + asyncio.wait_for), returns `(results, stats)` tuple — stats fed into query log | `src/search/preview.py`, see `decisions/search06_preview.md` |
 | **Query Log** | Append-only JSONL log written after every `search_web_workflow` call — per-engine `{rate_wait_ms, search_ms, status, result_count, drop_reason}` + preview stats + total_wall_ms + bottleneck_engine. Gitignored. | `src/search/query_logger.py` → `src/logs/query_log.jsonl`; inspect via `dev/search_pipeline/inspect_query_log.py` |
-| **Parked** | Brave (PoW CAPTCHA incompatible with parallel architecture); Bing (dropped — DDG uses Bing index, no added value) | See `decisions/stealth00_engine_status.md` |
+| **Parked** | Brave (PoW CAPTCHA incompatible with parallel architecture); Bing (dropped — DDG uses Bing index, no added value) | See `decisions/stealth.md` |
 
 ### Scrape Pipeline (Crawl4AI)
 
@@ -74,15 +74,17 @@ searxng/
 │   ├── search02_routing.md
 │   ├── search03_ranking.md
 │   ├── search04_weights.md
+│   ├── search05_engine_expansion.md
+│   ├── search06_preview.md
+│   ├── search07_ranking_format.md
 │   ├── scrape01_browser.md
 │   ├── scrape02_filtering.md
 │   ├── scrape03_garbage.md
+│   ├── scrape04_cloudflare_fastpath.md
 │   ├── explore01_discovery.md
-│   ├── agent01_search.md
-│   ├── agent02_routing.md
-│   ├── agent03_coverage.md
-│   ├── search06_preview.md
-│   └── search07_ranking_format.md
+│   ├── plugin_routing.md
+│   ├── stealth.md
+│   └── OldThemes/                  → deferred/historical entries
 ├── src/                            → [DOCS.md](src/DOCS.md)
 │   ├── routing.py                  → Plugin domain routing
 │   ├── search/                     → [DOCS.md](src/search/DOCS.md) — search engines (10 active: 6 browser + 4 API)
