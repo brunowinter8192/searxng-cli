@@ -13,41 +13,60 @@ In production, Google Scholar returns 0 results on every query when fired as par
 
 ## Root Cause
 
-Google Scholar's anti-bot system issues a reCAPTCHA Enterprise challenge (`www.google.com/sorry/index`) when it detects a **Chrome browser tab** originating from a process that already has 8+ other browser tabs loading simultaneously. The trigger is concurrent Chrome tab count, not IP-level HTTP request rate. HTTP-based Scholar requests (httpx, no tab opened) fire alongside the same 8 concurrent browser engines with 0% block rate.
+Two independent anti-bot triggers can cause Scholar EMPTY_BLOCK. They are stacked in production; both must be eliminated for Scholar to function reliably.
 
-Evidence ruling out alternative hypotheses:
+**(a) Concurrent Chrome tab burst — Scholar's own tab.** Scholar's pydoll browser tab opens inside a Chrome instance that is simultaneously rendering tabs for other concurrent browser engines (DDG, Mojeek, Lobsters, Semantic Scholar, and optionally Google). Google's infrastructure detects the concurrent-tab origin on `scholar.google.com` and issues a reCAPTCHA Enterprise challenge before serving the search page. HTTP Scholar opens no browser tab and therefore does not emit this signal — HTTP Scholar fires alongside 4 concurrent browser-engine tabs (DDG, Mojeek, Lobsters, Semantic Scholar) with 0% block rate (12/12 OK, row 4 of Evidence Table). **HTTP migration eliminates trigger (a).**
+
+**(b) Google-domain co-fire — Google browser + Scholar HTTP from same IP.** When `google.com` (browser) and `scholar.google.com` (HTTP) are accessed concurrently from the same IP, Google's infrastructure issues a block even though Scholar makes no browser request of its own. Evidence: Phase B Full Smoke (discarded branch) ran HTTP Scholar with 10 engines including Google browser → 2/2 EMPTY_BLOCK. Same HTTP Scholar without Google (row 4) → 0/12 block. The causal delta is Google's browser tab running concurrently with the Scholar HTTP request. **HTTP migration does NOT eliminate trigger (b).** Eliminating trigger (b) requires Google-decoupling: Scholar must not fire in the same `asyncio.gather` call as Google browser engine (bead `searxng-f3i`).
+
+Evidence ruling out other hypotheses:
 
 - **Not fingerprint:** bot.sannysoft.com probe (commit `c2b2d73`, `dev/search_pipeline/01_reports/pydoll_stealth_phase_a_20260508.md`) showed all 57 detection checks passing. Fingerprint is identical between isolated (0% block) and concurrent (100% block) browser Scholar. Cannot explain the difference.
-- **Not Google-domain co-fire:** no-Google browser-Scholar smoke (this session, 9 engines, `google` absent) produced 12/12 EMPTY_BLOCK. Removing Google from the engine set does not prevent the block.
-- **Not IP-level HTTP request rate:** HTTP Scholar smoke (this session) fired alongside 8 concurrent browser engines with 0% block rate (12/12 OK). Scholar's requests reached Google's servers without challenge when no Chrome tab was opened.
-- **Not behavioral scoring:** browser Scholar receives `/sorry/` during `go_to()` at 1.7–2.0s, before any Scholar page content loads or user interaction is simulated.
+- **Not behavioral scoring:** browser Scholar receives `/sorry/` during `go_to()` at 1.7–2.0s, before any Scholar page content loads or user interaction is simulated. Timing rules out any analysis of page-interaction behavior.
+- **Google-domain co-fire is architecture-dependent:** for browser Scholar, Google's presence is not the primary trigger — no-Google browser smoke (12/12 EMPTY_BLOCK, row 3) shows trigger (a) is sufficient to cause block without Google present. For HTTP Scholar, Google's presence is the remaining trigger — HTTP Scholar without Google = 0/12 block (row 4); HTTP Scholar with Google = 2/2 block (row 5).
 
-**Mechanistic path:** `asyncio.gather` fires 9–10 engine coroutines simultaneously. Browser engines (DDG, Mojeek, Lobsters, Semantic Scholar, Google, Scholar) each open a pydoll Chrome tab. Scholar's tab opens in an instance already rendering 5–8 other Chrome tabs. Google's infrastructure detects concurrent Chrome-tab origin on `scholar.google.com` and redirects to `/sorry/` before serving the search page. HTTP Scholar sends an `httpx.AsyncClient` GET — no Chrome tab is opened, no concurrent-tab signal is emitted — and receives results normally.
+**Mechanistic path (browser Scholar):** `asyncio.gather` fires 9–10 coroutines. Browser engines each open a pydoll tab. Scholar's tab opens in a Chrome instance already rendering other tabs. Google detects concurrent-tab origin on `scholar.google.com` → `/sorry/` redirect before page load. **Mechanistic path (HTTP Scholar + Google browser):** `asyncio.gather` fires HTTP Scholar (`httpx.AsyncClient` GET, no tab) concurrently with Google browser tab loading `google.com`. Google's IP-level scoring detects simultaneous access to both `google.com` and `scholar.google.com` from the same IP → `/sorry/` on Scholar HTTP response.
 
 ---
 
 ## Evidence Table
 
-| Test | Configuration | Scholar BLOCK | Effective attempts | Avg search_ms | Reference |
-|---|---|---|---|---|---|
-| Production baseline | 10 engines concurrent incl. `google` browser, browser Scholar | **100% (3/3)** | 3 (rest RATE_SKIP cascade) | 1910 | ciw_concurrent_block report on discarded ciw-investigate branch, commit `9feaab6` |
-| HTTP isolation (Phase B, discarded) | Scholar HTTP + CrossRef + OpenAlex — 3 engines, no `google`, no other browser engines | **0% (0/4)** | 4 (5 results each) | ~1800 | Phase B branch discarded; concurrent Chrome tab count = 2, below threshold |
-| no-Google browser smoke (this session, pre-redirect) | 9 engines, no `google`, browser Scholar in asyncio.gather | **100% (12/12)** | 12 (no RATE_SKIP cascade — search_web CLI calls spaced >15s, token replenishes) | 1850 | main `src/logs/query_log.jsonl` lines 55–66 |
-| **no-Google HTTP probe smoke (this session)** | 9 engines, no `google`, HTTP Scholar (httpx, no tab) in asyncio.gather | **0% (0/12)** | 12 | 724 | `dev/search_pipeline/01_reports/no_google_burst_20260508_220631.jsonl` |
+| Test | Engines | Scholar arch | Google? | Scholar BLOCK | Effective N | Avg search_ms | Reference |
+|---|---|---|---|---|---|---|---|
+| Production baseline | 10 | BROWSER | Yes | **100% (3/3)** | 3 (rest RATE_SKIP cascade) | 1910 | ciw_concurrent_block report, discarded branch commit `9feaab6` |
+| HTTP isolation (Phase B, discarded) | 3 | HTTP | No | **0% (0/4)** | 4 | ~1800 | Phase B branch discarded; 0 other browser tabs |
+| no-Google browser smoke (this session, pre-redirect) | 9 | BROWSER | No | **100% (12/12)** | 12 | 1850 | main `src/logs/query_log.jsonl` lines 55–66 |
+| **no-Google HTTP probe smoke (this session)** | 9 | HTTP | No | **0% (0/12)** | 12 | 724 | `dev/search_pipeline/01_reports/no_google_burst_20260508_220631.jsonl` |
+| Phase B Full Smoke (HTTP+Google, discarded) | 10 | HTTP | Yes | **100% (2/2)** | 2 | ~1900 | Phase B branch discarded; N=2, inline-summarized |
 
-**Read across rows 3 and 4:** same 9-engine set, same asyncio.gather fanout, same queries, same IP, same session day. Only variable: browser tab (row 3 = 100% block) vs HTTP request (row 4 = 0% block). Architecture is the causal variable.
+**Architecture × Google presence — 2×2 matrix:**
+
+| | Google absent | Google present |
+|---|---|---|
+| **HTTP Scholar** | **0%** (rows 2, 4 — triggers a+b both absent) | **100%** (row 5 — trigger b active) |
+| **Browser Scholar** | **100%** (row 3 — trigger a sufficient) | **100%** (row 1 — triggers a+b both active) |
+
+Reading: HTTP migration eliminates trigger (a) only. Google-decoupling eliminates trigger (b). Production-functional Scholar requires both.
 
 ---
 
 ## IST Policy (post-2026-05-08)
 
-**Architecture matters. HTTP Scholar survives the concurrent multi-engine burst; browser Scholar does not.** The path forward is HTTP migration of scholar.py from pydoll-browser to httpx+lxml, using the probe pattern in `dev/search_pipeline/scholar_http_probe.py`.
+**Two sequential steps are required. Neither alone restores Scholar in production default queries.**
 
-Current codebase status: `src/search/engines/scholar.py` is still browser-based (pydoll). The HTTP migration is NOT live in production — it is validated in `dev/` and ready for src/ promotion. Until promotion, Scholar is effectively non-functional in all production query paths (`search_web`, `search_batch`, `--academic`, `--pdf`).
+**Step 1 — HTTP migration (eliminates trigger a):** Promote `dev/search_pipeline/scholar_http_probe.py` pattern to `src/search/engines/scholar.py`. Replaces pydoll browser tab with `httpx.AsyncClient` GET. Validated: 0/12 block in no-Google concurrent burst (row 4). Bead: `searxng-ciw` (existing).
 
-**HTTP probe performance note:** HTTP Scholar (row 4) averages 724ms search_ms vs browser Scholar isolation baseline ~1900ms. HTTP is also 2.5× faster. The migration removes a Chrome tab from the concurrent burst AND improves latency.
+**Step 2 — Google-decoupling (eliminates trigger b):** Prevent Scholar from firing in the same `asyncio.gather` call as the Google browser engine. Required because all default production engine sets (`--academic`, `--pdf`, `--books`, `--docs`, and the bare default) include `google`. HTTP migration alone leaves Scholar blocked in every production default query path. Bead: `searxng-f3i` (Scholar-Google decoupling). Implementation options documented in Open Items below.
 
-**Cascade note on row 3:** `search_web` CLI calls are separate processes with Chrome-warm + 9-engine gather + preview overhead totalling ≥15s per call. Scholar's rate limiter replenishes at 4 req/min (one token per 15s). Each CLI call therefore gets a fresh token → no RATE_SKIP cascade → all 12 queries are effective. The original production smoke (`search_batch`) fires queries back-to-back within one process; queries ≤15s apart trigger cascade, giving only 3 effective burst-openers. This difference changes the denominator, not the block-rate finding.
+**Step 1 without Step 2:** Scholar fires concurrently with Google browser → trigger (b) active → EMPTY_BLOCK. Scholar remains non-functional in all default production paths.
+
+**Step 2 without Step 1:** Browser Scholar decoupled from Google → trigger (b) eliminated, trigger (a) still active (Scholar's own browser tab in concurrent burst) → EMPTY_BLOCK persists. Still non-functional.
+
+Current codebase status: `src/search/engines/scholar.py` is browser-based (pydoll). Neither step is implemented. Scholar is non-functional in all production query paths.
+
+**HTTP probe performance note:** HTTP Scholar (row 4) averages 724ms search_ms vs browser Scholar isolation baseline ~1900ms — 2.5× faster. Migration eliminates a Chrome tab from the concurrent burst AND improves latency.
+
+**Cascade note on row 3:** `search_web` CLI calls are separate processes; Chrome-warm + 9-engine gather + preview overhead ≥15s per call ≥ Scholar's 15s token replenishment interval → no RATE_SKIP cascade → 12 effective attempts. Original production smoke (`search_batch`) fires queries back-to-back within one process; inter-query gap ≤15s triggers cascade → only 3 effective burst-openers. Denominator differs; block-rate finding (100% vs 0%) is architecture-driven, not cascade-driven.
 
 ---
 
@@ -55,35 +74,50 @@ Current codebase status: `src/search/engines/scholar.py` is still browser-based 
 
 | Approach | Reason discarded |
 |---|---|
-| "Remove Google from engine set" policy | No-Google browser smoke (row 3) shows 12/12 EMPTY_BLOCK without `google`. The tab-burst signal fires at 8+ concurrent Chrome tabs regardless of whether `google` is in the set. Empirically falsified. |
-| Sequential Scholar after gather (option from original mitigation recommendation in ciw report) | Architecturally correct but unnecessary given HTTP migration: HTTP Scholar can run concurrently inside the same gather with 0% block. Sequencing adds latency for no gain. Revisit only if HTTP Scholar starts blocking in the future. |
-| Stagger tab opening (200–500ms inter-engine delays) | Adds global latency tunable, slows all browser engines; doesn't address the concurrent-tab signal on Google's server-side IP scoring (small delays between tab opens would likely still register as concurrent-origin). User declined. |
-| Patchright migration | Patches `Runtime.enable` CDP leak — relevant for CDP-level detection, not for concurrent-Chrome-tab IP scoring. Both Patchright and pydoll would open a Chrome tab; the tab itself is the signal. Not applicable. |
-| PoW auto-solve on `/sorry/` | Fragile, maintains BLOCK as an expected code path. Superseded by HTTP architecture which avoids the block entirely. |
+| Sequential Scholar after gather (option from original ciw mitigation recommendation) | Architecturally correct for trigger (b) but unnecessary given that HTTP migration + Google-decoupling together deliver 0% block at lower complexity. Revisit only if HTTP Scholar develops problems requiring a sequential fallback. |
+| Stagger tab opening (200–500ms inter-engine delays) | Adds global latency tunable, slows all browser engines; doesn't address IP-level concurrent scoring. User declined. |
+| Patchright migration | Patches `Runtime.enable` CDP leak — not relevant to concurrent Chrome-tab or Google-co-fire triggers. Both triggers active regardless of CDP implementation. |
+| PoW auto-solve on `/sorry/` | Fragile, maintains BLOCK as an expected code path. Superseded by HTTP architecture which avoids trigger (a) entirely. |
 | Residential proxy (paid) | Out of scope (free-fix-path constraint). |
+
+**Note on "Remove Google from engine set" policy:** NOT discarded for HTTP Scholar. For browser Scholar it was empirically falsified (row 3: browser Scholar blocks even without Google, trigger (a) sufficient). For HTTP Scholar, removing Google IS what produces 0% block (row 4 vs row 5). Google-decoupling is Step 2 of the production fix — see Open Items #1 + #2.
 
 ---
 
 ## Open Items
 
-### 1. Promote scholar_http_probe.py → src/search/engines/scholar.py
+### 1. Promote scholar_http_probe.py → src/search/engines/scholar.py (Step 1 of 2)
 
-The HTTP implementation is empirically validated. Promotion steps:
-- Replace `src/search/engines/scholar.py` content with the probe pattern from `dev/search_pipeline/scholar_http_probe.py`
-- Rename class back to `ScholarEngine`, restore `name = "google_scholar"` (ENGINES dict key)
-- Remove the probe-local `RateLimiter` constructor; production scholar uses `get_limiter(self.name)` for backoff (acquire is handled by `_engine_with_timing`)
-- Update `ENGINE_WATCHDOG_OVERRIDE` in `search_web.py` — `"google_scholar": 6.0` was added in commit `82bc88f` (already present if that commit was cherry-picked, otherwise add it)
+**Prerequisite for Step 2. Promotion alone does NOT restore Scholar in production default queries** — all default engine sets (`--academic`, `--pdf`, `--books`, `--docs`, bare default) include `google`. After Step 1, trigger (b) (Google co-fire) remains active → Scholar still blocks on every default production query. Step 2 (bead `searxng-f3i`) is required to complete the fix.
+
+Promotion steps:
+- Replace `src/search/engines/scholar.py` with probe pattern from `dev/search_pipeline/scholar_http_probe.py`
+- Rename class → `ScholarEngine`, restore `name = "google_scholar"` (ENGINES dict key)
+- Remove probe-local `RateLimiter` constructor; production scholar uses `get_limiter(self.name)` for backoff (acquire handled by `_engine_with_timing`)
+- Add `"google_scholar": 6.0` to `ENGINE_WATCHDOG_OVERRIDE` in `search_web.py` (was in commit `82bc88f`, add if not present)
 - Update `src/search/DOCS.md` scholar entry: `browser → HTTP`
 - Update `decisions/stealth00_engine_status.md` IST row for Scholar
-- Smoke verify with `dev/search_pipeline/08_scholar_smoke.py` + `dev/search_pipeline/no_google_burst_smoke.py`
+- Smoke verify with `dev/search_pipeline/08_scholar_smoke.py` (isolated Scholar) + `dev/search_pipeline/no_google_burst_smoke.py` (concurrent no-Google burst)
 
-Bead for this work: open a new bead or extend `searxng-ciw`. The `dev/` probe exists — promotion is a contained, scoped task.
+Bead: `searxng-ciw` (extend existing). Contained, scoped — `dev/` probe exists.
 
-### 2. `--pdf` mode Scholar re-evaluation
+### 2. Google-decoupling implementation (Step 2 of 2, bead searxng-f3i)
 
-`_PDF_ENGINES` in `search_web.py` includes `google_scholar` (Scholar surfaces arxiv.org/abs/ links → TIER1 transform → PDF download). After HTTP promotion, Scholar should fire in `--pdf` mode without block. Verify with `dev/search_pipeline/no_google_burst_smoke.py` adapted for a PDF-flavored query set, or check `src/logs/query_log.jsonl` post-promotion.
+Prevent Scholar from firing in the same `asyncio.gather` as the Google browser engine. Required because all production default engine sets include `google`. Implementation options:
 
-### 3. Empirical re-validation cadence
+| Option | Description | Trade-off |
+|---|---|---|
+| (a) Engine-class routing in `_query_engines_concurrent` | Classify `google_scholar` as `GOOGLE_SENSITIVE`; when `google` is in selected set, fire Scholar in a post-gather sequential step | Adds ~700ms tail latency per query where both are active; clean separation, no config |
+| (b) Mutual-exclusion in `_select_engines` | Drop Scholar from selected set when `google` is present | Scholar loses output in all default queries; simplest code change; acceptable if Scholar academic yield is low priority vs Google |
+| (c) Mode-specific engine sets | Redefine `_ACADEMIC_ENGINES` (and `_PDF_ENGINES` etc.) to exclude Scholar when Google is present, include Scholar in a `--scholar` explicit flag | Breaking change to default behavior; cleanest long-term API |
+
+Option (a) is recommended: Scholar fires sequentially after gather (same Chrome already warm), adds minimal latency, preserves Scholar output on all query modes. Bead `searxng-f3i` owns this implementation.
+
+### 3. `--pdf` mode Scholar re-evaluation
+
+`_PDF_ENGINES` in `search_web.py` includes `google_scholar` (Scholar surfaces arxiv.org/abs/ links → TIER1 transform → PDF download). `_PDF_ENGINES` also includes `google`. After Step 1 + Step 2 (HTTP promotion + Google-decoupling), Scholar in `--pdf` mode will run sequentially post-gather while Google runs concurrently. Verify with `dev/search_pipeline/no_google_burst_smoke.py` adapted for a PDF-flavored query set post-promotion.
+
+### 4. Empirical re-validation cadence
 
 HTTP Scholar's 0% block rate was measured at 12 queries in one session from a home/residential IP. Quarterly re-validation via `./venv/bin/python dev/search_pipeline/no_google_burst_smoke.py` (or subset of 4 queries). If block rate rises above 0% post-promotion, fall back to sequential-after-gather option from the discarded approaches table above.
 
