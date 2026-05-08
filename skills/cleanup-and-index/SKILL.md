@@ -328,6 +328,8 @@ This handles: server health check → start if needed → classify (skip/adopt/i
 
 ### Wait for indexing to finish — match timer duration to expected wallclock
 
+**Lock awareness**: The indexer holds a global RAG lock for its full duration (written to `~/.rag-locks/rag.lock`). Any `rag-cli` command other than `status` will fail with "rag busy" while the lock is held. **Do NOT call `rag-cli progress` while the indexer is running** — it would hit a DB query blocked by indexer DDL/write locks and hang (this was the root cause of the zombie-process bug). Use `rag-cli status` instead to check mid-run progress — it reads the lockfile directly, no DB query.
+
 Indexing takes 30–90 minutes for typical book-sized collections. The default polling pattern `sleep 60 && rag-cli progress` is the single most expensive anti-pattern in worker orchestration: each `Bash(run_in_background=true)` completion arriving while an API stream is open fires a new REQ, cancels the in-flight stream client-side, and gets billed input + cache-read. A 60-minute index with 60s polls = ~60 cascade events. **Never** set a short timer for a long-running job.
 
 Two correct patterns, depending on whether anything follows the indexer:
@@ -342,14 +344,14 @@ wait
 
 The `sleep 30` *inside* the loop is normal blocking sleep — it does NOT trigger CC tool-completion events. CC sees ONE backgrounded call, ONE completion at the very end. Zero cascade.
 
-**B) More steps follow after the indexer (e.g. sample-query verification, cleanup pass on an output dir)** — set ONE timer that approximates the expected remaining wallclock. **The timer duration must match the work, not a default like 60–120s.** For a 29-minute remaining run, set the timer to ~25 minutes. ONE completion fires, then check `rag-cli progress`. If more time needed, set another sized-to-remaining timer. Never fire 14 short timers for a single long run.
+**B) More steps follow after the indexer (e.g. sample-query verification, cleanup pass on an output dir)** — set ONE timer that approximates the expected remaining wallclock. **The timer duration must match the work, not a default like 60–120s.** For a 29-minute remaining run, set the timer to ~25 minutes. ONE completion fires, then check `rag-cli status` (lock free = done; still held = still running + shows progress). If more time needed, set another sized-to-remaining timer. Never fire 14 short timers for a single long run.
 
-If the user asks "how far?" at any moment, do ONE manual `rag-cli progress "$COLLECTION"` in foreground — that is fine. The anti-pattern is *automated repeated short polling*, not a single user-triggered status read.
+If the user asks "how far?" at any moment, do ONE manual `rag-cli status` in foreground — shows document progress from the lockfile with no DB query. The anti-pattern is *automated repeated short polling*, not a single user-triggered status read.
 
-After indexing completes, run the post-checks:
+After indexing completes (lock released, `rag-cli status` shows FREE), run the post-checks:
 
 ```bash
-rag-cli progress "$COLLECTION"          # all docs must show done == total
+rag-cli progress "$COLLECTION"          # all docs must show done == total (safe: lock is free)
 tail -30 /tmp/${COLLECTION}_index.log    # confirm "Done: N files indexed (X chunks), Y skipped, Z adopted"
 ```
 
@@ -372,7 +374,7 @@ A document is currently being indexed when its row shows `done < total`. Documen
 tail -20 /tmp/${COLLECTION}_index.log
 ```
 
-Confirm the summary line `Done: N files indexed (X chunks), Y skipped, Z adopted` — N+Y+Z must equal the total number of `.md` files found. Cross-check with `rag-cli progress` — every document should show `done == total`. NULL-embedding skips are logged at WARNING level in `src/rag/logs/indexer.log` (search for `NULL embedding skipped`); investigate via the indexer log before treating the collection as complete if any are present.
+Confirm the summary line `Done: N files indexed (X chunks), Y skipped, Z adopted` — N+Y+Z must equal the total number of `.md` files found. Cross-check with `rag-cli progress` — every document should show `done == total` (call only after lock is free). NULL-embedding skips are logged at WARNING level in `src/rag/logs/indexer.log` (search for `NULL embedding skipped`); investigate via the indexer log before treating the collection as complete if any are present.
 
 ### Verify
 
