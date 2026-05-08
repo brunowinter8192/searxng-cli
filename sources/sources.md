@@ -94,5 +94,12 @@
 | Croft/Metzler/Strohman — Search Engines: IR in Practice (2010) | Book | g82 | Indexing in progress (worker rate-skip 2026-05-08) |
 | Baeza-Yates/Ribeiro-Neto — Modern Information Retrieval (2nd Ed 2010, 195 MB) | Book | g82 | Indexing in progress (worker rate-skip 2026-05-08) |
 | Liu — Learning to Rank for Information Retrieval (2011) | Book | g82 | Indexing in progress (worker rate-skip 2026-05-08) |
+| jarrodoverson.com / jsoverson.medium.com — Bypassing CAPTCHAs with Headless Chrome (Puppeteer + 2Captcha tutorial) | Web | ciw | Referenced (community knowledge of Scholar anti-bot detection patterns) |
+| latenode.com — How Headless Browser Detection Works and How to Bypass It | Web | ciw | Referenced (enumerates navigator.webdriver / TLS fingerprint / canvas / WebGL / font / timing detection vectors) |
+| alterlab.io — Why Your Headless Browser Gets Detected (and How to Fix It) | Web | ciw | Referenced (detection signal catalogue) |
+| scrape.do — How to Scrape Google Scholar / 5 Working Methods to Bypass Cloudflare | Web | ciw | Referenced (residential proxy + undetected-chromedriver practitioner stack) |
+| harzing.com — Publish or Perish Tutorial — Google Scholar CAPTCHAs | Web | ciw | Referenced (HTTP 429 + 24h block, IP-reputation-based anti-bot evidence) |
+| scholarly Python package (PyPI + GitHub issues #131 Tor sustainability) | Repo | ciw | Referenced (open-source Scholar scraper, documents Tor exit shrinkage — Scholar specifically hostile to Tor) |
+| support.google.com — How to solve unusual traffic problem for Google Scholar (official support thread) | Web | ciw | Referenced ("If Google Scholar works on a new network, it strongly indicates your home IP is the problem" — official IP-flag confirmation) |
 
 Consult via RAG search before making assumptions. Pipeline step references match `decisions/` files.
