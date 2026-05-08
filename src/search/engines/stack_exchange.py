@@ -23,6 +23,7 @@ _KEY_WARNED = False
 # ORCHESTRATOR
 
 # Search Stack Exchange stackoverflow and return structured results
+# Empty-on-success not sub-classified — HTTP API, no DOM-drift/CAPTCHA-page patterns apply
 class StackExchangeEngine(BaseEngine):
     name = "stack_exchange"
 

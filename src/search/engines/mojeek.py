@@ -8,6 +8,7 @@ from src.search.browser import new_tab
 from src.search.engines.base import BaseEngine
 from src.search.rate_limiter import RateLimiter, get_limiter, _limiters
 from src.search.result import SearchResult
+from src.search import status as S
 
 logger = logging.getLogger(__name__)
 
@@ -41,7 +42,8 @@ _limiters["mojeek"] = RateLimiter(max_requests=4, window_seconds=60)
 class MojeekEngine(BaseEngine):
     name = "mojeek"
 
-    async def search(self, query: str, language: str = "en", max_results: int = 10) -> list[SearchResult]:
+    # Full search logic with empty-reason diagnosis; exceptions propagate to _engine_with_timing
+    async def search_with_reason(self, query: str, language: str = "en", max_results: int = 10) -> tuple[list[SearchResult], str | None]:
         logger.info("Mojeek search: %s", query)
         limiter = get_limiter(self.name)
         tab = await new_tab()
@@ -49,17 +51,24 @@ class MojeekEngine(BaseEngine):
         try:
             await tab.go_to(search_url, timeout=3.0)
             if not await _wait_for_results(tab):
-                logger.warning("No Mojeek results loaded for: %s", query)
-                return []
+                reason = await _diagnose_empty(tab)
+                logger.warning("Mojeek empty (%s) for: %s", reason, query)
+                return [], reason
             results = await _parse_results(tab, max_results)
-        except Exception as e:
-            logger.error("Mojeek search failed: %s", e)
-            limiter.backoff()
-            return []
+            limiter.reset_backoff()
+            return results, (None if results else S.EMPTY_NO_RESULTS)
         finally:
             await tab.close()
-        limiter.reset_backoff()
-        return results
+
+    # Legacy thin wrapper — delegates to search_with_reason; swallows exceptions for dev-script compat
+    async def search(self, query: str, language: str = "en", max_results: int = 10) -> list[SearchResult]:
+        try:
+            results, _ = await self.search_with_reason(query, language, max_results)
+            return results
+        except Exception as e:
+            logger.error("Mojeek search failed: %s", e)
+            get_limiter(self.name).backoff()
+            return []
 
 
 # FUNCTIONS
@@ -111,3 +120,15 @@ async def _parse_results(tab, max_results: int) -> list[SearchResult]:
             position=i + 1,
         ))
     return results
+
+
+# Diagnose why Mojeek returned empty after _wait_for_results failed; tab is still open
+# Priority: BLOCK → CONCURRENT_RACE → NO_CONTAINER (no known captcha selector for Mojeek)
+async def _diagnose_empty(tab) -> str:
+    title = _extract_value(await tab.execute_script("return document.title.toLowerCase()")) or ""
+    if any(x in title for x in ("captcha", "unusual traffic", "are you a bot", "robot", "access denied")):
+        return S.EMPTY_BLOCK
+    state = _extract_value(await tab.execute_script("return document.readyState")) or ""
+    if state != "complete":
+        return S.EMPTY_CONCURRENT_RACE
+    return S.EMPTY_NO_CONTAINER

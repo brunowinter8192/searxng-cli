@@ -117,6 +117,7 @@ def aggregate_engine_stats(records: list[dict]) -> dict[str, dict]:
             "dom_fail": dom_fail,
             "avg_ms": avg_ms,
             "avg_results": avg_res,
+            "status_counts": dict(c),  # raw per-sub-status counter for classify_health
         }
     return stats
 
@@ -125,6 +126,29 @@ def aggregate_engine_stats(records: list[dict]) -> dict[str, dict]:
 def classify_health(s: dict) -> tuple[str, str]:
     if s["total"] < MIN_SAMPLES:
         return "⚪", "INSUFFICIENT"
+    sc = s.get("status_counts", {})
+
+    # Sub-status-aware EMPTY rules (fire before coarse success_rate checks when signal is clear)
+    empty_total = s["empty"]
+    if empty_total >= MIN_SAMPLES:
+        no_container = sc.get("EMPTY_NO_CONTAINER", 0)
+        block = sc.get("EMPTY_BLOCK", 0)
+        no_results = sc.get("EMPTY_NO_RESULTS", 0)
+        if no_container / empty_total > 0.50:
+            return "🔴", "BROKEN (DOM-DRIFT)"
+        if block / empty_total > 0.30:
+            return "🟡", "DEGRADED (ANTI-BOT)"
+        if no_results / empty_total > 0.70 and s["success_rate"] >= SUCCESS_DEGRADED:
+            return "✅", "HEALTHY-EMPTY"
+
+    # TIMEOUT sub-status: PYDOLL-CANCEL-LEAK flag
+    timeout_total = s["timeout"]
+    if timeout_total >= 3:
+        noncoop = sc.get("TIMEOUT_NONCOOP", 0)
+        if noncoop / timeout_total > 0.10:
+            return "⚠️", "FLAG (PYDOLL-CANCEL-LEAK)"
+
+    # Coarse success-rate rules (unchanged)
     if s["success_rate"] < SUCCESS_BROKEN:
         return "🔴", "BROKEN"
     if s["success_rate"] < SUCCESS_DEGRADED:
