@@ -34,8 +34,8 @@ from src.search.merge import _merge_and_rank
 from src.search import status as S
 # From query_logger.py: append-only JSONL query log
 from src.search.query_logger import log_query
-# From filter_modes.py: engine restriction, modifier map, and URL filter for --books/--pdf/--docs flags
-from src.search.filter_modes import apply_filter_mode, filter_urls_by_mode
+# From filter_modes.py: engine restriction, modifier map, URL filter, and default engine set
+from src.search.filter_modes import apply_filter_mode, filter_urls_by_mode, _DEFAULT_ENGINES
 
 logger = logging.getLogger(__name__)
 
@@ -46,6 +46,7 @@ ENGINE_WATCHDOG_OVERRIDE: dict[str, float] = {
     "open_library": 6.0,        # Server-dominated 1.4-5.8s latency; 3.6s cap caused ~35% timeouts
     "semantic_scholar": 5.0,    # CSR hydration 0.5-2.5s + go_to budget post-DOM-drift fix
     "crossref": 6.0,            # API response 1-5s range; 3.6s httpx cap races watchdog deadline
+    "google_scholar": 6.0,      # HTTP latency 0.7-5s; 3.6s default would produce TIMEOUT_HTTPX
 }
 
 # Empirical per-engine ceilings (max_results_probe_20260507_024429.md)
@@ -93,8 +94,9 @@ async def search_web_workflow(
 ) -> list[TextContent] | tuple[list[TextContent], dict]:
     t_total = time.perf_counter()
     logger.info("Searching: %s (language=%s, books=%s, pdf=%s, docs=%s)", query, language, books, pdf, docs)
-    selected = _select_engines(engines)
-    selected, query_modifier_map, mode = apply_filter_mode(selected, books, pdf, docs, query_modifier_map)
+    selected, select_excluded = _select_engines(engines)
+    selected, query_modifier_map, mode, mode_excluded = apply_filter_mode(selected, books, pdf, docs, query_modifier_map)
+    all_excluded = {**select_excluded, **mode_excluded}
     effective_timeout = engine_timeout if engine_timeout is not None else ENGINE_WATCHDOG_TIMEOUT
 
     raw_results, engine_stats, engine_fanout_ms, engine_ms, engine_details = await _run_engine_fanout(
@@ -123,7 +125,7 @@ async def search_web_workflow(
     cache_write_ms = round((time.perf_counter() - t0) * 1000)
 
     total_ms = round((time.perf_counter() - t_total) * 1000)
-    _build_query_log_entry(query, language, selected, total_ms, engine_stats, preview_stats)
+    _build_query_log_entry(query, language, selected, total_ms, engine_stats, preview_stats, all_excluded)
 
     result = [TextContent(type="text", text=formatted_text)]
 
@@ -154,7 +156,7 @@ async def search_batch_workflow(
     pdf: bool = False,
     docs: bool = False,
 ) -> list[list[TextContent]]:
-    results = []
+    results: list = []
     try:
         for q in queries:
             results.append(await search_web_workflow(
@@ -179,7 +181,7 @@ def fetch_search_results(
     engines: str | None,
     pageno: int
 ) -> list:
-    selected = _select_engines(engines)
+    selected, _ = _select_engines(engines)
     results, _ = asyncio.run(_query_engines_concurrent(query, language, 10, selected))
     return [
         {
@@ -194,12 +196,14 @@ def fetch_search_results(
 
 # FUNCTIONS
 
-# Filter engine registry by comma-separated names param or return all
-def _select_engines(engines: str | None) -> dict:
+# Filter engine registry; default path excludes google_scholar (Google co-fire constraint)
+# Returns (selected, excluded) — excluded maps engine.name → reason for engines not included
+def _select_engines(engines: str | None) -> tuple[dict, dict[str, str]]:
     if not engines:
-        return ENGINES
+        selected = {k: v for k, v in ENGINES.items() if k in _DEFAULT_ENGINES}
+        return selected, {"google_scholar": "decoupled_from_google"}
     names = [e.strip().lower() for e in engines.split(",")]
-    return {k: v for k, v in ENGINES.items() if k in names}
+    return {k: v for k, v in ENGINES.items() if k in names}, {}
 
 
 # Execute engine fanout (timed or plain); return (raw_results, engine_stats, fanout_ms, engine_ms, engine_details)
@@ -359,6 +363,7 @@ def _build_query_log_entry(
     total_ms: int,
     engine_stats: dict,
     preview_stats: dict,
+    engines_excluded: dict[str, str],
 ) -> None:
     bottleneck = max(engine_stats, key=lambda k: engine_stats[k]["search_ms"]) if engine_stats else None
     ts = datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%S.%f")[:-3] + "Z"
@@ -367,6 +372,7 @@ def _build_query_log_entry(
         "query": query,
         "language": language,
         "engines_requested": [eng.name for eng in selected.values()],
+        "engines_excluded": engines_excluded,
         "total_wall_ms": total_ms,
         "bottleneck_engine": bottleneck,
         "engines": engine_stats,

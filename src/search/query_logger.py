@@ -10,7 +10,13 @@ logger = logging.getLogger(__name__)
 #   "ts": str (ISO-8601 UTC),
 #   "query": str,
 #   "language": str,
-#   "engines_requested": [str],
+#   "engines_requested": [str],          // engine.name list of engines that ran
+#   "engines_excluded": {                // engines dropped before fanout, with reason
+#     "<engine_name>": "<reason>"        // reason ∈ {"decoupled_from_google",
+#                                        //            "not_in_pdf_engine_set",
+#                                        //            "not_in_books_engine_set",
+#                                        //            "not_in_docs_engine_set"}
+#   },
 #   "total_wall_ms": int,
 #   "bottleneck_engine": str | null,
 #   "engines": {
