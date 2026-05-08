@@ -1,0 +1,210 @@
+#!/usr/bin/env python3
+"""
+No-Google concurrent burst smoke — HTTP Scholar probe vs 8 production engines.
+
+Architectural discriminator test: does HTTP Scholar survive the concurrent multi-engine
+burst pattern when Google browser is absent?
+
+Engine set (9 total, no Google):
+  scholar_http (probe), duckduckgo, mojeek, lobsters, crossref, openalex,
+  stack_exchange, semantic_scholar, open_library
+
+Queries: 12 canonical academic queries from ciw_concurrent_block_20260508.md
+(3 bursts × 4), reused for cross-test comparability.
+
+Output: JSONL per-query records → dev/search_pipeline/01_reports/no_google_burst_<ts>.jsonl
+        Summary table → stderr
+"""
+
+# INFRASTRUCTURE
+import asyncio
+import json
+import logging
+import sys
+import time
+from datetime import datetime
+from pathlib import Path
+
+import httpx
+import pydoll.exceptions as _pydoll_exc
+import websockets.exceptions as _ws_exc
+
+SCRIPT_DIR = Path(__file__).parent
+sys.path.insert(0, str(SCRIPT_DIR.parent.parent))
+
+from src.search import status as S
+from src.search.browser import close_browser
+from src.search.engines.crossref import CrossRefEngine
+from src.search.engines.duckduckgo import DuckDuckGoEngine
+from src.search.engines.lobsters import LobstersEngine
+from src.search.engines.mojeek import MojeekEngine
+from src.search.engines.open_library import OpenLibraryEngine
+from src.search.engines.openalex import OpenAlexEngine
+from src.search.engines.semantic_scholar import SemanticScholarEngine
+from src.search.engines.stack_exchange import StackExchangeEngine
+
+# Probe lives in dev/ — explicit path import
+from dev.search_pipeline.scholar_http_probe import ScholarHTTPProbe
+
+logging.basicConfig(level=logging.WARNING, format="%(levelname)s %(name)s: %(message)s")
+
+REPORT_DIR = SCRIPT_DIR / "01_reports"
+REPORT_DIR.mkdir(parents=True, exist_ok=True)
+
+# Watchdog timeouts per engine (seconds) — mirrors ENGINE_WATCHDOG_OVERRIDE in search_web.py
+WATCHDOG: dict[str, float] = {
+    "open_library": 6.0,
+    "semantic_scholar": 5.0,
+    "crossref": 6.0,
+    "scholar_http": 6.0,
+}
+DEFAULT_WATCHDOG = 3.6
+
+# 12 canonical queries — 3 bursts × 4, identical to ciw_concurrent_block_20260508.md
+QUERIES = [
+    "neural network optimization Adam SGD convergence",
+    "transformer architecture vision image classification",
+    "BERT fine-tuning downstream tasks benchmark",
+    "Tiefes Lernen Convolutional Netze Bilderkennung",
+    "quantum computing error correction surface code",
+    "reinforcement learning reward shaping sparse signal",
+    "federated learning privacy preserving gradient",
+    "Sprachmodelle GPT Trainingsdaten Skalierungsgesetze",
+    "graph neural network knowledge graph embedding",
+    "knowledge distillation teacher student model",
+    "continual learning catastrophic forgetting replay",
+    "Optimierung Gradientenverfahren neuronale Netzwerke Konvergenz",
+]
+
+
+# ORCHESTRATOR
+
+async def run_smoke() -> None:
+    ts = datetime.now().strftime("%Y%m%d_%H%M%S")
+    report_path = REPORT_DIR / f"no_google_burst_{ts}.jsonl"
+
+    engines = {
+        "scholar_http": ScholarHTTPProbe(),
+        "duckduckgo": DuckDuckGoEngine(),
+        "mojeek": MojeekEngine(),
+        "lobsters": LobstersEngine(),
+        "crossref": CrossRefEngine(),
+        "openalex": OpenAlexEngine(),
+        "stack_exchange": StackExchangeEngine(),
+        "semantic_scholar": SemanticScholarEngine(),
+        "open_library": OpenLibraryEngine(),
+    }
+
+    print(f"Smoke: 9 engines (no Google), {len(QUERIES)} queries", file=sys.stderr)
+    print(f"Report: {report_path}", file=sys.stderr)
+    print(file=sys.stderr)
+
+    records = []
+    try:
+        for qi, query in enumerate(QUERIES):
+            burst = qi // 4 + 1
+            q_in_burst = qi % 4 + 1
+            label = f"B{burst}-Q{q_in_burst}"
+            print(f"[{qi + 1:02}/{len(QUERIES)}] {label} {query}", file=sys.stderr)
+            record = await _run_burst(engines, query, label)
+            records.append(record)
+            scholar_status = record["engines"].get("scholar_http", {}).get("status", "?")
+            scholar_ms = record["engines"].get("scholar_http", {}).get("search_ms", 0)
+            scholar_n = record["engines"].get("scholar_http", {}).get("result_count", 0)
+            print(f"         scholar_http={scholar_status} ms={scholar_ms} n={scholar_n}", file=sys.stderr)
+            with open(report_path, "a") as f:
+                f.write(json.dumps(record) + "\n")
+    finally:
+        await close_browser()
+
+    _print_summary(records)
+    print(f"\nReport written: {report_path}", file=sys.stderr)
+
+
+# FUNCTIONS
+
+# Run all 9 engines concurrently for one query; return per-engine stats dict
+async def _run_burst(engines: dict, query: str, label: str) -> dict:
+    t_wall = time.perf_counter()
+    tasks = {
+        name: asyncio.create_task(
+            _run_engine(eng, query, WATCHDOG.get(name, DEFAULT_WATCHDOG))
+        )
+        for name, eng in engines.items()
+    }
+    results_map = dict(zip(tasks.keys(), await asyncio.gather(*tasks.values(), return_exceptions=True)))
+    wall_ms = round((time.perf_counter() - t_wall) * 1000)
+
+    engine_stats = {}
+    for name, result in results_map.items():
+        if isinstance(result, Exception):
+            engine_stats[name] = {"status": S.ERROR, "search_ms": 0, "result_count": 0, "error": str(result)}
+        else:
+            status, search_ms, result_count = result
+            engine_stats[name] = {"status": status, "search_ms": search_ms, "result_count": result_count}
+
+    return {
+        "label": label,
+        "query": query,
+        "wall_ms": wall_ms,
+        "engines": engine_stats,
+    }
+
+
+# Drive one engine with watchdog timeout; return (status, search_ms, result_count)
+async def _run_engine(engine, query: str, timeout: float) -> tuple[str, int, int]:
+    t0 = time.perf_counter()
+    try:
+        results, reason = await asyncio.wait_for(
+            engine.search_with_reason(query, "en", 10),
+            timeout=timeout,
+        )
+        search_ms = round((time.perf_counter() - t0) * 1000)
+        if results:
+            return S.OK, search_ms, len(results)
+        return reason or S.EMPTY, search_ms, 0
+    except asyncio.TimeoutError:
+        search_ms = round((time.perf_counter() - t0) * 1000)
+        return S.TIMEOUT_WATCHDOG, search_ms, 0
+    except httpx.TimeoutException:
+        search_ms = round((time.perf_counter() - t0) * 1000)
+        return S.TIMEOUT_HTTPX, search_ms, 0
+    except (_pydoll_exc.PydollException, _ws_exc.WebSocketException, ConnectionError):
+        search_ms = round((time.perf_counter() - t0) * 1000)
+        return S.ERROR_BROWSER, search_ms, 0
+    except httpx.HTTPError:
+        search_ms = round((time.perf_counter() - t0) * 1000)
+        return S.ERROR_HTTP, search_ms, 0
+    except Exception:
+        search_ms = round((time.perf_counter() - t0) * 1000)
+        return S.ERROR, search_ms, 0
+
+
+# Print per-query Scholar status table + aggregate to stderr
+def _print_summary(records: list[dict]) -> None:
+    print("\n=== SCHOLAR HTTP PROBE SUMMARY ===", file=sys.stderr)
+    print(f"{'#':3} {'Label':7} {'Scholar status':22} {'ms':6} {'n':4} {'query':45}", file=sys.stderr)
+    print("-" * 95, file=sys.stderr)
+    scholar_statuses = []
+    for i, rec in enumerate(records):
+        s = rec["engines"].get("scholar_http", {})
+        status = s.get("status", "?")
+        ms = s.get("search_ms", 0)
+        n = s.get("result_count", 0)
+        scholar_statuses.append(status)
+        print(f"{i + 1:3} {rec['label']:7} {status:22} {ms:6} {n:4} {rec['query'][:45]}", file=sys.stderr)
+
+    from collections import Counter
+    counts = Counter(scholar_statuses)
+    effective = [s for s in scholar_statuses if s != S.RATE_SKIP]
+    blocks = [s for s in effective if s == S.EMPTY_BLOCK]
+
+    print(file=sys.stderr)
+    print("Scholar status distribution:", dict(counts), file=sys.stderr)
+    print(f"Effective attempts (non-RATE_SKIP): {len(effective)}/{len(scholar_statuses)}", file=sys.stderr)
+    block_rate = f"{len(blocks) / len(effective) * 100:.0f}%" if effective else "N/A"
+    print(f"EMPTY_BLOCK: {len(blocks)}/{len(effective)} effective → block rate {block_rate}", file=sys.stderr)
+
+
+if __name__ == "__main__":
+    asyncio.run(run_smoke())
