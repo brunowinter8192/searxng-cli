@@ -18,6 +18,7 @@ _limiters["open_library"] = RateLimiter(max_requests=4, window_seconds=60)
 # ORCHESTRATOR
 
 # Search Open Library catalog and return structured book results
+# Empty-on-success not sub-classified — HTTP API, no DOM-drift/CAPTCHA-page patterns apply
 class OpenLibraryEngine(BaseEngine):
     name = "open_library"
 

@@ -20,6 +20,7 @@ _limiters["openalex"] = RateLimiter(max_requests=4, window_seconds=60)
 # ORCHESTRATOR
 
 # Search OpenAlex academic graph and return structured results
+# Empty-on-success not sub-classified — HTTP API, no DOM-drift/CAPTCHA-page patterns apply
 class OpenAlexEngine(BaseEngine):
     name = "openalex"
 

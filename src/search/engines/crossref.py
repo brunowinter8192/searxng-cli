@@ -21,6 +21,7 @@ _limiters["crossref"] = RateLimiter(max_requests=4, window_seconds=60)
 # ORCHESTRATOR
 
 # Search CrossRef and return ranked results
+# Empty-on-success not sub-classified — HTTP API, no DOM-drift/CAPTCHA-page patterns apply
 class CrossRefEngine(BaseEngine):
     name = "crossref"
 
