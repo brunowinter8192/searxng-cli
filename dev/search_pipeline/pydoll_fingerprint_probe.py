@@ -1,0 +1,200 @@
+"""
+Probe: measures pydoll/Chrome fingerprint against bot detection pages.
+
+Tests our current browser.py setup against bot.sannysoft.com — a page that
+runs JS checks and renders a table of PASS/FAIL results per fingerprint vector.
+
+Usage (from project root):
+    ./venv/bin/python dev/search_pipeline/pydoll_fingerprint_probe.py
+
+Output:
+    /tmp/pydoll_probe_sannysoft.png   — screenshot of full page
+    Prints JSON summary of pass/fail per check to stdout
+"""
+
+# INFRASTRUCTURE
+import asyncio
+import json
+import sys
+from pathlib import Path
+
+# Add project root to path so we can import src/
+sys.path.insert(0, str(Path(__file__).parent.parent.parent))
+from src.search.browser import new_tab, close_browser
+
+SANNYSOFT_URL = "https://bot.sannysoft.com/"
+SCREENSHOT_PATH = "/tmp/pydoll_probe_sannysoft.png"
+
+# JS that extracts the test table from bot.sannysoft.com
+# The page renders rows with class "passed" or "failed" in a <table>
+EXTRACT_RESULTS_JS = """
+(() => {
+    const rows = document.querySelectorAll('table tr');
+    const results = [];
+    rows.forEach(row => {
+        const cells = row.querySelectorAll('td');
+        if (cells.length >= 2) {
+            const label = cells[0].innerText.trim();
+            const value = cells[1].innerText.trim();
+            const passed = row.classList.contains('passed');
+            const failed = row.classList.contains('failed');
+            if (label) {
+                results.push({
+                    label,
+                    value,
+                    status: passed ? 'PASS' : (failed ? 'FAIL' : 'UNKNOWN')
+                });
+            }
+        }
+    });
+    return JSON.stringify(results);
+})()
+"""
+
+# JS to read specific high-signal navigator properties directly
+READ_NAVIGATOR_JS = """
+(() => {
+    const props = {
+        webdriver: navigator.webdriver,
+        plugins_length: navigator.plugins.length,
+        languages: JSON.stringify(navigator.languages),
+        hardwareConcurrency: navigator.hardwareConcurrency,
+        deviceMemory: navigator.deviceMemory,
+        vendor: navigator.vendor,
+        userAgent: navigator.userAgent,
+        platform: navigator.platform,
+    };
+    // WebGL renderer
+    try {
+        const canvas = document.createElement('canvas');
+        const gl = canvas.getContext('webgl') || canvas.getContext('experimental-webgl');
+        if (gl) {
+            const dbgInfo = gl.getExtension('WEBGL_debug_renderer_info');
+            if (dbgInfo) {
+                props.webgl_vendor = gl.getParameter(dbgInfo.UNMASKED_VENDOR_WEBGL);
+                props.webgl_renderer = gl.getParameter(dbgInfo.UNMASKED_RENDERER_WEBGL);
+            }
+        }
+    } catch(e) {
+        props.webgl_error = String(e);
+    }
+    // Permissions API: notifications should be 'default' for real user
+    return JSON.stringify(props);
+})()
+"""
+
+# JS to check permissions API for notifications
+CHECK_PERMISSIONS_JS = """
+(async () => {
+    try {
+        const result = await navigator.permissions.query({ name: 'notifications' });
+        return result.state;
+    } catch(e) {
+        return 'error: ' + String(e);
+    }
+})()
+"""
+
+# FUNCTIONS
+
+def _extract_value(result):
+    """Extract primitive value from CDP execute_script result dict."""
+    try:
+        return result["result"]["result"]["value"]
+    except (KeyError, TypeError):
+        return None
+
+
+# ORCHESTRATOR
+
+async def run_probe():
+    print(f"[probe] Starting Chrome via browser.py with existing options...")
+    tab = await new_tab()
+    try:
+        print(f"[probe] Navigating to {SANNYSOFT_URL} ...")
+        await tab.go_to(SANNYSOFT_URL)
+
+        # Wait for JS checks to complete
+        print("[probe] Waiting 4s for JS detection checks to settle...")
+        await asyncio.sleep(4)
+
+        # Screenshot
+        print(f"[probe] Taking screenshot → {SCREENSHOT_PATH}")
+        await tab.take_screenshot(SCREENSHOT_PATH)
+        print(f"[probe] Screenshot saved.")
+
+        # Extract sannysoft results table
+        print("[probe] Extracting sannysoft result table...")
+        raw_table = await tab.execute_script(EXTRACT_RESULTS_JS)
+        table_json = _extract_value(raw_table)
+        table_results = json.loads(table_json) if table_json else []
+
+        # Direct navigator reads
+        print("[probe] Reading navigator properties...")
+        raw_nav = await tab.execute_script(READ_NAVIGATOR_JS)
+        nav_json = _extract_value(raw_nav)
+        nav_props = json.loads(nav_json) if nav_json else {}
+
+        # Permissions check (async JS)
+        print("[probe] Checking permissions API...")
+        raw_perm = await tab.execute_script(CHECK_PERMISSIONS_JS, await_promise=True)
+        perm_state = _extract_value(raw_perm) or "error"
+
+        # Report
+        print("\n" + "="*60)
+        print("SANNYSOFT BOT CHECK — RESULTS TABLE")
+        print("="*60)
+        passed = [r for r in table_results if r['status'] == 'PASS']
+        failed = [r for r in table_results if r['status'] == 'FAIL']
+        unknown = [r for r in table_results if r['status'] == 'UNKNOWN']
+        print(f"  PASS: {len(passed)} | FAIL: {len(failed)} | UNKNOWN: {len(unknown)}\n")
+        for r in table_results:
+            marker = "✅" if r['status'] == 'PASS' else ("❌" if r['status'] == 'FAIL' else "❓")
+            print(f"  {marker} {r['label']}: {r['value']}")
+
+        print("\n" + "="*60)
+        print("DIRECT NAVIGATOR / WEBGL READS")
+        print("="*60)
+        for k, v in nav_props.items():
+            print(f"  {k}: {v}")
+        print(f"  permissions.notifications: {perm_state}")
+
+        print("\n" + "="*60)
+        print("KEY SIGNALS (SUMMARY)")
+        print("="*60)
+        webdriver_val = nav_props.get('webdriver')
+        print(f"  navigator.webdriver   = {webdriver_val!r}  {'✅ undefined/false' if not webdriver_val else '❌ TRUE — bot flagged'}")
+        print(f"  navigator.plugins     = {nav_props.get('plugins_length')} entries  {'✅' if nav_props.get('plugins_length', 0) > 0 else '❌ 0 — headless tell'}")
+        wgl = nav_props.get('webgl_renderer', '')
+        swiftshader = 'SwiftShader' in str(wgl) or 'llvmpipe' in str(wgl).lower()
+        print(f"  webgl_renderer        = {wgl!r}  {'❌ SwiftShader — headless GPU' if swiftshader else '✅'}")
+        perm_ok = 'default' in str(perm_state)
+        print(f"  notifications perm    = {perm_state!r}  {'✅' if perm_ok else '❌ not default — headless tell'}")
+        print(f"  navigator.languages   = {nav_props.get('languages')}")
+        fail_labels = [r['label'] for r in failed]
+        print(f"\n  FAILED CHECKS: {fail_labels}")
+        print(f"  Screenshot: {SCREENSHOT_PATH}")
+
+        # Compact JSON summary for report
+        summary = {
+            "passed_count": len(passed),
+            "failed_count": len(failed),
+            "unknown_count": len(unknown),
+            "table_results": table_results,
+            "navigator": nav_props,
+            "permissions_notifications": perm_state,
+        }
+        print("\nJSON_SUMMARY_START")
+        print(json.dumps(summary, indent=2))
+        print("JSON_SUMMARY_END")
+
+    finally:
+        await close_browser()
+
+# FUNCTIONS
+
+def main():
+    asyncio.run(run_probe())
+
+if __name__ == "__main__":
+    main()
