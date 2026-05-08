@@ -42,6 +42,7 @@ RATE_WAIT_TIMEOUT: float = 5.0
 ENGINE_WATCHDOG_OVERRIDE: dict[str, float] = {
     "open_library": 6.0,        # Server-dominated 1.4-5.8s latency; 3.6s cap caused ~35% timeouts
     "semantic_scholar": 5.0,    # CSR hydration 0.5-2.5s + go_to budget post-DOM-drift fix
+    "crossref": 6.0,            # API response 1-5s range; 3.6s httpx cap races watchdog deadline
 }
 
 # Empirical per-engine ceilings (max_results_probe_20260507_024429.md)
