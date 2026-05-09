@@ -112,7 +112,7 @@
 Aktive Engines (Stand 2026-05-01):
 - **Google** — pydoll Chrome, ~4 req/min empirisches Detection-Limit, 28/30 OK in burst smoke
 - **Bing** — pydoll Chrome, broken seit Block-A-Smoke (Selektor `#b_results .b_algo` liefert 0 Ergebnisse, vermutlich DOM-Drift)
-- **Google Scholar** — pydoll Chrome, Status unverifiziert
+- **Google Scholar** — pydoll Chrome, Status unverifiziert *(updated 2026-05-09: HTTP-Migration via bead f3i, Scholar dormant in `_DEFAULT_ENGINES` wegen Google-Co-Fire-Decoupling — siehe `OldThemes/scholar_decoupling_20260509.md`)*
 - **CrossRef** — pure HTTP via httpx, stabil
 
 User-Profil: science / GitHub / reddit / Dokumentation / general hard-info — wenig news, wenig boulevard. GitHub und reddit über separate Plugins gelöst, vergleichbare Engines fehlen für (a) general-purpose Suche mit technischem Bias und (b) HackerNews / StackExchange als Discussion- / Q&A-Plattformen.

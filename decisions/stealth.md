@@ -88,6 +88,8 @@ Dieser Run ist die aktuelle Referenz-Baseline. Details → `dev/search_pipeline/
 
 **Aktueller Stand (2026-05-04):** 8 aktive Engines im 4 req/min uniform Rate-Limit-Pool — Google, DuckDuckGo, Mojeek, Lobsters (Browser via pydoll); Google Scholar (Browser, JS-Fix 2026-05-04); CrossRef, OpenAlex, Stack Exchange (HTTP-API). Bing in `src/search/engines/bing.py` aber broken (DOM-drift, nicht aktiv im Smoke). HN dropped 2026-05-04 (rate-limit-cascade-hostile). Siehe [search05_engine_expansion.md](search05_engine_expansion.md) für Engine-Expansion-Historie.
 
+**Update 2026-05-09:** Google Scholar Browser → HTTP migration (bead `searxng-f3i`). Scholar aus `_DEFAULT_ENGINES` ausgeschlossen wegen Google-Co-Fire-Decoupling — dormant in default queries bis Pooling-Rework. Plus Semantic Scholar (browser, added 2026-05-07) und Open Library (HTTP, 2026-05-08). Aktueller Default-Set: 9 Engines (Google, DDG, Mojeek, Lobsters, SemScholar via Browser; CrossRef, OpenAlex, StackExchange, Open Library via HTTP). Siehe `decisions/OldThemes/scholar_decoupling_20260509.md`.
+
 ### Brave — Drop-Entscheidung & Rationale
 
 **Entscheidung: Brave wird gedroppt.**
