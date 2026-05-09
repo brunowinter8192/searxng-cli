@@ -147,35 +147,44 @@ Pool size: 481 raw → 447 unique URLs.
 
 Worker `pooling-probe` killed at user direction. Branch + worktree removed. GPU services (embedding/SPLADE/reranker on ports 49445/49302/49425) stopped.
 
-### Phase 7 — Pool-Based Cheap Scoring (planned next)
+### Phase 7 — BM25 Sweep + Variants (executed 2026-05-09)
 
-User design intent: pool-as-flat-Documents (no engine groups, no class hierarchy), pick top-20 via cheap query-document scoring. With embedding ruled out, the remaining theory-aligned candidate is **BM25 over title+snippet** — Croft chapter 7, local CPU, ~ms latency, theory-backed (decades of TREC validation).
+Five BM25-family probes run: parameter sweep (16+4 configs), 5-config side-by-side compare, IDF + engine-weighting variants, per-engine top-K cap. Best BM25 config 34/40 quality vs Hard-Slot 34/40 — no BM25 variant decisively beat the production baseline. `k1` had zero effect on short docs, `b` dominant axis with peak at 0.75, IDF didn't help on small-pool short-doc data, engine-inverse-weighting bipolar (helped Q2/Q3 by surfacing multi-engine consensus, over-rewarded sparse engines on Q4 — stack_exchange with 2 URLs got weight 0.5 → SO question floated to #1), per-engine top-K cap shrinks pool 5-7× without changing top-K quality (cap removes depth-tail noise but not engine-top-K noise like semscholar's PV-cell-defect false friend).
 
-Trade-off vs embedding: weaker on synonym/paraphrase matching, but title+snippet is short text where embedding's lexical-vs-semantic gap is smaller. Latency: ~50 ms vs 169 000 ms.
+Detailed findings + eyeball quality table → `01_bm25_evaluation_findings.md`.
+
+### Phase 8 — URL-Filter + BM25-Retrieve + Semantic Rerank (executed 2026-05-09)
+
+Pivot to retrieve-then-rerank architecture. Pipeline: URL-pattern filter (search-results-pages like `?q=`, `/search/`) → BM25-Retrieve top-50 → semantic rerank → top-20. Two semantic methods compared: Qwen3-Embedding-0.6B bi-encoder (cosine similarity) vs Qwen3-Reranker-0.6B cross-encoder (joint pair scoring). Both are 0.6B-parameter Q8_0 GGUF on llama-server.
+
+**Cross-Encoder is the first method in this investigation to outperform Hard-Slot.** Aggregate quality 35/40 (ties Hard-Slot) AND wins on Q1 with 9/10 vs Hard-Slot's 8/10 — semantic disambiguation eliminates the PV-cell/WSD/scholar-echo false-friends that BM25 cannot filter. Embedding-Cosine bi-encoder underperforms at 26/40 — architectural limitation of separate query/doc encoding on short snippets, not parameter count (8B bi-encoder ruled out earlier on latency). Latency cost: ~1.7s per query for 50 docs (rerank only); total per-query wallclock ~5s.
+
+Detailed findings → `02_rerank_findings.md`. GitHub research note: SearXNG upstream's ranking formula is `score = num_engines × Σ(1/position_i)` — directly encodes multi-engine-overlap signal, similar to ranx CombMNZ. Independent confirmation that overlap signal matters, but our cross-encoder approach captures it via different mechanism (semantic match on jointly-encoded query+doc).
 
 ---
 
-## Approaches under evaluation
+## Approaches Evaluated
 
-| Approach | Method | LOC | Latency | Status |
+| Approach | Method | Latency | Quality | Status |
 |---|---|---|---|---|
-| Hard-Slot | class-bucket + 12/6/2 slots | 0 | ~1 ms | current production baseline |
-| RRF | Σ 1/(60+pos_i) over engines | 30 | ~1 ms | tested Phase 3 — has DOI-flooding issue (cross-API correlation) |
-| Embedding-Cosine | cos_sim(query, doc) | ~50 + GPU | ~169 s | DROPPED Phase 6 (latency + structural mismatch) |
-| Hybrid (Embedding + SPLADE + Rerank) | Dense + Sparse + Cross-Encoder | ~150 + 3-4 GPU | ~184 s | DROPPED Phase 6 (latency + structural mismatch) |
-| **BM25 over title+snippet** | local TF-IDF, Croft Kap. 7 | ~30 | ~50 ms | next probe — Phase 7 |
+| Hard-Slot 12/6/2 | class-bucket + slots | ~1 ms | 34-35/40 | current production baseline |
+| RRF | Σ 1/(60+pos_i) over engines | ~1 ms | DOI-flood on Q1 | dropped Phase 3 |
+| Embedding-Cosine (8B) | cos_sim, Qwen3-Embedding-8B | ~169 s | not quality-eval'd | DROPPED Phase 6 (latency) |
+| Hybrid (Embedding+SPLADE+Rerank, 8B) | Dense+Sparse+Cross-Encoder | ~184 s | not eval'd | DROPPED Phase 6 (latency) |
+| BM25 vanilla (k1=1.2, b=0.75) | TF + length-norm | ~50 ms | 32/40 | dropped Phase 7 |
+| BM25 + per-pool IDF | BM25Okapi default | ~50 ms | 32/40 (IDF no effect) | dropped Phase 7 |
+| BM25 + engine-inv-weighting | × Σ(1/engine_count) | ~50 ms | 34/40 (Q4 SE-overboost) | dropped Phase 7 |
+| BM25-Capped | per-engine top-K cap | ~15 ms | 33-35/40 (Q1 weak) | reference, not winner |
+| Filter+BM25-Retrieve+Embedding-Cosine (0.6B) | bi-encoder rerank | ~5 s total | 26/40 | DROPPED Phase 8 |
+| **Filter+BM25-Retrieve+Cross-Encoder (0.6B)** | cross-encoder rerank | ~5 s total | **35/40, wins Q1** | **PRIMARY CANDIDATE pending validation** |
 
 ---
 
-## Next Probe (planned)
+## Next Iteration (planned)
 
-`dev/search_pipeline/bm25_pool_smoke.py`
-- Same 4 queries as `rrf_vs_hardslot_smoke.py` and the killed `embed_hybrid_smoke.py`
-- BM25 ranking on the dedup'd flat pool (no class buckets, no engine groups, no engine-rank-fusion)
-- Compare to Hard-Slot baseline (and reference Phase 3 RRF results for context)
-- Measure: per-query latency, top-20 URLs, overlap with Hard-Slot
+20-query validation probe before committing to production migration. Cross-Encoder's Q1 win is real but n=1 on the pathology category. Larger query set spanning academic / product / technical / mixed-intent (including multiple academic-noise cases) needed. Reranker domain-dependency warning from RAG eval (`/RAG/decisions/retrieval04_reranking.md`) applies — cross-encoders help on academic text but hurt on technical docs in full-document indexing; our snippet-rerank case differs but the warning stands.
 
-If BM25 produces top-20 lists comparable to or better than Hard-Slot at <100 ms latency, that's the production answer for `_merge_and_rank` rework.
+If validation confirms: production migration design — modify `src/search/merge.py` to call the reranker via HTTP, register cross-encoder as managed service in RAG SERVERS dict (currently runs as one-off llama-server background process on port 8092 because port 8082 is occupied by Monitor_CC mitmdump session-proxy).
 
 ---
 
