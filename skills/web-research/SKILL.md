@@ -476,11 +476,11 @@ Then follow its protocol with these inputs:
 Report when done. No commit needed (output is data files, not code).
 ```
 
-Spawn:
+Spawn the worker in the **current project's** worktree, NOT the searxng plugin source. The cleanup-and-index skill is plugin-registered and works regardless of where the worker is spawned. Worker-Project-Scope rule (workers-1) trumps any spawn-path convenience:
 
 ```bash
 worker-cli spawn cleanup-<collection_lower> /tmp/spawn-<worker_name>.md \
-    /Users/brunowinter2000/Documents/ai/Meta/ClaudeCode/MCP/searxng sonnet
+    <current_project_root> sonnet
 ```
 
 #### 5. Wait for Worker, Verify
