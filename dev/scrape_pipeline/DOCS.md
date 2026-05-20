@@ -93,7 +93,7 @@ The file is gitignored — it accumulates across production MCP tool calls and i
 
 **Purpose:** URL-spanning cleanup of raw scraped markdown for RAG indexing. Reads files from `02_raw_outputs/<ts>/`, applies pattern set (pre-h1 chrome strip, skip-link strip, sphinx anchor strip, tail chrome strip, blank-line collapse) plus site-specific handlers (GitHub issue title anchor, HN top-nav strip), writes cleaned files to `cleaned_outputs/<ts>/`.
 
-**Note:** This script is the **iterative-discovery artifact** from the session that produced the `scrape-cleanup` skill — kept as reference for which patterns work on which shapes. Do NOT copy to prod. Future cleanup work follows the diagnose-first workflow defined in `skills/scrape-cleanup/SKILL.md` (5-shape classification, per-shape cleaner, isolated tests).
+**Note:** This script is the **iterative-discovery artifact** from the session that produced the scrape-cleanup skill — kept as reference for which patterns work on which shapes. Do NOT copy to prod.
 
 **Output:** `cleaned_outputs/<ts>/<slug>_<hash>.md` per URL + `_summary.md` with byte deltas.
 
@@ -218,7 +218,7 @@ URLs are processed in parallel (PARALLEL_URLS=5, Semaphore). The 5 configs per U
 ### 06_content_source.py
 
 **Purpose:** Tests Crawl4AI's `content_source` parameter across many URLs per domain. Scrapes each URL with 6 configurations in parallel (5 URLs concurrent, 6 configs per URL concurrent) and saves the raw markdown output as individual .md files for manual inspection. Max 20 URLs per domain.
-**Input:** Explore pipeline reports from `../../explore_pipeline/01_reports/*.json`
+**Input:** Explore pipeline reports (JSON) from dev/explore_pipeline/01_reports/ — created by running `dev/explore_pipeline/01_discovery.py --all`
 **Output:** `05_content_source/<domain>/<config>/<NN>_<slug>.md`
 
 Configs tested:

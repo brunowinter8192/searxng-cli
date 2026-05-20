@@ -1,8 +1,10 @@
 # Search Pipeline Step 2: Routing & Proxy
 
-## Status Quo
+> **⚠️ Superseded (2026-04-15 engine-cut):** This file documents the SearXNG-Docker Tor-routing architecture. That stack (src/searxng/, Docker Tor container, SearXNG suspension times) was removed in the engine-cut. Current architecture uses pydoll Chrome + httpx with no proxy — all engines run direct. Rate-limiting is a token-bucket in `src/search/rate_limiter.py`, not SearXNG suspension times.
 
-**Code:** `src/searxng/settings.yml` — `outgoing` + per-Engine `proxies`/`using_tor_proxy`
+## Status Quo (Historical, pre-engine-cut)
+
+**Code:** src/searxng/settings.yml (deleted 2026-04-15) — `outgoing` + per-Engine `proxies`/`using_tor_proxy`
 **Method:** Split-Routing: Default Tor, Ausnahmen direkt für Engines die Tor-Exit-Nodes blockieren
 
 ### Globaler Tor-Default
@@ -101,7 +103,7 @@ Split-Routing-Architektur: **Default Tor, Ausnahmen direkt.** Rationale:
 
 ## Quellen
 
-- `src/searxng/settings.yml` — Routing-Konfiguration
+- src/searxng/settings.yml (deleted 2026-04-15) — Routing-Konfiguration
 - `searxng/searxng` GitHub Repo (`searx/network.py`) — Proxy-Inheritance-Logik
 - SearXNG Docs (RAG Collection: searxng) — outgoing, proxy, suspended_times Parameter
 - search01_engines.md — Engine-Auswahl und Kategorie-Zuordnung
@@ -146,7 +148,7 @@ Skripte `20_tls_fingerprint.py` + `21_cipher_shuffle_verify.py` entwickelt (lega
 
 ### Mojeek Patch — .pyc Cache Lektion
 
-Mojeek-Patch (`src/searxng/patches/mojeek.py`) hatte Stale `.pyc` Cache im Docker-Container — aktualisierter Patch wurde ignoriert.
+Mojeek-Patch (src/searxng/patches/mojeek.py, deleted 2026-04-15) hatte Stale `.pyc` Cache im Docker-Container — aktualisierter Patch wurde ignoriert.
 
 **Lösung:** `docker compose build --no-cache` löscht `.pyc` Files und erzwingt Re-Kompilierung.
 
@@ -158,7 +160,7 @@ Mojeek-Patch (`src/searxng/patches/mojeek.py`) hatte Stale `.pyc` Cache im Docke
 
 Semantic Scholar von Tor auf DIREKT umgestellt (`proxies: {}` + `using_tor_proxy: false`). Session-Cookie-Tracking inkompatibel mit Tor-IP-Rotation.
 
-**Patch:** `src/searxng/patches/semantic_scholar.py` — Cookies (`s2Exp`, `tid`) werden 300s gecacht und bei nachfolgenden Requests mitgesendet.
+**Patch:** src/searxng/patches/semantic_scholar.py (deleted 2026-04-15) — Cookies (`s2Exp`, `tid`) wurden 300s gecacht und bei nachfolgenden Requests mitgesendet.
 
 **Einschränkung:** Soft-Limit ~6 Requests/Session. Nach ~6 Queries liefert Semantic Scholar 0 Ergebnisse. Kein Hard-Block — Recovery durch SearXNG-Restart oder Session-Rotation.
 

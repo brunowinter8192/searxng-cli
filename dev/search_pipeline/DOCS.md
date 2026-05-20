@@ -52,7 +52,7 @@ Production-mode smoke test suite for all 9 active search engines. Each per-engin
 
 **Date:** 2026-05-04  
 **Run:** `05_search_smoke.py --engines google duckduckgo mojeek lobsters "google scholar" crossref openalex stack_exchange --max-queries 30`  
-**Report:** `01_reports/search_smoke_20260504_023641.md`
+**Report:** deleted (see git history at 1ad627f)
 
 ### Per-Engine Results (from full-pool smoke)
 
@@ -77,7 +77,7 @@ Production-mode smoke test suite for all 9 active search engines. Each per-engin
 - **Stack:** headless Chrome via `GoogleEngine` (src/), uniform 4 req/min, no backoff on EMPTY, SOCS cookie injection per-tab, fingerprint patches, selectors `#rso h3` + `.MjjYud`
 
 #### DuckDuckGo
-- **Result (standalone):** 30/30 OK — first prod-mode standalone 2026-05-03, `01_reports/ddg_smoke_20260503_174043.md` (archived)
+- **Result (standalone):** 30/30 OK — first prod-mode standalone 2026-05-03 (report deleted, see git 1ad627f)
 - **Stack:** headless Chrome via `DuckDuckGoEngine` (src/), uniform 4 req/min, no backoff on EMPTY, GET `html.duckduckgo.com/html/`
 
 #### Mojeek
@@ -86,12 +86,12 @@ Production-mode smoke test suite for all 9 active search engines. Each per-engin
 - **Rate-limit break (stress only):** 403 at query 10 (~1.2 req/s burst). Production 4 req/min stays well within threshold.
 
 #### Google Scholar
-- **Result:** 28/30 OK standalone — `01_reports/scholar_smoke_20260504_004124.md` (archived); 29/30 in full-pool run
+- **Result:** 28/30 OK standalone (report deleted, see git 1ad627f); 29/30 in full-pool run
 - **Stack:** headless Chrome via `ScholarEngine` (src/), uniform 4 req/min (up from 3), no backoff on EMPTY
 - **JS fix (2026-05-03):** `_JS_PARSE` rewritten from IIFE-with-leading-`return` to flat JS. Root cause: pydoll `execute_script` wraps single-line `return` scripts but passes multi-line raw to `Runtime.evaluate` where top-level `return` is illegal.
 
 #### OpenAlex
-- **Result:** 26/30 OK — `01_reports/openalex_smoke_20260504_003111.md` (archived); 4 EMPTY on non-academic queries
+- **Result:** 26/30 OK (report deleted, see git 1ad627f); 4 EMPTY on non-academic queries
 - **Stack:** pure httpx, `OpenAlexEngine` (src/), rate limiter 4 req/60s, ~7 min for 30 queries
 
 #### Lobsters
@@ -100,7 +100,7 @@ Production-mode smoke test suite for all 9 active search engines. Each per-engin
 - **Notes:** Link-aggregator — smaller index; German + off-topic queries EMPTY (expected). Snippet = domain only by design.
 
 #### Stack Exchange
-- **Result:** 15/30 OK — consistent across standalone (`01_reports/se_smoke_20260504_012742.md`, archived) and full-pool run
+- **Result:** 15/30 OK — consistent across standalone (report deleted, see git 1ad627f) and full-pool run
 - **Stack:** pure httpx, `StackExchangeEngine` (src/), rate limiter 4 req/60s, site=stackoverflow, filter=withbody, anonymous quota
 - **Notes:** 15 EMPTY — German queries (6) + niche dev-tool queries. Token bucket paces to 59s wait every 4 queries.
 

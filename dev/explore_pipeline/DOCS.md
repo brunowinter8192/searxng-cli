@@ -45,7 +45,7 @@ Default test URL: docs.crawl4ai.com. Report includes results table, speedup calc
 
 ## Report Formats
 
-**01_reports:** JSON with summary (total fetched, unique URLs, duplicates, content/empty counts, total chars) and URL list with per-URL content status and character counts. Reports are consumed by `dev/scrape_pipeline/06_content_source.py`.
+**01_reports:** JSON with summary (total fetched, unique URLs, duplicates, content/empty counts, total chars) and URL list with per-URL content status and character counts. Reports are consumed by `dev/scrape_pipeline/filter_eval/06_content_source.py`.
 
 **02_reports:** Markdown with summary table, removed URLs list, and full baseline URL list with [REMOVED] markers.
 

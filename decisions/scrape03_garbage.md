@@ -109,7 +109,7 @@ PDF-URLs: Eigenes MCP Tool `download_pdf` statt Scraping-Versuch. Agent-Instruct
 
 **Recovery condition:** Stripped content must (a) differ from original and (b) pass `is_garbage_content()` returning None. If either condition fails, falls through to normal garbage discard.
 
-**Prototype source:** `dev/scrape_pipeline/09_garbage_fix_prototype.py` — constants and algorithm taken directly. Evidence in `dev/scrape_pipeline/09_reports/`.
+**Prototype source:** `dev/scrape_pipeline/garbage_eval/09_garbage_fix_prototype.py` — constants and algorithm taken directly. Evidence in `dev/scrape_pipeline/garbage_eval/09_reports/`.
 
 **`cookie_wall` threshold item:** Partially addressed — stripping recovers content from pages that mix consent prefix with real content. Pages that are pure consent walls (no heading after offset) are still discarded. Threshold calibration (>15 cookie-signals for detection) remains open.
 

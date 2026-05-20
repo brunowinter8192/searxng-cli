@@ -2,7 +2,7 @@
 
 ## Bing dropped (2026-05-04)
 
-**Engine:** `src/search/engines/bing.py` — deleted; `BingEngine` import + ENGINES entry removed from `src/search/search_web.py`
+**Engine:** src/search/engines/bing.py (deleted 2026-05-04); `BingEngine` import + ENGINES entry removed from `src/search/search_web.py`
 **Dropped by:** Bruno verdict
 
 **Reason:** No added value over DuckDuckGo. DDG's web index IS Bing — DDG queries Bing under the hood and re-ranks with its own snippet generation. Adding Bing-direct gave us only snippet-and-ranking variation on the same URL set, not actual coverage. Plus Bing's selector `#b_results .b_algo` had drifted (DOM change since the engine was wired) and required a repair effort that didn't pay back. DDG remains as the Bing-index access path; a Bing-direct re-eval can be revisited later if a clear use case emerges (own snippet quality vs. DDG, Bing News / Images sub-pipelines).
@@ -11,7 +11,7 @@
 
 ## HN dropped (2026-05-04)
 
-**Engine:** `src/search/engines/hn.py` — deleted  
+**Engine:** src/search/engines/hn.py (deleted 2026-05-04)
 **Dropped by:** Bruno verdict
 
 **Reason:** HN Algolia's backoff behavior is rate-limit-cascade-hostile in the parallel engine architecture. Any query that yields 0 results (link-stories EMPTY, German queries, non-tech topics) triggers `limiter.backoff()` because `_wait_for_results` returns False on empty content — the engine cannot distinguish "rate limited" from "no matching content". In a 4-engine parallel gather, this compounds exponentially across consecutive empty queries (attempt 0: 34s → attempt 1: 63s → attempt 2: 125s → ...), effectively stalling the entire search gather on sequences of non-HN queries. Replaced by Stack Exchange API which returns empty result list cleanly without backoff penalty.
@@ -28,7 +28,7 @@
 
 **Fields used:** `link` (URL), `title` (HTML-decoded), `body` (HTML stripped to plaintext, truncated 500 chars), `score`, `answer_count`, `tags` (fallback snippet when body absent).
 
-**Smoke baseline (2026-05-04):** `dev/search_pipeline/01_reports/se_smoke_20260504_012742.md`
+**Smoke baseline (2026-05-04):** 15/30 OK (report deleted, see git history at 1ad627f)
 - 15/30 OK — German queries (6× EMPTY expected), pydoll/crawl4ai/trafilatura/SPLADE niche queries EMPTY (no SO matches)
 - No rate-limit block — anonymous 300/day quota not exhausted; 4 req/min token bucket paces correctly (59s wait every 4 queries)
 - Live CLI harness: 26 results for "python asyncio best practices" with body snippets + preview
@@ -55,7 +55,7 @@
 
 **Snippet caveat:** Lobsters search page has no body text — only title + domain + tags + comments-count + submitter. Snippet = `a.domain` (domain-as-displayed) by design. `og:description` from preview-fetch fills the description field downstream.
 
-**Smoke baseline (2026-05-03):** `dev/search_pipeline/01_reports/lobsters_smoke_20260503_224702.md`
+**Smoke baseline (2026-05-03):** 16/30 OK at 0-delay stress (report deleted, see git history at 1ad627f)
 - 16/30 OK at 0-delay stress — 11× EMPTY (German queries + content-empty: crawl4ai, pydoll, epidemiology, climate change), 3× SUSPECT (3 results, low domain diversity)
 - No rate-limit block observed — EMPTY = Lobsters simply has no matching content for those queries
 - Nav timing: mean 488ms / max 1639ms; DOM-wait mean 477ms / max 613ms
@@ -80,7 +80,7 @@
 - In-page "×Mojeek User Survey" notification does not block result parsing
 - `page_title` pattern: `"{query} - Mojeek Search"` — used in `_derive_status` BLOCKED check
 
-**Smoke baseline (2026-05-03):** `dev/search_pipeline/01_reports/mojeek_smoke_20260503_193022.md`
+**Smoke baseline (2026-05-03):** 7/30 OK at 0-delay stress (report deleted, see git history at 1ad627f)
 - 7/30 OK at 0-delay stress — 403 block kicks in at query 10 (~9 queries in 7.5s = ~1.2 req/s burst)
 - 2× SUSPECT: valid results (10 hits) with low domain diversity (4 domains) — not a detection signal
 - Production 4 req/min limiter (1 query per 15s) stays well within burst threshold
@@ -137,15 +137,11 @@ Recherche-Pass GitHub-Search 2026-05-01 zur Frage: welche Engines erweitern den 
 
 ## Recommendation (SOLL)
 
-**HN-Algolia** als nächste Engine implementieren. Pure HTTP analog zu CrossRef, eigene Datei `src/search/engines/hn.py`. Bricht aus pydoll-Architektur aus — keine Browser-Last, keine Konkurrenz mit Google um Tabs, keine CAPTCHA-Hölle. Erstes Smoke-Script `dev/search_pipeline/03_hn_smoke.py` analog zu `01_google_smoke.py`. 30/30 Baseline-Test mit den existierenden Queries, Default-Filter `tags=story` damit nur Posts gelistet werden, Fallback-URL `news.ycombinator.com/item?id=` für hits ohne externen Link.
+**Pool stable (2026-05-08):** HN and SE were implemented (see sections above); HN was then dropped 2026-05-04 due to rate-limit-cascade hostility. SE (Stack Exchange) remains at 10-engine pool. Current pool: Google, DuckDuckGo, Mojeek, Lobsters, Semantic Scholar (pydoll); Google Scholar, CrossRef, OpenAlex, Stack Exchange, Open Library (HTTP).
 
-**Stack-Exchange-API** als zweite API-Engine direkt nach HN. Selbes httpx-Pattern. Routing-Frage: alle SE-Sites in einem Aufruf via Multi-Site oder pro Site separat. Erstmal eine generische SE-Engine die per Default stackoverflow.com + serverfault.com + unix.stackexchange.com abfragt und Treffer dedupliziert. Anonymous-Mode (300/Tag) reicht zum Anfangen, API-Key bei Volume-Bedarf nachträglich.
+**Marginalia** — deferred. Try-or-drop probe at hosted endpoint search.marginalia.nu when there is a concrete use-case gap in the current pool.
 
-**Marginalia** Re-Eval erst nach HN+SE-Stabilisierung. Try-or-drop Probe am Hosted-Endpoint. Wenn zugänglich: dritte API-Engine. Wenn nicht: gestrichen, kein Email-Klärungsprozess.
-
-**Bing** Status separat klären (broken, nicht Teil dieser Erweiterung — Selektor-Drift wahrscheinlich, nicht Rate-Limit).
-
-**Domain-Boost-Layer** über Google+Bing-Treffer: deferred. HN-Algolia und SE liefern bereits direkt Treffer aus den relevanten Plattformen — Re-Rank-Heuristik wird unnötig wenn die Engines selbst die Quellen sind.
+**Domain-Boost-Layer** — deferred. SE and HN already cover the relevant developer platforms directly; re-rank heuristic is not needed while the engines themselves source those domains.
 
 ## Offene Fragen
 

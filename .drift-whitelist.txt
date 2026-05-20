@@ -1,0 +1,67 @@
+# .drift-whitelist.txt — symbol false-positives for docs-drift-check
+# Format: one symbol per line. Lines starting with # are comments.
+# These identifiers appear in documentation prose/headers but are NOT Python
+# constants or functions — they are German/English emphasis words, acronyms,
+# template placeholders, or shell function parameter names.
+
+# Prose emphasis — German
+DIREKT
+ALLE
+NICHT
+IMPLEMENTIERT
+ANNAHME
+ODER
+ANDEREM
+MULTIPLIKATIV
+ZWEIFACH
+
+# Prose emphasis — English
+BEFORE
+FIRST
+MUST
+BOTH
+SAME
+UNLESS
+LIFTED
+FLIP
+MILD
+INDEPENDENT
+DONE
+RULED
+CRITICAL
+SOLL
+SOURCE
+SESSION
+HEAD
+
+# Acronyms and shorthand labels in prose
+WASM
+TLDR
+ALPN
+SOCKS
+SIGIR
+VOPRF
+STUN
+PMID
+CHANGELOG
+POST
+SETTINGS
+WINDOW_UPDATE
+NONCOOP
+HTTPX
+DOCS
+PLUGIN
+GITHUB
+REDDIT
+YYYYMMDD_HHMMSS
+
+# Shell function parameter names (documented in src/spawn/tmux_spawn.sh, not Python)
+PROJECT_PATH
+MODEL
+TASK_PROMPT
+EXTRA_FLAGS
+PROMPT_FILE
+WINDOW_NAME
+
+# Concept label in scrape03_garbage.md prose — actual code uses get_plugin_hint() function
+PLUGIN_HINTS
