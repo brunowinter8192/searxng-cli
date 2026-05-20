@@ -28,7 +28,7 @@ Weight rationale (initial): Google and Brave assigned weight=2 as highest-qualit
 
 ## Evidenz
 
-_Pending — run `dev/search_pipeline/10_engine_consensus.py` and paste results here._
+_Pending — consensus evaluation script was never built (planned as 10_engine_consensus.py but not implemented)._
 
 Metrics to collect per engine:
 - Consensus Rate (% of URLs found by ≥2 engines)
@@ -38,7 +38,7 @@ Metrics to collect per engine:
 
 ## Recommendation (SOLL)
 
-Pending — needs evaluation via `10_engine_consensus.py`.
+Pending — needs consensus evaluation (script not built yet).
 
 ## Offene Fragen
 
@@ -50,6 +50,6 @@ Pending — needs evaluation via `10_engine_consensus.py`.
 ## Quellen
 
 - src/searxng/settings.yml (deleted 2026-04-15) — historical weight configuration
-- `dev/search_pipeline/10_engine_consensus.py` — consensus evaluation script
+- dev/search_pipeline/10_engine_consensus.py (not built) — planned consensus evaluation script
 - `decisions/search01_engines.md` — engine selection rationale
 - `searxng/searxng` GitHub Repo (`searx/results.py`) — score formula

@@ -15,7 +15,7 @@ Problems:
 
 ## Evidenz
 
-Source: `dev/search_pipeline/01_reports/snippet_quality_20260504_183833.md` (1856 URL records, 30-query pool smoke 2026-05-04).
+Source: `dev/search_pipeline/01_reports/snippet_quality_20260505_223506.md` (1856 URL records, 30-query pool smoke 2026-05-04; earlier report deleted, see git history at 1ad627f).
 
 ### Per-source snippet quality
 
@@ -154,8 +154,8 @@ If `cited_by_count > 50`: append ` (Cited {n}×)` to snippet. Threshold 50 is a 
 
 | Source | Type | Notes |
 |--------|------|-------|
-| `dev/search_pipeline/01_reports/snippet_quality_20260504_183833.md` | Internal | Data basis: per-source bloat %, overlap matrix, side-by-side examples |
-| `dev/search_pipeline/01_reports/search_smoke_20260504_023641.md` | Internal | 30-query 8-engine pool smoke (referenced in bead) |
+| `dev/search_pipeline/01_reports/snippet_quality_20260505_223506.md` | Internal | Data basis: per-source bloat %, overlap matrix, side-by-side examples |
+| dev/search_pipeline/01_reports/search_smoke_20260504_023641.md (deleted, see git 1ad627f) | Internal | 30-query 8-engine pool smoke |
 | `dev/search_pipeline/snippet_quality_analysis.py` | Internal | Bloat detection + strip_bloat patterns |
 | Bead `searxng-a45` | Internal | Problem framing and KPI definition |
 | CrossRef REST API (`api.crossref.org/works`) | External | JSON shape verified via live probe 2026-05-04 |

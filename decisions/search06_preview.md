@@ -27,8 +27,7 @@ N. {title}
 
 ## Evidenz
 
-Smoke run `dev/search_pipeline/05_search_smoke.py --engines google duckduckgo` — 2026-05-03, 30 baseline queries.  
-Report: `dev/search_pipeline/01_reports/search_smoke_20260503_182524.md`
+Smoke run `dev/search_pipeline/05_search_smoke.py --engines google duckduckgo` — 2026-05-03, 30 baseline queries (report deleted, see git history at 1ad627f).
 
 | Metric | Value |
 |--------|-------|

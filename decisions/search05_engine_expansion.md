@@ -28,7 +28,7 @@
 
 **Fields used:** `link` (URL), `title` (HTML-decoded), `body` (HTML stripped to plaintext, truncated 500 chars), `score`, `answer_count`, `tags` (fallback snippet when body absent).
 
-**Smoke baseline (2026-05-04):** `dev/search_pipeline/01_reports/se_smoke_20260504_012742.md`
+**Smoke baseline (2026-05-04):** 15/30 OK (report deleted, see git history at 1ad627f)
 - 15/30 OK — German queries (6× EMPTY expected), pydoll/crawl4ai/trafilatura/SPLADE niche queries EMPTY (no SO matches)
 - No rate-limit block — anonymous 300/day quota not exhausted; 4 req/min token bucket paces correctly (59s wait every 4 queries)
 - Live CLI harness: 26 results for "python asyncio best practices" with body snippets + preview
@@ -55,7 +55,7 @@
 
 **Snippet caveat:** Lobsters search page has no body text — only title + domain + tags + comments-count + submitter. Snippet = `a.domain` (domain-as-displayed) by design. `og:description` from preview-fetch fills the description field downstream.
 
-**Smoke baseline (2026-05-03):** `dev/search_pipeline/01_reports/lobsters_smoke_20260503_224702.md`
+**Smoke baseline (2026-05-03):** 16/30 OK at 0-delay stress (report deleted, see git history at 1ad627f)
 - 16/30 OK at 0-delay stress — 11× EMPTY (German queries + content-empty: crawl4ai, pydoll, epidemiology, climate change), 3× SUSPECT (3 results, low domain diversity)
 - No rate-limit block observed — EMPTY = Lobsters simply has no matching content for those queries
 - Nav timing: mean 488ms / max 1639ms; DOM-wait mean 477ms / max 613ms
@@ -80,7 +80,7 @@
 - In-page "×Mojeek User Survey" notification does not block result parsing
 - `page_title` pattern: `"{query} - Mojeek Search"` — used in `_derive_status` BLOCKED check
 
-**Smoke baseline (2026-05-03):** `dev/search_pipeline/01_reports/mojeek_smoke_20260503_193022.md`
+**Smoke baseline (2026-05-03):** 7/30 OK at 0-delay stress (report deleted, see git history at 1ad627f)
 - 7/30 OK at 0-delay stress — 403 block kicks in at query 10 (~9 queries in 7.5s = ~1.2 req/s burst)
 - 2× SUSPECT: valid results (10 hits) with low domain diversity (4 domains) — not a detection signal
 - Production 4 req/min limiter (1 query per 15s) stays well within burst threshold

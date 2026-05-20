@@ -72,7 +72,7 @@ Applies to: `src/search/` (pydoll-based custom engine) + `dev/search_pipeline/` 
 |--------|-------|-------|--------|
 | Google | 30/30 ✅ | headless pydoll Chrome, SOCS cookie, 4 JS-Patches | `dev/search_pipeline/config.yml` + `01_google_smoke.py` |
 
-Dieser Run ist die aktuelle Referenz-Baseline. Details → `dev/search_pipeline/01_reports/smoke_20260421_022343.md`.
+Dieser Run ist die aktuelle Referenz-Baseline. (Report deleted, see git history at 1ad627f.)
 
 ## Dropped Engines — Final Verdict
 
@@ -114,8 +114,8 @@ Voraussetzungen für Resume:
 
 - `dev/search_pipeline/01_google_smoke.py` — Baseline-Implementation
 - `dev/search_pipeline/config.yml` — Baseline-Config
-- `dev/search_pipeline/01_reports/smoke_20260421_022343.md` — 30/30 Baseline-Run
-- `dev/search_pipeline/01_reports/smoke_20260421_182917.md` — 28/30 Re-verify Run
+- dev/search_pipeline/01_reports/smoke_20260421_022343.md (deleted, see git 1ad627f) — 30/30 Baseline-Run
+- dev/search_pipeline/01_reports/smoke_20260421_182917.md (deleted, see git 1ad627f) — 28/30 Re-verify Run
 
 ---
 
@@ -442,7 +442,7 @@ Evidenz für IP-Block (nicht Fingerprint-Detection):
 - /sorry/ startet ab Q1 in Run 4 — kein Query-spezifischer Trigger, vollständiger IP-Block
 - Runs 1–3 zeigen normale Nav-Zeiten (345–520ms mean) — Fingerprint-Patches unangetastet
 
-**Referenz:** `dev/search_pipeline/01_reports/stress_20260422_012755.md`
+**Referenz:** dev/search_pipeline/01_reports/stress_20260422_012755.md (deleted, see git 1ad627f)
 
 ### Recommendation (SOLL)
 
