@@ -1,24 +1,20 @@
 # INFRASTRUCTURE
 import json
 import logging
+import os
 from pathlib import Path
 
 logger = logging.getLogger(__name__)
 
-# Record schema (per-query JSONL line):
+# Record schema — two record_type values written per production query, one per probe query:
+#
+# record_type = "engine_run"  (written by _query_engines_concurrent — always):
 # {
+#   "record_type": "engine_run",
 #   "ts": str (ISO-8601 UTC),
 #   "query": str,
 #   "language": str,
-#   "engines_requested": [str],          // engine.name list of engines that ran
-#   "engines_excluded": {                // engines dropped before fanout, with reason
-#     "<engine_name>": "<reason>"        // reason ∈ {"decoupled_from_google",
-#                                        //            "not_in_pdf_engine_set",
-#                                        //            "not_in_books_engine_set",
-#                                        //            "not_in_docs_engine_set"}
-#   },
-#   "total_wall_ms": int,
-#   "bottleneck_engine": str | null,
+#   "engines_requested": [str],
 #   "engines": {
 #     "<engine_name>": {
 #       "rate_wait_ms": int, "search_ms": int, "result_count": int,
@@ -28,19 +24,37 @@ logger = logging.getLogger(__name__)
 #                            # ERROR | ERROR_BROWSER | ERROR_HTTP | ERROR_PARSE | ERROR_OTHER
 #       "drop_reason": str | null
 #     }
-#   },
+#   }
+# }
+#
+# record_type = "workflow_summary"  (written by search_web_workflow — production only):
+# {
+#   "record_type": "workflow_summary",
+#   "ts": str (ISO-8601 UTC),
+#   "query": str,
+#   "language": str,
+#   "engines_requested": [str],
+#   "engines_excluded": { "<engine_name>": "<reason>" },
+#   "total_wall_ms": int,
+#   "bottleneck_engine": str | null,
+#   "engines": { ... same as engine_run ... },
 #   "preview": { "urls_attempted": int, "urls_succeeded": int, "url_timeouts": int, "total_ms": int }
 # }
-LOG_PATH = Path(__file__).parent.parent.parent / "src" / "logs" / "query_log.jsonl"
+#
+# Old records (no record_type field) are workflow_summary-equivalent — backward compatible.
+# Log path: SEARXNG_QUERY_LOG_PATH env var → DEFAULT_LOG_PATH fallback.
+DEFAULT_LOG_PATH = Path(__file__).parent.parent.parent / "src" / "logs" / "query_log.jsonl"
 
 
 # FUNCTIONS
 
-# Append one JSONL record per query; fail-soft on any write error
+# Append one JSONL record; path read from SEARXNG_QUERY_LOG_PATH env var at call time; fail-soft
 def log_query(record: dict) -> None:
+    env = os.environ.get("SEARXNG_QUERY_LOG_PATH")
+    log_path = Path(env) if env else DEFAULT_LOG_PATH
     try:
-        LOG_PATH.parent.mkdir(parents=True, exist_ok=True)
-        with open(LOG_PATH, "a", encoding="utf-8") as f:
+        log_path.parent.mkdir(parents=True, exist_ok=True)
+        with open(log_path, "a", encoding="utf-8") as f:
             f.write(json.dumps(record, ensure_ascii=False) + "\n")
     except Exception as e:
         logger.warning("query_log write failed: %s", e)

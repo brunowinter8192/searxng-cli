@@ -20,6 +20,7 @@ Output: dev/search_pipeline/01_reports/rerank_probe_<ts>.md
 # INFRASTRUCTURE
 import asyncio
 import math
+import os
 import re
 import sys
 import time
@@ -132,6 +133,8 @@ async def run_probe() -> None:
 
     ts = datetime.now().strftime("%Y%m%d_%H%M%S")
     report_path = REPORT_DIR / f"rerank_probe_{ts}.md"
+    probe_log_path = REPORT_DIR / f"rerank_probe_{ts}.queries.jsonl"
+    os.environ["SEARXNG_QUERY_LOG_PATH"] = str(probe_log_path)
 
     selected, _ = _select_engines(None)
     print(f"Engines ({len(selected)}): {', '.join(sorted(selected.keys()))}", file=sys.stderr)
