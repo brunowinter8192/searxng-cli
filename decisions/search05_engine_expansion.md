@@ -2,7 +2,7 @@
 
 ## Bing dropped (2026-05-04)
 
-**Engine:** `src/search/engines/bing.py` — deleted; `BingEngine` import + ENGINES entry removed from `src/search/search_web.py`
+**Engine:** src/search/engines/bing.py (deleted 2026-05-04); `BingEngine` import + ENGINES entry removed from `src/search/search_web.py`
 **Dropped by:** Bruno verdict
 
 **Reason:** No added value over DuckDuckGo. DDG's web index IS Bing — DDG queries Bing under the hood and re-ranks with its own snippet generation. Adding Bing-direct gave us only snippet-and-ranking variation on the same URL set, not actual coverage. Plus Bing's selector `#b_results .b_algo` had drifted (DOM change since the engine was wired) and required a repair effort that didn't pay back. DDG remains as the Bing-index access path; a Bing-direct re-eval can be revisited later if a clear use case emerges (own snippet quality vs. DDG, Bing News / Images sub-pipelines).
@@ -11,7 +11,7 @@
 
 ## HN dropped (2026-05-04)
 
-**Engine:** `src/search/engines/hn.py` — deleted  
+**Engine:** src/search/engines/hn.py (deleted 2026-05-04)
 **Dropped by:** Bruno verdict
 
 **Reason:** HN Algolia's backoff behavior is rate-limit-cascade-hostile in the parallel engine architecture. Any query that yields 0 results (link-stories EMPTY, German queries, non-tech topics) triggers `limiter.backoff()` because `_wait_for_results` returns False on empty content — the engine cannot distinguish "rate limited" from "no matching content". In a 4-engine parallel gather, this compounds exponentially across consecutive empty queries (attempt 0: 34s → attempt 1: 63s → attempt 2: 125s → ...), effectively stalling the entire search gather on sequences of non-HN queries. Replaced by Stack Exchange API which returns empty result list cleanly without backoff penalty.
@@ -137,15 +137,11 @@ Recherche-Pass GitHub-Search 2026-05-01 zur Frage: welche Engines erweitern den 
 
 ## Recommendation (SOLL)
 
-**HN-Algolia** als nächste Engine implementieren. Pure HTTP analog zu CrossRef, eigene Datei `src/search/engines/hn.py`. Bricht aus pydoll-Architektur aus — keine Browser-Last, keine Konkurrenz mit Google um Tabs, keine CAPTCHA-Hölle. Erstes Smoke-Script `dev/search_pipeline/03_hn_smoke.py` analog zu `01_google_smoke.py`. 30/30 Baseline-Test mit den existierenden Queries, Default-Filter `tags=story` damit nur Posts gelistet werden, Fallback-URL `news.ycombinator.com/item?id=` für hits ohne externen Link.
+**Pool stable (2026-05-08):** HN and SE were implemented (see sections above); HN was then dropped 2026-05-04 due to rate-limit-cascade hostility. SE (Stack Exchange) remains at 10-engine pool. Current pool: Google, DuckDuckGo, Mojeek, Lobsters, Semantic Scholar (pydoll); Google Scholar, CrossRef, OpenAlex, Stack Exchange, Open Library (HTTP).
 
-**Stack-Exchange-API** als zweite API-Engine direkt nach HN. Selbes httpx-Pattern. Routing-Frage: alle SE-Sites in einem Aufruf via Multi-Site oder pro Site separat. Erstmal eine generische SE-Engine die per Default stackoverflow.com + serverfault.com + unix.stackexchange.com abfragt und Treffer dedupliziert. Anonymous-Mode (300/Tag) reicht zum Anfangen, API-Key bei Volume-Bedarf nachträglich.
+**Marginalia** — deferred. Try-or-drop probe at hosted endpoint search.marginalia.nu when there is a concrete use-case gap in the current pool.
 
-**Marginalia** Re-Eval erst nach HN+SE-Stabilisierung. Try-or-drop Probe am Hosted-Endpoint. Wenn zugänglich: dritte API-Engine. Wenn nicht: gestrichen, kein Email-Klärungsprozess.
-
-**Bing** Status separat klären (broken, nicht Teil dieser Erweiterung — Selektor-Drift wahrscheinlich, nicht Rate-Limit).
-
-**Domain-Boost-Layer** über Google+Bing-Treffer: deferred. HN-Algolia und SE liefern bereits direkt Treffer aus den relevanten Plattformen — Re-Rank-Heuristik wird unnötig wenn die Engines selbst die Quellen sind.
+**Domain-Boost-Layer** — deferred. SE and HN already cover the relevant developer platforms directly; re-rank heuristic is not needed while the engines themselves source those domains.
 
 ## Offene Fragen
 
