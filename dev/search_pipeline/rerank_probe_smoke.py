@@ -2,7 +2,8 @@
 """
 URL-Filter + BM25-Retrieve + Semantic Rerank Probe.
 
-5 configs side-by-side, top-10 each, on 4 standard queries:
+5 configs side-by-side, top-10 each, on 20 diverse queries (5 academic / 5 product /
+5 technical / 5 mixed-intent pathology):
   1. Hard-Slot baseline (12/6/2, no URL filter)
   2. Filter + BM25-only
   3. Filter + BM25-Retrieve-50 + Embedding-Cosine Rerank (Qwen3-Embedding-0.6B)
@@ -10,8 +11,8 @@ URL-Filter + BM25-Retrieve + Semantic Rerank Probe.
   5. BM25-Capped reference (K=google count, no filter, no rerank)
 
 Services required:
-  Embedding:    http://127.0.0.1:8090/v1/embeddings
-  Cross-encoder: http://127.0.0.1:8092/v1/rerank
+  Embedding:    http://127.0.0.1:8084/v1/embeddings   (preset: embedding-0.6b)
+  Cross-encoder: http://127.0.0.1:8082/v1/rerank      (preset: reranker-0.6b)
 
 Output: dev/search_pipeline/01_reports/rerank_probe_<ts>.md
 """
@@ -51,6 +52,57 @@ from src.search.search_web import _query_engines_concurrent, _select_engines
 import logging
 logging.basicConfig(level=logging.WARNING, format="%(levelname)s %(name)s: %(message)s")
 
+# Override imported 4-query set with 20-query validation set (g82 extended probe)
+QUERIES = [
+    # ACADEMIC (A1-A5) — paper-style; Scholar/CrossRef/OpenAlex contribute
+    "bert fine-tuning natural language processing",
+    "knowledge graph embedding relational learning",
+    "contrastive learning self-supervised representations",
+    "variational autoencoder latent space generative model",
+    "graph neural network node classification",
+    # PRODUCT (P1-P5) — consumer-intent; general-web engines dominate
+    "best espresso machine under 500 2026",
+    "mechanical keyboard switches comparison tactile linear",
+    "best noise cancelling headphones 2026",
+    "standing desk ergonomics home office",
+    "air fryer vs convection oven cooking",
+    # TECHNICAL (T1-T5) — how-to/implementation; Stack Exchange + Lobsters contribute
+    "python asyncio event loop concurrency",
+    "rust ownership borrowing lifetime explained",
+    "docker compose network bridge host mode",
+    "postgresql index types btree gin gist performance",
+    "react useEffect cleanup subscription pattern",
+    # MIXED-INTENT / PATHOLOGY (M1-M5) — academic-noise pathology + Lobsters misclassification
+    "transformer attention mechanism",           # original Q1 anchor
+    "neural network activation functions comparison",
+    "gradient descent optimization methods stochastic",
+    "protein structure prediction alphafold deep learning",
+    "convolutional neural network image classification tutorial",
+]
+
+QUERY_CATEGORIES: dict[str, str] = {
+    "bert fine-tuning natural language processing":              "academic",
+    "knowledge graph embedding relational learning":             "academic",
+    "contrastive learning self-supervised representations":      "academic",
+    "variational autoencoder latent space generative model":     "academic",
+    "graph neural network node classification":                  "academic",
+    "best espresso machine under 500 2026":                      "product",
+    "mechanical keyboard switches comparison tactile linear":    "product",
+    "best noise cancelling headphones 2026":                     "product",
+    "standing desk ergonomics home office":                      "product",
+    "air fryer vs convection oven cooking":                      "product",
+    "python asyncio event loop concurrency":                     "technical",
+    "rust ownership borrowing lifetime explained":               "technical",
+    "docker compose network bridge host mode":                   "technical",
+    "postgresql index types btree gin gist performance":         "technical",
+    "react useEffect cleanup subscription pattern":              "technical",
+    "transformer attention mechanism":                           "mixed_pathology",
+    "neural network activation functions comparison":            "mixed_pathology",
+    "gradient descent optimization methods stochastic":          "mixed_pathology",
+    "protein structure prediction alphafold deep learning":      "mixed_pathology",
+    "convolutional neural network image classification tutorial": "mixed_pathology",
+}
+
 REPORT_DIR = SCRIPT_DIR / "01_reports"
 REPORT_DIR.mkdir(parents=True, exist_ok=True)
 
@@ -61,8 +113,8 @@ BM25_B      = 0.75
 BM25_SW     = True
 BM25_REPR   = "title+snippet"
 
-EMBEDDING_URL = "http://127.0.0.1:8090/v1/embeddings"
-RERANKER_URL  = "http://127.0.0.1:8092/v1/rerank"
+EMBEDDING_URL = "http://127.0.0.1:8084/v1/embeddings"
+RERANKER_URL  = "http://127.0.0.1:8082/v1/rerank"
 
 # Search-results-page URL patterns (generic, query-independent)
 SEARCH_PAGE_RE = re.compile(
@@ -230,30 +282,40 @@ async def _run_one_query(query: str, selected: dict) -> tuple[str, dict]:
     bm25_ms += round((time.perf_counter() - t0) * 1000)  # add to bm25_ms
 
     cand_docs  = [d for d, _ in bm25_candidates]
-    cand_texts = [_doc_repr(d, BM25_REPR) for d in cand_docs]
+    # Filter out empty/whitespace-only texts — reranker returns 400 on empty documents
+    _raw_texts = [_doc_repr(d, BM25_REPR) for d in cand_docs]
+    _valid     = [(d, t) for d, t in zip(cand_docs, _raw_texts) if t.strip()]
+    cand_docs  = [d for d, _ in _valid]
+    cand_texts = [t for _, t in _valid]
 
     # --- Config 3: Embedding-Cosine Rerank ---
     t0 = time.perf_counter()
-    all_texts = [query] + cand_texts
-    embeddings = embed_batch(all_texts)
-    query_emb  = embeddings[0]
-    doc_embs   = embeddings[1:]
-    cosine_scores = [cosine_sim(query_emb, de) for de in doc_embs]
-    cos_ranked = sorted(range(len(cand_docs)), key=lambda i: -cosine_scores[i])
-    embed_top  = [
-        {"url": cand_docs[i]["url"], "engines": cand_docs[i]["engines"], "score": cosine_scores[i]}
-        for i in cos_ranked[:TOP_N]
-    ]
+    if cand_texts:
+        all_texts = [query] + cand_texts
+        embeddings = embed_batch(all_texts)
+        query_emb  = embeddings[0]
+        doc_embs   = embeddings[1:]
+        cosine_scores = [cosine_sim(query_emb, de) for de in doc_embs]
+        cos_ranked = sorted(range(len(cand_docs)), key=lambda i: -cosine_scores[i])
+        embed_top  = [
+            {"url": cand_docs[i]["url"], "engines": cand_docs[i]["engines"], "score": cosine_scores[i]}
+            for i in cos_ranked[:TOP_N]
+        ]
+    else:
+        embed_top = []
     embed_ms = round((time.perf_counter() - t0) * 1000)
 
     # --- Config 4: Cross-Encoder Rerank ---
     t0 = time.perf_counter()
-    ce_pairs   = cross_encoder_rerank(query, cand_texts)
-    ce_sorted  = sorted(ce_pairs, key=lambda x: -x[1])
-    ce_top     = [
-        {"url": cand_docs[idx]["url"], "engines": cand_docs[idx]["engines"], "score": score}
-        for idx, score in ce_sorted[:TOP_N]
-    ]
+    if cand_texts:
+        ce_pairs  = cross_encoder_rerank(query, cand_texts)
+        ce_sorted = sorted(ce_pairs, key=lambda x: -x[1])
+        ce_top    = [
+            {"url": cand_docs[idx]["url"], "engines": cand_docs[idx]["engines"], "score": score}
+            for idx, score in ce_sorted[:TOP_N]
+        ]
+    else:
+        ce_top = []
     rerank_ms = round((time.perf_counter() - t0) * 1000)
 
     # --- Config 5: BM25-Capped reference ---
@@ -409,6 +471,64 @@ def _build_query_section(
     return "\n".join(lines)
 
 
+# Build per-category latency + pool-stats aggregation block
+def _build_category_summary(summaries: list[dict]) -> str:
+    from collections import defaultdict
+    cats: dict[str, list[dict]] = defaultdict(list)
+    for s in summaries:
+        cat = QUERY_CATEGORIES.get(s["query"], "unknown")
+        cats[cat].append(s)
+
+    cat_order = ["academic", "product", "technical", "mixed_pathology"]
+    lines = [
+        "## Per-Category Aggregation",
+        "",
+        "### Latency (averages across queries in category)",
+        "",
+        "| Category | n | avg_fetch_ms | avg_rerank_ms | avg_embed_ms | avg_pool_unique |",
+        "|----------|---|--------------|---------------|--------------|-----------------|",
+    ]
+    for cat in cat_order:
+        grp = cats.get(cat, [])
+        if not grp:
+            continue
+        n = len(grp)
+        avg_fetch  = round(sum(s["fetch_ms"]  for s in grp) / n)
+        avg_rerank = round(sum(s["rerank_ms"] for s in grp) / n)
+        avg_embed  = round(sum(s["embed_ms"]  for s in grp) / n)
+        avg_pool   = round(sum(s["unique_after_dedup"] for s in grp) / n)
+        lines.append(f"| {cat} | {n} | {avg_fetch} | {avg_rerank} | {avg_embed} | {avg_pool} |")
+    lines.append("")
+
+    lines += [
+        "### Pathology Markers (mixed_pathology category — URL filter removals + pool size)",
+        "",
+        "| Query | removed_filter | pool_unique |",
+        "|-------|----------------|-------------|",
+    ]
+    for s in cats.get("mixed_pathology", []):
+        q_short = s["query"][:55]
+        lines.append(f"| {q_short} | {s['removed_by_filter']} | {s['unique_after_dedup']} |")
+    lines.append("")
+
+    lines += [
+        "### Quality Score Table (fill in post-run eyeball — count topical top-10 per query)",
+        "",
+        "| Category | Query | Hard-Slot | BM25-only | Embed-Cosine | Cross-Encoder | BM25-Capped |",
+        "|----------|-------|-----------|-----------|--------------|---------------|-------------|",
+    ]
+    for cat in cat_order:
+        for s in cats.get(cat, []):
+            q_short = s["query"][:45]
+            lines.append(f"| {cat} | {q_short} | | | | | |")
+    lines += [
+        "",
+        "**Total (sum):** | | | | | | |",
+        "",
+    ]
+    return "\n".join(lines)
+
+
 # Write full report: global summary + per-query sections
 def _write_report(
     sections: list[str],
@@ -441,8 +561,10 @@ def _write_report(
         )
     sum_lines.append("")
 
+    category_block = _build_category_summary(summaries)
+
     header = "\n".join(sum_lines)
-    path.write_text("\n\n---\n\n".join([header] + sections), encoding="utf-8")
+    path.write_text("\n\n---\n\n".join([header, category_block] + sections), encoding="utf-8")
 
 
 if __name__ == "__main__":
