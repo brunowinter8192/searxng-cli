@@ -2,97 +2,87 @@
 
 ## Status Quo
 
-**Code:** `src/scraper/explore_site.py`
-**Method:** Zwei-Phasen-Discovery: Sitemap-Check → BFS-Crawl mit Prefetch
+**Code:** `src/crawler/explore_site.py` (URL discovery, CLI entry point); `src/crawler/crawl_site.py` (BFS + sitemap functions called by explore_site)
+**Method:** Cascade discovery: sitemap → prefetch BFS fallback, with shallow-sitemap threshold and redirect resolution
 **Config:**
 
 ```python
-MAX_DEPTH = 10
-DEFAULT_MAX_PAGES = 50
-CRAWL_TIMEOUT = 120  # Sekunden
+DEFAULT_MAX_PAGES = 200        # in explore_site.py
+SITEMAP_MIN_THRESHOLD = 5      # in explore_site.py
 ```
 
 **Discovery-Kaskade (`explore_site_workflow`):**
-1. `check_sitemap(domain)` — Crawl4AI `AsyncUrlSeeder` mit `source="sitemap"`. Gibt alle Sitemap-URLs zurück (normalisiert: dict→string).
-2. `crawl_for_discovery(url, domain, max_pages, url_pattern)` — BFS-Crawl unabhängig von Sitemap-Ergebnis, immer ausgeführt
-3. `build_site_map()` — Merged BFS-Ergebnisse + Sitemap-URLs (dedupliziert via `seen` Set)
-4. Strategy-Empfehlung basierend auf Ergebnissen:
-   - Sitemap vorhanden → `"sitemap (N URLs)"`
-   - >1 BFS-Seite gefunden → `"prefetch"`
-   - Nur 1 BFS-Seite → `"bfs (JS-heavy, prefetch found only 1 page)"`
+1. `resolve_redirect(url)` — HEAD request to resolve redirect chains before discovery. Returns `(final_url, final_domain)`. Fixes discovery for URLs that redirect to different domains (e.g. `docs.anthropic.com` → `platform.claude.com`).
+2. `discover_urls_sitemap(domain, include_patterns)` — Crawl4AI `AsyncUrlSeeder` mit `source="sitemap"`. Filtered via `filter_sitemap_by_seed_path()` to match seed URL's path prefix.
+3. **Shallow-sitemap threshold:** If sitemap returns `< SITEMAP_MIN_THRESHOLD` (5) URLs, also run `discover_urls()` prefetch BFS and take the larger result set.
+4. **No sitemap:** Fall through to `discover_urls()` prefetch BFS only.
+5. Output: text file with one URL per line + console summary.
 
-**BFS-Konfiguration (`crawl_for_discovery`):**
+**BFS-Konfiguration (`discover_urls` in `crawl_site.py`):**
 ```python
 BFSDeepCrawlStrategy(
-    max_depth=MAX_DEPTH,      # 10
+    max_depth=depth,           # CLI arg, no named constant
     include_external=False,
     filter_chain=FilterChain([
         DomainFilter(allowed_domains=[domain]),
         ContentTypeFilter(allowed_types=["text/html"]),
-        URLPatternFilter(patterns=[url_pattern])  # optional
+        URLPatternFilter(...)  # optional include/exclude
     ]),
-    max_pages=max_pages,      # default 50
+    max_pages=max_pages,       # CLI arg, default DEFAULT_MAX_PAGES
 )
 
 CrawlerRunConfig(
     cache_mode=CacheMode.BYPASS,
     wait_until="domcontentloaded",
-    prefetch=True,             # HTML+Links, kein Content-Rendering
+    prefetch=True,
 )
 ```
-
-**Timeout:** `asyncio.wait_for(run_crawl(), timeout=120)` — bei Überschreitung wird `timed_out=True` gesetzt, Partial-Ergebnisse werden weiterverwendet.
 
 ## Evidenz
 
 ### Sitemap als Discovery-Quelle
-Sitemap-URLs sind die vollständigste Quelle für eine Site-Struktur — vom Site-Betreiber explizit gepflegt, keine Crawl-Limitierung. `AsyncUrlSeeder` mit `source="sitemap"` prüft `/sitemap.xml` und gängige Varianten automatisch. Sitemap-URLs werden als Seeds in `build_site_map` integriert: Sie erhalten `chars=0` (kein Content gecrawlt) und eine geschätzte Tiefe via URL-Pfad-Segmente.
+Sitemap-URLs sind die vollständigste Quelle für eine Site-Struktur — vom Site-Betreiber explizit gepflegt, keine Crawl-Limitierung. `AsyncUrlSeeder` mit `source="sitemap"` prüft `/sitemap.xml` und gängige Varianten automatisch.
 
-### BFS immer ausführen (parallel zu Sitemap)
-Der BFS-Crawl läuft unabhängig vom Sitemap-Ergebnis. Rationale: BFS liefert tatsächliche Link-Struktur und HTML-Größen (`chars`), die Sitemap nicht hat. Selbst bei vorhandener Sitemap ist die BFS-Tiefenverteilung für die Strategy-Empfehlung relevant.
+### Shallow-Sitemap-Schwellwert (SITEMAP_MIN_THRESHOLD = 5)
+Einige Sites liefern unvollständige Sitemaps: ReadTheDocs-Sitemaps enthalten oft nur die Versions-Root-URL, Cookiebot-Sitemaps geben nur die Homepage zurück. Schwellwert 5: Sitemap mit weniger als 5 URLs → prefetch BFS ergänzend durchführen und das größere Ergebnis verwenden.
+
+### Redirect-Auflösung vor Discovery
+HEAD-Request mit `allow_redirects=True` bevor BFS-DomainFilter gesetzt wird. Ohne Redirect-Auflösung sperrt der DomainFilter alle Links auf der Redirect-Zielseite (domain mismatch). Getestet: `docs.anthropic.com` → `platform.claude.com`, `api.search.brave.com` → `api-dashboard.search.brave.com`.
+
+### Seed-Path-Filter auf Sitemap-URLs
+`filter_sitemap_by_seed_path()` filtert Sitemap-URLs auf den Pfad-Prefix der Seed-URL. Fix: `playwright.dev/python/docs` seed → Sitemap liefert `/docs/` (JS-Docs) statt `/python/docs/` → Filter hält nur URLs die den Seed-Pfad enthalten.
 
 ### Prefetch = True
-`prefetch=True` in `CrawlerRunConfig` aktiviert den Crawl4AI-Prefetch-Modus: Seiten werden gecrawlt um Links zu extrahieren, aber kein Full-Rendering oder Content-Extraktion. Deutlich schneller als normaler Crawl, ausreichend für Discovery-Zweck (URL-Struktur, nicht Content).
+`prefetch=True` in `CrawlerRunConfig` aktiviert den Crawl4AI-Prefetch-Modus: Seiten werden gecrawlt um Links zu extrahieren, ohne Full-Rendering oder Content-Extraktion. Deutlich schneller als normaler Crawl, ausreichend für Discovery-Zweck (URL-Struktur, nicht Content).
 
 ### CacheMode.BYPASS
 Discovery soll aktuelle Site-Struktur zeigen, nicht gecachte Versionen. `BYPASS` stellt sicher dass jede Seite frisch gecrawlt wird.
 
 ### wait_until="domcontentloaded"
-Schnellster sinnvoller Trigger — wartet auf DOM-Parse ohne JavaScript-Execution. Für reine Link-Extraktion ausreichend. JS-schwere Sites benötigen `networkidle` — das ist der Grund für die Strategy-Empfehlung "bfs" wenn Prefetch nur 1 Seite findet.
+Schnellster sinnvoller Trigger — wartet auf DOM-Parse ohne JavaScript-Execution. Für reine Link-Extraktion ausreichend. JS-schwere Sites (SPAs) finden Prefetch meist nur 1 Seite → `crawl_site.py` BFS mit Full-Rendering als Fallback (strategy=bfs).
 
-### MAX_DEPTH = 10
-Praktisch unlimitierte Tiefe für normale Sites (die meisten Sites haben Tiefe ≤ 5). Echte Begrenzung kommt via `max_pages=50`. MAX_DEPTH=10 verhindert nur pathologische Fälle (zirkuläre Redirects, unendlich tiefe generierte URLs).
-
-### DEFAULT_MAX_PAGES = 50
-Balanciert Discovery-Vollständigkeit gegen Crawl-Zeit. Bei `request_timeout=5s` pro Seite und Prefetch-Overhead sind 50 Seiten in ~30-60s erreichbar. Überschreitung des CRAWL_TIMEOUT=120s bei 50 Seiten möglich bei langsamen Sites.
-
-### CRAWL_TIMEOUT = 120s
-Verhindert dass `explore_site_workflow` unbegrenzt blockiert. Partial-Ergebnisse werden bei Timeout weiterverwertet (`timed_out=True` im Output signalisiert Unvollständigkeit).
-
-### Sitemap dict→string Normalisierung
-`AsyncUrlSeeder` gibt teils `dict`-Objekte statt `str` zurück (undokumentiertes Verhalten). `check_sitemap` normalisiert: `u if isinstance(u, str) else u.get("url", str(u))`. Gleiche Normalisierung in `build_site_map` für Sitemap-URLs.
+### DEFAULT_MAX_PAGES = 200
+Balanciert Discovery-Vollständigkeit gegen Crawl-Zeit. 200 Seiten mit Prefetch sind in ~2-4 Minuten erreichbar. Kein Hard-Timeout im Workflow — Crawl läuft bis `max_pages` oder bis keine neuen URLs mehr gefunden werden.
 
 ## Entscheidung
 
-Zwei-Phasen-Architektur wurde iterativ entwickelt:
-- Sitemap-Phase zuerst: gibt sofortige vollständige URL-Liste ohne Crawl-Overhead
-- BFS immer: ergänzt Sitemap mit strukturellen Daten (Tiefe, Char-Count) die für Strategy-Empfehlung nötig sind
-- Prefetch statt Full-Crawl: Exploration braucht URL-Struktur, nicht Content — Prefetch ist 3-5x schneller
-- Strategy-Empfehlung gibt dem Caller (Claude) einen konkreten Hinweis für den nächsten Tool-Aufruf (scrape_url vs. weitere Crawl-Parameter)
+Cascade-Architektur (sitemap-first, BFS-fallback) wurde beibehalten, aber erweitert:
+- Shallow-sitemap threshold: verhindert dass unvollständige Sitemaps die BFS-Discovery unterbinden
+- Redirect-Auflösung: fix für häufige Redirect-Chains bei Docs-Seiten
+- Seed-Path-Filter: fix für Sitemaps die mehr URLs als die Seed-Section enthalten
 
 ## Offene Fragen
 
-- BFS läuft immer auch wenn Sitemap vollständige URL-Liste liefert: könnte übersprungen werden wenn Sitemap ≥ max_pages URLs enthält
-- Sitemap-Tiefenschätzung via URL-Segmente ist ungenau (z.B. `/docs/v2/api/endpoint` hat Tiefe 3 laut Schätzung, aber BFS würde andere Tiefe messen)
-- `wait_until="domcontentloaded"` reicht nicht für SPAs (React/Vue/Angular). Bei SPAs findet Prefetch meist nur 1 Seite → Strategy "bfs" korrekt, aber BFS ohne `networkidle` hilft auch nicht. Keine Lösung konfiguriert.
-- URLPatternFilter ist optional — bei Sites mit vielen Noise-URLs (Pagination, Query-Parameter) empfehlenswert aber nicht automatisch gesetzt
-- `include_external=False` ist korrekt für Discovery, schließt aber CDN-gehostete Docs aus (z.B. assets.example.com)
+- `wait_until="domcontentloaded"` reicht nicht für SPAs (React/Vue/Angular). Bei SPAs findet Prefetch meist nur 1 Seite → Strategy "bfs" korrekt, aber BFS ohne `networkidle` hilft auch nicht.
+- URLPatternFilter ist optional — bei Sites mit vielen Noise-URLs (Pagination, Query-Parameter) empfehlenswert aber nicht automatisch gesetzt.
+- `include_external=False` ist korrekt für Discovery, schließt aber CDN-gehostete Docs aus (z.B. assets.example.com).
 
 ## Quellen
 
-- `src/scraper/explore_site.py` — vollständige Implementation
+- `src/crawler/explore_site.py` — vollständige Implementation
+- `src/crawler/crawl_site.py` — BFS + Sitemap Discovery-Funktionen
 - Crawl4AI Docs (RAG Collection: Crawl4AIDocs) — BFSDeepCrawlStrategy, CrawlerRunConfig, prefetch, AsyncUrlSeeder
-- `src/scraper/DOCS.md` — Scraper-Übersicht
+- `src/crawler/DOCS.md` — Crawler-Übersicht
 
 ### Zum Indexieren (für systematische Verbesserung)
 
