@@ -1,8 +1,10 @@
 # Search Pipeline Step 4: Engine Weights
 
-## Status Quo
+> **⚠️ Superseded (2026-04-15 engine-cut):** This file documents per-engine weights in the SearXNG-Docker settings.yml. That config (src/searxng/settings.yml, deleted 2026-04-15) no longer exists. Current ranking is slot-based (12 general / 6 academic / 2 Q&A) with overlap-counting, documented in `decisions/search07_ranking_format.md`.
 
-**Code:** `src/searxng/settings.yml` (engines section)
+## Status Quo (Historical, pre-engine-cut)
+
+**Code:** src/searxng/settings.yml (deleted 2026-04-15, engines section)
 **Method:** Static per-engine weights influencing SearXNG's internal score formula
 
 ### Current Weights
@@ -47,7 +49,7 @@ Pending — needs evaluation via `10_engine_consensus.py`.
 
 ## Quellen
 
-- `src/searxng/settings.yml` — current weight configuration
+- src/searxng/settings.yml (deleted 2026-04-15) — historical weight configuration
 - `dev/search_pipeline/10_engine_consensus.py` — consensus evaluation script
 - `decisions/search01_engines.md` — engine selection rationale
 - `searxng/searxng` GitHub Repo (`searx/results.py`) — score formula

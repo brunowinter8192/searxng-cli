@@ -1,10 +1,10 @@
 # Search Pipeline Step 1: Engines
 
-> **⚠️ Superseded (2026-04-15 engine-cut + ongoing):** This file documents the historical SearXNG-aggregator architecture. The path `src/searxng/settings.yml` no longer exists — replaced by direct pydoll engines in `src/search/engines/` after the engine-cut. **For current state read [src/search/DOCS.md](../src/search/DOCS.md) (live engine list + per-engine description) and [search05_engine_expansion.md](search05_engine_expansion.md) (post-cut engine additions: HN, DDG, Mojeek, Lobsters, OpenAlex, Stack Exchange + drop history).** Current pool (2026-05-04): 8 engines uniform 4 req/min — Google, DuckDuckGo, Mojeek, Lobsters, Google Scholar (Browser); CrossRef, OpenAlex, Stack Exchange (HTTP). Bing, HN, Brave, Startpage, Semantic Scholar dropped.
+> **⚠️ Superseded (2026-04-15 engine-cut + ongoing):** This file documents the historical SearXNG-aggregator architecture. The path src/searxng/settings.yml no longer exists — replaced by direct pydoll engines in `src/search/engines/` after the engine-cut. **For current state read [src/search/DOCS.md](../src/search/DOCS.md) (live engine list + per-engine description) and [search05_engine_expansion.md](search05_engine_expansion.md) (post-cut engine additions: HN, DDG, Mojeek, Lobsters, OpenAlex, Stack Exchange + drop history).** Current pool (2026-05-04): 8 engines uniform 4 req/min — Google, DuckDuckGo, Mojeek, Lobsters, Google Scholar (Browser); CrossRef, OpenAlex, Stack Exchange (HTTP). Bing, HN, Brave, Startpage, Semantic Scholar dropped.
 
 ## Status Quo (Historical, pre-engine-cut)
 
-**Code:** `src/searxng/settings.yml`
+**Code:** src/searxng/settings.yml (deleted 2026-04-15)
 **Method:** SearXNG aggregiert Ergebnisse aus mehreren Suchmaschinen pro Query
 
 ### Kategorie-System
@@ -104,7 +104,7 @@ Engine-Set und Weights basieren auf Index-Diversifizierung und Kategorie-Trennun
 
 ## Quellen
 
-- `src/searxng/settings.yml` — Engine-Konfiguration
+- src/searxng/settings.yml (deleted 2026-04-15) — Engine-Konfiguration
 - `searxng/searxng` GitHub Repo (`searx/results.py`) — Scoring-Algorithmus
 - `searxng/searxng` GitHub Repo (`searx/settings.yml`) — Default Engine-Konfigurationen
 - SearXNG Docs (RAG Collection: searxng) — Engine-Parameter, Weight-Semantik
