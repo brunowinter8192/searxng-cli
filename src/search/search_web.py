@@ -248,7 +248,7 @@ async def _run_engine_fanout(
     return raw_results, engine_stats, engine_fanout_ms, engine_ms, engine_details
 
 
-# Query selected engines concurrently; return (combined_results, engine_stats_dict)
+# Query selected engines concurrently; write engine_run log entry; return (combined_results, engine_stats_dict)
 async def _query_engines_concurrent(
     query: str,
     language: str,
@@ -273,6 +273,15 @@ async def _query_engines_concurrent(
             "result_count": len(eng_results),
             "drop_reason": drop_reason,
         }
+    ts = datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%S.%f")[:-3] + "Z"
+    log_query({
+        "record_type": "engine_run",
+        "ts": ts,
+        "query": query,
+        "language": language,
+        "engines_requested": list(selected.keys()),
+        "engines": engine_stats,
+    })
     return combined, engine_stats
 
 
@@ -355,7 +364,7 @@ def _format_results(query: str, results: list[SearchResult]) -> tuple[str, dict[
     return "\n".join(lines), sources, texts
 
 
-# Build and write query log entry after each search_web_workflow call
+# Build and write workflow_summary log entry after each search_web_workflow call
 def _build_query_log_entry(
     query: str,
     language: str,
@@ -368,6 +377,7 @@ def _build_query_log_entry(
     bottleneck = max(engine_stats, key=lambda k: engine_stats[k]["search_ms"]) if engine_stats else None
     ts = datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%S.%f")[:-3] + "Z"
     log_query({
+        "record_type": "workflow_summary",
         "ts": ts,
         "query": query,
         "language": language,
