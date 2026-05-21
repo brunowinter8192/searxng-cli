@@ -14,7 +14,7 @@ logger = logging.getLogger(__name__)
 # Default engine set — all engines except google_scholar; Scholar excluded because Google co-fire
 # (scholar.google.com + google.com from same IP → EMPTY_BLOCK even with HTTP Scholar).
 # Scholar dormant until Pooling-Rework (bead searxng-g82) assigns it a Google-free pool.
-# See decisions/OldThemes/scholar_decoupling_20260509.md for rationale.
+# See decisions/OldThemes/scholar_decoupling/20260509.md for rationale.
 _DEFAULT_ENGINES: frozenset[str] = frozenset({
     "google", "crossref", "duckduckgo", "mojeek", "lobsters",
     "openalex", "stack_exchange", "semantic_scholar", "open_library",
@@ -27,7 +27,7 @@ _BOOKS_MODIFIER: Callable[[str], str] = lambda q: f"{q} book"
 # --pdf mode: restrict to PDF-rich engines and append ' pdf' modifier; post-filter via is_pdf_url
 # Engine selection rationale (free_word_injection_probe_20260507_033631.md):
 #   google/ddg/mojeek → surface direct .pdf file URLs
-#   Scholar dropped 2026-05-09 (Google co-fire constraint — see scholar_decoupling_20260509.md)
+#   Scholar dropped 2026-05-09 (Google co-fire constraint — see scholar_decoupling/20260509.md)
 #   crossref/openalex dropped: return doi.org-only results, 0 yield after is_pdf_url filter
 _PDF_ENGINES: frozenset[str] = frozenset({"google", "duckduckgo", "mojeek"})
 _PDF_MODIFIER: Callable[[str], str] = lambda q: f"{q} pdf"
