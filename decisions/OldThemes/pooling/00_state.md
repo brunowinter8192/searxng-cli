@@ -188,6 +188,31 @@ If validation confirms: production migration design — modify `src/search/merge
 
 ---
 
+## Phase 9 (executed 2026-05-21, after bee-resolution)
+
+20-query validation on capped pool — 4 ranking strategies (C1 Overlap-Count, C2 BM25, C3 Cross-Encoder direct, C4 Embedding-Cosine direct). Hard-Slot dropped from comparison per user direction.
+
+Verdict: C2/C3/C4 all floor-tied at 0 obvious-Müll across 20 queries × ~210 URL slots. C1 produces 12 Müll (5.9% rate), all clustered in one discriminating query (Q6 espresso machine where "500" keyword-matches academic papers).
+
+Detailed findings → `05_capped_pool_probe.md`. Initially suggested BM25 migration as cheapest equivalent; Phase 10 then revealed this conclusion was premature.
+
+## Phase 10 (executed 2026-05-21)
+
+Single-query deep-dive on Q14 "postgresql index types btree gin gist performance". Full pool dump (57 URLs) alongside each config's Top-10 picks via comparison matrix.
+
+Critical findings:
+- 0 URLs picked by all 4 configs (no consensus)
+- 34 of 57 pool URLs picked by no config
+- Among the 34: 8 high-quality expert sources (hakibenita, pganalyze, depesz, citusdata, 2ndquadrant, percona, thoughtbot, mydbops) — ALL missed by ALL 4 rankers
+- Lobsters surfaced 4 of 8 experts; Google had 3 in deep-tail (positions 4-10); Mojeek 1
+- Lobsters is structurally penalized: single-engine origin → engine_count=1 → C1 demotes; terse snippets → C2/C3/C4 demote on text content
+
+Detailed findings → `06_q14_pool_dump.md`. Production migration BLOCKED — Müll-floor masked top-source-recall failure.
+
+Next-session direction: solve top-URL identification automation first. Lobsters-boost as structural prior is the leading hypothesis (cheap, broadly applicable).
+
+---
+
 ## Sources
 
 DB-state after cleanup 2026-05-09 (only sources actually extracted from):
