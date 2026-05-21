@@ -31,10 +31,6 @@ _COOKIES = {"CONSENT": "YES+"}
 # 6.0s — Scholar HTTP latency 0.7-5s range; 3.6s default would produce TIMEOUT_HTTPX
 _TIMEOUT = 6.0
 
-# Uniform 4 req/min across all engines (Google-Baseline, normalized 2026-05-04)
-_limiters["google_scholar"] = RateLimiter(max_requests=4, window_seconds=60)
-
-
 # ORCHESTRATOR
 
 # Google Scholar search via httpx (no browser); migrated from pydoll 2026-05-09 (bead searxng-f3i)
