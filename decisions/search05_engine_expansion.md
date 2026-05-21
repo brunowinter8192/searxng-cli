@@ -109,11 +109,25 @@
 
 ## Status Quo (IST)
 
-Aktive Engines (Stand 2026-05-01):
-- **Google** — pydoll Chrome, ~4 req/min empirisches Detection-Limit, 28/30 OK in burst smoke
-- **Bing** — pydoll Chrome, broken seit Block-A-Smoke (Selektor `#b_results .b_algo` liefert 0 Ergebnisse, vermutlich DOM-Drift)
-- **Google Scholar** — pydoll Chrome, Status unverifiziert *(updated 2026-05-09: HTTP-Migration via bead f3i, Scholar dormant in `_DEFAULT_ENGINES` wegen Google-Co-Fire-Decoupling — siehe `OldThemes/scholar_decoupling/20260509.md`)*
-- **CrossRef** — pure HTTP via httpx, stabil
+Active engine set (9 engines, updated 2026-05-21):
+
+| Engine | Class | Implementation | Rate |
+|---|---|---|---|
+| google | GENERAL | pydoll Chrome | 4/min |
+| duckduckgo | GENERAL | pydoll Chrome | 4/min |
+| mojeek | GENERAL | pydoll Chrome | 4/min |
+| lobsters | QA | pydoll Chrome | 4/min |
+| semantic_scholar | ACADEMIC | pydoll Chrome | 4/min |
+| crossref | ACADEMIC | httpx | 4/min |
+| openalex | ACADEMIC | httpx | 4/min |
+| stack_exchange | QA | httpx | 4/min |
+| open_library | GENERAL | httpx | 4/min |
+
+**Google Scholar fully removed** (2026-05-21, bee fix). Not dormant — no import, no ENGINES entry, no `_limiters` registration. Removed until Pooling-Rework (bead `searxng-g82`) assigns it a Google-free pool. See `decisions/bee_fix.md` and `decisions/OldThemes/bee_cdp_starvation/04_resolution.md` for rationale. Historical decoupling path documented in `OldThemes/scholar_decoupling/20260509.md`.
+
+**Bing** dropped 2026-05-04 (DDG covers Bing index, no added value — see "Bing dropped" section below).
+
+Bucket-uniformity invariant (2026-05-21): all 9 engines fire on every query. Filter modes (`--books`, `--pdf`, `--docs`) apply per-engine query modifiers and post-merge URL filtering only — never restrict which engines participate.
 
 User-Profil: science / GitHub / reddit / Dokumentation / general hard-info — wenig news, wenig boulevard. GitHub und reddit über separate Plugins gelöst, vergleichbare Engines fehlen für (a) general-purpose Suche mit technischem Bias und (b) HackerNews / StackExchange als Discussion- / Q&A-Plattformen.
 

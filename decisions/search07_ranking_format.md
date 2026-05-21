@@ -76,6 +76,15 @@ URL-level merge aggregates: `engines` list (all engines that found this URL), `s
 
 Class filter is included in the cache key. `search_more` must use the same flags as the original `search_web` call to produce a cache hit.
 
+#### Filter mode fanout (updated 2026-05-21 — bucket-uniformity invariant)
+
+`--books`, `--pdf`, `--docs` flags do NOT restrict which engines participate in the fanout. All 9 engines fire on every query regardless of filter mode. Filter modes act via two mechanisms only:
+
+1. **Per-engine query modifier** — engines in `_BOOKS_ENGINES` / `_PDF_ENGINES` / `_DOCS_ENGINES` (`filter_modes.py`) receive the relevant suffix (`+book`, `+pdf`, `+documentation`). Other engines receive the bare query.
+2. **Post-merge URL filter** — `filter_urls_by_mode()` applies `is_book_url` / `is_pdf_url` / `is_docs_url` to the merged ranked list after slot allocation.
+
+No engines are excluded from the `selected` dict in filter mode. `apply_filter_mode()` always returns `excluded={}`. `_ENGINE_BOOKS/PDF/DOCS` constants are modifier-target sets, not restriction sets.
+
 ### C. Snippet Selection Priority (per-URL, 7-step)
 
 Rationale: query-relevant extracts beat generic page descriptions when similarly clean. og is a page-author-curated meta description (generic); DDG/Mojeek snippets are search-engine-extracted excerpts based on query terms (query-relevant). For search-result display, query-relevance wins when cleanliness is similar. og remains the right fallback when no clean engine snippet is available.

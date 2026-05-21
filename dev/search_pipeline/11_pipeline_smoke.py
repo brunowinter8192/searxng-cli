@@ -6,6 +6,7 @@ import argparse
 import asyncio
 import statistics
 import sys
+import time
 from datetime import datetime
 from pathlib import Path
 
@@ -32,6 +33,10 @@ async def run_pipeline_smoke(max_queries: int | None, language: str, engine_time
     queries = _load_queries(QUERIES_FILE, max_queries)
     print(f"Pipeline smoke | Queries: {len(queries)} | Language: {language}", file=sys.stderr)
     records = []
+    checkpoints: list[dict] = []
+    t_run_start = time.perf_counter()
+    prev_qi = 0
+    prev_elapsed = 0.0
     try:
         for qi, query in enumerate(queries, 1):
             _, timings = await search_web_workflow(query, language, None, None, _with_timings=True, engine_timeout=engine_timeout)
@@ -48,10 +53,39 @@ async def run_pipeline_smoke(max_queries: int | None, language: str, engine_time
                 f"total_ms={timings['total_ms']}",
                 file=sys.stderr,
             )
+            if qi in {4, 8, 12, 16, 20}:
+                elapsed = round(time.perf_counter() - t_run_start, 1)
+                seg_records = records[prev_qi:qi]
+                seg_s = elapsed - prev_elapsed
+                avg_per_q = round(seg_s / len(seg_records), 1)
+                ok_count = 0
+                rs_count = 0
+                for rec in seg_records:
+                    for info in (rec["timings"] or {}).get("engine_details", {}).values():
+                        st = info.get("status", "")
+                        if st == "OK":
+                            ok_count += 1
+                        elif st == "RATE_SKIP":
+                            rs_count += 1
+                cp = {
+                    "milestone": f"Q{qi}",
+                    "cumulative_s": elapsed,
+                    "avg_per_q_s": avg_per_q,
+                    "engines_ok": ok_count,
+                    "engines_rate_skip": rs_count,
+                }
+                checkpoints.append(cp)
+                print(
+                    f"[CHECKPOINT Q{qi}] cumulative={elapsed}s avg/q={avg_per_q}s "
+                    f"ok={ok_count} rate_skip={rs_count}",
+                    file=sys.stderr,
+                )
+                prev_qi = qi
+                prev_elapsed = elapsed
     finally:
         await close_browser()
     REPORT_DIR.mkdir(parents=True, exist_ok=True)
-    path = _write_report(records, language)
+    path = _write_report(records, language, checkpoints)
     ok = sum(1 for r in records if r["total_urls"] > 0)
     print(f"\nReport: {path}", file=sys.stderr)
     print(f"Done: {ok}/{len(records)} queries with results", file=sys.stderr)
@@ -244,6 +278,25 @@ def _render_timing_section(records: list[dict]) -> list[str]:
     return L
 
 
+# Render cumulative-wallclock checkpoint table at Q4/Q8/Q12/Q16/Q20 milestones
+def _render_timing_checkpoints(checkpoints: list[dict]) -> list[str]:
+    if not checkpoints:
+        return []
+    L: list[str] = [
+        "",
+        "## Timing Checkpoints",
+        "",
+        "| Milestone | Cumulative wall (s) | Avg/query in segment (s) | Engines OK | Engines RATE_SKIP |",
+        "|-----------|--------------------:|-------------------------:|-----------:|------------------:|",
+    ]
+    for cp in checkpoints:
+        L.append(
+            f"| {cp['milestone']} | {cp['cumulative_s']} | {cp['avg_per_q_s']} "
+            f"| {cp['engines_ok']} | {cp['engines_rate_skip']} |"
+        )
+    return L
+
+
 # Render per-engine status aggregate section across all queries
 def _render_engine_status(records: list[dict]) -> list[str]:
     status_counts: dict[str, dict[str, int]] = {}
@@ -271,13 +324,14 @@ def _render_engine_status(records: list[dict]) -> list[str]:
 
 
 # Write markdown report to 01_reports/pipeline_smoke_<ts>.md, return path
-def _write_report(records: list[dict], language: str) -> Path:
+def _write_report(records: list[dict], language: str, checkpoints: list[dict]) -> Path:
     ts   = datetime.now().strftime("%Y%m%d_%H%M%S")
     path = REPORT_DIR / f"pipeline_smoke_{ts}.md"
     lines = (
         _render_header(records, language, ts)
         + _render_class_defs()
         + _render_summary(records)
+        + _render_timing_checkpoints(checkpoints)
         + ["", "---", ""]
     )
     for qi, r in enumerate(records, 1):

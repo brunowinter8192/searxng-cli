@@ -15,7 +15,6 @@ from src.search.browser import close_browser
 from src.search.cache import cache_key, cache_write
 from src.search.engines.google import GoogleEngine
 from src.search.preview import fetch_previews
-from src.search.engines.scholar import ScholarEngine
 from src.search.engines.crossref import CrossRefEngine
 from src.search.engines.duckduckgo import DuckDuckGoEngine
 from src.search.engines.mojeek import MojeekEngine
@@ -41,18 +40,16 @@ logger = logging.getLogger(__name__)
 
 SNIPPET_LENGTH = 5000
 ENGINE_WATCHDOG_TIMEOUT: float = 3.6
-RATE_WAIT_TIMEOUT: float = 5.0
+RATE_WAIT_TIMEOUT: float = 60.0
 ENGINE_WATCHDOG_OVERRIDE: dict[str, float] = {
     "open_library": 6.0,        # Server-dominated 1.4-5.8s latency; 3.6s cap caused ~35% timeouts
     "semantic_scholar": 5.0,    # CSR hydration 0.5-2.5s + go_to budget post-DOM-drift fix
     "crossref": 6.0,            # API response 1-5s range; 3.6s httpx cap races watchdog deadline
-    "google_scholar": 6.0,      # HTTP latency 0.7-5s; 3.6s default would produce TIMEOUT_HTTPX
 }
 
 # Empirical per-engine ceilings (max_results_probe_20260507_024429.md)
 ENGINE_MAX_RESULTS: dict[str, int] = {
     "google": 100,          # server cap via num= URL param; DOM renders ~9-11
-    "google_scholar": 20,   # Scholar renders max ~20 per page
     "duckduckgo": 10,       # no count param; post-fetch DOM slice only
     "mojeek": 10,           # no count param; post-fetch DOM slice only
     "lobsters": 20,         # no count param; pool is query-dependent
@@ -65,7 +62,6 @@ ENGINE_MAX_RESULTS: dict[str, int] = {
 
 ENGINES = {
     "google": GoogleEngine(),
-    "google scholar": ScholarEngine(),
     "crossref": CrossRefEngine(),
     "duckduckgo": DuckDuckGoEngine(),
     "mojeek": MojeekEngine(),
@@ -196,12 +192,12 @@ def fetch_search_results(
 
 # FUNCTIONS
 
-# Filter engine registry; default path excludes google_scholar (Google co-fire constraint)
+# Filter engine registry; default path returns full 9-engine set (Scholar fully removed — see decisions/bee_fix.md)
 # Returns (selected, excluded) — excluded maps engine.name → reason for engines not included
 def _select_engines(engines: str | None) -> tuple[dict, dict[str, str]]:
     if not engines:
         selected = {k: v for k, v in ENGINES.items() if k in _DEFAULT_ENGINES}
-        return selected, {"google_scholar": "decoupled_from_google"}
+        return selected, {}
     names = [e.strip().lower() for e in engines.split(",")]
     return {k: v for k, v in ENGINES.items() if k in names}, {}
 
