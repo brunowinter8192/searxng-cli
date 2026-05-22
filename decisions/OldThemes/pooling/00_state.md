@@ -211,6 +211,43 @@ Detailed findings → `06_q14_pool_dump.md`. Production migration BLOCKED — M�
 
 Next-session direction: solve top-URL identification automation first. Lobsters-boost as structural prior is the leading hypothesis (cheap, broadly applicable).
 
+## Phase 11 (executed 2026-05-22)
+
+LLM-as-Oracle value-eval — 4 modes (general/pdf/books/docs) × 4 queries (strict from canonical 20) × 4 C-methods (C1 Overlap, C2 BM25, C2' BM25-Capped, C3 Cross-Encoder). Worker (Sonnet) reads each pool independently, picks Top-10, scripted Jaccard computes overlap with each C-method.
+
+**Architecture pivot before the eval:** all three y6e-bead-proposed directions rejected by user (authority-domain list / LLM-judge / Lobsters-boost) plus structural-feature mining as too query-specific. Final architecture: keep ranker simple (one C-method), add runtime LLM-driven engine-drill-down on the cached pool. Phase 11 picks the ranker; the drill-down tool follows after migration.
+
+**Results:**
+
+| Mode | C1 | C2 | C2' | C3 | Winner |
+|---|---|---|---|---|---|
+| general | 0.179 | 0.181 | 0.162 | **0.302** | C3 (+0.121) |
+| docs | 0.195 | 0.400 | 0.446 | **0.458** | C3 (+0.012) |
+| pdf | 0.871 (tie, undersized pools) |
+| books | 1.000 (tie, undersized pools) |
+| **Overall** | 0.498 | 0.558 | 0.565 | **0.609** | **C3 Cross-Encoder** |
+
+C3 wins overall and in both reliable modes. PDF and books are noise (pool sizes ≤ 10 = trivial Jaccard).
+
+**Caveats:** Google was out on all 16 pairs due to CAPTCHA + exponential-backoff cascade (3 backoff events, 466s wasted, google=0 throughout). 8-engine eval, not 9-engine. Method-comparison is internally fair (all 4 saw same pool) but Google's absence in general-mode means the +0.121 margin could shift in a 9-engine re-eval. Books mode broken for ML/DL queries (Open Library returns philosophy classics), docs mode has academic-engine precision noise — separate engine-coverage baustellen.
+
+Detailed findings → `07_value_eval.md`. Migration recommended-but-still-BLOCKED on: (1) rate-limiter fail-fast refactor (`decisions/rate_limiting.md` + `decisions/OldThemes/no_backoff_retry.md`, new bead created for the work), (2) optional 9-engine re-eval, (3) cache format extension for per-engine position (prerequisite for drill-down tool), (4) cross-encoder SERVERS-dict registration in RAG infra.
+
+---
+
+## Approaches Evaluated (refreshed 2026-05-22)
+
+| Approach | Method | Latency | Quality (overall Jaccard) | Status |
+|---|---|---|---|---|
+| Hard-Slot 12/6/2 (= C1 Overlap as ranker key) | class-bucket + slots | ~1 ms | 0.498 (worst in Phase 11) | current production baseline |
+| RRF | Σ 1/(60+pos_i) over engines | ~1 ms | DOI-flood on Q1 | dropped Phase 3 |
+| Embedding-Cosine (8B) | cos_sim Qwen3-Embedding-8B | ~169 s | not eval'd at scale | DROPPED Phase 6 (latency) |
+| Hybrid (Emb+SPLADE+Rerank 8B) | Dense+Sparse+Cross | ~184 s | not eval'd | DROPPED Phase 6 (latency) |
+| BM25 vanilla (C2) | k1=1.2, b=0.75 sw=on full pool | ~13 ms | 0.558 | candidate, not winner |
+| BM25-Capped (C2') | per-engine top-K cap | ~1 ms | 0.565 | candidate, not winner |
+| Embedding-Cosine (0.6B C4) | bi-encoder rerank | ~5 s | 26/40 Phase 8 | DROPPED Phase 8 (architectural) |
+| **Cross-Encoder (C3) Qwen3-Reranker-0.6B** | Filter+BM25→Rerank or direct | ~2-5 s total | **0.609 (Phase 11 winner)** | **RECOMMENDED for migration pending blockers** |
+
 ---
 
 ## Sources
