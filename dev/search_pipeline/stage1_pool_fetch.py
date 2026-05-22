@@ -5,10 +5,13 @@ Stage 1 — Pool Fetch (value_eval_v2).
 Fetches results for 16 (mode, query) pairs (4 modes × 4 queries).
 Writes per-pair pool.json + engine_report.md, then engine_report_summary.md.
 
+No URL filter applied — C-methods (BM25, Cross-Encoder) handle topic relevance from
+title+snippet. Query modifier (+book / +pdf / +documentation) still biases engine results.
+
 pool.json schema:
-  pool      — oracle input + C1/C2'/C3: filt_capped sorted by URL, ALL fields
+  pool      — oracle input + C1/C2'/C3: capped_pool sorted by URL, ALL fields
                (url / title / snippet / engines / min_position)
-  pool_full — C2 BM25 vanilla: filt_pool (not capped) sorted by URL, ALL fields
+  pool_full — C2 BM25 vanilla: full_pool (all deduped results) sorted by URL, ALL fields
 
 Oracle workers: read pool[*].{url, title, snippet} only — ignore engines and min_position.
 
@@ -25,7 +28,6 @@ import sys
 import time
 from datetime import datetime
 from pathlib import Path
-from urllib.parse import urlparse as _urlparse
 
 SCRIPT_DIR   = Path(__file__).parent
 PROJECT_ROOT = SCRIPT_DIR.parent.parent
@@ -76,53 +78,6 @@ _STATUS_HINTS: dict[str, str] = {
     "ERROR":                 "error",
 }
 
-# --- URL filter data (mirrors src/search/{pdf_filter,book_whitelist,docs_filter}.py) ---
-
-_PDF_HOSTS = frozenset({
-    "arxiv.org", "aclanthology.org", "openreview.net",
-    "biorxiv.org", "medrxiv.org", "chemrxiv.org", "osf.io",
-    "mdpi.com", "pmc.ncbi.nlm.nih.gov",
-    "inspirehep.net", "zenodo.org", "hal.science", "hal.archives-ouvertes.fr", "europepmc.org",
-})
-_PDF_BAD = frozenset({
-    "github.com", "gitlab.com", "books.google.com",
-    "scribd.com", "semanticscholar.org", "openalex.org", "researchgate.net",
-})
-_PDF_PATHS = (".pdf", "/pdf/", "/pdfs/", "/content/pdf/", "/_downloads/")
-
-_BOOK_WHITELIST = frozenset({
-    "amazon.com", "amazon.de", "amazon.in", "amazon.co.uk", "abebooks.de", "thalia.de",
-    "barnesandnoble.com", "kulturkaufhaus.de", "buecher.de", "hugendubel.info", "beck-shop.de",
-    "exsila.ch", "booklooker.de", "buchshop.bod.de", "books.apple.com", "ebooks.com",
-    "audible.com", "blinkist.com", "perlego.com", "ebookaktiv.de", "legimi.de",
-    "e-booksdirectory.com", "hqaudiobooks.net", "book-sharing.de", "downmagaz.net", "ebooksyard.com",
-    "oreilly.com", "manning.com", "simonandschuster.com", "penguinrandomhouse.com",
-    "hachettebookgroup.com", "fischerverlage.de", "chbeck.de", "bloomsbury.com", "penguin.de",
-    "tharpa.com", "bibleandbookcenter.com",
-    "goodreads.com", "gutenberg.org", "openlibrary.org", "archive.org", "books.google.com",
-    "deutsche-digitale-bibliothek.de", "en.wikisource.org", "yumpu.com", "worldmags.net",
-    "drive.google.com",
-    "fivebooks.com", "bookauthority.org", "ordertoread.com", "reedsy.com",
-    "bookseriesinorder.com", "booksinorder.org", "infobooks.org", "booksaremythirdplace.com",
-    "eatyourbooks.com", "fictionhorizon.com", "shortform.com", "dedp.online", "harrypotter.com",
-    "refactoring.guru", "formdesignpatterns.com", "cleancodecookbook.com",
-    "superfastpython.com", "pythonbooks.org", "buddho.org", "berniegourley.com", "eternalisedofficial.com",
-})
-_BOOK_BAD  = frozenset({"github.com", "gitlab.com", "bitbucket.org", "gist.github.com"})
-_BOOK_PATHS = (
-    "/books/", "/buecher/", "/buch/", "/book/show/", "/dp/", "/ebooks/",
-    "/detail/isbn-", "/library/view/", "/title/", "/ebook/",
-)
-
-_DOCS_BAD_HOSTS = frozenset({
-    "reddit.com", "stackoverflow.com", "bugs.python.org",
-    "medium.com", "youtube.com", "dev.to",
-    "github.com", "gitlab.com", "bitbucket.org",
-    "w3schools.com", "geeksforgeeks.org", "freecodecamp.org", "codezup.com", "riptutorial.com",
-    "slideshare.net", "scribd.com", "deepwiki.com",
-})
-_DOCS_BAD_PATHS = ("/blog/", "/community/")
-
 _MODE_ENGINES = frozenset({"google", "duckduckgo", "mojeek"})
 
 
@@ -148,7 +103,7 @@ async def run_pool_fetch(smoke: bool, ts_dir_arg: Path | None) -> Path:
             meta = await _run_one_pair(ts_dir, mode, query, selected)
             print(
                 f"  raw={meta['raw_count']}  capped={meta['capped_count']}"
-                f"  filtered={meta['filtered_count']}  oracle={meta['oracle_count']}"
+                f"  oracle={meta['oracle_count']}"
                 f"  fetch={meta['fetch_ms']}ms",
                 file=sys.stderr,
             )
@@ -176,46 +131,6 @@ def _modifier_map(mode: str) -> dict | None:
     return None
 
 
-# Bare domain (strip www.) from URL
-def _url_domain(url: str) -> str:
-    try:
-        host = _urlparse(url).netloc.lower()
-        return host[4:] if host.startswith("www.") else host
-    except Exception:
-        return ""
-
-
-# True if URL matches PDF host/path whitelist; bad-host blacklist returns False
-def _is_pdf_url(url: str) -> bool:
-    d = _url_domain(url)
-    if d in _PDF_BAD or any(d.endswith("." + h) for h in _PDF_BAD): return False
-    if d in _PDF_HOSTS or any(d.endswith("." + h) for h in _PDF_HOSTS): return True
-    return any(p in _urlparse(url).path.lower() for p in _PDF_PATHS)
-
-
-# True if URL matches book whitelist or book path; code-hosting blacklist returns False
-def _is_book_url(url: str) -> bool:
-    d = _url_domain(url)
-    if d in _BOOK_BAD or any(d.endswith("." + h) for h in _BOOK_BAD): return False
-    if d in _BOOK_WHITELIST or any(d.endswith("." + h) for h in _BOOK_WHITELIST): return True
-    return any(p in _urlparse(url).path.lower() for p in _BOOK_PATHS)
-
-
-# True if URL is NOT in docs noise blacklist (passes docs, blocks noise)
-def _is_docs_url(url: str) -> bool:
-    d = _url_domain(url)
-    if d in _DOCS_BAD_HOSTS or any(d.endswith("." + h) for h in _DOCS_BAD_HOSTS): return False
-    return not any(p in _urlparse(url).path.lower() for p in _DOCS_BAD_PATHS)
-
-
-# Apply mode URL filter to pool of dicts
-def _filter_pool(pool: list[dict], mode: str) -> list[dict]:
-    if mode == "pdf":   return [m for m in pool if _is_pdf_url(m["url"])]
-    if mode == "books": return [m for m in pool if _is_book_url(m["url"])]
-    if mode == "docs":  return [m for m in pool if _is_docs_url(m["url"])]
-    return pool
-
-
 # Cap raw results to position <= K then dedup into pool dicts
 def _build_capped_pool(raw_results: list, K: int) -> list[dict]:
     return _build_pool([r for r in raw_results if r.position <= K])
@@ -237,37 +152,34 @@ async def _run_one_pair(ts_dir: Path, mode: str, query: str, selected: dict) -> 
 
     full_pool   = _build_pool(raw_results)
     capped_pool = _build_capped_pool(raw_results, K)
-    filt_pool   = _filter_pool(full_pool,   mode)
-    filt_capped = _filter_pool(capped_pool, mode)
-    oracle_pool = sorted(filt_capped, key=lambda m: m["url"])
+    oracle_pool = sorted(capped_pool, key=lambda m: m["url"])
 
     slug = _query_slug(query)
     _save_pool_json(
         ts_dir, mode, slug, query, fetched_ts, google_count,
-        oracle_pool, filt_pool, len(raw_results), len(capped_pool),
+        oracle_pool, full_pool, len(raw_results), len(capped_pool),
     )
     _save_engine_report(
         ts_dir, mode, slug, query, fetched_ts, engine_stats, oracle_pool,
-        len(raw_results), len(capped_pool), len(filt_pool), len(filt_capped),
+        len(raw_results), len(capped_pool),
     )
 
     return {
-        "mode":           mode,
-        "query":          query,
-        "slug":           slug,
-        "raw_count":      len(raw_results),
-        "capped_count":   len(capped_pool),
-        "filtered_count": len(filt_pool),
-        "oracle_count":   len(oracle_pool),
-        "fetch_ms":       fetch_ms,
-        "engine_stats":   engine_stats,
+        "mode":         mode,
+        "query":        query,
+        "slug":         slug,
+        "raw_count":    len(raw_results),
+        "capped_count": len(capped_pool),
+        "oracle_count": len(oracle_pool),
+        "fetch_ms":     fetch_ms,
+        "engine_stats": engine_stats,
     }
 
 
 # Save pool.json — oracle input (pool) + C2 full pool (pool_full)
 def _save_pool_json(
     ts_dir: Path, mode: str, slug: str, query: str, fetched_ts: str,
-    google_count: int, oracle_pool: list[dict], filt_pool: list[dict],
+    google_count: int, oracle_pool: list[dict], full_pool: list[dict],
     raw_count: int, capped_count: int,
 ) -> None:
     def _item(m: dict) -> dict:
@@ -287,11 +199,10 @@ def _save_pool_json(
         "pool_sizes": {
             "raw":             raw_count,
             "capped":          capped_count,
-            "filtered":        len(filt_pool),
-            "filtered_capped": len(oracle_pool),
+            "filtered_capped": len(oracle_pool),  # = capped (no URL filter)
         },
         "pool":      [_item(m) for m in oracle_pool],
-        "pool_full": [_item(m) for m in sorted(filt_pool, key=lambda m: m["url"])],
+        "pool_full": [_item(m) for m in sorted(full_pool, key=lambda m: m["url"])],
     }
     (ts_dir / f"{mode}_{slug}_pool.json").write_text(
         json.dumps(data, indent=2, ensure_ascii=False), encoding="utf-8"
@@ -302,9 +213,9 @@ def _save_pool_json(
 def _save_engine_report(
     ts_dir: Path, mode: str, slug: str, query: str, fetched_ts: str,
     engine_stats: dict, oracle_pool: list[dict],
-    raw_count: int, capped_count: int, filtered_count: int, oracle_count: int,
+    raw_count: int, capped_count: int,
 ) -> None:
-    filter_label = "no filter applied" if mode == "general" else f"{mode} filter"
+    oracle_count = len(oracle_pool)
 
     # URLs = raw result_count from engine_stats (matches 11_pipeline_smoke.py convention)
     rows: list[tuple] = []
@@ -330,8 +241,7 @@ def _save_engine_report(
         "|-------|------:|",
         f"| Raw results | {raw_count} |",
         f"| Capped (K=google_count) | {capped_count} |",
-        f"| Filtered ({filter_label}) | {filtered_count} |",
-        f"| Oracle pool (filtered+capped) | {oracle_count} |",
+        f"| Oracle pool (capped — no URL filter) | {oracle_count} |",
         "",
         "## Engine Breakdown",
         "",
