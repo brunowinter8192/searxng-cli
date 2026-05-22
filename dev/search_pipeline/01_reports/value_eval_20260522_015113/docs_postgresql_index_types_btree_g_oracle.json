@@ -1,0 +1,32 @@
+{
+  "mode": "docs",
+  "query": "postgresql index types btree gin gist performance",
+  "selection_method": "LLM oracle (Sonnet, value-eval-b2)",
+  "undersized_pool": false,
+  "pool_size": 23,
+  "top_10": [
+    "https://www.postgresql.org/docs/current/indexes-types.html",
+    "https://www.postgresql.org/docs/current/gin.html",
+    "https://doi.org/10.20944/preprints202511.2170.v1",
+    "https://explain.technical.li/postgres-indexes-beyond-b-tree/",
+    "https://blog.devops.dev/how-to-choose-between-index-types-b-tree-gin-gist-in-postgresql-2954638ec4b6",
+    "https://habr.com/en/companies/postgrespro/articles/448746/",
+    "https://postgrespro.com/docs/postgresql/14/indexes-types",
+    "https://www.meerako.com/blogs/postgresql-indexing-strategies-btree-gin-gist-guide",
+    "https://doi.org/10.1088/1742-6596/944/1/012022",
+    "https://www.thenile.dev/docs/extensions/btree_gin"
+  ],
+  "rationale": {
+    "https://www.postgresql.org/docs/current/indexes-types.html": "PostgreSQL official documentation, Index Types (v18 current) — THE authoritative reference covering all index types: B-tree, Hash, GiST, SP-GiST, GIN, BRIN, bloom. Primary source, no substitute.",
+    "https://www.postgresql.org/docs/current/gin.html": "PostgreSQL official GIN documentation — detailed GIN index internals, directly on-topic for the GIN component of the query. Authoritative.",
+    "https://doi.org/10.20944/preprints202511.2170.v1": "'Indexing in PostgreSQL: Performance Evaluation and Use Cases' — comprehensive benchmark-based comparison of all 6 native index types across OLTP, OLAP, full-text, JSONB, spatial, time-series workloads. Produces a recommendation matrix. Exactly what the query asks for.",
+    "https://explain.technical.li/postgres-indexes-beyond-b-tree/": "'Postgres Indexes Beyond B-Tree—GIN, GiST, BRIN, SP-GiST' with real queries and 20-1000x performance claims. Practical tutorial covering all non-default index types with examples.",
+    "https://blog.devops.dev/how-to-choose-between-index-types-b-tree-gin-gist-in-postgresql-2954638ec4b6": "'How to Choose Between Index Types (B-tree, GIN, GiST)' — decision-guide format, directly answering when to choose each type. High relevance to query framing.",
+    "https://habr.com/en/companies/postgrespro/articles/448746/": "PostgresPro (PostgreSQL core contributors) article on GIN indexes — part 7 of their deep-dive series on PostgreSQL indexing. Source from core PG team gives technical depth.",
+    "https://postgrespro.com/docs/postgresql/14/indexes-types": "PostgresPro index-types documentation (PG 14) — mirrors official docs with same B-tree/GiST/GIN/BRIN coverage. Lower priority than official PG 18 current docs but still authoritative.",
+    "https://www.meerako.com/blogs/postgresql-indexing-strategies-btree-gin-gist-guide": "'PostgreSQL Indexing Deep Dive: B-Tree, GIN, GiST' — practical strategy guide from DB experts covering the three most common types named in the query.",
+    "https://doi.org/10.1088/1742-6596/944/1/012022": "'Improving generalized inverted index lock wait times' — technical paper on GIN locking protocol in PostgreSQL's MVCC. Addresses concurrent GIN operations — relevant for the 'performance' dimension of the query.",
+    "https://www.thenile.dev/docs/extensions/btree_gin": "Nile docs on btree_gin extension — covers the hybrid use case where GIN indexes handle B-tree types. Addresses cross-type performance optimization."
+  },
+  "notes": "Pool of 23 has clear signal/noise separation. Signal: official PG docs, PostgresPro, practical tutorials, one comprehensive benchmark paper. Noise: 'Performance of the Bispectral Index During Electrocautery' (medical paper, false positive on 'index' and 'performance'), 'The Gist of Reading' book index (false positive on 'GiST'), 3 chapters from a PostgreSQL Configuration book about installation/logging (not indexing), MongoDB vs PostgreSQL broad comparison, CityGML/cjdb paper. Excluded the PostgreSQL performance optimization thesis (openalex W2612672839) as too broad — focuses on general optimization not index types specifically."
+}

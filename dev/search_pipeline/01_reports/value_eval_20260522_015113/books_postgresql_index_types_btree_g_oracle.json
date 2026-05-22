@@ -1,0 +1,9 @@
+{
+  "mode": "books",
+  "query": "postgresql index types btree gin gist performance",
+  "selection_method": "LLM oracle (Sonnet, value-eval-b2)",
+  "undersized_pool": true,
+  "pool_size": 0,
+  "top_10": [],
+  "note": "Pool is empty — no books results passed the BOOK_WHITELIST filter for this query. Aggregator should skip this pair in per-mode mean computation."
+}

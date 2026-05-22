@@ -1,0 +1,32 @@
+{
+  "mode": "docs",
+  "query": "contrastive learning self-supervised representations",
+  "selection_method": "LLM oracle (Sonnet, value-eval-b2)",
+  "undersized_pool": false,
+  "pool_size": 33,
+  "top_10": [
+    "http://keg.cs.tsinghua.edu.cn/jietang/publications/TKDE21-Liu-et-al-Self-supervised-Learning-Generative-or-Contrastive.pdf",
+    "https://lightning.ai/docs/pytorch/1.8.1/notebooks/course_UvA-DL/13-contrastive-learning.html",
+    "https://link.springer.com/article/10.1007/s13735-022-00245-6",
+    "https://openaccess.thecvf.com/content/ICCV2021/papers/Kotar_Contrasting_Contrastive_Self-Supervised_Representation_Learning_Pipelines_ICCV_2021_paper.pdf",
+    "https://ieeexplore.ieee.org/document/9711402",
+    "https://asci-cbl-practicals2025.readthedocs.io/en/latest/notebooks/5_Self_Supervised_Learning.html",
+    "https://arxiv.org/pdf/2510.10572",
+    "https://keras.io/examples/vision/simsiam/",
+    "https://arxiv.org/html/2509.11316v1",
+    "https://www.sciencedirect.com/science/article/pii/S0167865522000502"
+  ],
+  "rationale": {
+    "http://keg.cs.tsinghua.edu.cn/jietang/publications/TKDE21-Liu-et-al-Self-supervised-Learning-Generative-or-Contrastive.pdf": "'Self-supervised Learning: Generative or Contrastive' (Liu et al., TKDE 2021) — comprehensive survey of SSL methods for representation learning across CV, NLP, and graphs. Direct match to query scope.",
+    "https://lightning.ai/docs/pytorch/1.8.1/notebooks/course_UvA-DL/13-contrastive-learning.html": "PyTorch Lightning / UvA DL Tutorial 13: Self-Supervised Contrastive Learning with SimCLR — hands-on tutorial from a major ML framework, covers SimCLR implementation and theory. High practical value.",
+    "https://link.springer.com/article/10.1007/s13735-022-00245-6": "'Contrastive self-supervised learning: review, progress...' (Springer) — comprehensive review of CL methodology, encoding techniques, and loss functions. Survey paper directly on-topic.",
+    "https://openaccess.thecvf.com/content/ICCV2021/papers/Kotar_Contrasting_Contrastive_Self-Supervised_Representation_Learning_Pipelines_ICCV_2021_paper.pdf": "'Contrasting Contrastive Self-Supervised Representation Learning Pipelines' (ICCV 2021) — analyzes how different training methods and datasets influence performance across contrastive SSL methods.",
+    "https://ieeexplore.ieee.org/document/9711402": "IEEE 'Contrasting Contrastive Self-Supervised Representation Learning' — analysis paper on contrastive approaches as the most successful SSL paradigm. Peer-reviewed.",
+    "https://asci-cbl-practicals2025.readthedocs.io/en/latest/notebooks/5_Self_Supervised_Learning.html": "'Practical 5: Self-Supervised Contrastive Learning with SimCLR' — recent (2025) practical tutorial covering SimCLR in detail. Relevant and accessible.",
+    "https://arxiv.org/pdf/2510.10572": "'Understanding Self-supervised Contrastive Learning through Supervised...' — theory paper introducing prototype representation bias and balanced contrastive loss. Explains contrastive learning behavior at a foundational level.",
+    "https://keras.io/examples/vision/simsiam/": "Keras SimSiam implementation example — official Keras tutorial on non-contrastive SSL. Covers self-supervised representation learning without negative pairs; useful counterpoint to standard contrastive methods.",
+    "https://arxiv.org/html/2509.11316v1": "'Contrastive Network Representation Learning' — covers contrastive learning for graph/network representations, extending the query to graph SSL.",
+    "https://www.sciencedirect.com/science/article/pii/S0167865522000502": "'Mixing up contrastive learning: Self-supervised representation learning...' — ScienceDirect paper on augmentation strategies in contrastive SSL. Covers the data augmentation perspective."
+  },
+  "notes": "Pool of 33 has good on-topic signal but also noise: Google 2020 year-in-review (broad, unfocused), LLM patterns blog (off-topic), 'Faster sorting algorithms with RL' (Nature, completely off-topic), DL history (tangential), HuBERT explanation (tangential speech model), prompt engineering blog. Many domain-specific application papers present: protein embeddings, remote sensing, histopathology, speech/audio SSL, molecular property prediction, EHR — all relevant to contrastive SSL but narrowly domain-specific. Top-10 prioritizes foundational surveys, ICCV/IEEE papers, and framework tutorials over domain applications."
+}

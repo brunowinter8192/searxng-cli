@@ -1,0 +1,16 @@
+{
+  "mode": "books",
+  "query": "transformer attention mechanism",
+  "selection_method": "LLM oracle (Sonnet, value-eval-b2)",
+  "undersized_pool": true,
+  "pool_size": 4,
+  "top_10": [
+    "https://openlibrary.org/works/OL12439399W",
+    "https://openlibrary.org/works/OL15311250W",
+    "https://openlibrary.org/works/OL1618262W",
+    "https://openlibrary.org/works/OL18481636W"
+  ],
+  "rationale": {
+    "note": "All 4 pool entries are Open Library false positives — none relate to transformer/attention in ML sense. 'Cartesian Meditations' (Husserl), 'The Origin of Ideas' (Rosmini), 'History of the World's Fair' (Truman 1893), 'Understanding Events' (Zacks 2007) are philosophy/history. The books engine returned 0 ML-relevant results for this query; the pool passes the BOOK_WHITELIST filter but is entirely off-topic. Including all 4 per undersized-pool rule but Jaccard scores from this pair are noise. This reveals a books-mode precision problem for ML/DL queries — the query modifier +book is insufficient to surface relevant technical ML books through the current engine set."
+  }
+}

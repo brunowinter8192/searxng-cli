@@ -1,0 +1,32 @@
+{
+  "mode": "docs",
+  "query": "python asyncio event loop concurrency",
+  "selection_method": "LLM oracle (Sonnet, value-eval-b2)",
+  "undersized_pool": false,
+  "pool_size": 40,
+  "top_10": [
+    "https://docs.python.org/3/library/asyncio.html",
+    "https://docs.python.org/3/library/asyncio-eventloop.html",
+    "https://docs.python.org/3/library/asyncio-dev.html",
+    "https://realpython.com/async-io-python/",
+    "https://pymotw.com/3/asyncio/index.html",
+    "https://lucumr.pocoo.org/2016/10/30/i-dont-understand-asyncio/",
+    "https://async-concurrency.com/asyncio-fundamentals-event-loop-architecture/event-loop-configuration/how-to-properly-configure-asyncio-event-loops-for-production/",
+    "https://asyncio-notes.readthedocs.io/en/latest/3_asyncio-eventloops.html",
+    "https://tutorialedge.net/python/concurrency/asyncio-event-loops-tutorial/",
+    "https://doi.org/10.1007/978-1-4842-4401-2_2"
+  ],
+  "rationale": {
+    "https://docs.python.org/3/library/asyncio.html": "Official Python asyncio documentation (top-level, v3.14) — THE authoritative reference. Primary source for all asyncio questions.",
+    "https://docs.python.org/3/library/asyncio-eventloop.html": "Official Python event loop documentation — directly on-topic for 'event loop' component. Covers policy system, running loops, scheduling callbacks.",
+    "https://docs.python.org/3/library/asyncio-dev.html": "Official asyncio development guide — covers debugging, subprocess, concurrency model best practices. Practical companion to the API docs.",
+    "https://realpython.com/async-io-python/": "Real Python asyncio walkthrough — one of the most-cited practical asyncio tutorials. Covers coroutines, event loops, tasks, I/O-bound concurrency. Well-maintained.",
+    "https://pymotw.com/3/asyncio/index.html": "PyMOTW (Python Module of the Week) asyncio — comprehensive module walkthrough by Doug Hellmann. Covers event loop, coroutines, tasks, transport, protocol. Authoritative.",
+    "https://lucumr.pocoo.org/2016/10/30/i-dont-understand-asyncio/": "Armin Ronacher (Flask creator) on asyncio internals — famous deep-dive post explaining the event loop architecture. Addresses 'what is actually happening' level of understanding.",
+    "https://async-concurrency.com/asyncio-fundamentals-event-loop-architecture/event-loop-configuration/how-to-properly-configure-asyncio-event-loops-for-production/": "Production asyncio event loop configuration guide — specifically addresses high-concurrency workloads, thread starvation, deterministic shutdown. Highly practical for 'concurrency' dimension.",
+    "https://asyncio-notes.readthedocs.io/en/latest/3_asyncio-eventloops.html": "asyncio developer notes event loops documentation — focuses on the policy pattern, event loop management model. Directly on-topic for event loop internals.",
+    "https://tutorialedge.net/python/concurrency/asyncio-event-loops-tutorial/": "asyncio event loops tutorial — tutorial specifically about the event loop component, covering asyncio.get_event_loop() and the event loop lifecycle.",
+    "https://doi.org/10.1007/978-1-4842-4401-2_2": "'Working with Event Loops' — Apress book chapter specifically about asyncio event loops and event loop policies. Academic/textbook treatment of event loops."
+  },
+  "notes": "Pool of 40 has strong on-topic signal at the top (official Python docs, canonical tutorials) but significant noise: Julia for HEP (completely off-topic), Xilinx RFSoC/SDR paper, automated driving digital twins, Power Hardware-in-the-Loop, Smart City IoT paper, Nightcore serverless microservices. Also 6 Springer chapters from asyncio books (de Groot 2022, Hunt 2019/2023, Hetland 2024, Divakaran 2025) — relevant but less accessible than tutorial/official sources. The aosabook.org crawler chapter (AOSA) is a strong alternative #11, excluded only by top-10 constraint."
+}
