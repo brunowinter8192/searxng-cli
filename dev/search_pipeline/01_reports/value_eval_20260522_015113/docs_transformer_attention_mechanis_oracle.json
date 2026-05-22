@@ -1,0 +1,32 @@
+{
+  "mode": "docs",
+  "query": "transformer attention mechanism",
+  "selection_method": "LLM oracle (Sonnet, value-eval-b2)",
+  "undersized_pool": false,
+  "pool_size": 44,
+  "top_10": [
+    "https://doi.org/10.65215/2q58a426",
+    "https://jalammar.github.io/illustrated-transformer/",
+    "https://lilianweng.github.io/posts/2018-06-24-attention/",
+    "https://d2l.ai/chapter_attention-mechanisms-and-transformers/index.html",
+    "https://huggingface.co/docs/transformers/v4.30.0/attention",
+    "https://arxiv.org/html/2604.00965v1",
+    "https://arxiv.org/html/2302.07730v4",
+    "https://doi.org/10.31219/osf.io/m6gcn",
+    "https://www.baeldung.com/cs/attention-mechanism-transformers",
+    "https://web.stanford.edu/~jurafsky/slp3/slides/transformer24aug.pdf"
+  ],
+  "rationale": {
+    "https://doi.org/10.65215/2q58a426": "\"Attention Is All You Need\" (Vaswani et al., 6546 citations) — THE original transformer paper. Primary source for query; no top-10 is complete without it.",
+    "https://jalammar.github.io/illustrated-transformer/": "Jay Alammar's Illustrated Transformer — the most widely-referenced visual explanation of transformer architecture and attention. Canonical secondary source.",
+    "https://lilianweng.github.io/posts/2018-06-24-attention/": "Lilian Weng's 'Attention? Attention!' — seminal, comprehensive blog post covering all major attention variants. One of the most-cited blog references in ML.",
+    "https://d2l.ai/chapter_attention-mechanisms-and-transformers/index.html": "Dive into Deep Learning textbook chapter on attention mechanisms and transformers — authoritative textbook, widely used in courses. Covers both theory and implementation.",
+    "https://huggingface.co/docs/transformers/v4.30.0/attention": "HuggingFace attention documentation — practitioner-facing doc on attention variants (sparse, LSH, local). Essential for developers using the dominant transformer library.",
+    "https://arxiv.org/html/2604.00965v1": "'Understanding Transformers and Attention Mechanisms' — tutorial paper specifically about the attention mechanism in modern LMs. Recent (2026) and targeted.",
+    "https://arxiv.org/html/2302.07730v4": "'Transformer models: an introduction and catalog' — comprehensive survey of transformer variants. Useful reference for scope of the field.",
+    "https://doi.org/10.31219/osf.io/m6gcn": "'Attention Mechanism, Transformers, BERT, and GPT: Tutorial and Survey' — explicit tutorial+survey covering seq2seq attention, self-attention, multihead, BERT, GPT. 80 citations.",
+    "https://www.baeldung.com/cs/attention-mechanism-transformers": "Baeldung developer-oriented article on attention in transformers — concise, practical, widely read by practitioners.",
+    "https://web.stanford.edu/~jurafsky/slp3/slides/transformer24aug.pdf": "Stanford Jurafsky/Martin transformer slides — authoritative academic slides from the SLP3 textbook authors. Covers self-attention mechanism directly."
+  },
+  "notes": "Pool of 44 contains strong signal: the original paper, D2L textbook, top blogs (Alammar, Weng), HuggingFace docs, and Stanford slides. Also contains significant noise: Open Library false positives (Husserl, Rosmini, World's Fair, Zacks — same 4 entries as the books pool), domain-application papers (bearing fault diagnosis, satellite detection, drug-drug interaction, ASR), and off-topic entries (GPT-3 Creative Fiction, tokenization article, Mamba, MatMul-free). Excluded domain papers despite high citation counts (Informer 5886×, time-series bearing 485×) because they use transformer attention for specific applications rather than explaining the mechanism."
+}
