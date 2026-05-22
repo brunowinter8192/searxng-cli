@@ -1,0 +1,2591 @@
+{
+  "mode": "general",
+  "query": "postgresql index types btree gin gist performance",
+  "fetched_ts": "2026-05-23T00:02:05",
+  "google_count": 0,
+  "pool_sizes": {
+    "raw": 239,
+    "capped": 48,
+    "filtered_capped": 48
+  },
+  "pool": [
+    {
+      "url": "https://bigdataboutique.com/blog/postgresql-indexes-best-practices",
+      "title": "PostgreSQL Indexes Best Practices: Choosing the Right Index for Every ...",
+      "snippet": "A practical guide to PostgreSQL index types - B-tree, GIN, GiST, BRIN, and more - covering when to use each, common pitfalls, and optimization techniques for production workloads.",
+      "engines": [
+        "duckduckgo"
+      ],
+      "min_position": 7
+    },
+    {
+      "url": "https://blog.devops.dev/how-to-choose-between-index-types-b-tree-gin-gist-in-postgresql-2954638ec4b6",
+      "title": "How to Choose Between Index Types (B-tree, GIN, GiST) in PostgreSQL",
+      "snippet": "Choosing the right index type in PostgreSQL can make the difference between blazing-fast queries and sluggish performance. While B-tree indexes are the default and work for most situations, GIN and GiST indexes unlock powerful capabilities for specific data types and query patterns.",
+      "engines": [
+        "duckduckgo"
+      ],
+      "min_position": 2
+    },
+    {
+      "url": "https://dba.stackexchange.com/questions/46685/index-method-for-very-few-updates-and-many-inserts",
+      "title": "postgresql - Index method for very few updates and many inserts",
+      "snippet": "As a rule of thumb, a GIN index is faster to search than a GiST index, but slower to build or update; so GIN is better suited for static data and ...",
+      "engines": [
+        "mojeek"
+      ],
+      "min_position": 9
+    },
+    {
+      "url": "https://docs.bswen.com/blog/2026-04-20-postgresql-index-types-guide/",
+      "title": "PostgreSQL Index Types: B-tree vs BRIN vs GIN - When to Use Each",
+      "snippet": "Learn how to choose the right PostgreSQL index type for your query patterns. Compare B-tree, BRIN, GIN, and GiST with real production examples.",
+      "engines": [
+        "duckduckgo"
+      ],
+      "min_position": 8
+    },
+    {
+      "url": "https://doi.org/10.1007/978-1-4842-5663-3",
+      "title": "PostgreSQL Configuration",
+      "snippet": "Shaik, B. (2020)",
+      "engines": [
+        "crossref"
+      ],
+      "min_position": 9
+    },
+    {
+      "url": "https://doi.org/10.1007/978-1-4842-5663-3_1",
+      "title": "Best Ways to Install PostgreSQL",
+      "snippet": "Shaik, B. (2020), PostgreSQL Configuration",
+      "engines": [
+        "crossref"
+      ],
+      "min_position": 2
+    },
+    {
+      "url": "https://doi.org/10.1007/978-1-4842-5663-3_5",
+      "title": "Enable Logging of Your Database and Monitoring PostgreSQL Instances",
+      "snippet": "Shaik, B. (2020), PostgreSQL Configuration",
+      "engines": [
+        "crossref"
+      ],
+      "min_position": 4
+    },
+    {
+      "url": "https://doi.org/10.1007/s10707-020-00407-w",
+      "title": "MongoDB Vs PostgreSQL: A comparative study on performance aspects",
+      "snippet": "Abstract Several modern day problems need to deal with large amounts of spatio-temporal data. As such, in order to meet the application requirements, more and more systems are adapting to the specificities of those data. The most prominent case is perhaps the data storage systems, that have developed a large number of functionalities to efficiently support spatio-temporal data operations. This work is motivated by the question of which of those data storage systems is better suited to address the needs of industrial applications. In particular, the work conducted, set to identify the most efficient data store system in terms of response times, comparing two of the most representative of the two categories (NoSQL and relational), i.e. MongoDB and PostgreSQL. The evaluation is based upon real, business scenarios and their subsequent queries as well as their underlying infrastructures and concludes in confirming the superiority of PostgreSQL in almost all cases with the exception of the polygon intersection queries. Furthermore, the average response time is radically reduced with the use of indexes, especially in the case of MongoDB. (Cited 71×)",
+      "engines": [
+        "openalex"
+      ],
+      "min_position": 1
+    },
+    {
+      "url": "https://doi.org/10.1007/springerreference_62191",
+      "title": "GiST Index",
+      "snippet": "",
+      "engines": [
+        "crossref"
+      ],
+      "min_position": 3
+    },
+    {
+      "url": "https://doi.org/10.1088/1742-6596/944/1/012022",
+      "title": "Improving generalized inverted index lock wait times",
+      "snippet": "Concurrent operations on tree like data structures is a cornerstone of any database system. Concurrent operations intended for improving read\\write performance and usually implemented via some way of locking. Deadlock-free methods of concurrency control are known as tree locking protocols. These protocols provide basic operations(verbs) and algorithm (ways of operation invocations) for applying it to any tree-like data structure. These algorithms operate on data, managed by storage engine which are very different among RDBMS implementations. In this paper, we discuss tree locking protocol implementation for General inverted index (Gin) applied to multiversion concurrency control (MVCC) storage engine inside PostgreSQL RDBMS. After that we introduce improvements to locking protocol and provide usage statistics about evaluation of our improvement in very high load environment in one of the world's largest IT company.",
+      "engines": [
+        "openalex"
+      ],
+      "min_position": 2
+    },
+    {
+      "url": "https://doi.org/10.1097/01.ana.0000187778.94201.f7",
+      "title": "Performance of the Bispectral Index During Electrocautery",
+      "snippet": "T, G. et al. (2005), Journal of Neurosurgical Anesthesiology",
+      "engines": [
+        "crossref"
+      ],
+      "min_position": 5
+    },
+    {
+      "url": "https://doi.org/10.1109/informatics47936.2019.9119265",
+      "title": "An implementation of the M-tree index structure for PostgreSQL using GiST",
+      "snippet": "Donko, I. et al. (2019), 2019 IEEE 15th International Scientific Conference on Informatics",
+      "engines": [
+        "crossref"
+      ],
+      "min_position": 1
+    },
+    {
+      "url": "https://doi.org/10.1515/9781503604100-012",
+      "title": "INDEX",
+      "snippet": "(2020), The Gist of Reading",
+      "engines": [
+        "crossref"
+      ],
+      "min_position": 7
+    },
+    {
+      "url": "https://doi.org/10.20944/preprints202511.2170.v1",
+      "title": "Indexing in PostgreSQL: Performance Evaluation and Use Cases",
+      "snippet": "Efficient indexing remains a central factor in achieving predictable performance in modern relational database systems. PostgreSQL provides six native index types—B-Tree, Hash, GiST, SP-GiST, GIN, and BRIN—yet their relative behaviour under different workloads has been characterized in a variety of empirical studies, technical reports and official documentation rather than within a single unified benchmark. This paper presents a comparative, literaturebased analysis of these index types across transactional (OLTP), analytical (OLAP), full-text, JSONB, spatial and time-series workloads. Drawing from existing benchmarks and evaluations, the study synthesizes reported insights on index build time, query latency, storage footprint, maintenance overhead, and index bloat across PostgreSQL deployments. Prior work consistently finds that B-Tree remains the most robust default choice for OLTP equality and range workloads; GIN provides the lowest latency for fulltext and JSONB containment queries at the cost of substantial maintenance overhead and index bloat; GiST and SP-GiST dominate spatial workloads; and BRIN offers the best scalability for append-only analytical and time-series tables due to compact block-range summarization. The analysis highlights that index selection in PostgreSQL must be guided by workload semantics, update intensity, and storage constraints rather than by generic heuristics. Based on the synthesized findings, the paper proposes a practical recommendation matrix that maps workloads to suitable index types, providing actionable guidelines for database practitioners. By consolidating previously fragmented benchmark evidence into a single coherent review, the study clarifies when each native PostgreSQL index type is likely to be the most effective choice in practice.",
+      "engines": [
+        "crossref"
+      ],
+      "min_position": 8
+    },
+    {
+      "url": "https://doi.org/10.3139/9783446473157.bm",
+      "title": "Index",
+      "snippet": "Fröhlich, L. (2022), PostgreSQL",
+      "engines": [
+        "crossref"
+      ],
+      "min_position": 10
+    },
+    {
+      "url": "https://doi.org/10.48550/arxiv.2307.06621",
+      "title": "cjdb: a simple, fast, and lean database solution for the CityGML data model",
+      "snippet": "When it comes to storing 3D city models in a database, the implementation of the CityGML data model can be quite demanding and often results in complicated schemas. As an example, 3DCityDB, a widely used solution, depends on a schema having 66 tables, mapping closely the CityGML architecture. In this paper, we propose an alternative (called cjdb) for storing CityGML models efficiently in PostgreSQL with a much simpler table structure and data model design (only 3 tables are necessary). This is achieved by storing the attributes and geometries of the objects directly in JSON. In the case of the geometries we thus adopt the Simple Feature paradigm and we use the structure of CityJSON. We compare our solution against 3DCityDB with large real-world 3D city models, and we find that cjdb has significantly lower demands in storage space (around a factor of 10), allows for faster import/export of data, and has a comparable data retrieval speed with some queries being faster and some slower. The accompanying software (importer and exporter) is available at https://github.com/cityjson/cjdb/ under a permissive open-source license.",
+      "engines": [
+        "openalex"
+      ],
+      "min_position": 3
+    },
+    {
+      "url": "https://doi.org/10.64149/j.ijesrt.15.4.22-31",
+      "title": "A COMPARATIVE EXPERIMENTAL STUDY OF INDEX PERFORMANCE IN MONGODB AND POSTGRESQL",
+      "snippet": "The continuous growth in data volumes, combined with the increasing complexity of modern enterprise information systems, requires database management systems (DBMS) to guarantee ever faster response times. In this context, query performance optimization has become a major challenge for improving operational efficiency and organizational productivity. Among the most widely used DBMS, PostgreSQL and MongoDB stand out for their ability to manage large amounts of complex data while offering advanced performance optimization mechanisms. These systems notably integrate indexing techniques that significantly accelerate query processing, even in environments characterized by very large data volumes. In the context of this study, we analyze the impact of different indexing techniques applied to queries executed on these two reference DBMS. More specifically, we evaluate the performance of three types of indexes: single index, composite index, and text index. The indexing strategies were applied to different data manipulation operations, including retrieval, update, and deletion. The results obtained highlight the effectiveness of indexing techniques in optimizing query performance and confirm their essential role in the efficient management of large databases within modern information systems.",
+      "engines": [
+        "crossref"
+      ],
+      "min_position": 6
+    },
+    {
+      "url": "https://elephanttamer.net/?p=9",
+      "title": "GiST vs GIN index for LIKE searches – a comparison",
+      "snippet": "Takeaway: always use GIN for trigram indexing, and if your database suffers from poor LIKE performance, check not only the scan type, but also the ...",
+      "engines": [
+        "mojeek"
+      ],
+      "min_position": 6
+    },
+    {
+      "url": "https://habr.com/ru/company/postgrespro/blog/441962/",
+      "title": "Indexes in PostgreSQL",
+      "snippet": "habr.com",
+      "engines": [
+        "lobsters"
+      ],
+      "min_position": 1
+    },
+    {
+      "url": "https://hakibenita.com/postgresql-correlation-brin-multi-minmax",
+      "title": "When Good Correlation is Not Enough",
+      "snippet": "hakibenita.com",
+      "engines": [
+        "lobsters"
+      ],
+      "min_position": 2
+    },
+    {
+      "url": "https://hakibenita.com/postgresql-hash-index",
+      "title": "Re-Introducing Hash Indexes in PostgreSQL",
+      "snippet": "hakibenita.com",
+      "engines": [
+        "lobsters"
+      ],
+      "min_position": 3
+    },
+    {
+      "url": "https://ntsd.dev/postgresql-index-types/",
+      "title": "Explain index types in PostgreSQL | Jirawat Boonkumnerd",
+      "snippet": "Postgres provides many index types such as B-tree, hash, GiST, and GIN. ... GiST and GIN are indexes for supporting Full-Text Search which I’ll ...",
+      "engines": [
+        "mojeek"
+      ],
+      "min_position": 8
+    },
+    {
+      "url": "https://oneuptime.com/blog/post/2026-01-25-use-index-types-effectively-postgresql/view",
+      "title": "How to Use Index Types Effectively in PostgreSQL",
+      "snippet": "Learn how to choose and use the right index types in PostgreSQL. This guide covers B-tree, Hash, GIN, GiST, BRIN, and partial indexes with practical examples for optimal query performance.",
+      "engines": [
+        "duckduckgo"
+      ],
+      "min_position": 5
+    },
+    {
+      "url": "https://openalex.org/W2612672839",
+      "title": "PostgreSQL database performance optimization",
+      "snippet": "The thesis was request by Marlevo software Oy for a general description of the PostgreSQL database and its performance optimization technics. Its purpose was to help new PostgreSQL users to quickly understand the system and to assist DBAs to improve the database performance.\r\\n\r\\nThe thesis was divided into two parts. The first part described PostgreSQL database optimization technics in theory. In additional popular tools were also introduced. This part was based on PostgreSQL documentation, relevant books and other online resources. The second part demonstrates the optimization process in practice with 3 test cases. Each case was created from a different aspect.\r\\n\r\\nThe thesis concludes PostgreSQL database optimization is different from others. Users should have enough knowledge about it before performing database optimization tasks. Especially for those who come from SQL server and DB2 world.",
+      "engines": [
+        "openalex"
+      ],
+      "min_position": 5
+    },
+    {
+      "url": "https://openalex.org/W2896189947",
+      "title": "Highly Efficient Search In Linguistic Data",
+      "snippet": "Electronic dictionaries and online learning services have become a common tool for translators, linguistics and people trying to learn a new language.This master's thesis work has been carried out in the company Kielikone.The company owns an online learning service called Sanakirja.fi,which helps in studying and teaching foreign languages with the help of a dictionary search service, where people can make bidirectional searches for headwords in multiple languages (over 40).The goal of this thesis is to analyse and develop a unified interface to search entries from different dictionary resources.In this master's thesis work we try to develop a 'standard' information retrieval system on linguistic data.Although the system uses many different methods existing in Information Retrieval Systems, it also contains facilities, optimized for linguistic data.We have tried to compare and use different techniques of information retrieval and learning to rank to store, retrieve and rank information from a very large data source, containing around 80 million records.The system also supports approximate search which has been implemented using wild card searching algorithm and ranks results according to the degree of closeness to the query.In the end we implement a learning to rank system which learns from user feedback and the results are passed to a logistic regression classifier.The classifier predicts the feature coefficients and those, combined with the real weight features are used to improve the ranking of the system.",
+      "engines": [
+        "openalex"
+      ],
+      "min_position": 4
+    },
+    {
+      "url": "https://stackoverflow.com/questions/12738997/postgres-gist-vs-btree-index",
+      "title": "postgresql - Postgres GIST vs Btree index - Stack Overflow",
+      "snippet": "It's considerably slower than regular b-tree indexes, but allows you to create a multi-column index that contains both GiST-only types and regular ...",
+      "engines": [
+        "mojeek"
+      ],
+      "min_position": 3
+    },
+    {
+      "url": "https://stackoverflow.com/questions/1540374/why-are-postgresql-text-search-gist-indexes-so-much-slower-than-gin-indexes",
+      "title": "performance - Why are PostgreSQL Text-Search GiST indexes so",
+      "snippet": "The docs have a nice overview of the performance differences between GiST and GIN indexes if you're interested: GiST and GIN Index Types .",
+      "engines": [
+        "mojeek"
+      ],
+      "min_position": 5
+    },
+    {
+      "url": "https://stackoverflow.com/questions/21830/postgresql-gin-or-gist-indexes",
+      "title": "indexing - PostgreSQL: GIN or GiST indexes? - Stack Overflow",
+      "snippet": "First of all, do you need to use them for text search indexing? GIN and GiST are index specialized for some data types.",
+      "engines": [
+        "mojeek"
+      ],
+      "min_position": 2
+    },
+    {
+      "url": "https://stackoverflow.com/questions/40780825/btree-vs-gin-vs-gist-index",
+      "title": "postgresql - BTREE vs GIN vs GIST index - Stack Overflow",
+      "snippet": "5 From PostgreSQL documentation: 11.2. Index Types By default, the CREATE INDEX command creates B-tree indexes The other index types are selected by writing the keyword USING followed by the index type name B-trees can handle equality and range queries on data that can be sorted (< <= = >= > BETWEEN, IN)",
+      "engines": [
+        "duckduckgo",
+        "mojeek"
+      ],
+      "min_position": 1
+    },
+    {
+      "url": "https://stackoverflow.com/questions/766488/whats-the-difference-between-b-tree-and-gist-index-methods-in-postgresql",
+      "title": "indexing - What's the difference between B-Tree and GiST",
+      "snippet": "There was a recent post on the PG lists about a huge performance hit for using GiST indexes; they're expected to be slower than B-Trees (such is the ...",
+      "engines": [
+        "mojeek"
+      ],
+      "min_position": 4
+    },
+    {
+      "url": "https://www.2ndquadrant.com/en/blog/parallelism-comes-to-vacuum/",
+      "title": "Parallelism comes to VACUUM",
+      "snippet": "2ndquadrant.com",
+      "engines": [
+        "lobsters"
+      ],
+      "min_position": 5
+    },
+    {
+      "url": "https://www.depesz.com/2014/05/12/joining-btree-and-gingist-indexes/",
+      "title": "Joining BTree and GIN/GiST indexes – select * from depesz;",
+      "snippet": "... gin_btree (there is also gist_btree if your “ base\" index ... What it is – it adds “ btree\" type of operators support to gin index.",
+      "engines": [
+        "mojeek"
+      ],
+      "min_position": 7
+    },
+    {
+      "url": "https://www.elysiate.com/blog/best-postgresql-indexes-for-performance",
+      "title": "Best PostgreSQL Indexes for Performance | Elysiate",
+      "snippet": "A practical PostgreSQL guide to choosing the best indexes for performance, including B-tree, GIN, GiST, BRIN, partial, multicolumn, covering, and expression indexes.",
+      "engines": [
+        "duckduckgo"
+      ],
+      "min_position": 4
+    },
+    {
+      "url": "https://www.iamraghuveer.com/posts/postgresql-indexes-deep-dive/",
+      "title": "PostgreSQL Indexes Deep Dive: B-Tree, GIN, GiST, and BRIN",
+      "snippet": "PostgreSQL Indexes Deep Dive: B-Tree, GIN, GiST, and BRIN Choosing the wrong index type or missing an index entirely is among the most common causes of database performance problems.",
+      "engines": [
+        "duckduckgo"
+      ],
+      "min_position": 10
+    },
+    {
+      "url": "https://www.meerako.com/blogs/postgresql-indexing-strategies-btree-gin-gist-guide",
+      "title": "PostgreSQL Indexing Deep Dive | Meerako",
+      "snippet": "PostgreSQL Indexing Deep Dive: B-Tree, GIN, GiST, and When to Use Them Slow queries? The right index is magic. Our Postgres experts explain different index types (B-Tree, GIN, GiST) and how to optimize your queries.",
+      "engines": [
+        "duckduckgo"
+      ],
+      "min_position": 3
+    },
+    {
+      "url": "https://www.mydbops.com/blog/postgresql-indexing-best-practices-guide",
+      "title": "PostgreSQL Index Best Practices for Faster Queries | Mydbops",
+      "snippet": "Boost PostgreSQL query performance with the right indexing strategies. Learn best practices for using B-Tree, Hash, GIN, and more to Contact Mydbops today.",
+      "engines": [
+        "duckduckgo"
+      ],
+      "min_position": 9
+    },
+    {
+      "url": "https://www.percona.com/blog/2019/06/21/hypothetical-indexes-in-postgresql/",
+      "title": "Hypothetical Indexes in PostgreSQL",
+      "snippet": "percona.com",
+      "engines": [
+        "lobsters"
+      ],
+      "min_position": 4
+    },
+    {
+      "url": "https://www.postgresql.org/about/news/postgresql-18-beta-1-released-3070/",
+      "title": "PostgreSQL 18 Beta 1 Released",
+      "snippet": "postgresql.org",
+      "engines": [
+        "lobsters"
+      ],
+      "min_position": 6
+    },
+    {
+      "url": "https://www.postgresql.org/docs/current/indexes-types.html",
+      "title": "PostgreSQL: Documentation: 18: 11.2. Index Types",
+      "snippet": "PostgreSQL provides several index types: B-tree, Hash, GiST, SP-GiST, GIN, BRIN, and the extension bloom. Each index type uses a different algorithm that is best suited to different types of indexable clauses. By default, the CREATE INDEX command creates B-tree indexes, which fit the most common situations. The other index types are selected by writing the keyword USING followed by the index ...",
+      "engines": [
+        "duckduckgo"
+      ],
+      "min_position": 1
+    },
+    {
+      "url": "https://www.semanticscholar.org/paper/Comparative-analysis-of-indexing-strategies-in-load-Zolotukhina/a1bcf6c3ddb11cd3dc7cb9cafbbae31fd2c222f7",
+      "title": "Comparative analysis of indexing strategies in PostgreSQL under various load scenarios",
+      "snippet": "TLDRThe main conclusions of the conducted research are recommendations on the choice of indexes depending on the types of queries and their execution conditions, which makes it possible to improve application performance by choosing an optimal indexing strategy.Expand",
+      "engines": [
+        "semantic_scholar"
+      ],
+      "min_position": 1
+    },
+    {
+      "url": "https://www.semanticscholar.org/paper/Efficient-Iris-Recognition-Management-in-Databases-Alvez-Miranda/cd69c81398ea9b392f8f93f9e290cc5402cf5b5f",
+      "title": "Efficient Iris Recognition Management in Object-Related Databases",
+      "snippet": "TLDRAn extension of an Object Relational Database Management System for the integral management of a biometric system based on the human iris was presented, which includes both the extension of the type system and the definition of domain indexes for performance improvement.Expand",
+      "engines": [
+        "semantic_scholar"
+      ],
+      "min_position": 7
+    },
+    {
+      "url": "https://www.semanticscholar.org/paper/Intra-page-Indexing-in-Generalized-Search-Trees-of-Borodin-Mirvoda/a402de1fc7c031608b9a55083b5084aaf4390e97",
+      "title": "Intra-page Indexing in Generalized Search Trees of PostgreSQL",
+      "snippet": "TLDRThis paper proposes changes to this limitation with additional intra-page indexing, based on the concept of skip tuples, which allows to increase of insert and update performance by the factor of 1.5 and opens new ways towards GiST API advancement.Expand",
+      "engines": [
+        "semantic_scholar"
+      ],
+      "min_position": 5
+    },
+    {
+      "url": "https://www.semanticscholar.org/paper/Purdue-e-Pubs-Purdue-e-Pubs-non-traditional-Oracle/685f1a3f6b6207a98830f4e6d082c729af9f2e05",
+      "title": "Purdue e-Pubs Purdue e-Pubs",
+      "snippet": "TLDRThis paper presents a serious attempt at plementing and realizing SP-GiST-based in dexes inside Postgres facilitated by rapid SP-GiST instantiations and highlights the performance gains and several strengths and weak nesses of SP-GiST-bilsed indexes that need to be addressed in future research.Expand",
+      "engines": [
+        "semantic_scholar"
+      ],
+      "min_position": 6
+    },
+    {
+      "url": "https://www.semanticscholar.org/paper/Research-and-Comparative-Analysis-of-Approaches-to-Dubrovskaia-Balanev/ef8e4bbf124a1ae45eec52efbab4c3b0dd9e00f0",
+      "title": "Research and Comparative Analysis of Approaches to Data Storage Architecture, Hashing, Indexing, and data Compression in Oracle and PostgreSQL",
+      "snippet": "TLDRThe comparative analysis demonstrates that Oracle is oriented toward performance and scalability, while PostgreSQL emphasizes flexibility and architectural extensibility.Expand",
+      "engines": [
+        "semantic_scholar"
+      ],
+      "min_position": 2
+    },
+    {
+      "url": "https://www.semanticscholar.org/paper/Space-Partitioning-Trees-in-PostgreSQL%3A-Realization-Eltabakh-Eltarras/35cab96c86bae325db7a456ffc64f57c142fe56c",
+      "title": "Space-Partitioning Trees in PostgreSQL: Realization and Performance",
+      "snippet": "TLDRThis paper presents a serious attempt at implementing and realizing SP-GiST-based indexes inside PostgreSQL, and interesting results that highlight the potential performance gains of SP GiST- based indexes are presented.Expand",
+      "engines": [
+        "semantic_scholar"
+      ],
+      "min_position": 3
+    },
+    {
+      "url": "https://www.semanticscholar.org/paper/Supporting-Trajectory-UDF-Queries-and-Indexes-on-Yang-Nam/d0162e56e832f5bb439a2fba1825ed8b58521308",
+      "title": "Supporting Trajectory UDF Queries and Indexes on PostGIS",
+      "snippet": "TLDRA new system supporting trajectory queries on PostGIS using UDFs is developed and Experimental results show that the pre‐materialization techniques are about 1.2 times faster than naïve query processing using r‐tree index.Expand",
+      "engines": [
+        "semantic_scholar"
+      ],
+      "min_position": 8
+    },
+    {
+      "url": "https://www.semanticscholar.org/paper/To-Trie-or-Not-to-Trie-Realizing-Space-partitioning-Eltabakh-Eltarras/ed662da5a5b1211803258fff46e287ced52b10f8",
+      "title": "To Trie or Not to Trie? Realizing Space-partitioning Trees inside PostgreSQL: Challenges, Experiences and Performance",
+      "snippet": "TLDRThis paper presents a serious attempt at implementing and realizing SP-GiST-based indexes inside PostgreSQL and highlights the potentifd performance gains of SP-GiST-based indexes as well as several strengths and weaknesses of SP-GiST-bilsed indexes that need to be addressed in future research.Expand",
+      "engines": [
+        "semantic_scholar"
+      ],
+      "min_position": 4
+    },
+    {
+      "url": "https://www.thenile.dev/docs/extensions/btree_gin",
+      "title": "Btree_gin - Nile Documentation",
+      "snippet": "The btree_gin extension in PostgreSQL enables GIN indexes to support B-tree indexable data types. ... GIN index with btree_gin is useful when ...",
+      "engines": [
+        "mojeek"
+      ],
+      "min_position": 10
+    }
+  ],
+  "pool_full": [
+    {
+      "url": "https://bigdataboutique.com/blog/postgresql-indexes-best-practices",
+      "title": "PostgreSQL Indexes Best Practices: Choosing the Right Index for Every ...",
+      "snippet": "A practical guide to PostgreSQL index types - B-tree, GIN, GiST, BRIN, and more - covering when to use each, common pitfalls, and optimization techniques for production workloads.",
+      "engines": [
+        "duckduckgo"
+      ],
+      "min_position": 7
+    },
+    {
+      "url": "https://blog.devops.dev/how-to-choose-between-index-types-b-tree-gin-gist-in-postgresql-2954638ec4b6",
+      "title": "How to Choose Between Index Types (B-tree, GIN, GiST) in PostgreSQL",
+      "snippet": "Choosing the right index type in PostgreSQL can make the difference between blazing-fast queries and sluggish performance. While B-tree indexes are the default and work for most situations, GIN and GiST indexes unlock powerful capabilities for specific data types and query patterns.",
+      "engines": [
+        "duckduckgo"
+      ],
+      "min_position": 2
+    },
+    {
+      "url": "https://dba.stackexchange.com/questions/46685/index-method-for-very-few-updates-and-many-inserts",
+      "title": "postgresql - Index method for very few updates and many inserts",
+      "snippet": "As a rule of thumb, a GIN index is faster to search than a GiST index, but slower to build or update; so GIN is better suited for static data and ...",
+      "engines": [
+        "mojeek"
+      ],
+      "min_position": 9
+    },
+    {
+      "url": "https://docs.bswen.com/blog/2026-04-20-postgresql-index-types-guide/",
+      "title": "PostgreSQL Index Types: B-tree vs BRIN vs GIN - When to Use Each",
+      "snippet": "Learn how to choose the right PostgreSQL index type for your query patterns. Compare B-tree, BRIN, GIN, and GiST with real production examples.",
+      "engines": [
+        "duckduckgo"
+      ],
+      "min_position": 8
+    },
+    {
+      "url": "https://doi.org/10.1007/978-0-387-35973-1_535",
+      "title": "GiST Index",
+      "snippet": "Shekhar, S. et al. (2008), Encyclopedia of GIS",
+      "engines": [
+        "crossref"
+      ],
+      "min_position": 54
+    },
+    {
+      "url": "https://doi.org/10.1007/978-1-4302-0018-5",
+      "title": "Beginning Databases with PostgreSQL",
+      "snippet": "(2005)",
+      "engines": [
+        "crossref"
+      ],
+      "min_position": 98
+    },
+    {
+      "url": "https://doi.org/10.1007/978-1-4302-0018-5_1",
+      "title": "Introduction to PostgreSQL",
+      "snippet": "",
+      "engines": [
+        "crossref"
+      ],
+      "min_position": 30
+    },
+    {
+      "url": "https://doi.org/10.1007/978-1-4302-0018-5_11",
+      "title": "PostgreSQL Administration",
+      "snippet": "",
+      "engines": [
+        "crossref"
+      ],
+      "min_position": 11
+    },
+    {
+      "url": "https://doi.org/10.1007/978-1-4302-0018-5_12",
+      "title": "Database Design",
+      "snippet": "",
+      "engines": [
+        "crossref"
+      ],
+      "min_position": 131
+    },
+    {
+      "url": "https://doi.org/10.1007/978-1-4302-0018-5_13",
+      "title": "Accessing PostgreSQL from C Using libpq",
+      "snippet": "",
+      "engines": [
+        "crossref"
+      ],
+      "min_position": 32
+    },
+    {
+      "url": "https://doi.org/10.1007/978-1-4302-0018-5_14",
+      "title": "Accessing PostgreSQL from C Using Embedded SQL",
+      "snippet": "",
+      "engines": [
+        "crossref"
+      ],
+      "min_position": 45
+    },
+    {
+      "url": "https://doi.org/10.1007/978-1-4302-0018-5_15",
+      "title": "Accessing PostgreSQL from PHP",
+      "snippet": "",
+      "engines": [
+        "crossref"
+      ],
+      "min_position": 28
+    },
+    {
+      "url": "https://doi.org/10.1007/978-1-4302-0018-5_16",
+      "title": "Accessing PostgreSQL from Perl",
+      "snippet": "",
+      "engines": [
+        "crossref"
+      ],
+      "min_position": 38
+    },
+    {
+      "url": "https://doi.org/10.1007/978-1-4302-0018-5_17",
+      "title": "Accessing PostgreSQL from Java",
+      "snippet": "",
+      "engines": [
+        "crossref"
+      ],
+      "min_position": 36
+    },
+    {
+      "url": "https://doi.org/10.1007/978-1-4302-0018-5_18",
+      "title": "Accessing PostgreSQL from C#",
+      "snippet": "",
+      "engines": [
+        "crossref"
+      ],
+      "min_position": 40
+    },
+    {
+      "url": "https://doi.org/10.1007/978-1-4302-0018-5_2",
+      "title": "Relational Database Principles",
+      "snippet": "",
+      "engines": [
+        "crossref"
+      ],
+      "min_position": 141
+    },
+    {
+      "url": "https://doi.org/10.1007/978-1-4302-0018-5_3",
+      "title": "Getting Started with PostgreSQL",
+      "snippet": "",
+      "engines": [
+        "crossref"
+      ],
+      "min_position": 20
+    },
+    {
+      "url": "https://doi.org/10.1007/978-1-4302-0018-5_4",
+      "title": "Accessing Your Data",
+      "snippet": "",
+      "engines": [
+        "crossref"
+      ],
+      "min_position": 165
+    },
+    {
+      "url": "https://doi.org/10.1007/978-1-4302-0018-5_5",
+      "title": "PostgreSQL Command-Line and Graphical Tools",
+      "snippet": "",
+      "engines": [
+        "crossref"
+      ],
+      "min_position": 17
+    },
+    {
+      "url": "https://doi.org/10.1007/978-1-4302-0018-5_6",
+      "title": "Data Interfacing",
+      "snippet": "",
+      "engines": [
+        "crossref"
+      ],
+      "min_position": 124
+    },
+    {
+      "url": "https://doi.org/10.1007/978-1-4302-0018-5_7",
+      "title": "Advanced Data Selection",
+      "snippet": "",
+      "engines": [
+        "crossref"
+      ],
+      "min_position": 170
+    },
+    {
+      "url": "https://doi.org/10.1007/978-1-4302-0018-5_8",
+      "title": "Data Definition and Manipulation",
+      "snippet": "",
+      "engines": [
+        "crossref"
+      ],
+      "min_position": 199
+    },
+    {
+      "url": "https://doi.org/10.1007/978-1-4302-0018-5_9",
+      "title": "Transactions and Locking",
+      "snippet": "",
+      "engines": [
+        "crossref"
+      ],
+      "min_position": 158
+    },
+    {
+      "url": "https://doi.org/10.1007/978-1-4302-0136-6",
+      "title": "Beginning PHP and PostgreSQL 8",
+      "snippet": "(2006)",
+      "engines": [
+        "crossref"
+      ],
+      "min_position": 128
+    },
+    {
+      "url": "https://doi.org/10.1007/978-1-4302-0136-6_11",
+      "title": "PEAR",
+      "snippet": "",
+      "engines": [
+        "crossref"
+      ],
+      "min_position": 139
+    },
+    {
+      "url": "https://doi.org/10.1007/978-1-4302-0136-6_12",
+      "title": "Date and Time",
+      "snippet": "",
+      "engines": [
+        "crossref"
+      ],
+      "min_position": 174
+    },
+    {
+      "url": "https://doi.org/10.1007/978-1-4302-0136-6_13",
+      "title": "Forms and Navigational Cues",
+      "snippet": "",
+      "engines": [
+        "crossref"
+      ],
+      "min_position": 190
+    },
+    {
+      "url": "https://doi.org/10.1007/978-1-4302-0136-6_14",
+      "title": "Authentication",
+      "snippet": "",
+      "engines": [
+        "crossref"
+      ],
+      "min_position": 122
+    },
+    {
+      "url": "https://doi.org/10.1007/978-1-4302-0136-6_15",
+      "title": "Handling File Uploads",
+      "snippet": "",
+      "engines": [
+        "crossref"
+      ],
+      "min_position": 162
+    },
+    {
+      "url": "https://doi.org/10.1007/978-1-4302-0136-6_16",
+      "title": "Networking",
+      "snippet": "",
+      "engines": [
+        "crossref"
+      ],
+      "min_position": 149
+    },
+    {
+      "url": "https://doi.org/10.1007/978-1-4302-0136-6_17",
+      "title": "PHP and LDAP",
+      "snippet": "",
+      "engines": [
+        "crossref"
+      ],
+      "min_position": 134
+    },
+    {
+      "url": "https://doi.org/10.1007/978-1-4302-0136-6_18",
+      "title": "Session Handlers",
+      "snippet": "",
+      "engines": [
+        "crossref"
+      ],
+      "min_position": 178
+    },
+    {
+      "url": "https://doi.org/10.1007/978-1-4302-0136-6_19",
+      "title": "Templating with Smarty",
+      "snippet": "",
+      "engines": [
+        "crossref"
+      ],
+      "min_position": 172
+    },
+    {
+      "url": "https://doi.org/10.1007/978-1-4302-0136-6_20",
+      "title": "Web Services",
+      "snippet": "",
+      "engines": [
+        "crossref"
+      ],
+      "min_position": 177
+    },
+    {
+      "url": "https://doi.org/10.1007/978-1-4302-0136-6_21",
+      "title": "Secure PHP Programming",
+      "snippet": "",
+      "engines": [
+        "crossref"
+      ],
+      "min_position": 148
+    },
+    {
+      "url": "https://doi.org/10.1007/978-1-4302-0136-6_22",
+      "title": "SQLite",
+      "snippet": "",
+      "engines": [
+        "crossref"
+      ],
+      "min_position": 160
+    },
+    {
+      "url": "https://doi.org/10.1007/978-1-4302-0136-6_23",
+      "title": "Introducing PDO",
+      "snippet": "",
+      "engines": [
+        "crossref"
+      ],
+      "min_position": 154
+    },
+    {
+      "url": "https://doi.org/10.1007/978-1-4302-0136-6_24",
+      "title": "Introducing PostgreSQL",
+      "snippet": "",
+      "engines": [
+        "crossref"
+      ],
+      "min_position": 19
+    },
+    {
+      "url": "https://doi.org/10.1007/978-1-4302-0136-6_25",
+      "title": "Installing PostgreSQL",
+      "snippet": "",
+      "engines": [
+        "crossref"
+      ],
+      "min_position": 16
+    },
+    {
+      "url": "https://doi.org/10.1007/978-1-4302-0136-6_26",
+      "title": "PostgreSQL Administration",
+      "snippet": "",
+      "engines": [
+        "crossref"
+      ],
+      "min_position": 15
+    },
+    {
+      "url": "https://doi.org/10.1007/978-1-4302-0136-6_27",
+      "title": "The Many PostgreSQL Clients",
+      "snippet": "",
+      "engines": [
+        "crossref"
+      ],
+      "min_position": 25
+    },
+    {
+      "url": "https://doi.org/10.1007/978-1-4302-0136-6_29",
+      "title": "Securing PostgreSQL",
+      "snippet": "",
+      "engines": [
+        "crossref"
+      ],
+      "min_position": 23
+    },
+    {
+      "url": "https://doi.org/10.1007/978-1-4302-0136-6_3",
+      "title": "PHP Basics",
+      "snippet": "",
+      "engines": [
+        "crossref"
+      ],
+      "min_position": 164
+    },
+    {
+      "url": "https://doi.org/10.1007/978-1-4302-0136-6_30",
+      "title": "PHP’s PostgreSQL Functionality",
+      "snippet": "",
+      "engines": [
+        "crossref"
+      ],
+      "min_position": 33
+    },
+    {
+      "url": "https://doi.org/10.1007/978-1-4302-0136-6_31",
+      "title": "Practical Database Queries",
+      "snippet": "",
+      "engines": [
+        "crossref"
+      ],
+      "min_position": 181
+    },
+    {
+      "url": "https://doi.org/10.1007/978-1-4302-0136-6_32",
+      "title": "Views and Rules",
+      "snippet": "",
+      "engines": [
+        "crossref"
+      ],
+      "min_position": 184
+    },
+    {
+      "url": "https://doi.org/10.1007/978-1-4302-0136-6_33",
+      "title": "PostgreSQL Functions",
+      "snippet": "",
+      "engines": [
+        "crossref"
+      ],
+      "min_position": 18
+    },
+    {
+      "url": "https://doi.org/10.1007/978-1-4302-0136-6_34",
+      "title": "PostgreSQL Triggers",
+      "snippet": "",
+      "engines": [
+        "crossref"
+      ],
+      "min_position": 24
+    },
+    {
+      "url": "https://doi.org/10.1007/978-1-4302-0136-6_35",
+      "title": "Indexes and Searching",
+      "snippet": "",
+      "engines": [
+        "crossref"
+      ],
+      "min_position": 176
+    },
+    {
+      "url": "https://doi.org/10.1007/978-1-4302-0136-6_36",
+      "title": "Transactions",
+      "snippet": "",
+      "engines": [
+        "crossref"
+      ],
+      "min_position": 152
+    },
+    {
+      "url": "https://doi.org/10.1007/978-1-4302-0136-6_37",
+      "title": "Importing and Exporting Data",
+      "snippet": "",
+      "engines": [
+        "crossref"
+      ],
+      "min_position": 169
+    },
+    {
+      "url": "https://doi.org/10.1007/978-1-4302-0136-6_4",
+      "title": "Functions",
+      "snippet": "",
+      "engines": [
+        "crossref"
+      ],
+      "min_position": 133
+    },
+    {
+      "url": "https://doi.org/10.1007/978-1-4302-0136-6_5",
+      "title": "Arrays",
+      "snippet": "",
+      "engines": [
+        "crossref"
+      ],
+      "min_position": 150
+    },
+    {
+      "url": "https://doi.org/10.1007/978-1-4302-0136-6_6",
+      "title": "Object-Oriented PHP",
+      "snippet": "",
+      "engines": [
+        "crossref"
+      ],
+      "min_position": 166
+    },
+    {
+      "url": "https://doi.org/10.1007/978-1-4302-0136-6_7",
+      "title": "Advanced OOP Features",
+      "snippet": "",
+      "engines": [
+        "crossref"
+      ],
+      "min_position": 186
+    },
+    {
+      "url": "https://doi.org/10.1007/978-1-4302-0136-6_8",
+      "title": "Error and Exception Handling",
+      "snippet": "",
+      "engines": [
+        "crossref"
+      ],
+      "min_position": 197
+    },
+    {
+      "url": "https://doi.org/10.1007/978-1-4302-0137-3_35",
+      "title": "Indexes and Searching",
+      "snippet": "",
+      "engines": [
+        "crossref"
+      ],
+      "min_position": 161
+    },
+    {
+      "url": "https://doi.org/10.1007/978-1-4302-0137-3_36",
+      "title": "Transactions",
+      "snippet": "",
+      "engines": [
+        "crossref"
+      ],
+      "min_position": 147
+    },
+    {
+      "url": "https://doi.org/10.1007/978-1-4842-3447-1_2",
+      "title": "PostgreSQL Architecture",
+      "snippet": "Shaik, B. et al. (2018), Beginning PostgreSQL on the Cloud",
+      "engines": [
+        "crossref"
+      ],
+      "min_position": 48
+    },
+    {
+      "url": "https://doi.org/10.1007/978-1-4842-5663-3",
+      "title": "PostgreSQL Configuration",
+      "snippet": "Shaik, B. (2020)",
+      "engines": [
+        "crossref"
+      ],
+      "min_position": 9
+    },
+    {
+      "url": "https://doi.org/10.1007/978-1-4842-5663-3_1",
+      "title": "Best Ways to Install PostgreSQL",
+      "snippet": "Shaik, B. (2020), PostgreSQL Configuration",
+      "engines": [
+        "crossref"
+      ],
+      "min_position": 2
+    },
+    {
+      "url": "https://doi.org/10.1007/978-1-4842-5663-3_2",
+      "title": "Configure Your Database for Better Performance",
+      "snippet": "Shaik, B. (2020), PostgreSQL Configuration",
+      "engines": [
+        "crossref"
+      ],
+      "min_position": 21
+    },
+    {
+      "url": "https://doi.org/10.1007/978-1-4842-5663-3_3",
+      "title": "User Management and Securing Databases",
+      "snippet": "Shaik, B. (2020), PostgreSQL Configuration",
+      "engines": [
+        "crossref"
+      ],
+      "min_position": 49
+    },
+    {
+      "url": "https://doi.org/10.1007/978-1-4842-5663-3_4",
+      "title": "Backup and Restore Best Practices",
+      "snippet": "Shaik, B. (2020), PostgreSQL Configuration",
+      "engines": [
+        "crossref"
+      ],
+      "min_position": 43
+    },
+    {
+      "url": "https://doi.org/10.1007/978-1-4842-5663-3_5",
+      "title": "Enable Logging of Your Database and Monitoring PostgreSQL Instances",
+      "snippet": "Shaik, B. (2020), PostgreSQL Configuration",
+      "engines": [
+        "crossref"
+      ],
+      "min_position": 4
+    },
+    {
+      "url": "https://doi.org/10.1007/978-1-4842-5663-3_6",
+      "title": "Execute Maintenance",
+      "snippet": "Shaik, B. (2020), PostgreSQL Configuration",
+      "engines": [
+        "crossref"
+      ],
+      "min_position": 35
+    },
+    {
+      "url": "https://doi.org/10.1007/978-1-4842-5663-3_7",
+      "title": "High Availability Procedures and Implementing a Pooler",
+      "snippet": "Shaik, B. (2020), PostgreSQL Configuration",
+      "engines": [
+        "crossref"
+      ],
+      "min_position": 65
+    },
+    {
+      "url": "https://doi.org/10.1007/978-1-4842-5663-3_8",
+      "title": "Basic Errors and Handy Queries",
+      "snippet": "Shaik, B. (2020), PostgreSQL Configuration",
+      "engines": [
+        "crossref"
+      ],
+      "min_position": 47
+    },
+    {
+      "url": "https://doi.org/10.1007/978-1-4842-6885-8_10",
+      "title": "Application Development and Performance",
+      "snippet": "Dombrovskaya, H. et al. (2021), PostgreSQL Query Optimization",
+      "engines": [
+        "crossref"
+      ],
+      "min_position": 92
+    },
+    {
+      "url": "https://doi.org/10.1007/978-1-4842-7047-9_6",
+      "title": "PolyBase to PostgreSQL",
+      "snippet": "Feasel, K. (2021), PolyBase in SQL Server 2019",
+      "engines": [
+        "crossref"
+      ],
+      "min_position": 100
+    },
+    {
+      "url": "https://doi.org/10.1007/978-1-4842-8992-1_14",
+      "title": "Building with Modern Spring, Java, and PostgreSQL",
+      "snippet": "Royal, P. (2023), Building Modern Business Applications",
+      "engines": [
+        "crossref"
+      ],
+      "min_position": 118
+    },
+    {
+      "url": "https://doi.org/10.1007/978-1-4842-9840-4_3",
+      "title": "PL/pgSQL Data Types",
+      "snippet": "Shaik, B. et al. (2023), Procedural Programming with PostgreSQL PL/pgSQL",
+      "engines": [
+        "crossref"
+      ],
+      "min_position": 39
+    },
+    {
+      "url": "https://doi.org/10.1007/978-3-319-04936-6_6",
+      "title": "Architecture and Performance Characteristics of a PostgreSQL Implementation of the TPC-E and TPC-V Workloads",
+      "snippet": "Bond, A. et al. (2014), Lecture Notes in Computer Science",
+      "engines": [
+        "crossref"
+      ],
+      "min_position": 198
+    },
+    {
+      "url": "https://doi.org/10.1007/978-3-319-17885-1_100519",
+      "title": "GiST Index",
+      "snippet": "(2017), Encyclopedia of GIS",
+      "engines": [
+        "crossref"
+      ],
+      "min_position": 26
+    },
+    {
+      "url": "https://doi.org/10.1007/978-3-540-36634-8_11",
+      "title": "PostgreSQL Database",
+      "snippet": "",
+      "engines": [
+        "crossref"
+      ],
+      "min_position": 123
+    },
+    {
+      "url": "https://doi.org/10.1007/979-8-8688-0069-6_11",
+      "title": "Application Development and Performance",
+      "snippet": "Dombrovskaya, H. et al. (2024), PostgreSQL Query Optimization",
+      "engines": [
+        "crossref"
+      ],
+      "min_position": 82
+    },
+    {
+      "url": "https://doi.org/10.1007/979-8-8688-0782-4_17",
+      "title": "PostgreSQL-to-PostgreSQL Replication",
+      "snippet": "Curtis, B. (2025), Pro Oracle GoldenGate 23ai for the DBA",
+      "engines": [
+        "crossref"
+      ],
+      "min_position": 117
+    },
+    {
+      "url": "https://doi.org/10.1007/979-8-8688-0817-3_1",
+      "title": "Introduction to PostgreSQL Database Management",
+      "snippet": "Vadlamani, V. (2024), PostgreSQL Skills Development on Cloud",
+      "engines": [
+        "crossref"
+      ],
+      "min_position": 105
+    },
+    {
+      "url": "https://doi.org/10.1007/979-8-8688-0817-3_10",
+      "title": "PostgreSQL Post-Installation Tasks",
+      "snippet": "Vadlamani, V. (2024), PostgreSQL Skills Development on Cloud",
+      "engines": [
+        "crossref"
+      ],
+      "min_position": 119
+    },
+    {
+      "url": "https://doi.org/10.1007/979-8-8688-0817-3_13",
+      "title": "PostgreSQL Recovery",
+      "snippet": "Vadlamani, V. (2024), PostgreSQL Skills Development on Cloud",
+      "engines": [
+        "crossref"
+      ],
+      "min_position": 99
+    },
+    {
+      "url": "https://doi.org/10.1007/979-8-8688-0817-3_14",
+      "title": "PostgreSQL High Availability",
+      "snippet": "Vadlamani, V. (2024), PostgreSQL Skills Development on Cloud",
+      "engines": [
+        "crossref"
+      ],
+      "min_position": 88
+    },
+    {
+      "url": "https://doi.org/10.1007/979-8-8688-0817-3_18",
+      "title": "Correction to: PostgreSQL Software Installation on Amazon EC2/Azure VM Linux",
+      "snippet": "Vadlamani, V. (2025), PostgreSQL Skills Development on Cloud",
+      "engines": [
+        "crossref"
+      ],
+      "min_position": 189
+    },
+    {
+      "url": "https://doi.org/10.1007/979-8-8688-0817-3_4",
+      "title": "PostgreSQL Software Installation on Amazon EC2/Azure VM Linux",
+      "snippet": "Vadlamani, V. (2024), PostgreSQL Skills Development on Cloud",
+      "engines": [
+        "crossref"
+      ],
+      "min_position": 173
+    },
+    {
+      "url": "https://doi.org/10.1007/979-8-8688-0817-3_6",
+      "title": "PostgreSQL on AWS RDS/Azure SQL Database",
+      "snippet": "Vadlamani, V. (2024), PostgreSQL Skills Development on Cloud",
+      "engines": [
+        "crossref"
+      ],
+      "min_position": 136
+    },
+    {
+      "url": "https://doi.org/10.1007/979-8-8688-0817-3_7",
+      "title": "PostgreSQL on Docker",
+      "snippet": "Vadlamani, V. (2024), PostgreSQL Skills Development on Cloud",
+      "engines": [
+        "crossref"
+      ],
+      "min_position": 96
+    },
+    {
+      "url": "https://doi.org/10.1007/979-8-8688-0817-3_9",
+      "title": "PostgreSQL on Windows Server in Cloud",
+      "snippet": "Vadlamani, V. (2024), PostgreSQL Skills Development on Cloud",
+      "engines": [
+        "crossref"
+      ],
+      "min_position": 113
+    },
+    {
+      "url": "https://doi.org/10.1007/979-8-8688-1507-2_1",
+      "title": "PostgreSQL System Architecture",
+      "snippet": "Ravi Kumar, Y. et al. (2025), Mastering PostgreSQL Administration",
+      "engines": [
+        "crossref"
+      ],
+      "min_position": 132
+    },
+    {
+      "url": "https://doi.org/10.1007/979-8-8688-1507-2_10",
+      "title": "New Features of PostgreSQL 17",
+      "snippet": "Ravi Kumar, Y. et al. (2025), Mastering PostgreSQL Administration",
+      "engines": [
+        "crossref"
+      ],
+      "min_position": 127
+    },
+    {
+      "url": "https://doi.org/10.1007/979-8-8688-1507-2_2",
+      "title": "PostgreSQL Installation and Initialization",
+      "snippet": "Ravi Kumar, Y. et al. (2025), Mastering PostgreSQL Administration",
+      "engines": [
+        "crossref"
+      ],
+      "min_position": 151
+    },
+    {
+      "url": "https://doi.org/10.1007/979-8-8688-1507-2_3",
+      "title": "PostgreSQL Physical Structures",
+      "snippet": "Ravi Kumar, Y. et al. (2025), Mastering PostgreSQL Administration",
+      "engines": [
+        "crossref"
+      ],
+      "min_position": 109
+    },
+    {
+      "url": "https://doi.org/10.1007/979-8-8688-1507-2_4",
+      "title": "PostgreSQL Management of Database Server",
+      "snippet": "Ravi Kumar, Y. et al. (2025), Mastering PostgreSQL Administration",
+      "engines": [
+        "crossref"
+      ],
+      "min_position": 130
+    },
+    {
+      "url": "https://doi.org/10.1007/979-8-8688-1507-2_5",
+      "title": "PostgreSQL Backup and Recovery",
+      "snippet": "Ravi Kumar, Y. et al. (2025), Mastering PostgreSQL Administration",
+      "engines": [
+        "crossref"
+      ],
+      "min_position": 142
+    },
+    {
+      "url": "https://doi.org/10.1007/979-8-8688-1507-2_6",
+      "title": "PostgreSQL Routine Maintenance",
+      "snippet": "Ravi Kumar, Y. et al. (2025), Mastering PostgreSQL Administration",
+      "engines": [
+        "crossref"
+      ],
+      "min_position": 129
+    },
+    {
+      "url": "https://doi.org/10.1007/979-8-8688-1507-2_7",
+      "title": "PostgreSQL Monitoring Using PgAdmin and Grafana",
+      "snippet": "Ravi Kumar, Y. et al. (2025), Mastering PostgreSQL Administration",
+      "engines": [
+        "crossref"
+      ],
+      "min_position": 159
+    },
+    {
+      "url": "https://doi.org/10.1007/979-8-8688-1507-2_8",
+      "title": "Data Migration from Oracle to PostgreSQL Using Ora2Pg",
+      "snippet": "Ravi Kumar, Y. et al. (2025), Mastering PostgreSQL Administration",
+      "engines": [
+        "crossref"
+      ],
+      "min_position": 144
+    },
+    {
+      "url": "https://doi.org/10.1007/979-8-8688-1507-2_9",
+      "title": "Data Replication from Oracle to PostgreSQL Using Oracle GoldenGate",
+      "snippet": "Ravi Kumar, Y. et al. (2025), Mastering PostgreSQL Administration",
+      "engines": [
+        "crossref"
+      ],
+      "min_position": 155
+    },
+    {
+      "url": "https://doi.org/10.1007/s10707-020-00407-w",
+      "title": "MongoDB Vs PostgreSQL: A comparative study on performance aspects",
+      "snippet": "Abstract Several modern day problems need to deal with large amounts of spatio-temporal data. As such, in order to meet the application requirements, more and more systems are adapting to the specificities of those data. The most prominent case is perhaps the data storage systems, that have developed a large number of functionalities to efficiently support spatio-temporal data operations. This work is motivated by the question of which of those data storage systems is better suited to address the needs of industrial applications. In particular, the work conducted, set to identify the most efficient data store system in terms of response times, comparing two of the most representative of the two categories (NoSQL and relational), i.e. MongoDB and PostgreSQL. The evaluation is based upon real, business scenarios and their subsequent queries as well as their underlying infrastructures and concludes in confirming the superiority of PostgreSQL in almost all cases with the exception of the polygon intersection queries. Furthermore, the average response time is radically reduced with the use of indexes, especially in the case of MongoDB. (Cited 71×)",
+      "engines": [
+        "openalex"
+      ],
+      "min_position": 1
+    },
+    {
+      "url": "https://doi.org/10.1007/s10707-020-00424-9",
+      "title": "Correction to: MongoDB Vs PostgreSQL: a comparative study on performance aspects",
+      "snippet": "The article “MongoDB Vs PostgreSQL: A comparative study on performance aspects”, written by Antonios Makris, Konstantinos Tserpes, Giannis Spiliopoulos, Dimitrios Zissis, Dimosthenis Anagnostopoulos, was originally published electronically on the publisher’s internet portal on 05 June 2020 without open access.",
+      "engines": [
+        "crossref"
+      ],
+      "min_position": 175
+    },
+    {
+      "url": "https://doi.org/10.1007/springerreference_62191",
+      "title": "GiST Index",
+      "snippet": "",
+      "engines": [
+        "crossref"
+      ],
+      "min_position": 3
+    },
+    {
+      "url": "https://doi.org/10.1017/9781009000062.012",
+      "title": "Index",
+      "snippet": "(2025), Session Types",
+      "engines": [
+        "crossref"
+      ],
+      "min_position": 187
+    },
+    {
+      "url": "https://doi.org/10.1037/e683232011-093",
+      "title": "Gist, verbatim memory and suggestibility: Effects of different types of misinformation",
+      "snippet": "Titcomb, A. et al. (1992), PsycEXTRA Dataset",
+      "engines": [
+        "crossref"
+      ],
+      "min_position": 64
+    },
+    {
+      "url": "https://doi.org/10.1088/1742-6596/1844/1/012021",
+      "title": "Inner Join Query Performance: MariaDB vs PostgreSQL",
+      "snippet": "Abstract Research to test the performance of inner joint queries between MariaDB and the PostgreSQL database management system. Inner joint queries have the same output in MariaDB and PostgreSQL DBMS. This study aims to provide a comparative analysis of the response time performance of MariaDB and PostgreSQL databases in the use of inner join queries. The research test was conducted with 1,050,000 records using 21 response time data collection scenarios ranging from 50,000 data to 1,050,000 data collection with multiples of 50,000 data. The PostgreSQL DBMS was found to have better response times than MariaDB in all test scenarios. The results of the regression analysis to test the effect of using the F-test show that there is a significant effect on the amount of data and the relationship together on the response time in MariaDB and PostgreSQL. Then the T-test is carried out to strengthen the results of the study that PostgreSQL has a faster response time than MariaDB, testing 1 combined relationship shows a significant difference, testing 2 combined relationships shows a significant difference and testing 3 combined relationships shows a significant difference.",
+      "engines": [
+        "crossref"
+      ],
+      "min_position": 125
+    },
+    {
+      "url": "https://doi.org/10.1088/1742-6596/944/1/012022",
+      "title": "Improving generalized inverted index lock wait times",
+      "snippet": "Concurrent operations on tree like data structures is a cornerstone of any database system. Concurrent operations intended for improving read\\write performance and usually implemented via some way of locking. Deadlock-free methods of concurrency control are known as tree locking protocols. These protocols provide basic operations(verbs) and algorithm (ways of operation invocations) for applying it to any tree-like data structure. These algorithms operate on data, managed by storage engine which are very different among RDBMS implementations. In this paper, we discuss tree locking protocol implementation for General inverted index (Gin) applied to multiversion concurrency control (MVCC) storage engine inside PostgreSQL RDBMS. After that we introduce improvements to locking protocol and provide usage statistics about evaluation of our improvement in very high load environment in one of the world's largest IT company.",
+      "engines": [
+        "openalex"
+      ],
+      "min_position": 2
+    },
+    {
+      "url": "https://doi.org/10.1093/jama/9780195176339.022.420",
+      "title": "Types of Index",
+      "snippet": "McGregor, B. et al. (2009), AMA Manual of Style",
+      "engines": [
+        "crossref"
+      ],
+      "min_position": 107
+    },
+    {
+      "url": "https://doi.org/10.1094/grow-cot-12-23-417",
+      "title": "Cotton Variety Performance Stability and Identification View from the Gin",
+      "snippet": "(2023), Grow: Plant Health Exchange",
+      "engines": [
+        "crossref"
+      ],
+      "min_position": 29
+    },
+    {
+      "url": "https://doi.org/10.1097/00000542-199709001-00305",
+      "title": "A305 PREGNANCY REDUCES THE BISPECTRAL INDEX DURING ISOFLURANE ANESTHESIA",
+      "snippet": "Gin, T. et al. (1997), Anesthesiology",
+      "engines": [
+        "crossref"
+      ],
+      "min_position": 153
+    },
+    {
+      "url": "https://doi.org/10.1097/01.ana.0000187778.94201.f7",
+      "title": "Performance of the Bispectral Index During Electrocautery",
+      "snippet": "T, G. et al. (2005), Journal of Neurosurgical Anesthesiology",
+      "engines": [
+        "crossref"
+      ],
+      "min_position": 5
+    },
+    {
+      "url": "https://doi.org/10.1097/ana.0b013e31823058bf",
+      "title": "Performance of the Bispectral Index During Electrocautery",
+      "snippet": "Chan, M. et al. (2012), Journal of Neurosurgical Anesthesiology",
+      "engines": [
+        "crossref"
+      ],
+      "min_position": 22
+    },
+    {
+      "url": "https://doi.org/10.1109/conmedia67140.2025.11290161",
+      "title": "An Experimental Study on SQL Query Structure Optimization Performance in MySQL, PostgreSQL, and Microsoft SQL Server Using Apache JMeter",
+      "snippet": "Tanujaya, G. et al. (2025), 2025 8th International Conference on New Media Studies (CONMEDIA)",
+      "engines": [
+        "crossref"
+      ],
+      "min_position": 188
+    },
+    {
+      "url": "https://doi.org/10.1109/icbda.2017.8078791",
+      "title": "Improving penalty function of R-tree over generalized index search tree possible way to advance performance of PostgreSQL cube extension",
+      "snippet": "Borodin, A. et al. (2017), 2017 IEEE 2nd International Conference on Big Data Analysis (ICBDA)(",
+      "engines": [
+        "crossref"
+      ],
+      "min_position": 34
+    },
+    {
+      "url": "https://doi.org/10.1109/icde.1999.754961",
+      "title": "Fat-Btree: an update-conscious parallel directory structure",
+      "snippet": "Yokota, H. et al. (1999), Proceedings 15th International Conference on Data Engineering (Cat. No.99CB36337)",
+      "engines": [
+        "crossref"
+      ],
+      "min_position": 180
+    },
+    {
+      "url": "https://doi.org/10.1109/icde.2006.146",
+      "title": "Space-Partitioning Trees in PostgreSQL: Realization and Performance",
+      "snippet": "Eltabakh, M. et al. (2006), 22nd International Conference on Data Engineering (ICDE'06)",
+      "engines": [
+        "crossref"
+      ],
+      "min_position": 87
+    },
+    {
+      "url": "https://doi.org/10.1109/icdew.2015.7129570",
+      "title": "Flash-aware index scan in PostgreSQL",
+      "snippet": "Hwang, D. et al. (2015), 2015 31st IEEE International Conference on Data Engineering Workshops",
+      "engines": [
+        "crossref"
+      ],
+      "min_position": 77
+    },
+    {
+      "url": "https://doi.org/10.1109/icimtech67074.2025.11265709",
+      "title": "Optimizing PostgreSQL Functionality with PL/Dotnet: A Performance Comparison and Procedural Integration",
+      "snippet": "Kuppili, R. (2025), 2025 International Conference on Information Management and Technology (ICIMTech)",
+      "engines": [
+        "crossref"
+      ],
+      "min_position": 90
+    },
+    {
+      "url": "https://doi.org/10.1109/icscss64956.2025.11501160",
+      "title": "Optimizing PostgreSQL Performance under High Transaction Loads: A Predictive and Consistency-Driven Perspective",
+      "snippet": "Srikanth Reddy, G. (2025), 2025 3rd International Conference on Sustainable Computing and Smart Systems (ICSCSS)",
+      "engines": [
+        "crossref"
+      ],
+      "min_position": 140
+    },
+    {
+      "url": "https://doi.org/10.1109/informatics47936.2019.9119265",
+      "title": "An implementation of the M-tree index structure for PostgreSQL using GiST",
+      "snippet": "Donko, I. et al. (2019), 2019 IEEE 15th International Scientific Conference on Informatics",
+      "engines": [
+        "crossref"
+      ],
+      "min_position": 1
+    },
+    {
+      "url": "https://doi.org/10.1109/isps.2015.7244971",
+      "title": "Performance evaluation of serializable snapshot isolation in PostgreSQL",
+      "snippet": "Zendaoui, F. et al. (2015), 2015 12th International Symposium on Programming and Systems (ISPS)",
+      "engines": [
+        "crossref"
+      ],
+      "min_position": 76
+    },
+    {
+      "url": "https://doi.org/10.1109/rusautocon52004.2021.9537400",
+      "title": "Performance Analysis of PostgreSQL, MySQL, Microsoft SQL Server Systems Based on TPC-H Tests",
+      "snippet": "Vershinin, I. et al. (2021), 2021 International Russian Automation Conference (RusAutoCon)",
+      "engines": [
+        "crossref"
+      ],
+      "min_position": 108
+    },
+    {
+      "url": "https://doi.org/10.1145/3805687.3806257",
+      "title": "PostLearn: Towards A Learned Index For PostgreSQL",
+      "snippet": "Fuad, A. et al. (2026), Proceedings of the 6th Workshop on Challenges and Opportunities of Efficient and Performant Storage Systems",
+      "engines": [
+        "crossref"
+      ],
+      "min_position": 171
+    },
+    {
+      "url": "https://doi.org/10.1163/9789004666429_012",
+      "title": "Index",
+      "snippet": "Gist, N. et al. (1973), Marginality and Identity",
+      "engines": [
+        "crossref"
+      ],
+      "min_position": 163
+    },
+    {
+      "url": "https://doi.org/10.1163/ej.9789004160910.i-270.50",
+      "title": "Index",
+      "snippet": "Bersselaar, D. (2007), The King of Drinks",
+      "engines": [
+        "crossref"
+      ],
+      "min_position": 110
+    },
+    {
+      "url": "https://doi.org/10.1167/18.10.144",
+      "title": "Scene Gist Narrative Priming: Sequential expectations influence scene gist recognition performance",
+      "snippet": "Smith, M. et al. (2018), Journal of Vision",
+      "engines": [
+        "crossref"
+      ],
+      "min_position": 58
+    },
+    {
+      "url": "https://doi.org/10.1515/9781503604100-012",
+      "title": "INDEX",
+      "snippet": "(2020), The Gist of Reading",
+      "engines": [
+        "crossref"
+      ],
+      "min_position": 7
+    },
+    {
+      "url": "https://doi.org/10.1520/d6379",
+      "title": "Test Method for Determination of Aromatic Hydrocarbon Types in Aviation Fuels and Petroleum Distillates--High Performance Liquid Chromatography Method with Refractive Index Detection",
+      "snippet": "",
+      "engines": [
+        "crossref"
+      ],
+      "min_position": 112
+    },
+    {
+      "url": "https://doi.org/10.1520/d6379-04",
+      "title": "Test Method for Determination of Aromatic Hydrocarbon Types in Aviation Fuels and Petroleum Distillates--High Performance Liquid Chromatography Method with Refractive Index Detection",
+      "snippet": "",
+      "engines": [
+        "crossref"
+      ],
+      "min_position": 115
+    },
+    {
+      "url": "https://doi.org/10.1520/d6379-11",
+      "title": "Test Method for Determination of Aromatic Hydrocarbon Types in Aviation Fuels and Petroleum Distillates--High Performance Liquid Chromatography Method with Refractive Index Detection",
+      "snippet": "",
+      "engines": [
+        "crossref"
+      ],
+      "min_position": 111
+    },
+    {
+      "url": "https://doi.org/10.1520/d6379-11r19",
+      "title": "Test Method for Determination of Aromatic Hydrocarbon Types in Aviation Fuels and Petroleum DistillatesHigh Performance Liquid Chromatography Method with Refractive Index Detection",
+      "snippet": "",
+      "engines": [
+        "crossref"
+      ],
+      "min_position": 106
+    },
+    {
+      "url": "https://doi.org/10.1520/d6379-21",
+      "title": "Test Method for Determination of Aromatic Hydrocarbon Types in Aviation Fuels and Petroleum DistillatesHigh Performance Liquid Chromatography Method with Refractive Index Detection",
+      "snippet": "",
+      "engines": [
+        "crossref"
+      ],
+      "min_position": 103
+    },
+    {
+      "url": "https://doi.org/10.1520/d6379-21e01",
+      "title": "Test Method for Determination of Aromatic Hydrocarbon Types in Aviation Fuels and Petroleum DistillatesHigh Performance Liquid Chromatography Method with Refractive Index Detection",
+      "snippet": "",
+      "engines": [
+        "crossref"
+      ],
+      "min_position": 104
+    },
+    {
+      "url": "https://doi.org/10.1520/d6379-99",
+      "title": "Test Method for Determination of Aromatic Hydrocarbon Types in Aviation Fuels and Petroleum Distillates--High Performance Liquid Chromatography Method with Refractive Index Detection",
+      "snippet": "",
+      "engines": [
+        "crossref"
+      ],
+      "min_position": 114
+    },
+    {
+      "url": "https://doi.org/10.1520/d6591",
+      "title": "Test Method for Determination of Aromatic Hydrocarbon Types in Middle Distillates--High Performance Liquid Chromatography Method with Refractive Index Detection",
+      "snippet": "",
+      "engines": [
+        "crossref"
+      ],
+      "min_position": 83
+    },
+    {
+      "url": "https://doi.org/10.1520/d6591-00",
+      "title": "Test Method for Determination of Aromatic Hydrocarbon Types in Middle Distillates--High Performance Liquid Chromatography Method with Refractive Index Detection",
+      "snippet": "",
+      "engines": [
+        "crossref"
+      ],
+      "min_position": 81
+    },
+    {
+      "url": "https://doi.org/10.1520/d6591-06",
+      "title": "Test Method for Determination of Aromatic Hydrocarbon Types in Middle Distillates--High Performance Liquid Chromatography Method with Refractive Index Detection",
+      "snippet": "",
+      "engines": [
+        "crossref"
+      ],
+      "min_position": 78
+    },
+    {
+      "url": "https://doi.org/10.1520/d6591-11",
+      "title": "Test Method for Determination of Aromatic Hydrocarbon Types in Middle Distillates--High Performance Liquid Chromatography Method with Refractive Index Detection",
+      "snippet": "",
+      "engines": [
+        "crossref"
+      ],
+      "min_position": 80
+    },
+    {
+      "url": "https://doi.org/10.1520/d6591-11r17",
+      "title": "Test Method for Determination of Aromatic Hydrocarbon Types in Middle Distillates--High Performance Liquid Chromatography Method with Refractive Index Detection",
+      "snippet": "",
+      "engines": [
+        "crossref"
+      ],
+      "min_position": 85
+    },
+    {
+      "url": "https://doi.org/10.1520/d6591-18",
+      "title": "Test Method for Determination of Aromatic Hydrocarbon Types in Middle DistillatesHigh Performance Liquid Chromatography Method with Refractive Index Detection",
+      "snippet": "",
+      "engines": [
+        "crossref"
+      ],
+      "min_position": 69
+    },
+    {
+      "url": "https://doi.org/10.1520/d6591-19",
+      "title": "Test Method for Determination of Aromatic Hydrocarbon Types in Middle DistillatesHigh Performance Liquid Chromatography Method with Refractive Index Detection",
+      "snippet": "",
+      "engines": [
+        "crossref"
+      ],
+      "min_position": 66
+    },
+    {
+      "url": "https://doi.org/10.1530/endoabs.70.aep1039",
+      "title": "Impact of obesity on types of myocardial infarction",
+      "snippet": "Gin, J. et al. (2020), Endocrine Abstracts",
+      "engines": [
+        "crossref"
+      ],
+      "min_position": 42
+    },
+    {
+      "url": "https://doi.org/10.15407/pp2026.01.014",
+      "title": "Implementing indexes in POSTGRESQL",
+      "snippet": "This article explores the process of designing and implementing a new index access method in the PostgreSQL database management system, using a suffix tree–based index as a case study. Suffix trees provide optimal theoretical search complexity; however, classical descriptions of this data structure assume unlimited memory, arbitrary pointer manipulation, and single-threaded access — conditions that PostgreSQL does not provide. The paper systematically examines the key architectural subsystems of PostgreSQL that directly affect index design: the \"one process per connection\" multi-process model, page-based storage organization with a fixed 8 KB block size, and the two-level memory management system based on the shared buffer pool and hierarchical memory contexts. Using a concrete implementation as an example, the paper analyzes the key design decisions a developer faces when building a new index: the strategy for mapping logical tree nodes onto physical pages, the organization of intra-page storage for variable-length edges with separation into identification and payload components, the design of the page special area for navigational metadata and suffix links, and mechanisms for page type identification. Particular attention is given to open implementation challenges — edge label compression, parallelism limitations of Ukkonen’s algorithm, and the feasibility of supporting index-only scans. It is shown that implementing a new index structure in a DBMS of PostgreSQL’s caliber is not merely a matter of adapting an algorithm to a specific programming interface, but also of aligning it with the internal invariants, protocols, and subsystem interaction logic that define the permissible space of architectural decisions.",
+      "engines": [
+        "crossref"
+      ],
+      "min_position": 89
+    },
+    {
+      "url": "https://doi.org/10.20295/2413-2527-2025-343-49-57",
+      "title": "Features of List Partitioning Application in the PostgreSQL DBMS",
+      "snippet": "As the volume of data processed in information systems increases, there is a growing need to use methods that ensure scalability, high performance, and efficient administration. One such method is table partitioning, which involves the logical division of data into independent segments. This process has been shown to optimize query execution and simplify the management of large tables. Purpose: to examine the particulars of employing list partitioning within the PostgreSQL database management system and to assess its effect on the performance of SQL queries. Results: the theoretical foundations of list partitioning, its syntactic implementation and limitations have been presented. A comparative experiment was conducted that demonstrated an enhancement in productivity when employing partitioning as opposed to a monolithic table. Typical scenarios of using the method when working with categorized data have been described. Practical significance: the efficiency of query processing and administration of large tables in PostgreSQL can be enhanced through the rational design of the data storage structure using list partitioning.",
+      "engines": [
+        "crossref"
+      ],
+      "min_position": 156
+    },
+    {
+      "url": "https://doi.org/10.20944/preprints202511.2170.v1",
+      "title": "Indexing in PostgreSQL: Performance Evaluation and Use Cases",
+      "snippet": "Efficient indexing remains a central factor in achieving predictable performance in modern relational database systems. PostgreSQL provides six native index types—B-Tree, Hash, GiST, SP-GiST, GIN, and BRIN—yet their relative behaviour under different workloads has been characterized in a variety of empirical studies, technical reports and official documentation rather than within a single unified benchmark. This paper presents a comparative, literaturebased analysis of these index types across transactional (OLTP), analytical (OLAP), full-text, JSONB, spatial and time-series workloads. Drawing from existing benchmarks and evaluations, the study synthesizes reported insights on index build time, query latency, storage footprint, maintenance overhead, and index bloat across PostgreSQL deployments. Prior work consistently finds that B-Tree remains the most robust default choice for OLTP equality and range workloads; GIN provides the lowest latency for fulltext and JSONB containment queries at the cost of substantial maintenance overhead and index bloat; GiST and SP-GiST dominate spatial workloads; and BRIN offers the best scalability for append-only analytical and time-series tables due to compact block-range summarization. The analysis highlights that index selection in PostgreSQL must be guided by workload semantics, update intensity, and storage constraints rather than by generic heuristics. Based on the synthesized findings, the paper proposes a practical recommendation matrix that maps workloads to suitable index types, providing actionable guidelines for database practitioners. By consolidating previously fragmented benchmark evidence into a single coherent review, the study clarifies when each native PostgreSQL index type is likely to be the most effective choice in practice.",
+      "engines": [
+        "crossref"
+      ],
+      "min_position": 8
+    },
+    {
+      "url": "https://doi.org/10.21236/ada559376",
+      "title": "High Capacity Single Table Performance Design Using Partitioning in Oracle or PostgreSQL",
+      "snippet": "Parker, T. et al. (2012)",
+      "engines": [
+        "crossref"
+      ],
+      "min_position": 44
+    },
+    {
+      "url": "https://doi.org/10.2139/ssrn.5275984",
+      "title": "Performance Comparison Oracle, Postgresql, and Mysql Database Using Jmeter Tools",
+      "snippet": "Setiawan, R. et al. (2025)",
+      "engines": [
+        "crossref"
+      ],
+      "min_position": 12
+    },
+    {
+      "url": "https://doi.org/10.2307/jj.14086451.11",
+      "title": "Index",
+      "snippet": "(2024), Gin and the English",
+      "engines": [
+        "crossref"
+      ],
+      "min_position": 46
+    },
+    {
+      "url": "https://doi.org/10.25140/2411-5363-2022-1(27)-136-141",
+      "title": "PERFORMANCE OF PHP CRUD WEB SERVICES WHEN WORKING WITH POSTGRESQL DATA",
+      "snippet": "When developing modern distributed computer systems that work with DBMS data, a service-oriented architecture is widely used. For the practical implementation of such systems, Web services are used, which are developed using various technologies.At the same time, the performance of a Web service largely determines the possibility of its use in a distributed system.PHP tools provide an efficient platform for building Web services that support various technologies.PostgreSQL is one of the most common and productive DBMS. The performance of XML-RPC, SOAP and RESTful PHP Web services when searching PostgreSQL data, i.e. when performing a CRUD read operation, has been explored before.At that time, similar studies for XML-RPC, SOAP and RESTful PHP Web services in the implementation of CRUD oper-ations to create, update and delete PostgreSQL data were not made.In this work, PHP CRUD Web services were developed to work with PostgreSQL data in the amount of 1 MB, as well as a tester program that evaluates their performance based on determining the response time when making Web requests.With the help of the created programs, the analysis of performance of XML-RPC, SOAP and RESTfulPHP CRUD Web services at work with PostgreSQL data is carried out.The SOAP Web service had the highest response time when performing create, read, update, and delete operations on DBMS data, the XML-RPC service had the average, and the RESTful service had the lowest (best performance).The results obtained indicate both the significant impact of service development technology on its performance, and the advisability of using RESTful Web services when creating applications with a service-oriented architecture for working with PostgreSQL DBMS data using CRUD operations.",
+      "engines": [
+        "crossref"
+      ],
+      "min_position": 41
+    },
+    {
+      "url": "https://doi.org/10.26552/com.c.2008.4.53-57",
+      "title": "A Performance Analysis of the Dbms - MYSQL Vs POSTGRESQL",
+      "snippet": "Andjelic, S. et al. (2008), Communications - Scientific letters of the University of Zilina",
+      "engines": [
+        "crossref"
+      ],
+      "min_position": 194
+    },
+    {
+      "url": "https://doi.org/10.26817/16925777.1812",
+      "title": "EFL Students’ Writing Strategies, Self-Efficacy, and Performance in Ethiopia: Exploring Interrelationships",
+      "snippet": "Effective writing is essential for academic and professional success, especially for students learning English as a Foreign Language (EFL). This study aimed to investigate the correlation between different writing strategies, EFL students' self-efficacy in writing, and their actual writing performance. A descriptive-correlational research design was employed, involving 150 EFL students. Data were collected through questionnaires, IELTS writing tests, and interviews. The results showed a fragile but positive relationship between students' self-efficacy and their use of writing strategies (r=0.119). Students who used various strategies, such as planning, revising, and self-monitoring, reported higher confidence in their writing abilities. Additionally, there was a significant but low correlation between the use of writing strategies and writing performance (r=0.114). However, writing strategies alone did not significantly predict improvements in writing abilities. These findings suggest that while enhancing students' self-efficacy and encouraging effective writing strategies can potentially improve writing performance, writing strategies alone may not be sufficient. Therefore, English teachers should focus on both training and motivating students to use effective writing strategies to address writing challenges effectively.",
+      "engines": [
+        "crossref"
+      ],
+      "min_position": 72
+    },
+    {
+      "url": "https://doi.org/10.26817/16925777.1917",
+      "title": "Editorial",
+      "snippet": "GiST, E. (2024), GIST – Education and Learning Research Journal",
+      "engines": [
+        "crossref"
+      ],
+      "min_position": 95
+    },
+    {
+      "url": "https://doi.org/10.26817/16925777.1959",
+      "title": "Enhancing Students’ Writing Performance through Self-Regulated Learning Strategies",
+      "snippet": "The fundamental goal of education is to teach students to become self-regulated learners who actively and efficiently manage their learning processes by deploying self-regulated learning strategies. Based on this stance, the present study investigated whether these strategies predicted the writing performance of English major students. Eleven students enrolled in the Advanced Writing Skills I course at Bahir Dar University in the 2024/2025 academic year participated in this study. An interrupted time-series within-group design, by which a single group is measured multiple times both before and after the intervention, was employed. Repeated measures of ANOVA, narration, and textual analysis were used to analyze the data obtained from argumentative writing tests, diary entries, and essay excerpts, respectively. A univariate ANOVA results (F(2.295, 50) = 73.657, p .05, ηp2= .880) revealed a significant effect of self- regulated learning strategies on writing performance. Moreover, diary entries indicated that the implementation of these strategies in EFL writing was effective in enhancing students’ writing skills. These included organization (introduction, body, conclusion, formulation of thesis sentence), mechanics, grammar, and cohesion. Regarding their progress across time, significant improvements in writing skills were observed in the first diary compared to the baseline data. Significant progress was also reported in the second diary, surpassing previous records. Additionally, textual analysis of the essays supported the finding that students made significant progress in their writing performance after the intervention. The students indeed believed that the instruction on self-regulated learning strategies was motivating, encouraging, commendable, and loving. Thus, the instructional process needs to incorporate these strategies along with the micro-analytic protocols.",
+      "engines": [
+        "crossref"
+      ],
+      "min_position": 79
+    },
+    {
+      "url": "https://doi.org/10.30929/1995-0519.2019.6.60-67",
+      "title": "PERFORMANCE ANALYSIS FOR GEOSPATIAL QUERIES POSTGRESQL/POSTGIS DATABASE VS. MONGODB",
+      "snippet": "et al. (2019), Transactions of Kremenchuk Mykhailo Ostrohradskyi National University",
+      "engines": [
+        "crossref"
+      ],
+      "min_position": 182
+    },
+    {
+      "url": "https://doi.org/10.3139/9783446456419.004",
+      "title": "Die Architektur von PostgreSQL",
+      "snippet": "Fröhlich, L. (2018), PostgreSQL 10",
+      "engines": [
+        "crossref"
+      ],
+      "min_position": 62
+    },
+    {
+      "url": "https://doi.org/10.3139/9783446456419.011",
+      "title": "Performance Tuning",
+      "snippet": "Fröhlich, L. (2018), PostgreSQL 10",
+      "engines": [
+        "crossref"
+      ],
+      "min_position": 37
+    },
+    {
+      "url": "https://doi.org/10.3139/9783446456419.015",
+      "title": "Applikationen für PostgreSQL entwickeln",
+      "snippet": "Fröhlich, L. (2018), PostgreSQL 10",
+      "engines": [
+        "crossref"
+      ],
+      "min_position": 73
+    },
+    {
+      "url": "https://doi.org/10.3139/9783446456419.024",
+      "title": "PostgreSQL in die IT-Landschaft einbinden",
+      "snippet": "Fröhlich, L. (2018), PostgreSQL 10",
+      "engines": [
+        "crossref"
+      ],
+      "min_position": 70
+    },
+    {
+      "url": "https://doi.org/10.3139/9783446456419.026",
+      "title": "Von Oracle nach PostgreSQL migrieren",
+      "snippet": "Fröhlich, L. (2018), PostgreSQL 10",
+      "engines": [
+        "crossref"
+      ],
+      "min_position": 91
+    },
+    {
+      "url": "https://doi.org/10.3139/9783446456419.027",
+      "title": "Replikation zwischen Oracle und PostgreSQL",
+      "snippet": "Fröhlich, L. (2018), PostgreSQL 10",
+      "engines": [
+        "crossref"
+      ],
+      "min_position": 84
+    },
+    {
+      "url": "https://doi.org/10.3139/9783446456419.028",
+      "title": "PostgreSQL in der Cloud",
+      "snippet": "Fröhlich, L. (2018), PostgreSQL 10",
+      "engines": [
+        "crossref"
+      ],
+      "min_position": 50
+    },
+    {
+      "url": "https://doi.org/10.3139/9783446456419.bm",
+      "title": "Index",
+      "snippet": "Fröhlich, L. (2018), PostgreSQL 10",
+      "engines": [
+        "crossref"
+      ],
+      "min_position": 14
+    },
+    {
+      "url": "https://doi.org/10.3139/9783446456419.fm",
+      "title": "PostgreSQL 10",
+      "snippet": "Fröhlich, L. (2018), PostgreSQL 10",
+      "engines": [
+        "crossref"
+      ],
+      "min_position": 67
+    },
+    {
+      "url": "https://doi.org/10.3139/9783446473157.004",
+      "title": "Die Architektur von PostgreSQL",
+      "snippet": "Fröhlich, L. (2022), PostgreSQL",
+      "engines": [
+        "crossref"
+      ],
+      "min_position": 60
+    },
+    {
+      "url": "https://doi.org/10.3139/9783446473157.013",
+      "title": "Performance Tuning",
+      "snippet": "Fröhlich, L. (2022), PostgreSQL",
+      "engines": [
+        "crossref"
+      ],
+      "min_position": 31
+    },
+    {
+      "url": "https://doi.org/10.3139/9783446473157.017",
+      "title": "Applikationen für PostgreSQL entwickeln",
+      "snippet": "Fröhlich, L. (2022), PostgreSQL",
+      "engines": [
+        "crossref"
+      ],
+      "min_position": 59
+    },
+    {
+      "url": "https://doi.org/10.3139/9783446473157.028",
+      "title": "PostgreSQL in die IT-Landschaft einbinden",
+      "snippet": "Fröhlich, L. (2022), PostgreSQL",
+      "engines": [
+        "crossref"
+      ],
+      "min_position": 75
+    },
+    {
+      "url": "https://doi.org/10.3139/9783446473157.030",
+      "title": "Von Oracle nach PostgreSQL migrieren",
+      "snippet": "Fröhlich, L. (2022), PostgreSQL",
+      "engines": [
+        "crossref"
+      ],
+      "min_position": 61
+    },
+    {
+      "url": "https://doi.org/10.3139/9783446473157.031",
+      "title": "Replikation zwischen Oracle und PostgreSQL",
+      "snippet": "Fröhlich, L. (2022), PostgreSQL",
+      "engines": [
+        "crossref"
+      ],
+      "min_position": 74
+    },
+    {
+      "url": "https://doi.org/10.3139/9783446473157.032",
+      "title": "PostgreSQL in der Cloud",
+      "snippet": "Fröhlich, L. (2022), PostgreSQL",
+      "engines": [
+        "crossref"
+      ],
+      "min_position": 71
+    },
+    {
+      "url": "https://doi.org/10.3139/9783446473157.bm",
+      "title": "Index",
+      "snippet": "Fröhlich, L. (2022), PostgreSQL",
+      "engines": [
+        "crossref"
+      ],
+      "min_position": 10
+    },
+    {
+      "url": "https://doi.org/10.3139/9783446473157.fm",
+      "title": "PostgreSQL",
+      "snippet": "Fröhlich, L. (2022), PostgreSQL",
+      "engines": [
+        "crossref"
+      ],
+      "min_position": 86
+    },
+    {
+      "url": "https://doi.org/10.32614/cran.package.pgtools",
+      "title": "pgTools: Functions for Generating PostgreSQL Statements/Scripts",
+      "snippet": "(2021), CRAN: Contributed Packages",
+      "engines": [
+        "crossref"
+      ],
+      "min_position": 93
+    },
+    {
+      "url": "https://doi.org/10.32614/cran.package.rpostgres",
+      "title": "RPostgres: C++ Interface to PostgreSQL",
+      "snippet": "Wickham, H. et al. (2017), CRAN: Contributed Packages",
+      "engines": [
+        "crossref"
+      ],
+      "min_position": 146
+    },
+    {
+      "url": "https://doi.org/10.32614/cran.package.rpostgresql",
+      "title": "RPostgreSQL: R Interface to the 'PostgreSQL' Database System",
+      "snippet": "Conway, J. et al. (2008), CRAN: Contributed Packages",
+      "engines": [
+        "crossref"
+      ],
+      "min_position": 102
+    },
+    {
+      "url": "https://doi.org/10.32614/cran.package.sqlhelpers",
+      "title": "sqlHelpers: Collection of 'SQL' Utilities for 'T-SQL' and 'Postgresql'",
+      "snippet": "Conwell, T. (2023), CRAN: Contributed Packages",
+      "engines": [
+        "crossref"
+      ],
+      "min_position": 183
+    },
+    {
+      "url": "https://doi.org/10.3390/fi16100382",
+      "title": "A Performance Benchmark for the PostgreSQL and MySQL Databases",
+      "snippet": "This study highlights the necessity for efficient database management in continuous authentication systems, which rely on large-scale behavioral biometric data such as keystroke patterns. A benchmarking framework was developed to evaluate the PostgreSQL and MySQL databases, minimizing repetitive coding through configurable functions and variables. The methodology involved experiments assessing select and insert queries under primary and complex conditions, simulating real-world scenarios. Our quantified results show PostgreSQL’s superior performance in select operations. In primary tests, PostgreSQL’s execution time for 1 million records ranged from 0.6 ms to 0.8 ms, while MySQL’s ranged from 9 ms to 12 ms, indicating that PostgreSQL is about 13 times faster. For select queries with a where clause, PostgreSQL required 0.09 ms to 0.13 ms compared to MySQL’s 0.9 ms to 1 ms, making it roughly 9 times more efficient. Insert operations were similar, with PostgreSQL at 0.0007 ms to 0.0014 ms and MySQL at 0.0010 ms to 0.0030 ms. In complex experiments with simultaneous operations, PostgreSQL maintained stable performance (0.7 ms to 0.9 ms for select queries during inserts), while MySQL’s performance degraded significantly (7 ms to 13 ms). These findings underscore PostgreSQL’s suitability for environments requiring low data latency and robust concurrent processing capabilities, making it ideal for continuous authentication systems.",
+      "engines": [
+        "crossref"
+      ],
+      "min_position": 63
+    },
+    {
+      "url": "https://doi.org/10.3390/s19235253",
+      "title": "Design of Microdisk-Shaped Ge on Si Photodetector with Recess Structure for Refractive-Index Sensing",
+      "snippet": "In this paper, we introduce a disk-shaped Ge-on-Si photodetector for refractive-index difference sensing at an operating wavelength of 1550 nm. For the implementation of a small-scale sensor, a Ge layer was formed on top of a Si layer to increase the absorption coefficient at the expense of the light-detection area. Additionally, the sensor had a ring waveguide structure along the edge of the disk formed by a recess into the inner part of the disk. This increased the interaction between the dominant optical mode traveling along the edge waveguide and the refractive index of the cladding material to be sensed, and conclusively increased detection sensitivity. The simulation results show that the proposed sensor exhibited a detection sensitivity of 50 nm/RIU (Refractive Index Unit), a quality factor of approximately 3000, and a minimum detectable refractive index change of 0.95 × 10−2 RIU with a small disk radius of 3 μm. This corresponds to 1.67 times the sensitivity without a recess (30 nm/RIU).",
+      "engines": [
+        "crossref"
+      ],
+      "min_position": 121
+    },
+    {
+      "url": "https://doi.org/10.34020/2073-6495-2023-3-144-153",
+      "title": "The study of performance and methods of storage of JSON objects in PostgreSQL database management system",
+      "snippet": "Currently there are several methods of data storage, such as table and object, as JSON objects. National and foreign scientists conducted studies on the comparison of performance of relational database management systems and NoSQL database management system, but there were no studies that compared the performance in data insertion and storage using ordinary records and JSON objects within the relational database management system. An experiment was carried out in terms of the real examples of corporate use of the database management system; the results show the relevance of the use of JSON objects in storage of large volumes of data.",
+      "engines": [
+        "crossref"
+      ],
+      "min_position": 137
+    },
+    {
+      "url": "https://doi.org/10.3403/30113925",
+      "title": "Petroleum products. Determination of aromatic hydrocarbon types in middle distillates. High performance liquid chromatography method with refractive index detection",
+      "snippet": "",
+      "engines": [
+        "crossref"
+      ],
+      "min_position": 55
+    },
+    {
+      "url": "https://doi.org/10.3403/30304454",
+      "title": "Petroleum products. Determination of aromatic hydrocarbon types in middle distillates. High performance liquid chromatography method with refractive index detection",
+      "snippet": "",
+      "engines": [
+        "crossref"
+      ],
+      "min_position": 51
+    },
+    {
+      "url": "https://doi.org/10.3403/30358922",
+      "title": "Petroleum products. Determination of aromatic hydrocarbon types in middle distillates. High performance liquid chromatography method with refractive index detection",
+      "snippet": "",
+      "engines": [
+        "crossref"
+      ],
+      "min_position": 53
+    },
+    {
+      "url": "https://doi.org/10.3403/30472687",
+      "title": "Petroleum products. Determination of aromatic hydrocarbon types in middle distillates. High performance liquid chromatography method with refractive index detection",
+      "snippet": "",
+      "engines": [
+        "crossref"
+      ],
+      "min_position": 52
+    },
+    {
+      "url": "https://doi.org/10.35784/jcsi.2026",
+      "title": "Comparison of MySQL, MSSQL, PostgreSQL, Oracle databases performance, including virtualization",
+      "snippet": "Oracle, MSSQL, MySQL and PostgreSQL are four of the most popular relational databases. They are often used in internet applications. This paper aims to compare the efficiency of these technologies in terms of speed using virtualization with Docker. No publications that include virtualization were found among previous papers. After review of the literature, it was hypothesized that the Oracle engine would be the fastest. During the research, a series of experiments was carried out using the application, in which tests for measuring the time of instruction execution were implemented. Each query was measured 100 times and the first measurement was rejected. The obtained results confirmed the hypothesis about the superiority of the Oracle database. As in previous studies, it proved to be the fastest, also using virtualization.",
+      "engines": [
+        "crossref"
+      ],
+      "min_position": 116
+    },
+    {
+      "url": "https://doi.org/10.35784/jcsi.2279",
+      "title": "Performance comparison of relational databases SQL Server, MySQL and PostgreSQL using a web application and the Laravel framework",
+      "snippet": "Many database implementations are supported by application frameworks that can affect their performance. The paper presents a comparison of the performance of SQL Server, MySQL and PostgreSQL relational databases based on an application written in PHP using the Laravel framework. The time of performance for various types of queries, both simple and using column and table concatenation was evaluated. The obtained results for the same database structures differed depending on the operations performed on the databases. Looking at the entirety of the research conducted, it can be concluded that in the case of databases in which the number of records is not too large (up to 1000 records) and the technical parameters of the device on which the database is running are of low or medium class, MySQL performs very well.",
+      "engines": [
+        "crossref"
+      ],
+      "min_position": 195
+    },
+    {
+      "url": "https://doi.org/10.35784/jcsi.2314",
+      "title": "Comparison of the performance of relational databases PostgreSQL and MySQL for desktop application",
+      "snippet": "The aim of this thesis was to compare the performance of two relational database management systems PostgreSQL and MySQL. For the purpose of the study a relational database was designed and a piece of software was implemented to connect desktop application with the database system. This software shall also create entities and relations between them in desired empty schemes on servers for databases. There has also been implemented a desktop application in Java programming language, that allows browsing data stored in database and performing the tests of database performance. Tests addressed basic operations of adding, collecting, updating and deleting data. Thisthesis makes a hypothesis \"PostgreSQL is more efficient for desktop application while loaded with small data, in that case 1000 of queries\", that was confirmed by achieved results from tests performed.",
+      "engines": [
+        "crossref"
+      ],
+      "min_position": 126
+    },
+    {
+      "url": "https://doi.org/10.35784/jcsi.3000",
+      "title": "Performance analysis of relational databases MySQL, PostgreSQL and Oracle using Doctrine libraries",
+      "snippet": "In modern applications, databases perform a very important function but the choice of a database system and additional libraries may affect the speed of the operations. The paper presents a time analysis concerning the performing of insert, update, delete and select operations on three database systems, MySQL 8.0, PostgreSQL 14.1 and Oracle 21c, cooperating with an application using Doctrine libraries. The obtained results showed differences between performing operations with and without object-relational mapping. In cooperation with the application, the operations were carried out the fastest using the PostgreSQL system. The Oracle system performed data selection faster without mapping on a large data set.",
+      "engines": [
+        "crossref"
+      ],
+      "min_position": 120
+    },
+    {
+      "url": "https://doi.org/10.37473/dac/10.3390/ijgi9110613",
+      "title": "UrbanWater: Integrating EPANET 2 in a PostgreSQL/PostGIS-Based Geospatial Database Management System",
+      "snippet": "",
+      "engines": [
+        "crossref"
+      ],
+      "min_position": 157
+    },
+    {
+      "url": "https://doi.org/10.37473/fic/10.3390/ijgi9110613",
+      "title": "UrbanWater: Integrating EPANET 2 in a PostgreSQL/PostGIS-Based Geospatial Database Management System",
+      "snippet": "",
+      "engines": [
+        "crossref"
+      ],
+      "min_position": 167
+    },
+    {
+      "url": "https://doi.org/10.37745/ejcsit.2013/vol13n47172182",
+      "title": "PostgreSQL Configuration: Best Practices for Performance and Security",
+      "snippet": "PostgreSQL configuration significantly impacts database performance and security, yet default settings often prioritize compatibility over optimization. This article presents a comprehensive framework for PostgreSQL configuration, addressing critical aspects including memory allocation, query planning, security hardening, and monitoring. By examining the interdependencies between configuration parameters and their effects on system behavior under various workloads, the article provides a structured approach to database optimization. Memory allocation strategies focus on shared buffers, work memory, and background writer settings to maximize performance while preventing resource contention. Query performance optimization encompasses planner configuration, autovacuum tuning, and parallel execution capabilities to enhance throughput and reduce latency. Security hardening measures include network protection, authentication controls, privilege management, and vulnerability mitigation techniques to safeguard data while maintaining functionality. Comprehensive logging and monitoring strategies enable proactive identification of performance bottlenecks and security threats. Together, these best practices enable organizations to implement secure, high-performance PostgreSQL environments tailored to their specific requirements.",
+      "engines": [
+        "crossref"
+      ],
+      "min_position": 135
+    },
+    {
+      "url": "https://doi.org/10.38124/ijisrt/25oct1435",
+      "title": "Adaptive Machine Learning Techniques for PostgreSQL Performance Optimization: A  PostgreSQL Case Study",
+      "snippet": "This article presents a framework for integrating advanced machine learning models within PostgreSQL to optimize query performance and manage workloads dynamically. The integration creates a paradigm shift from static, rule- based optimization to adaptive, data-driven approaches that respond to changing conditions. PostgreSQL's extensible architecture provides an ideal foundation for implementing ML-enhanced components without modifying core database code. The framework encompasses four key areas: query optimizer enhancement using gradient boosting and neural networks, adaptive indexing mechanisms that automatically adjust to workload patterns, dynamic resource allocation through workload classification and forecasting, and a comprehensive model training pipeline. Experimental evaluations across analytical, transactional, and hybrid workloads demonstrate significant improvements in cardinality estimation accuracy, execution plan quality, resource utilization, and administrative overhead reduction. The modular design enables incremental adoption in production environments while maintaining compatibility with existing applications, illustrating how traditional relational database systems can evolve to meet modern data challenges through machine learning integration.",
+      "engines": [
+        "crossref"
+      ],
+      "min_position": 13
+    },
+    {
+      "url": "https://doi.org/10.4095/327585",
+      "title": "Groundwater Information Network: GIN",
+      "snippet": "Groundwater Information Network Fed-prov-terr-int'l collaboration to share groundwater data online, using international standards; aligned with FGP, GOC Open Data and Open Science, Google Dataset Search. Third program cycle, since 2010. https://gw-info.net",
+      "engines": [
+        "crossref"
+      ],
+      "min_position": 185
+    },
+    {
+      "url": "https://doi.org/10.4095/329087",
+      "title": "Groundwater Information Network: GIN",
+      "snippet": "Groundwater Information Network. Fed-prov-terr-int'l collaboration to share groundwater data online, using international standards; aligned with FGP, GOC Open Data Portal and Open Science, Google Dataset Search. Third program cycle, since 2010. https://gw-info.net",
+      "engines": [
+        "crossref"
+      ],
+      "min_position": 191
+    },
+    {
+      "url": "https://doi.org/10.48550/arxiv.2307.06621",
+      "title": "cjdb: a simple, fast, and lean database solution for the CityGML data model",
+      "snippet": "When it comes to storing 3D city models in a database, the implementation of the CityGML data model can be quite demanding and often results in complicated schemas. As an example, 3DCityDB, a widely used solution, depends on a schema having 66 tables, mapping closely the CityGML architecture. In this paper, we propose an alternative (called cjdb) for storing CityGML models efficiently in PostgreSQL with a much simpler table structure and data model design (only 3 tables are necessary). This is achieved by storing the attributes and geometries of the objects directly in JSON. In the case of the geometries we thus adopt the Simple Feature paradigm and we use the structure of CityJSON. We compare our solution against 3DCityDB with large real-world 3D city models, and we find that cjdb has significantly lower demands in storage space (around a factor of 10), allows for faster import/export of data, and has a comparable data retrieval speed with some queries being faster and some slower. The accompanying software (importer and exporter) is available at https://github.com/cityjson/cjdb/ under a permissive open-source license.",
+      "engines": [
+        "openalex"
+      ],
+      "min_position": 3
+    },
+    {
+      "url": "https://doi.org/10.5040/9781501353307.0011",
+      "title": "The British Gin Craze",
+      "snippet": "(2020), Gin",
+      "engines": [
+        "crossref"
+      ],
+      "min_position": 192
+    },
+    {
+      "url": "https://doi.org/10.5040/9781682661260",
+      "title": "The Gin Game",
+      "snippet": "(2020), The Gin Game",
+      "engines": [
+        "crossref"
+      ],
+      "min_position": 168
+    },
+    {
+      "url": "https://doi.org/10.51793/os.2023.93.28.001",
+      "title": "PostgreSQL Ins and Outs",
+      "snippet": "В помощь специалистам, знакомым с устройством реляционных СУБД, планирующим переход на PostgreSQL, издательство «ДМК Пресс» выпустило книгу «PostgreSQL 15 изнутри». The exodus of western IT vendors from Russia has led to shrinkage of local enterprise database market. The way out is PostgreSQL, with major Russian financial and industrial corporations having migrated to the database without waiting for imported software products to “turn into a pumpkin”. However, it is no typical task for a corporation to maintain an opensource solution, tracking its development and ensuring guaranteed reliability of the system-level code. For PostgreSQL, those tasks are handled by Postgre Professional, a company offering the Postgres Pro database that is included into the Unified Registry of Russian Software Products.",
+      "engines": [
+        "crossref"
+      ],
+      "min_position": 57
+    },
+    {
+      "url": "https://doi.org/10.5194/isprs-archives-xli-b8-277-2016",
+      "title": "A NOVEL INDEX FOR ATMOSPHERIC AEROSOL TYPES CATEGORIZATION WITH  SPECTRAL OPTICAL DEPTHS FROM SATELLITE RETRIEVAL",
+      "snippet": "Abstract. In general, the type of atmospheric aerosols can be efficiently identified with the characteristics of optical properties, such as Ångström exponent (AE) and single scattering albedo (SSA). However, the retrieval of SSA is not frequently available to global area which may cause the difficulty in the identification of aerosol type. Since aerosol optical depth (AOD) can be easily requested, a novel index in terms of AOD, Normalized Gradient Aerosol Index (NGAI), is proposed to get over the constraint on SSA providing. With the NGAI derived from MODIS AOD products, the type of atmospheric aerosols can be clearly categorized between mineral dusts, biomass burning and anthropogenic pollutants. The results of aerosol type categorization show the well agreement with the ground-based observations (AERONET) in AE and SSA properties, implying that the proposed index equips highly practical for the application of aerosols type categorization by means of remote sensing. In addition, the fraction of AOD compositions can be potentially determined according to the value of index after compared with the products of CALIPSO Aerosol Subtype.",
+      "engines": [
+        "crossref"
+      ],
+      "min_position": 97
+    },
+    {
+      "url": "https://doi.org/10.5194/isprsarchives-xli-b8-277-2016",
+      "title": "A NOVEL INDEX FOR ATMOSPHERIC AEROSOL TYPES CATEGORIZATION WITH SPECTRAL OPTICAL DEPTHS FROM SATELLITE RETRIEVAL",
+      "snippet": "In general, the type of atmospheric aerosols can be efficiently identified with the characteristics of optical properties, such as Ångström exponent (AE) and single scattering albedo (SSA). However, the retrieval of SSA is not frequently available to global area which may cause the difficulty in the identification of aerosol type. Since aerosol optical depth (AOD) can be easily requested, a novel index in terms of AOD, Normalized Gradient Aerosol Index (NGAI), is proposed to get over the constraint on SSA providing. With the NGAI derived from MODIS AOD products, the type of atmospheric aerosols can be clearly categorized between mineral dusts, biomass burning and anthropogenic pollutants. The results of aerosol type categorization show the well agreement with the ground-based observations (AERONET) in AE and SSA properties, implying that the proposed index equips highly practical for the application of aerosols type categorization by means of remote sensing. In addition, the fraction of AOD compositions can be potentially determined according to the value of index after compared with the products of CALIPSO Aerosol Subtype.",
+      "engines": [
+        "crossref"
+      ],
+      "min_position": 101
+    },
+    {
+      "url": "https://doi.org/10.5220/0014696200004021",
+      "title": "Automated Assessment Tool for PostgreSQL",
+      "snippet": "Kakk, M. et al. (2026), Proceedings of the 18th International Conference on Computer Supported Education",
+      "engines": [
+        "crossref"
+      ],
+      "min_position": 138
+    },
+    {
+      "url": "https://doi.org/10.52710/fcb.240",
+      "title": "A Cloud-Agnostic Query-Aware Performance Governance Framework for Distributed MongoDB and PostgreSQL Systems",
+      "snippet": "Distributed database performance incidents in modern enterprises are increasingly driven by application-level query behavior rather than infrastructure-only bottlenecks. MongoDB and PostgreSQL deployments—often distributed across regions and cloud platforms—exhibit performance degradations such as query plan regressions, lock contention, replication lag, and I/O saturation that frequently surface only after user impact. Traditional database performance monitoring is typically reactive, threshold-driven, and fragmented across teams, creating systemic failure modes including alert fatigue, inconsistent incident handling, and prolonged application–database escalation cycles. This paper proposes a Cloud-Agnostic, Query-Aware Performance Governance Framework that combines intelligent observability with governed decision-making to operationalize database performance management at enterprise scale. The framework elevates monitoring from passive telemetry collection to a performance governance control plane that continuously reasons over query-level signals (e.g., query execution time distributions, wait events, lock waits, index usage, plan stability), correlates them with infrastructure telemetry and change events, and applies policy- and risk-aware response workflows with human-in-the-loop safeguards. Unlike vendor-centric monitoring solutions or ad-hoc runbooks, the framework is designed to be cloud-agnostic, supports both MongoDB and PostgreSQL performance primitives, and produces auditable decision artifacts suitable for regulated environments. We further present an applied case study demonstrating how query-aware reasoning reduces mean time to detection (MTTD) for query regressions, improves diagnostic precision during app-team escalations, and reduces operational toil by unifying signals and response pathways across heterogeneous database platforms. The outcome is a practical, defensible approach for enterprises to govern database performance reliably while preserving accountability and operational safety.",
+      "engines": [
+        "crossref"
+      ],
+      "min_position": 94
+    },
+    {
+      "url": "https://doi.org/10.53675/gist.v5i2.1379",
+      "title": "THE TYPES OF IDIOM IN THE MALEFICENT THE MOVIE (2014) BY FERNANDO THEORY",
+      "snippet": "This research is intend to define the types of idioms and meaning, especially idioms that found in movie with the tittle “Maleficent (2014)”. The purpose of this research are to find out the types of idioms found in the “Maleficent” the Movie (2014). The object of this research is English idiom, especially idiomatic expression in “Maleficent” the Movie (2014). The method employed in this research is descriptivequalitative method. The data consist of idiomatic expression in “Maleficent” the Movie (2014), there are 24 idioms were found by the researcher. After analyzing the data, the researcher found three types of idiom in this movie, there are pure idiom, semi idiom, and literal idiom. There are 4 idiomatic expression from 24 idiomatic expression of the data are included the pure idiom, then 13 idiomatic expression included semi idiom and the last is 7 data is literal idiom",
+      "engines": [
+        "crossref"
+      ],
+      "min_position": 143
+    },
+    {
+      "url": "https://doi.org/10.53675/gist.v6i2.1372",
+      "title": "AN ANALYSIS OF THE TYPES AND FUNCTIONS  OF AGNEZ MO’S CODE-MIXING ON DEDDY CORBUZIER’S PODCAST",
+      "snippet": "Code-mixing is now widely used in social media because of developments over time. Especially public figures, use Code-mixing to gain prestige. This analysis aims to find out the types and functions of Agnez Mo’s Code-mixing on Deddy Corbuzier’s podcast. This data analysis uses Muysken’s and McKay's theory and the author uses qualitative descriptive methods. The data source consists of a transcription of Agnez Mo’s speech on Deddy Corbuzier's podcast, and the object of this research is the type and function of speech. Data analysis uses several techniques, namely: classifying, interpreting, and making conclusions. The result of the analysis shows the type of Code-mixing they are insertion had the 2 data, alternation of 2 data, and congruent lexicalization 2 data. Then, the function of Code-mixing with identity marking is 2 data, stylistic is 1 data and Socio-expressive is 4 data. It can become a style out of habit. Code-mixing is also used when making a joke. And the last thing is to express one's emotions. The researcher only took a few examples of data from the large amount of data, because almost all of them had the same pattern.",
+      "engines": [
+        "crossref"
+      ],
+      "min_position": 179
+    },
+    {
+      "url": "https://doi.org/10.55277/researchhub.opkdhtrr",
+      "title": "Real PostgreSQL-Essentials Braindumps PDF to Boost Exam Confidence",
+      "snippet": "leshawn, m. (2026)",
+      "engines": [
+        "crossref"
+      ],
+      "min_position": 193
+    },
+    {
+      "url": "https://doi.org/10.55277/researchhub.y4odkbn8",
+      "title": "Accurate PostgreSQL-Essentials Dumps Questions [2026] Ultimate Exam Guide",
+      "snippet": "Grace, O. (2026)",
+      "engines": [
+        "crossref"
+      ],
+      "min_position": 196
+    },
+    {
+      "url": "https://doi.org/10.5626/jok.2016.43.12.1385",
+      "title": "Performance Comparison of PostgreSQL and MongoDB using YCSB",
+      "snippet": "Kim, K. (2016), Journal of KIISE",
+      "engines": [
+        "crossref"
+      ],
+      "min_position": 145
+    },
+    {
+      "url": "https://doi.org/10.5626/ktcp.2019.25.3.203",
+      "title": "A Study on PostgreSQL Cost Model Performance on Flash Memory",
+      "snippet": "Lee, J. et al. (2019), KIISE Transactions on Computing Practices",
+      "engines": [
+        "crossref"
+      ],
+      "min_position": 27
+    },
+    {
+      "url": "https://doi.org/10.56726/irjmets98407",
+      "title": "Performance Analysis of B-Tree and Hash Indexing in PostgreSQL",
+      "snippet": "(2026), International Research Journal of Modernization in Engineering Technology & Science",
+      "engines": [
+        "crossref"
+      ],
+      "min_position": 68
+    },
+    {
+      "url": "https://doi.org/10.56975/tijer.v12i10.160053",
+      "title": "A Comprehensive Framework for PostgreSQL Performance and Security Optimization",
+      "snippet": "Mandapaka, S. (2025), Technix International Journal for Engineering Research",
+      "engines": [
+        "crossref"
+      ],
+      "min_position": 56
+    },
+    {
+      "url": "https://doi.org/10.58168/cismp2024_765-767",
+      "title": "DATA REPLICATION IN POSTGRESQL IN ASTRA LINUX",
+      "snippet": "The article provides an overview of various methods of data replication in PostgreSQL, including mechanisms provided by the system itself, as well as third-party solutions. Particular attention is paid to setting up and configuring replication in Astra Linux, using available tools and settings. The article will provide practical information and recommendations for using data replication in PostgreSQL in Astra Linux. Consideration of various replication methods and their configuration will allow readers to choose the most suitable solution depending on specific requirements and limitations.",
+      "engines": [
+        "crossref"
+      ],
+      "min_position": 200
+    },
+    {
+      "url": "https://doi.org/10.64149/j.ijesrt.15.4.22-31",
+      "title": "A COMPARATIVE EXPERIMENTAL STUDY OF INDEX PERFORMANCE IN MONGODB AND POSTGRESQL",
+      "snippet": "The continuous growth in data volumes, combined with the increasing complexity of modern enterprise information systems, requires database management systems (DBMS) to guarantee ever faster response times. In this context, query performance optimization has become a major challenge for improving operational efficiency and organizational productivity. Among the most widely used DBMS, PostgreSQL and MongoDB stand out for their ability to manage large amounts of complex data while offering advanced performance optimization mechanisms. These systems notably integrate indexing techniques that significantly accelerate query processing, even in environments characterized by very large data volumes. In the context of this study, we analyze the impact of different indexing techniques applied to queries executed on these two reference DBMS. More specifically, we evaluate the performance of three types of indexes: single index, composite index, and text index. The indexing strategies were applied to different data manipulation operations, including retrieval, update, and deletion. The results obtained highlight the effectiveness of indexing techniques in optimizing query performance and confirm their essential role in the efficient management of large databases within modern information systems.",
+      "engines": [
+        "crossref"
+      ],
+      "min_position": 6
+    },
+    {
+      "url": "https://elephanttamer.net/?p=9",
+      "title": "GiST vs GIN index for LIKE searches – a comparison",
+      "snippet": "Takeaway: always use GIN for trigram indexing, and if your database suffers from poor LIKE performance, check not only the scan type, but also the ...",
+      "engines": [
+        "mojeek"
+      ],
+      "min_position": 6
+    },
+    {
+      "url": "https://habr.com/ru/company/postgrespro/blog/441962/",
+      "title": "Indexes in PostgreSQL",
+      "snippet": "habr.com",
+      "engines": [
+        "lobsters"
+      ],
+      "min_position": 1
+    },
+    {
+      "url": "https://hakibenita.com/postgresql-correlation-brin-multi-minmax",
+      "title": "When Good Correlation is Not Enough",
+      "snippet": "hakibenita.com",
+      "engines": [
+        "lobsters"
+      ],
+      "min_position": 2
+    },
+    {
+      "url": "https://hakibenita.com/postgresql-hash-index",
+      "title": "Re-Introducing Hash Indexes in PostgreSQL",
+      "snippet": "hakibenita.com",
+      "engines": [
+        "lobsters"
+      ],
+      "min_position": 3
+    },
+    {
+      "url": "https://ntsd.dev/postgresql-index-types/",
+      "title": "Explain index types in PostgreSQL | Jirawat Boonkumnerd",
+      "snippet": "Postgres provides many index types such as B-tree, hash, GiST, and GIN. ... GiST and GIN are indexes for supporting Full-Text Search which I’ll ...",
+      "engines": [
+        "mojeek"
+      ],
+      "min_position": 8
+    },
+    {
+      "url": "https://oneuptime.com/blog/post/2026-01-25-use-index-types-effectively-postgresql/view",
+      "title": "How to Use Index Types Effectively in PostgreSQL",
+      "snippet": "Learn how to choose and use the right index types in PostgreSQL. This guide covers B-tree, Hash, GIN, GiST, BRIN, and partial indexes with practical examples for optimal query performance.",
+      "engines": [
+        "duckduckgo"
+      ],
+      "min_position": 5
+    },
+    {
+      "url": "https://openalex.org/W2612672839",
+      "title": "PostgreSQL database performance optimization",
+      "snippet": "The thesis was request by Marlevo software Oy for a general description of the PostgreSQL database and its performance optimization technics. Its purpose was to help new PostgreSQL users to quickly understand the system and to assist DBAs to improve the database performance.\r\\n\r\\nThe thesis was divided into two parts. The first part described PostgreSQL database optimization technics in theory. In additional popular tools were also introduced. This part was based on PostgreSQL documentation, relevant books and other online resources. The second part demonstrates the optimization process in practice with 3 test cases. Each case was created from a different aspect.\r\\n\r\\nThe thesis concludes PostgreSQL database optimization is different from others. Users should have enough knowledge about it before performing database optimization tasks. Especially for those who come from SQL server and DB2 world.",
+      "engines": [
+        "openalex"
+      ],
+      "min_position": 5
+    },
+    {
+      "url": "https://openalex.org/W2896189947",
+      "title": "Highly Efficient Search In Linguistic Data",
+      "snippet": "Electronic dictionaries and online learning services have become a common tool for translators, linguistics and people trying to learn a new language.This master's thesis work has been carried out in the company Kielikone.The company owns an online learning service called Sanakirja.fi,which helps in studying and teaching foreign languages with the help of a dictionary search service, where people can make bidirectional searches for headwords in multiple languages (over 40).The goal of this thesis is to analyse and develop a unified interface to search entries from different dictionary resources.In this master's thesis work we try to develop a 'standard' information retrieval system on linguistic data.Although the system uses many different methods existing in Information Retrieval Systems, it also contains facilities, optimized for linguistic data.We have tried to compare and use different techniques of information retrieval and learning to rank to store, retrieve and rank information from a very large data source, containing around 80 million records.The system also supports approximate search which has been implemented using wild card searching algorithm and ranks results according to the degree of closeness to the query.In the end we implement a learning to rank system which learns from user feedback and the results are passed to a logistic regression classifier.The classifier predicts the feature coefficients and those, combined with the real weight features are used to improve the ranking of the system.",
+      "engines": [
+        "openalex"
+      ],
+      "min_position": 4
+    },
+    {
+      "url": "https://stackoverflow.com/questions/12738997/postgres-gist-vs-btree-index",
+      "title": "postgresql - Postgres GIST vs Btree index - Stack Overflow",
+      "snippet": "It's considerably slower than regular b-tree indexes, but allows you to create a multi-column index that contains both GiST-only types and regular ...",
+      "engines": [
+        "mojeek"
+      ],
+      "min_position": 3
+    },
+    {
+      "url": "https://stackoverflow.com/questions/1540374/why-are-postgresql-text-search-gist-indexes-so-much-slower-than-gin-indexes",
+      "title": "performance - Why are PostgreSQL Text-Search GiST indexes so",
+      "snippet": "The docs have a nice overview of the performance differences between GiST and GIN indexes if you're interested: GiST and GIN Index Types .",
+      "engines": [
+        "mojeek"
+      ],
+      "min_position": 5
+    },
+    {
+      "url": "https://stackoverflow.com/questions/21830/postgresql-gin-or-gist-indexes",
+      "title": "indexing - PostgreSQL: GIN or GiST indexes? - Stack Overflow",
+      "snippet": "First of all, do you need to use them for text search indexing? GIN and GiST are index specialized for some data types.",
+      "engines": [
+        "mojeek"
+      ],
+      "min_position": 2
+    },
+    {
+      "url": "https://stackoverflow.com/questions/40780825/btree-vs-gin-vs-gist-index",
+      "title": "postgresql - BTREE vs GIN vs GIST index - Stack Overflow",
+      "snippet": "5 From PostgreSQL documentation: 11.2. Index Types By default, the CREATE INDEX command creates B-tree indexes The other index types are selected by writing the keyword USING followed by the index type name B-trees can handle equality and range queries on data that can be sorted (< <= = >= > BETWEEN, IN)",
+      "engines": [
+        "duckduckgo",
+        "mojeek"
+      ],
+      "min_position": 1
+    },
+    {
+      "url": "https://stackoverflow.com/questions/766488/whats-the-difference-between-b-tree-and-gist-index-methods-in-postgresql",
+      "title": "indexing - What's the difference between B-Tree and GiST",
+      "snippet": "There was a recent post on the PG lists about a huge performance hit for using GiST indexes; they're expected to be slower than B-Trees (such is the ...",
+      "engines": [
+        "mojeek"
+      ],
+      "min_position": 4
+    },
+    {
+      "url": "https://www.2ndquadrant.com/en/blog/parallelism-comes-to-vacuum/",
+      "title": "Parallelism comes to VACUUM",
+      "snippet": "2ndquadrant.com",
+      "engines": [
+        "lobsters"
+      ],
+      "min_position": 5
+    },
+    {
+      "url": "https://www.depesz.com/2014/05/12/joining-btree-and-gingist-indexes/",
+      "title": "Joining BTree and GIN/GiST indexes – select * from depesz;",
+      "snippet": "... gin_btree (there is also gist_btree if your “ base\" index ... What it is – it adds “ btree\" type of operators support to gin index.",
+      "engines": [
+        "mojeek"
+      ],
+      "min_position": 7
+    },
+    {
+      "url": "https://www.elysiate.com/blog/best-postgresql-indexes-for-performance",
+      "title": "Best PostgreSQL Indexes for Performance | Elysiate",
+      "snippet": "A practical PostgreSQL guide to choosing the best indexes for performance, including B-tree, GIN, GiST, BRIN, partial, multicolumn, covering, and expression indexes.",
+      "engines": [
+        "duckduckgo"
+      ],
+      "min_position": 4
+    },
+    {
+      "url": "https://www.iamraghuveer.com/posts/postgresql-indexes-deep-dive/",
+      "title": "PostgreSQL Indexes Deep Dive: B-Tree, GIN, GiST, and BRIN",
+      "snippet": "PostgreSQL Indexes Deep Dive: B-Tree, GIN, GiST, and BRIN Choosing the wrong index type or missing an index entirely is among the most common causes of database performance problems.",
+      "engines": [
+        "duckduckgo"
+      ],
+      "min_position": 10
+    },
+    {
+      "url": "https://www.meerako.com/blogs/postgresql-indexing-strategies-btree-gin-gist-guide",
+      "title": "PostgreSQL Indexing Deep Dive | Meerako",
+      "snippet": "PostgreSQL Indexing Deep Dive: B-Tree, GIN, GiST, and When to Use Them Slow queries? The right index is magic. Our Postgres experts explain different index types (B-Tree, GIN, GiST) and how to optimize your queries.",
+      "engines": [
+        "duckduckgo"
+      ],
+      "min_position": 3
+    },
+    {
+      "url": "https://www.mydbops.com/blog/postgresql-indexing-best-practices-guide",
+      "title": "PostgreSQL Index Best Practices for Faster Queries | Mydbops",
+      "snippet": "Boost PostgreSQL query performance with the right indexing strategies. Learn best practices for using B-Tree, Hash, GIN, and more to Contact Mydbops today.",
+      "engines": [
+        "duckduckgo"
+      ],
+      "min_position": 9
+    },
+    {
+      "url": "https://www.percona.com/blog/2019/06/21/hypothetical-indexes-in-postgresql/",
+      "title": "Hypothetical Indexes in PostgreSQL",
+      "snippet": "percona.com",
+      "engines": [
+        "lobsters"
+      ],
+      "min_position": 4
+    },
+    {
+      "url": "https://www.postgresql.org/about/news/postgresql-18-beta-1-released-3070/",
+      "title": "PostgreSQL 18 Beta 1 Released",
+      "snippet": "postgresql.org",
+      "engines": [
+        "lobsters"
+      ],
+      "min_position": 6
+    },
+    {
+      "url": "https://www.postgresql.org/docs/current/indexes-types.html",
+      "title": "PostgreSQL: Documentation: 18: 11.2. Index Types",
+      "snippet": "PostgreSQL provides several index types: B-tree, Hash, GiST, SP-GiST, GIN, BRIN, and the extension bloom. Each index type uses a different algorithm that is best suited to different types of indexable clauses. By default, the CREATE INDEX command creates B-tree indexes, which fit the most common situations. The other index types are selected by writing the keyword USING followed by the index ...",
+      "engines": [
+        "duckduckgo"
+      ],
+      "min_position": 1
+    },
+    {
+      "url": "https://www.semanticscholar.org/paper/Comparative-analysis-of-indexing-strategies-in-load-Zolotukhina/a1bcf6c3ddb11cd3dc7cb9cafbbae31fd2c222f7",
+      "title": "Comparative analysis of indexing strategies in PostgreSQL under various load scenarios",
+      "snippet": "TLDRThe main conclusions of the conducted research are recommendations on the choice of indexes depending on the types of queries and their execution conditions, which makes it possible to improve application performance by choosing an optimal indexing strategy.Expand",
+      "engines": [
+        "semantic_scholar"
+      ],
+      "min_position": 1
+    },
+    {
+      "url": "https://www.semanticscholar.org/paper/Efficient-Iris-Recognition-Management-in-Databases-Alvez-Miranda/cd69c81398ea9b392f8f93f9e290cc5402cf5b5f",
+      "title": "Efficient Iris Recognition Management in Object-Related Databases",
+      "snippet": "TLDRAn extension of an Object Relational Database Management System for the integral management of a biometric system based on the human iris was presented, which includes both the extension of the type system and the definition of domain indexes for performance improvement.Expand",
+      "engines": [
+        "semantic_scholar"
+      ],
+      "min_position": 7
+    },
+    {
+      "url": "https://www.semanticscholar.org/paper/Intra-page-Indexing-in-Generalized-Search-Trees-of-Borodin-Mirvoda/a402de1fc7c031608b9a55083b5084aaf4390e97",
+      "title": "Intra-page Indexing in Generalized Search Trees of PostgreSQL",
+      "snippet": "TLDRThis paper proposes changes to this limitation with additional intra-page indexing, based on the concept of skip tuples, which allows to increase of insert and update performance by the factor of 1.5 and opens new ways towards GiST API advancement.Expand",
+      "engines": [
+        "semantic_scholar"
+      ],
+      "min_position": 5
+    },
+    {
+      "url": "https://www.semanticscholar.org/paper/Purdue-e-Pubs-Purdue-e-Pubs-non-traditional-Oracle/685f1a3f6b6207a98830f4e6d082c729af9f2e05",
+      "title": "Purdue e-Pubs Purdue e-Pubs",
+      "snippet": "TLDRThis paper presents a serious attempt at plementing and realizing SP-GiST-based in dexes inside Postgres facilitated by rapid SP-GiST instantiations and highlights the performance gains and several strengths and weak nesses of SP-GiST-bilsed indexes that need to be addressed in future research.Expand",
+      "engines": [
+        "semantic_scholar"
+      ],
+      "min_position": 6
+    },
+    {
+      "url": "https://www.semanticscholar.org/paper/Research-and-Comparative-Analysis-of-Approaches-to-Dubrovskaia-Balanev/ef8e4bbf124a1ae45eec52efbab4c3b0dd9e00f0",
+      "title": "Research and Comparative Analysis of Approaches to Data Storage Architecture, Hashing, Indexing, and data Compression in Oracle and PostgreSQL",
+      "snippet": "TLDRThe comparative analysis demonstrates that Oracle is oriented toward performance and scalability, while PostgreSQL emphasizes flexibility and architectural extensibility.Expand",
+      "engines": [
+        "semantic_scholar"
+      ],
+      "min_position": 2
+    },
+    {
+      "url": "https://www.semanticscholar.org/paper/Space-Partitioning-Trees-in-PostgreSQL%3A-Realization-Eltabakh-Eltarras/35cab96c86bae325db7a456ffc64f57c142fe56c",
+      "title": "Space-Partitioning Trees in PostgreSQL: Realization and Performance",
+      "snippet": "TLDRThis paper presents a serious attempt at implementing and realizing SP-GiST-based indexes inside PostgreSQL, and interesting results that highlight the potential performance gains of SP GiST- based indexes are presented.Expand",
+      "engines": [
+        "semantic_scholar"
+      ],
+      "min_position": 3
+    },
+    {
+      "url": "https://www.semanticscholar.org/paper/Supporting-Trajectory-UDF-Queries-and-Indexes-on-Yang-Nam/d0162e56e832f5bb439a2fba1825ed8b58521308",
+      "title": "Supporting Trajectory UDF Queries and Indexes on PostGIS",
+      "snippet": "TLDRA new system supporting trajectory queries on PostGIS using UDFs is developed and Experimental results show that the pre‐materialization techniques are about 1.2 times faster than naïve query processing using r‐tree index.Expand",
+      "engines": [
+        "semantic_scholar"
+      ],
+      "min_position": 8
+    },
+    {
+      "url": "https://www.semanticscholar.org/paper/To-Trie-or-Not-to-Trie-Realizing-Space-partitioning-Eltabakh-Eltarras/ed662da5a5b1211803258fff46e287ced52b10f8",
+      "title": "To Trie or Not to Trie? Realizing Space-partitioning Trees inside PostgreSQL: Challenges, Experiences and Performance",
+      "snippet": "TLDRThis paper presents a serious attempt at implementing and realizing SP-GiST-based indexes inside PostgreSQL and highlights the potentifd performance gains of SP-GiST-based indexes as well as several strengths and weaknesses of SP-GiST-bilsed indexes that need to be addressed in future research.Expand",
+      "engines": [
+        "semantic_scholar"
+      ],
+      "min_position": 4
+    },
+    {
+      "url": "https://www.thenile.dev/docs/extensions/btree_gin",
+      "title": "Btree_gin - Nile Documentation",
+      "snippet": "The btree_gin extension in PostgreSQL enables GIN indexes to support B-tree indexable data types. ... GIN index with btree_gin is useful when ...",
+      "engines": [
+        "mojeek"
+      ],
+      "min_position": 10
+    }
+  ]
+}
