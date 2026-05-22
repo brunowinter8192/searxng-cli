@@ -1,0 +1,17 @@
+{
+  "mode": "pdf",
+  "query": "contrastive learning self-supervised representations",
+  "selection_method": "LLM oracle (Sonnet, oracle-worker no-filter run)",
+  "top_10": [
+    {"rank": 1, "url": "http://keg.cs.tsinghua.edu.cn/jietang/publications/TKDE21-Liu-et-al-Self-supervised-Learning-Generative-or-Contrastive.pdf", "rationale": "Direct PDF — foundational TKDE survey 'Self-supervised Learning: Generative or Contrastive'. University-hosted PDF, comprehensive coverage of contrastive and generative SSL methods."},
+    {"rank": 2, "url": "https://proceedings.neurips.cc/paper_files/paper/2020/file/d89a66c7c80a29b1bdbab0f2a1a94af8-Paper.pdf", "rationale": "Direct NeurIPS PDF — 'Supervised Contrastive Learning'. Official NeurIPS 2020 proceedings paper PDF on supervised contrastive learning, the key extension of contrastive SSL."},
+    {"rank": 3, "url": "https://link.springer.com/content/pdf/10.1007/s13735-022-00245-6.pdf", "rationale": "Direct Springer PDF — 'Contrastive Self-supervised Learning: Review, Progress, Challenges'. Comprehensive review covering autoencoders, contrastive methods, and SSL frameworks."},
+    {"rank": 4, "url": "https://marslanm.github.io/assets/pdf/Contrastive_Self-Supervised_Learning_A_Survey_on_Different_Architectures.pdf", "rationale": "Direct university-hosted PDF — 'Contrastive Self-Supervised Learning: A Survey on Different Architectures'. Survey covering generative + contrastive SSL integration."},
+    {"rank": 5, "url": "https://openaccess.thecvf.com/content/CVPR2024/papers/Li_Self-Supervised_Representation_Learning_from_Arbitrary_Scenarios_CVPR_2024_paper.pdf", "rationale": "Direct CVPR 2024 Open Access PDF — 'Self-Supervised Representation Learning from Arbitrary Scenarios'. Combines contrastive learning and masked image modeling. Official conference paper PDF."},
+    {"rank": 6, "url": "https://www.frontiersin.org/journals/neuroscience/articles/10.3389/fnins.2023.1225312/pdf", "rationale": "Direct Frontiers PDF — 'Contrastive self-supervised representation learning without negative samples'. Open-access journal PDF on multimodal contrastive SSL framework."},
+    {"rank": 7, "url": "https://arxiv.org/pdf/2510.10572", "rationale": "Direct arXiv PDF — 'Understanding Self-supervised Contrastive Learning through Supervised'. PDF format, covers prototype representation bias and balanced contrastive loss."},
+    {"rank": 8, "url": "https://proceedings.mlr.press/v119/chen20j.html", "rationale": "ICML 2020 PMLR proceedings page for SimCLR 'A Simple Framework for Contrastive Learning of Visual Representations' — official conference proceedings page with PDF download link."},
+    {"rank": 9, "url": "https://arxiv.org/abs/2004.11362", "rationale": "arXiv abstract page for 'Supervised Contrastive Learning' (Khosla et al.) — arXiv abstract with full PDF available. Key extension of contrastive learning to supervised settings."},
+    {"rank": 10, "url": "https://doi.org/10.48550/arxiv.2002.05709", "rationale": "arXiv DOI for SimCLR 'A Simple Framework for Contrastive Learning of Visual Representations' — canonical foundational paper with arXiv PDF available."}
+  ]
+}

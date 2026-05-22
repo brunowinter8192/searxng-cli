@@ -1,0 +1,17 @@
+{
+  "mode": "pdf",
+  "query": "python asyncio event loop concurrency",
+  "selection_method": "LLM oracle (Sonnet, oracle-worker no-filter run)",
+  "top_10": [
+    {"rank": 1, "url": "https://archive.org/download/python-programming-collection-pdf-ebooks-all-you-need/Using%20Asyncio%20in%20Python%203_%20Understanding%20Python%27s%20Asynchronous%20Programming%20Features%20%28CONV%29%20-%20Caleb%20Hattingh%20%28O%27Reilly%20Media%3BFree%20Programming%20Ebooks%3B2018%29.pdf", "rationale": "Direct PDF — 'Using Asyncio in Python 3' (Caleb Hattingh, O'Reilly) hosted on Archive.org. Book-length treatment of asyncio event loop machinery and concurrency model. Top PDF hit for the topic."},
+    {"rank": 2, "url": "https://link.springer.com/content/pdf/10.1007/978-3-030-25943-3_34.pdf", "rationale": "Direct Springer PDF — 'Concurrency with AsyncIO' book chapter. Covers asyncio.run() and event loop management, direct PDF of a published book chapter on asyncio concurrency."},
+    {"rank": 3, "url": "https://indico.gsi.de/event/17490/contributions/71045/attachments/43482/61031/Event-driven%20Programming%20with%20Python%20asyncio.pdf", "rationale": "Direct conference PDF — 'Event-driven Programming with Python asyncio'. Covers event loop architecture, coroutines, and sequential-looking async code execution. Directly matches 'event loop concurrency'."},
+    {"rank": 4, "url": "https://sschwarzer.com/download/concurrency_pycon_de2018.pdf", "rationale": "Direct PyCon DE 2018 PDF — 'Concurrency in Python: Concepts, frameworks and best practices'. Covers asyncio event loop I/O switching pattern and concurrency frameworks. Direct conference PDF."},
+    {"rank": 5, "url": "https://media.githubusercontent.com/media/Rishabh-creator601/Books/refs/heads/master/python_books/Python_Concurrency_with_asyncio_Matthew_Fowler.pdf", "rationale": "Direct PDF — 'Python Concurrency with asyncio' by Matthew Fowler. Full book PDF covering the asyncio single-threaded concurrency model, event loop, and APIs."},
+    {"rank": 6, "url": "https://github.com/gegasnake/django_books/blob/main/Python%20Concurrency%20with%20asyncio.pdf", "rationale": "GitHub-hosted PDF — 'Python Concurrency with asyncio'. Same definitive book via GitHub PDF viewer; event loop and concurrency coverage."},
+    {"rank": 7, "url": "https://doi.org/10.1007/978-1-4842-4401-2_2", "rationale": "Springer book chapter 'Working with Event Loops' — directly covers asyncio event loop orchestration of callbacks and asynchronous tasks in Python 3.4+. Has Springer PDF available."},
+    {"rank": 8, "url": "https://www.scribd.com/document/680700921/Python-Asyncio", "rationale": "Scribd 'Mastering Python Asyncio Essentials | PDF' — comprehensive PDF guide covering coroutines, event loops, non-blocking I/O, and concurrency patterns in asyncio."},
+    {"rank": 9, "url": "https://welib.org/md5/2a6542ca9655d08c97dacbe92cbce3b0", "rationale": "WeLib 'Python Concurrency with asyncio (PDF, 6.4 MB)' — PDF download page for the Fowler book; labeled PDF with size confirmation."},
+    {"rank": 10, "url": "https://sciarium.com/file/546119/", "rationale": "Sciarium 'Download Fowler Matthew. Python Concurrency with asyncio [PDF]' — PDF download link for the asyncio concurrency book; PDF-mode landing page."}
+  ]
+}

@@ -1,0 +1,17 @@
+{
+  "mode": "books",
+  "query": "transformer attention mechanism",
+  "selection_method": "LLM oracle (Sonnet, oracle-worker no-filter run)",
+  "top_10": [
+    {"rank": 1, "url": "https://link.springer.com/chapter/10.1007/978-3-032-10738-1_9", "rationale": "Springer book chapter 'Attention Mechanism and Transformers' — directly on topic, published in a Springer volume. Introduces attention as a data-weighting strategy and its role in deep learning models and sequence modeling."},
+    {"rank": 2, "url": "https://tailoredread.com/book/attention-mechanisms-deep-learning-master-transformers-5f35e3523c6b", "rationale": "Book page for 'Attention Mechanisms in Deep Learning: Master Transformers' — explicitly a book bridging attention theory and production-grade implementation of transformers."},
+    {"rank": 3, "url": "https://d2l.ai/chapter_attention-mechanisms-and-transformers/index.html", "rationale": "'Dive into Deep Learning' (D2L.ai) — authoritative open interactive textbook, Chapter 11 'Attention Mechanisms and Transformers'. Book-format online textbook covering the complete transformer attention mechanism."},
+    {"rank": 4, "url": "https://doi.org/10.31219/osf.io/m6gcn", "rationale": "Comprehensive tutorial and survey 'Attention Mechanism, Transformers, BERT, and GPT' — covers attention mechanism, seq2seq, self-attention, encoder-decoder architecture. Survey depth matches a book chapter."},
+    {"rank": 5, "url": "https://faculty.ist.psu.edu/vhonavar/Courses/dsmethods/transformer.pdf", "rationale": "PDF of the tutorial and survey 'Attention Mechanism, Transformers, BERT, and GPT' — same comprehensive coverage in PDF form, suitable for book-mode reading."},
+    {"rank": 6, "url": "https://arxiv.org/abs/1706.03762", "rationale": "'Attention Is All You Need' (arXiv 1706.03762) — the foundational transformer paper, cited in every book on the topic. Essential reference for any book-level treatment of transformer attention mechanisms."},
+    {"rank": 7, "url": "https://papers.neurips.cc/paper/7181-attention-is-all-you-need.pdf", "rationale": "NeurIPS published PDF of 'Attention Is All You Need' — official proceedings version of the foundational transformer paper, authoritative primary source."},
+    {"rank": 8, "url": "https://doi.org/10.3390/biology12071033", "rationale": "Comprehensive review 'Transformer Architecture and Attention Mechanisms in Genome Data Analysis' — covers transformer architecture and attention mechanisms thoroughly, book-chapter depth."},
+    {"rank": 9, "url": "https://arxiv.org/html/2302.07730v4", "rationale": "'Transformer models: an introduction and catalog' — comprehensive catalog of transformer architectures and attention mechanism variants; survey breadth comparable to a book chapter."},
+    {"rank": 10, "url": "https://en.wikipedia.org/wiki/Attention_Is_All_You_Need", "rationale": "Wikipedia article on 'Attention Is All You Need' — encyclopedic reference covering the history, architecture, and impact of the transformer attention mechanism paper."}
+  ]
+}

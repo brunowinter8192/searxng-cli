@@ -1,0 +1,17 @@
+{
+  "mode": "docs",
+  "query": "transformer attention mechanism",
+  "selection_method": "LLM oracle (Sonnet, oracle-worker no-filter run)",
+  "top_10": [
+    {"rank": 1, "url": "https://huggingface.co/docs/transformers/v4.30.0/attention", "rationale": "Official Hugging Face Transformers library documentation — 'Attention mechanisms'. Covers full attention matrix, computational bottlenecks for long texts, and efficient attention variants (Longformer, Reformer). Direct official library docs."},
+    {"rank": 2, "url": "https://docs.nvidia.com/deeplearning/transformer-engine/user-guide/examples/attention/attention.html", "rationale": "Official NVIDIA Transformer Engine documentation — 'Attention Is All You Need!' example. Covers scaled dot-product attention and SDPA implementation in NVIDIA's official DL library."},
+    {"rank": 3, "url": "https://github.com/huggingface/transformers/blob/main/docs/source/en/attention_interface.md", "rationale": "Official Hugging Face Transformers repository documentation on custom attention interface — covers registering custom attention functions and AttentionMaskInterface. Source-level official docs."},
+    {"rank": 4, "url": "https://deepwiki.com/pytorch/pytorch/3.5-attention-mechanisms-and-transformers", "rationale": "DeepWiki page for pytorch/pytorch — 'Attention Mechanisms and Transformers'. Documents PyTorch's suite of attention implementations including SDPA and advanced variants."},
+    {"rank": 5, "url": "https://d2l.ai/chapter_attention-mechanisms-and-transformers/index.html", "rationale": "'Dive into Deep Learning' (D2L.ai) — Chapter 11 'Attention Mechanisms and Transformers'. Authoritative interactive online textbook, covering the full transformer attention stack."},
+    {"rank": 6, "url": "https://doi.org/10.31219/osf.io/m6gcn", "rationale": "Comprehensive tutorial and survey 'Attention Mechanism, Transformers, BERT, and GPT' — covers attention, self-attention, encoder-decoder architecture comprehensively; authoritative reference document."},
+    {"rank": 7, "url": "https://arxiv.org/html/2302.07730v4", "rationale": "'Transformer models: an introduction and catalog' — comprehensive catalog of transformer architectures and attention mechanism variants; covers key-query-value architecture and parallel computation."},
+    {"rank": 8, "url": "https://arxiv.org/html/2604.00965v1", "rationale": "'Understanding Transformers and Attention Mechanisms: An' — brief educational introduction to the attention mechanism used in modern language models; directly addresses the query topic."},
+    {"rank": 9, "url": "https://www.baeldung.com/cs/attention-mechanism-transformers", "rationale": "Baeldung CS article 'Attention Mechanism in the Transformers Model' — focused explanation of the attention module, from a reputable CS tutorial platform."},
+    {"rank": 10, "url": "https://www.geeksforgeeks.org/nlp/transformer-attention-mechanism-in-nlp/", "rationale": "GeeksforGeeks 'Transformer Attention Mechanism in NLP' — covers the transformer attention mechanism for sequential data tasks (translation, generation); well-indexed reference article."}
+  ]
+}

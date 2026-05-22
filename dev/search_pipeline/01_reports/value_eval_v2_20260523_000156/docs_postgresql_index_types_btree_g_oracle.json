@@ -1,0 +1,17 @@
+{
+  "mode": "docs",
+  "query": "postgresql index types btree gin gist performance",
+  "selection_method": "LLM oracle (Sonnet, oracle-worker no-filter run)",
+  "top_10": [
+    {"rank": 1, "url": "https://www.postgresql.org/docs/current/indexes-types.html", "rationale": "Official PostgreSQL documentation (v18) — '11.2. Index Types'. The canonical reference covering B-tree, Hash, GiST, SP-GiST, GIN, BRIN, and bloom. Primary source for all index type documentation."},
+    {"rank": 2, "url": "https://www.postgresql.org/docs/current/gin.html", "rationale": "Official PostgreSQL documentation (v18) — '65.4. GIN Indexes'. Deep documentation on GIN index internals, extensibility, and performance characteristics."},
+    {"rank": 3, "url": "https://postgrespro.com/docs/postgresql/14/indexes-types", "rationale": "Official PostgreSQL documentation (v14 via Postgres Pro) — '11.2. Index Types'. Same canonical reference page for PostgreSQL 14, covering all index types."},
+    {"rank": 4, "url": "https://www.thenile.dev/docs/extensions/btree_gin", "rationale": "Nile Documentation for the btree_gin extension — explains how btree_gin enables GIN indexes to support B-tree indexable data types, directly relevant to the query's B-tree/GIN intersection."},
+    {"rank": 5, "url": "https://habr.com/en/companies/postgrespro/articles/448746/", "rationale": "Postgres Pro technical series 'Indexes in PostgreSQL — 7 (GIN)' — deep technical treatment of GIN index internals by PostgreSQL's commercial support provider; series covers hash, B-tree, GiST, SP-GiST, GIN."},
+    {"rank": 6, "url": "https://medium.com/postgres-professional/indexes-in-postgresql-5-gist-86e19781b5db", "rationale": "Postgres Professional 'Indexes in PostgreSQL — 5 (GiST)' — deep technical treatment of GiST internals from the official PostgreSQL support company; part of the same comprehensive index series."},
+    {"rank": 7, "url": "https://doi.org/10.20944/preprints202511.2170.v1", "rationale": "Preprint 'Indexing in PostgreSQL: Performance Evaluation and Use Cases' — comprehensive performance evaluation of all six native index types (B-Tree, Hash, GiST, SP-GiST, GIN, BRIN) directly matching the query."},
+    {"rank": 8, "url": "https://explain.technical.li/postgres-indexes-beyond-b-tree/", "rationale": "'Postgres Indexes Beyond B-Tree—GIN, GiST, BRIN, SP-GiST' — practical guide with performance benchmarks showing 20-1000x improvement over B-tree for specific use cases."},
+    {"rank": 9, "url": "https://bigdataboutique.com/blog/postgresql-indexes-best-practices", "rationale": "'PostgreSQL Indexes Best Practices: Choosing the Right Index for Every ...' — comprehensive production-oriented guide covering B-tree, GIN, GiST, BRIN with when-to-use guidance and pitfalls."},
+    {"rank": 10, "url": "https://doi.org/10.64149/j.ijesrt.15.4.22-31", "rationale": "Academic paper 'A Comparative Experimental Study of Index Performance in MongoDB and PostgreSQL' — empirical performance evaluation of PostgreSQL indexes against MongoDB, providing comparative performance data."}
+  ]
+}
