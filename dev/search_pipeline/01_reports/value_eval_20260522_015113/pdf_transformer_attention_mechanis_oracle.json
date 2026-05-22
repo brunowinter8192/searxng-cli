@@ -1,0 +1,57 @@
+{
+  "mode": "pdf",
+  "query": "transformer attention mechanism",
+  "selection_method": "LLM oracle (Sonnet, value-eval-b1)",
+  "top_10": [
+    {
+      "rank": 1,
+      "url": "https://faculty.ist.psu.edu/vhonavar/Courses/dsmethods/transformer.pdf",
+      "rationale": "Tutorial and Survey PDF on attention mechanism, transformers, BERT, and GPT — comprehensive structured tutorial covering self-attention, multi-head attention, positional encoding, and architectures."
+    },
+    {
+      "rank": 2,
+      "url": "https://arxiv.org/pdf/2601.03329",
+      "rationale": "Survey PDF 'Attention mechanisms in neural networks' — covers attention across NLP, CV, and multimodal learning including language modeling, bidirectional encoders, seq2seq, ViT, and cross-modal attention."
+    },
+    {
+      "rank": 3,
+      "url": "https://cs231n.stanford.edu/slides/2025/lecture_8.pdf",
+      "rationale": "Stanford CS231n 2025 lecture slides on attention and transformers — high-quality educational PDF from a leading ML course, recent (2025)."
+    },
+    {
+      "rank": 4,
+      "url": "https://arxiv.org/html/2604.00965v1",
+      "rationale": "Survey 'Understanding Transformers and Attention Mechanisms' — recent academic paper directly addressing the query, arxiv-hosted, covers semantic encoding through attention building blocks."
+    },
+    {
+      "rank": 5,
+      "url": "https://engineering.purdue.edu/DeepLearn/pdf-kak/Transformers.pdf",
+      "rationale": "Purdue Deep Learning course PDF on transformers — academic tutorial building from attention basics to the full architecture, with mathematical exposition."
+    },
+    {
+      "rank": 6,
+      "url": "https://research.colfax-intl.com/wp-content/uploads/2024/03/intro-to-transformers.pdf",
+      "rationale": "Colfax Research intro to transformers PDF — covers the history from RNN+attention to self-attention-only architecture, with key architectural insights."
+    },
+    {
+      "rank": 7,
+      "url": "https://aclanthology.org/D19-1443/",
+      "rationale": "ACL 2019 'Transformer Dissection: A Unified Understanding' — dissects the attention mechanism systematically, providing a unified view of its components and variants."
+    },
+    {
+      "rank": 8,
+      "url": "https://momath.org/wp-content/uploads/2023/06/Rohan_Mehta_compressed.pdf",
+      "rationale": "Attention mechanism demystified PDF — provides a clear, accessible mathematical explanation of key/query/value attention for non-specialist audiences."
+    },
+    {
+      "rank": 9,
+      "url": "https://fenix.tecnico.ulisboa.pt/downloadFile/1970943312377766/lecture_10.pdf",
+      "rationale": "IST Lisbon lecture notes PDF on attention mechanisms and transformers — academic course material covering the mechanism rigorously."
+    },
+    {
+      "rank": 10,
+      "url": "https://cl-illc.github.io/semantics-2023/resources/slides/attention_and_transformers.pdf",
+      "rationale": "ILLC semantics course slides PDF on attention and transformers — includes hierarchical attention and transformer context, academic resource."
+    }
+  ]
+}
