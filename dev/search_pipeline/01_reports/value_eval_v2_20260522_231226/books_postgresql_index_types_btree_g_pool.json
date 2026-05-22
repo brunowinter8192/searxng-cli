@@ -1,0 +1,34 @@
+{
+  "mode": "books",
+  "query": "postgresql index types btree gin gist performance",
+  "fetched_ts": "2026-05-22T23:14:34",
+  "google_count": 10,
+  "pool_sizes": {
+    "raw": 241,
+    "capped": 47,
+    "filtered": 1,
+    "filtered_capped": 1
+  },
+  "pool": [
+    {
+      "url": "https://pganalyze.com/ebooks/postgres-indexing",
+      "title": "Indexing Postgres: Creating The Best Index For Your Queries",
+      "snippet": "Indexing can make a significant impact on the performance of your application's query workload. Too many indexes will slow down your write performance, but creating the right indexes can often improve your query performance by 10x or even 100x. In this book, you will learn: How Postgres uses indexes Data types, operators and index types B-tree indexes, Hash indexes, BRIN indexes, and Generic ...",
+      "engines": [
+        "duckduckgo"
+      ],
+      "min_position": 7
+    }
+  ],
+  "pool_full": [
+    {
+      "url": "https://pganalyze.com/ebooks/postgres-indexing",
+      "title": "Indexing Postgres: Creating The Best Index For Your Queries",
+      "snippet": "Indexing can make a significant impact on the performance of your application's query workload. Too many indexes will slow down your write performance, but creating the right indexes can often improve your query performance by 10x or even 100x. In this book, you will learn: How Postgres uses indexes Data types, operators and index types B-tree indexes, Hash indexes, BRIN indexes, and Generic ...",
+      "engines": [
+        "duckduckgo"
+      ],
+      "min_position": 7
+    }
+  ]
+}
