@@ -1,0 +1,318 @@
+# Engine Report — general × python asyncio event loop concurrency
+
+**Mode:** general
+**Query:** python asyncio event loop concurrency
+**Fetched:** 2026-05-22T23:12:39
+
+## Pool Sizes
+
+| Stage | Count |
+|-------|------:|
+| Raw results | 406 |
+| Capped (K=google_count) | 72 |
+| Filtered (no filter applied) | 397 |
+| Oracle pool (filtered+capped) | 72 |
+
+## Engine Breakdown
+
+| Engine | URLs | Status | Reason | ms |
+|--------|-----:|--------|--------|----|
+| crossref | 200 | OK |  | 2534 |
+| openalex | 115 | OK |  | 1878 |
+| stack_exchange | 31 | OK |  | 477 |
+| lobsters | 20 | OK |  | 599 |
+| duckduckgo | 10 | OK |  | 892 |
+| google | 10 | OK |  | 688 |
+| mojeek | 10 | OK |  | 654 |
+| semantic_scholar | 10 | OK |  | 1700 |
+| open_library | 0 | EMPTY | empty | 5440 |
+
+## Pool URL Listing (oracle pool — 72 URLs, sorted by URL)
+
+1. http://aosabook.org/en/500L/a-web-crawler-with-asyncio-coroutines.html
+   Title: A Web Crawler With asyncio Coroutines
+   Snippet: aosabook.org
+
+2. http://techspot.zzzeek.org/2015/02/15/asynchronous-python-and-databases/
+   Title: Asynchronous Python and Databases
+   Snippet: techspot.zzzeek.org
+
+3. https://blog.nelhage.com/post/concurrent-error-handling/
+   Title: From error-handling to structured concurrency
+   Snippet: blog.nelhage.com
+
+4. https://charlesleifer.com/blog/asyncio/
+   Title: AsyncIO Thoughts
+   Snippet: charlesleifer.com
+
+5. https://dev.to/imsushant12/asyncio-architecture-in-python-event-loops-tasks-and-futures-explained-4pn3
+   Title: Asyncio Architecture in Python: Event Loops, Tasks, and ...
+   Snippet: Asyncio Architecture in Python: Event Loops, Tasks, and ...DEV Communityhttps://dev.to › imsushant12 › asyncio-architecture-in-p...DEV Communityhttps://dev.to › imsushant12 › asyncio-architecture-in-p
+
+6. https://dhirendrabiswal.com/advanced-python-concurrency-asyncio-event-loop-optimization-and-concurrent-futures-patterns/
+   Title: Advanced Python Concurrency: Asyncio Event Loop Optimization and ...
+   Snippet: TL;DR: In this guide, I dive deep into advanced Python concurrency using asyncio and concurrent.futures. You'll learn how to optimize the event loop for high-performance I/O-bound and mixed workloads,
+
+7. https://docs.python.org/3/library/asyncio-eventloop.html
+   Title: Event loop — Python 3.14.5 documentation
+   Snippet: Web resultsEvent loop — Python 3.14.5 documentationPython documentationhttps://docs.python.org › library › asyncio-eventloopPython documentationhttps://docs.python.org › library › asyncio-eventloopThe
+
+8. https://doi.org/10.1007/978-1-4842-3742-7_9
+   Title: Applications with asyncio and Twisted
+   Snippet: Williams, M. et al. (2019), Expert Twisted
+
+9. https://doi.org/10.1007/978-1-4842-4401-2_2
+   Title: Working with Event Loops
+   Snippet: Python version 3.4 has adopted a powerful framework to support concurrent execution of code: asyncio. This framework uses event loops to orchestrate the callbacks and asynchronous tasks. Event loops l
+
+10. https://doi.org/10.1007/978-1-4842-8140-6_1
+   Title: (A)synchronous Python
+   Snippet: de Groot, C. (2022), Asynchronous Python Programming with Asyncio and Async/await
+
+11. https://doi.org/10.1007/978-1-4842-8140-6_13
+   Title: Testing
+   Snippet: de Groot, C. (2022), Asynchronous Python Programming with Asyncio and Async/await
+
+12. https://doi.org/10.1007/978-1-4842-8140-6_17
+   Title: History
+   Snippet: de Groot, C. (2022), Asynchronous Python Programming with Asyncio and Async/await
+
+13. https://doi.org/10.1007/978-1-4842-8140-6_2
+   Title: Modern Asynchronous Python The Building Blocks
+   Snippet: de Groot, C. (2022), Asynchronous Python Programming with Asyncio and Async/await
+
+14. https://doi.org/10.1007/978-1-4842-8140-6_6
+   Title: asyncio Streams
+   Snippet: de Groot, C. (2022), Asynchronous Python Programming with Asyncio and Async/await
+
+15. https://doi.org/10.1007/978-3-030-25943-3_34
+   Title: Concurrency with AsyncIO
+   Snippet: Hunt, J. (2019), Undergraduate Topics in Computer Science
+
+16. https://doi.org/10.1007/978-3-031-40336-1
+   Title: Advanced Guide to Python 3 Programming
+   Snippet: 
+
+17. https://doi.org/10.1007/978-3-031-40336-1_43
+   Title: Concurrency with AsyncIO
+   Snippet: Hunt, J. (2023), Undergraduate Topics in Computer Science
+
+18. https://doi.org/10.1007/979-8-8688-1261-3_16
+   Title: Asyncio
+   Snippet: Divakaran, A. (2025), Deep Dive Python
+
+19. https://doi.org/10.1007/s41781-021-00053-3
+   Title: Performance of Julia for High Energy Physics Analyses
+   Snippet: 
+
+20. https://doi.org/10.1109/access.2020.3008954
+   Title: Control and Visualisation of a Software Defined Radio System on the Xilinx RFSoC Platform Using the 
+   Snippet: The availability of commercial Radio Frequency System on Chip (RFSoC) devices brings new possibilities for implementing Software Defined Radio (SDR) systems. Such systems are of increasing interest gi
+
+21. https://doi.org/10.1109/ojits.2023.3266800
+   Title: Infrastructure-Based Digital Twins for Cooperative, Connected, Automated Driving and Smart Road Serv
+   Snippet: Driving requires continuous decision making from a driver taking into account all available relevant information. Automating driving tasks also automates the related decisions. However, humans are ver
+
+22. https://doi.org/10.1145/3445814.3446701
+   Title: Nightcore: efficient and scalable serverless computing for latency-sensitive, interactive microservi
+   Snippet: The microservice architecture is a popular software engineering approach for building flexible, large-scale online services. Serverless functions, or function as a service (FaaS), provide a simple pro
+
+23. https://doi.org/10.3390/en13153770
+   Title: Distributed Power Hardware-in-the-Loop Testing Using a Grid-Forming Converter as Power Interface
+   Snippet: This paper presents an approach to extend the capabilities of smart grid laboratories through the concept of Power Hardware-in-the-Loop (PHiL) testing by re-purposing existing grid-forming converters.
+
+24. https://doi.org/10.4018/ijswis.2016100102
+   Title: Managing Large Amounts of Data Generated by a Smart City Internet of Things Deployment
+   Snippet: The Smart City concept is being developed from a lot of different axes encompassing multiple areas of social and technical sciences. However, something that is common to all these approaches is the ce
+
+25. https://doi.org/10.47667/ijpasr.v4i2.202
+   Title: Python TCP/IP libraries: A Review
+   Snippet: The Internet's core is TCP/IP, which stands for Transmission Control Protocol/Internet Protocol. It connects network devices on the internet via communication protocols. Python has several TCP/IP pack
+
+26. https://doi.org/10.7256/2454-0714.2018.2.25851
+   Title: Савостин П.А., Ефремова Н.Э. Практическое применение асинхронного программирования на языке Python п
+   Snippet: (2018), Программные системы и вычислительные методы
+
+27. https://emptysqua.re/blog/why-should-async-get-all-the-love/
+   Title: Why Should Async Get All The Love?: Advanced Control Flow With Threads
+   Snippet: emptysqua.re
+
+28. https://fractalideas.com/blog/sans-io-when-rubber-meets-road/
+   Title: Sans I/O when rubber meets the road
+   Snippet: fractalideas.com
+
+29. https://leapcell.medium.com/high-performance-python-asyncio-7a0d70e1be46#:~:text=Concurrent%20Execution%3A%20asyncio%20can%20concurrently,thus%20achieving%20efficient%20concurrent%20programming.
+   Title: High-Performance Python: Asyncio - Leapcell
+   Snippet: Featured snippet from the webConcurrent Execution: asyncio can concurrently execute multiple coroutine tasks. The event loop will automatically schedule the execution of coroutines according to the re
+
+30. https://medium.com/@yeraydiazdiaz/asyncio-for-the-working-python-developer-5c468e6e2e8e
+   Title: AsyncIO for the Working Python Developer
+   Snippet: medium.com/@yeraydiazdiaz
+
+31. https://medium.com/towardsdev/whats-the-best-way-to-handle-concurrency-in-python-threadpoolexecutor-or-asyncio-85da1be58557
+   Title: What's the Best Way to Handle Concurrency in Python
+   Snippet: Web resultsWhat's the Best Way to Handle Concurrency in PythonMedium · Soumit Salman Rahman70+ likes  ·  9 months agoMedium · Soumit Salman Rahman70+ likes  ·  9 months agoasyncio uses an event loop w
+
+32. https://realpython.com/async-io-python/
+   Title: Python's asyncio: A Hands-On Walkthrough - Real Python
+   Snippet: Python's asyncio library enables you to write concurrent code using the async and await keywords. The core building blocks of async I/O in Python are awaitable objects—most often coroutines—that an ev
+
+33. https://stackoverflow.com/questions/26270681/can-an-asyncio-event-loop-run-in-the-background-without-suspending-the-python-in
+   Title: concurrency - Can an asyncio event loop run in the background
+   Snippet: Can an asyncio event loop run in the background without suspending the Python interpreter? ... Note that you must call asyncio.set_event_loop on the ...
+
+34. https://stackoverflow.com/questions/29269370/how-to-properly-create-and-run-concurrent-tasks-using-pythons-asyncio-module
+   Title: How to properly create and run concurrent tasks using python's asyncio module?
+   Snippet: I am trying to properly understand and implement two concurrently running Task objects using Python 3's relatively new asyncio module. In a nutshell, asyncio seems designed to handle asynchronous proc
+
+35. https://stackoverflow.com/questions/31623194/asyncio-two-loops-for-different-i-o-tasks
+   Title: python - Asyncio two loops for different I/O tasks?
+   Snippet: python - Asyncio two loops for different I/O tasks?Stack Overflow6 answers  ·  10 years agoStack Overflow6 answers  ·  10 years agoI am using Python3 Asyncio module to create a load balancing applicat
+
+36. https://stackoverflow.com/questions/48483348/how-to-limit-concurrency-with-python-asyncio
+   Title: How to limit concurrency with Python asyncio? - Stack Overflow
+   Snippet: This pauses the generator when there are enough active tasks, and lets the event loop clean up finished tasks. Note, for older python versions, replace create_task with ensure_future.
+
+37. https://stackoverflow.com/questions/49584561/run-infinite-loop-in-asyncio-event-loop-running-off-the-main-thread
+   Title: python - run infinite loop in asyncio event loop running off
+   Snippet: Instead, you can await an asyncio.Event , and set it using something like loop.call_soon_threadsafe(event.set) from the other thread.
+
+38. https://stackoverflow.com/questions/53268438/python-asyncio-within-multiprocessing-one-event-loop-per-process
+   Title: Python asyncio within Multiprocessing. One event loop per process
+   Snippet: I am writing a function for my team that will download some data from the cloud. The function itself is a regular python function but under the hood, it uses asyncio. So, I create an event loop with i
+
+39. https://stackoverflow.com/questions/57024533/trouble-in-optimizing-asyncio-with-concurrent-futures
+   Title: Trouble in Optimizing asyncio with concurrent futures
+   Snippet: I'm trying to run asyncio task concurrently on each worker thread of concurrent.futures Threadpool. However, I couldn't achieve the desired outcome. async def say_after(delay, message): logging.info(f
+
+40. https://stackoverflow.com/questions/66247720/understanding-behavior-of-asyncio-set-result-as-it-relates-to-slow-callback-dura
+   Title: Understanding behavior of asyncio set_result as it relates to slow_callback_duration
+   Snippet: I'm attempting to debug performance of a running production python web service, built on top of tornado using uvloop as the asyncio event loop. In trying to improve the concurrency, I'm looking to fin
+
+41. https://stackoverflow.com/questions/72919537/runtimeerror-event-loop-is-closed-asyncio-aiohttp-concurrent-request
+   Title: Runtimeerror: Event loop is closed - asyncio, aiohttp, concurrent request
+   Snippet: I am very new to async programming. Environment- Win11,Python 3.10.5. I am trying to make concurrent requests and obtain the results in a list simply. I've tried going through the suggestions on stack
+
+42. https://stackoverflow.com/questions/75471729/use-cases-for-threading-and-asyncio-in-python
+   Title: Use cases for threading and asyncio in python
+   Snippet: I've read quite a few articles on threading and asyncio modules in python and the major difference I can seem to draw (correct me if I'm wrong) is that in, threading : multiple threads can be used to 
+
+43. https://stackoverflow.com/questions/75988992/how-can-i-inspect-the-internal-state-of-an-asyncio-event-loop
+   Title: How can I inspect the internal state of an asyncio event loop?
+   Snippet: I have a Python program that uses asyncio . When concurrency is high, a particular part of the program hangs. I would like to inspect the state of the asyncio event loop myself, to try and understand 
+
+44. https://stackoverflow.com/questions/78171567/is-uvicorn-used-for-an-external-threadpool-or-an-internal-event-loop-which-runs
+   Title: Is uvicorn used for an external threadpool or an internal event loop which runs in the main (single)
+   Snippet: FastAPI uses uvicorn package to run the script: main:app --reload The docs explain that: Uvicorn is an ASGI web server implementation for Python... The ASGI specification fills this gap, and means we'
+
+45. https://stackoverflow.com/questions/79626334/what-happens-to-the-asyncio-event-loop-when-multiple-cpu-bound-tasks-run-concurr
+   Title: What happens to the asyncio event loop when multiple CPU-bound tasks ...Stack Overflow · 2 answers ·
+   Snippet: 
+
+46. https://superfastpython.com/asyncio-event-loop-separate-thread/
+   Title: Asyncio Event Loop in Separate Thread - Super Fast Python
+   Snippet: We can create coroutines and send them to the event loop for execution via the asyncio.run_coroutine_threadsafe() method.
+
+47. https://superfastpython.com/asyncio-multiple-event-loops/
+   Title: Asyncio Run Multiple Concurrent Event Loops - Super Fast Python
+   Snippet: We can run multiple concurrent asyncio event loops by starting and running each new event loop in a separate thread. Each thread can host and manage one event loop.
+
+48. https://superfastpython.com/category/asyncio/page/3/
+   Title: Python Asyncio Archives - Page 3 of 20 - Super Fast Python
+   Snippet: Tutorials on the asyncio module for concurrency in Python. ... We can run an asyncio event loop " forever " , until explicitly stopped or ...
+
+49. https://trent.me/articles/pytorch-and-python-free-threading/
+   Title: PyTorch and Python Free-Threading: Unlocking multi-threaded parallel inference on PyTorch models
+   Snippet: trent.me
+
+50. https://tutorialedge.net/python/concurrency/asyncio-event-loops-tutorial/
+   Title: Asyncio Event Loops Tutorial | TutorialEdge.net
+   Snippet: The main component of any asyncio based Python program has to be the underlying event loop. ... event loop we ’ ll use asyncio.get_event_loop() ...
+
+51. https://www.aeracode.org/2018/02/19/python-async-simplified/
+   Title: Python & Async Simplified
+   Snippet: aeracode.org
+
+52. https://www.c-sharpcorner.com/article/python-asyncio-complete-practical-guide-for-concurrent-io/
+   Title: Python asyncio — Complete Practical Guide for Concurrent I/O
+   Snippet: Unlock Python's concurrency potential with asyncio! This practical guide covers coroutines, event loops, and non-blocking I/O for building high-performance applications. Learn to handle multiple tasks
+
+53. https://www.codersjungle.com/2025/09/11/how-to-understand-and-use-the-asyncio-event-loop-in-python/
+   Title: How to understand and use the asyncio event loop in Python
+   Snippet: The asyncio event loop is at the heart of asynchronous programming in Python. ... www.pythonfaq.net/how-to-understand-and-use-the-asyncio-event-loop ...
+
+54. https://www.educative.io/blog/concurrency-in-python
+   Title: Python Concurrency: Making sense of asyncio - Educative
+   Snippet: Python's asyncio module achieves high concurrency on a single thread by using an event loop that switches between tasks at await points, avoiding the complexity of thread-safe code and the memory over
+
+55. https://www.iamraghuveer.com/posts/python-asyncio-event-loop-internals/
+   Title: Python AsyncIO: Event Loop Internals and Practical Patterns
+   Snippet: Python AsyncIO: Event Loop Internals and Practical Patternsiamraghuveer.comhttps://www.iamraghuveer.com › posts › python-asynci...iamraghuveer.comhttps://www.iamraghuveer.com › posts › python-asynci..
+
+56. https://www.inexture.com/blog/python-async-await-concurrency-optimization/
+   Title: Python AsyncIO & Concurrency Guide | async/await, Tasks
+   Snippet: Learn how to use Python AsyncIO for high-performance applications. Covers async/await, event loops, tasks, concurrency models, FastAPI, async databases, benchmarks, and best practices.
+
+57. https://www.pythonfaq.net/how-to-understand-and-use-the-asyncio-event-loop-in-python/
+   Title: How to understand and use the asyncio event loop in Python
+   Snippet: The asyncio event loop is at the heart of asynchronous programming in Python. ... into asyncio, consider how coroutines interact with event loops and ...
+
+58. https://www.pythontutorial.net/python-concurrency/python-event-loop/
+   Title: Python Event Loop
+   Snippet: Python Event Loop Summary: in this tutorial, you'll learn about the Python event loop and how Python uses it to achieve the concurrency model using a single thread. Introduction to the Python event lo
+
+59. https://www.semanticscholar.org/paper/Applications-with-asyncio-and-Twisted-Williams-Benfield/870ec0448ec1f037b837438dbd59b59cc740230b
+   Title: Applications with asyncio and Twisted
+   Snippet: TLDRThe asyncio package, included with Python implementations since version 3.4, standardizes a suite of APIs for asynchronous, event-driven network programs and specifies an event loop interface that
+
+60. https://www.semanticscholar.org/paper/Event-driven-industrial-robot-control-architecture-Semeniuta-Falkman/a9d766d6fd3d61dbd502da03ae4f818f85898e6e
+   Title: Event-driven industrial robot control architecture for the Adept V+ platform
+   Snippet: TLDRThe proposed architecture is based on the robot controller providing a TCP/IP server and a collection of robot skills, and a high-level control module deployed to a dedicated computing device that
+
+61. https://www.semanticscholar.org/paper/Event-driven-industrial-robot-control-architecture-Semeniuta-Falkman/aadab6dee241c636387b932a731caef7de92254e
+   Title: Event-driven industrial robot control architecture for the Adept V+ platform.
+   Snippet: TLDRThe architecture is based on the robot controller providing a TCP/IP server and a collection of robot skills, and a high-level control module deployed to a dedicated computing device that facilita
+
+62. https://www.semanticscholar.org/paper/PyHLS%3A-Intermediate-Representation-for-Versatile-Cieszewski/b57ddb7929b674d5343e486ae5c2e18bd652d656
+   Title: PyHLS: Intermediate Representation for Versatile High-Level Synthesis
+   Snippet: TLDRAn Intermediate Representation (IR)-centric HLS flow—PyHLS— is proposed that explicitly introduces an abstraction layer between algorithm and Register- Transfer Level (RTL) design, and formalizes 
+
+63. https://www.semanticscholar.org/paper/Pytch-%E2%80%94-an-environment-for-bridging-block-and-text-Strong-North/bde25648da1a1e5904361eecbf409fc503d3418c
+   Title: Pytch — an environment for bridging block and text programming styles (Work in progress)
+   Snippet: TLDRThis paper introduces a new programming system, Pytch, which embodies “Scratch-Oriented programming” in Python using a web-based environment that requires no local setup, and offers the programmin
+
+64. https://www.semanticscholar.org/paper/Python-Gets-an-Event-Loop-(Again)-Beazley/3fa75a0063817a91b1c0311470b39dafc110b627
+   Title: Python Gets an Event Loop (Again)
+   Snippet: TLDRA bit of historical perspective is given as well as some examples of using the new asyncio module to the standard library in Python 3.4.Expand
+
+65. https://www.semanticscholar.org/paper/Python-Gets-an-Event-Loop-(again)-D.AVIDBEA/c1c7879907a2fd5be8cc1635bb547370e1830341
+   Title: Python Gets an Event Loop (again)
+   Snippet: TLDRA bit of historical perspective is given as well as some examples of using the new asyncio module to the standard library, which has been floating around the Python world for much longer than that
+
+66. https://www.semanticscholar.org/paper/The-impact-of-asynchronous-and-multithreaded-query-Makarov-Larin/ce0155a683f5ec546e6edcdc3ff578a01751c578
+   Title: The impact of asynchronous and multithreaded query processing models on the performance of server-si
+   Snippet: TLDRThe main conclusions of the study are recommendations on the use of asynchronous technologies in high-load I/O tasks and multithreaded approaches in computationally complex scenarios.Expand
+
+67. https://www.semanticscholar.org/paper/TracktorLive%3A-an-integrated-real-time-object-and-Minasandra-Sridhar/455e405ec2528dd82e5b82aeae11c35109250e72
+   Title: TracktorLive: an integrated real-time object tracking and response system
+   Snippet: TLDRTracktorLive is introduced, an open-source Python package designed to overcome challenges through concurrency and a modular, ‘cassette’-based architecture that can help democratize real-time track
+
+68. https://www.semanticscholar.org/paper/Working-with-Event-Loops-Tahrioui/ea267b563f62044458f54907f485893df8d77f02
+   Title: Working with Event Loops
+   Snippet: 
+
+69. https://www.shanechang.com/p/python-asyncio-event-loop-explained/
+   Title: Understanding the Event Loop: Python's Asynchronous Engine
+   Snippet: Web resultsUnderstanding the Event Loop: Python's Asynchronous Engineshanechang.comhttps://www.shanechang.com › python-asyncio-event-l...shanechang.comhttps://www.shanechang.com › python-asyncio-event
+
+70. https://www.xurrent.com/blog/concurrency-parallelism-asyncio
+   Title: The Ultimate Guide to Concurrency, Parallelism, and ...
+   Snippet: The Ultimate Guide to Concurrency, Parallelism, and ...Xurrenthttps://www.xurrent.com › blog › concurrency-paralleli...Xurrenthttps://www.xurrent.com › blog › concurrency-paralleli...3 Apr 2024 — Coro
+
+71. https://www.youtube.com/watch?v=RIVcqT2OGPA
+   Title: Asyncio Finally Explained: What the Event Loop Really DoesYouTube · ArjanCodes3 May 2024
+   Snippet: 
+
+72. https://yoric.github.io/post/quite-a-few-words-about-async/
+   Title: (Quite) A Few Words About Async
+   Snippet: yoric.github.io

@@ -1,0 +1,14 @@
+{
+  "mode": "books",
+  "query": "contrastive learning self-supervised representations",
+  "fetched_ts": "2026-05-22T23:14:42",
+  "google_count": 11,
+  "pool_sizes": {
+    "raw": 449,
+    "capped": 67,
+    "filtered": 0,
+    "filtered_capped": 0
+  },
+  "pool": [],
+  "pool_full": []
+}

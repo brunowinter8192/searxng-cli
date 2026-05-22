@@ -1,0 +1,198 @@
+{
+  "mode": "books",
+  "query": "python asyncio event loop concurrency",
+  "fetched_ts": "2026-05-22T23:14:36",
+  "google_count": 10,
+  "pool_sizes": {
+    "raw": 406,
+    "capped": 78,
+    "filtered": 10,
+    "filtered_capped": 10
+  },
+  "pool": [
+    {
+      "url": "https://books.google.com/books/about/Python_Concurrency_with_asyncio.html?id=M9xdEAAAQBAJ",
+      "title": "Python Concurrency with asyncio - Matthew Fowler - Google Books",
+      "snippet": "The book covers using asyncio with the entire Python concurrency landscape, including multiprocessing and multithreading. About the technology It's easy to overload standard Python and watch your programs slow to a crawl. Th e asyncio library was built to solve these problems by making it easy to divide and schedule tasks.",
+      "engines": [
+        "duckduckgo"
+      ],
+      "min_position": 2
+    },
+    {
+      "url": "https://pythonbooks.org/python-concurrency-with-asyncio/",
+      "title": "Python Concurrency with asyncio - Python books",
+      "snippet": "You'll learn how the complex-but-powerful asyncio library can achieve concurrency with just a single thread and use asyncio's APIs to run multiple web requests and database queries simultaneously. The book covers using asyncio with the entire Python concurrency landscape, including multiprocessing and multithreading.",
+      "engines": [
+        "duckduckgo"
+      ],
+      "min_position": 9
+    },
+    {
+      "url": "https://superfastpython.com/asyncio-event-loop-separate-thread/",
+      "title": "Asyncio Event Loop in Separate Thread - Super Fast Python",
+      "snippet": "It also provides a point of change if an alternate approach is preferred for starting the event loop, such as using the low-level asyncio API.",
+      "engines": [
+        "mojeek"
+      ],
+      "min_position": 3
+    },
+    {
+      "url": "https://superfastpython.com/asyncio-multiple-event-loops/",
+      "title": "Asyncio Run Multiple Concurrent Event Loops - Super Fast Python",
+      "snippet": "Scalability : Running multiple asyncio event loops concurrently allows the program to scale better, especially in scenarios where there are many ...",
+      "engines": [
+        "mojeek"
+      ],
+      "min_position": 2
+    },
+    {
+      "url": "https://superfastpython.com/python-concurrency-books/",
+      "title": "Python Concurrency Books - SuperFastPython",
+      "snippet": "Python provides thread-based concurrency in the threading module, as well as process-based concurrency in the multiprocessing module and coroutine-based concurrency in the asyncio module. Choosing the right type of concurrency is tricky and this guide may help.",
+      "engines": [
+        "duckduckgo"
+      ],
+      "min_position": 10
+    },
+    {
+      "url": "https://www.amazon.com/Python-Concurrency-asyncio-Matthew-Fowler/dp/1617298662",
+      "title": "Python Concurrency with asyncio: Fowler, Matthew",
+      "snippet": "Python Concurrency with asyncio: Fowler, MatthewAmazon.comhttps://www.amazon.com › Python-Concurrency-asynci...Amazon.comhttps://www.amazon.com › Python-Concurrency-asynci...The book covers using asyncio with the entire Python concurrency landscape, including multiprocessing and multithreading.Read more30-day returnsMissing: event ‎loop",
+      "engines": [
+        "google",
+        "duckduckgo"
+      ],
+      "min_position": 3
+    },
+    {
+      "url": "https://www.manning.com/books/python-concurrency-with-asyncio",
+      "title": "Python Concurrency with asyncio - Matthew Fowler",
+      "snippet": "You'll learn how the complex-but-powerful asyncio library can achieve concurrency with just a single thread and use asyncio's APIs to run multiple web requests and database queries simultaneously. The book covers using asyncio with the entire Python concurrency landscape, including multiprocessing and multithreading.",
+      "engines": [
+        "duckduckgo"
+      ],
+      "min_position": 1
+    },
+    {
+      "url": "https://www.oreilly.com/library/view/mastering-concurrency-in/9781789343052/a426acb5-23fe-4735-9d71-e880629776f2.xhtml",
+      "title": "Coroutines, event loops, and futures - Mastering ...",
+      "snippet": "Web resultsCoroutines, event loops, and futures - Mastering ...O'Reilly Mediahttps://www.oreilly.com › mastering-concurrency-inO'Reilly Mediahttps://www.oreilly.com › mastering-concurrency-inAn event loop keeps track of all of the tasks that are to be run asynchronously, and decides which of those tasks should be executed at a given moment. In other ...Read more",
+      "engines": [
+        "google"
+      ],
+      "min_position": 3
+    },
+    {
+      "url": "https://www.oreilly.com/library/view/python-concurrency-with/9781617298660/",
+      "title": "Python Concurrency with asyncio [Book] - O'Reilly Media",
+      "snippet": "The book covers using asyncio with the entire Python concurrency landscape, including multiprocessing and multithreading. About the Technology It's easy to overload standard Python and watch your programs slow to a crawl. Th e asyncio library was built to solve these problems by making it easy to divide and schedule tasks.",
+      "engines": [
+        "duckduckgo"
+      ],
+      "min_position": 4
+    },
+    {
+      "url": "https://www.simonandschuster.com/books/Python-Concurrency-with-asyncio/Matthew-Fowler/9781617298660",
+      "title": "Python Concurrency with asyncio | Book by Matthew Fowler | Official ...",
+      "snippet": "You'll learn how the complex-but-powerful asyncio library can achieve concurrency with just a single thread and use asyncio's APIs to run multiple web requests and database queries simultaneously. The book covers using asyncio with the entire Python concurrency landscape, including multiprocessing and multithreading.",
+      "engines": [
+        "duckduckgo"
+      ],
+      "min_position": 7
+    }
+  ],
+  "pool_full": [
+    {
+      "url": "https://books.google.com/books/about/Python_Concurrency_with_asyncio.html?id=M9xdEAAAQBAJ",
+      "title": "Python Concurrency with asyncio - Matthew Fowler - Google Books",
+      "snippet": "The book covers using asyncio with the entire Python concurrency landscape, including multiprocessing and multithreading. About the technology It's easy to overload standard Python and watch your programs slow to a crawl. Th e asyncio library was built to solve these problems by making it easy to divide and schedule tasks.",
+      "engines": [
+        "duckduckgo"
+      ],
+      "min_position": 2
+    },
+    {
+      "url": "https://pythonbooks.org/python-concurrency-with-asyncio/",
+      "title": "Python Concurrency with asyncio - Python books",
+      "snippet": "You'll learn how the complex-but-powerful asyncio library can achieve concurrency with just a single thread and use asyncio's APIs to run multiple web requests and database queries simultaneously. The book covers using asyncio with the entire Python concurrency landscape, including multiprocessing and multithreading.",
+      "engines": [
+        "duckduckgo"
+      ],
+      "min_position": 9
+    },
+    {
+      "url": "https://superfastpython.com/asyncio-event-loop-separate-thread/",
+      "title": "Asyncio Event Loop in Separate Thread - Super Fast Python",
+      "snippet": "It also provides a point of change if an alternate approach is preferred for starting the event loop, such as using the low-level asyncio API.",
+      "engines": [
+        "mojeek"
+      ],
+      "min_position": 3
+    },
+    {
+      "url": "https://superfastpython.com/asyncio-multiple-event-loops/",
+      "title": "Asyncio Run Multiple Concurrent Event Loops - Super Fast Python",
+      "snippet": "Scalability : Running multiple asyncio event loops concurrently allows the program to scale better, especially in scenarios where there are many ...",
+      "engines": [
+        "mojeek"
+      ],
+      "min_position": 2
+    },
+    {
+      "url": "https://superfastpython.com/python-concurrency-books/",
+      "title": "Python Concurrency Books - SuperFastPython",
+      "snippet": "Python provides thread-based concurrency in the threading module, as well as process-based concurrency in the multiprocessing module and coroutine-based concurrency in the asyncio module. Choosing the right type of concurrency is tricky and this guide may help.",
+      "engines": [
+        "duckduckgo"
+      ],
+      "min_position": 10
+    },
+    {
+      "url": "https://www.amazon.com/Python-Concurrency-asyncio-Matthew-Fowler/dp/1617298662",
+      "title": "Python Concurrency with asyncio: Fowler, Matthew",
+      "snippet": "Python Concurrency with asyncio: Fowler, MatthewAmazon.comhttps://www.amazon.com › Python-Concurrency-asynci...Amazon.comhttps://www.amazon.com › Python-Concurrency-asynci...The book covers using asyncio with the entire Python concurrency landscape, including multiprocessing and multithreading.Read more30-day returnsMissing: event ‎loop",
+      "engines": [
+        "google",
+        "duckduckgo"
+      ],
+      "min_position": 3
+    },
+    {
+      "url": "https://www.manning.com/books/python-concurrency-with-asyncio",
+      "title": "Python Concurrency with asyncio - Matthew Fowler",
+      "snippet": "You'll learn how the complex-but-powerful asyncio library can achieve concurrency with just a single thread and use asyncio's APIs to run multiple web requests and database queries simultaneously. The book covers using asyncio with the entire Python concurrency landscape, including multiprocessing and multithreading.",
+      "engines": [
+        "duckduckgo"
+      ],
+      "min_position": 1
+    },
+    {
+      "url": "https://www.oreilly.com/library/view/mastering-concurrency-in/9781789343052/a426acb5-23fe-4735-9d71-e880629776f2.xhtml",
+      "title": "Coroutines, event loops, and futures - Mastering ...",
+      "snippet": "Web resultsCoroutines, event loops, and futures - Mastering ...O'Reilly Mediahttps://www.oreilly.com › mastering-concurrency-inO'Reilly Mediahttps://www.oreilly.com › mastering-concurrency-inAn event loop keeps track of all of the tasks that are to be run asynchronously, and decides which of those tasks should be executed at a given moment. In other ...Read more",
+      "engines": [
+        "google"
+      ],
+      "min_position": 3
+    },
+    {
+      "url": "https://www.oreilly.com/library/view/python-concurrency-with/9781617298660/",
+      "title": "Python Concurrency with asyncio [Book] - O'Reilly Media",
+      "snippet": "The book covers using asyncio with the entire Python concurrency landscape, including multiprocessing and multithreading. About the Technology It's easy to overload standard Python and watch your programs slow to a crawl. Th e asyncio library was built to solve these problems by making it easy to divide and schedule tasks.",
+      "engines": [
+        "duckduckgo"
+      ],
+      "min_position": 4
+    },
+    {
+      "url": "https://www.simonandschuster.com/books/Python-Concurrency-with-asyncio/Matthew-Fowler/9781617298660",
+      "title": "Python Concurrency with asyncio | Book by Matthew Fowler | Official ...",
+      "snippet": "You'll learn how the complex-but-powerful asyncio library can achieve concurrency with just a single thread and use asyncio's APIs to run multiple web requests and database queries simultaneously. The book covers using asyncio with the entire Python concurrency landscape, including multiprocessing and multithreading.",
+      "engines": [
+        "duckduckgo"
+      ],
+      "min_position": 7
+    }
+  ]
+}
