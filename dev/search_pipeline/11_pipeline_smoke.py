@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Full pipeline smoke -- search_web_workflow per query, timings + snippet source + slot-position labels."""
+"""Full pipeline smoke -- search_web_workflow per query, engine-reliability focus."""
 
 # INFRASTRUCTURE
 import argparse
@@ -21,10 +21,24 @@ SCRIPT_DIR   = Path(__file__).parent
 QUERIES_FILE = SCRIPT_DIR / "queries.txt"
 REPORT_DIR   = SCRIPT_DIR / "01_reports"
 
-TARGET_GENERAL  = 12
-TARGET_ACADEMIC = 6
-TARGET_QA       = 2
-TARGET_TOTAL    = 20
+# Short human-readable hint per non-OK status (shown in per-query engine breakdown table)
+_STATUS_HINTS: dict[str, str] = {
+    "EMPTY_NO_RESULTS":      "0 hits",
+    "EMPTY_NO_CONTAINER":    "no DOM container",
+    "EMPTY_CONSENT":         "consent page",
+    "EMPTY_BLOCK":           "CAPTCHA",
+    "EMPTY_CONCURRENT_RACE": "page not ready",
+    "TIMEOUT_WATCHDOG":      "watchdog timeout",
+    "TIMEOUT_NONCOOP":       "non-cooperative",
+    "TIMEOUT_HTTPX":         "httpx timeout",
+    "ERROR_BROWSER":         "Chrome error",
+    "ERROR_HTTP":            "HTTP error",
+    "ERROR_PARSE":           "parse error",
+    "ERROR_OTHER":           "unexpected error",
+    "RATE_SKIP":             "rate skip",
+    "EMPTY":                 "empty",
+    "ERROR":                 "error",
+}
 
 
 # ORCHESTRATOR
@@ -44,13 +58,10 @@ async def run_pipeline_smoke(max_queries: int | None, language: str, engine_time
             key  = cache_key(query, language, None, None)
             hit  = cache_read(key)
             urls = hit.get("urls", []) if hit else []
-            slot_counts = (hit.get("slot_counts") or {}) if hit else {}
-            record = _build_record(query, urls, slot_counts, timings)
+            record = _build_record(query, urls, timings)
             records.append(record)
-            s = record["slots"]
             print(
-                f"[{qi}/{len(queries)}] {query!r} -> urls={len(urls)} "
-                f"G={s['GENERAL']} A={s['ACADEMIC']} Q={s['QA']} "
+                f"[{qi}/{len(queries)}] {query!r} -> urls={record['total_urls']} "
                 f"total_ms={timings['total_ms']}",
                 file=sys.stderr,
             )
@@ -101,50 +112,17 @@ def _load_queries(path: Path, max_queries: int | None) -> list[str]:
     return qs[:max_queries] if max_queries else qs
 
 
-# Assign slot-position label from slot_counts boundaries (position-based, not engine-deduced)
-def _slot_label(idx: int, slot_counts: dict) -> str:
-    n_gen = slot_counts.get("general", 0)
-    n_ac  = slot_counts.get("academic", 0)
-    n_qa  = slot_counts.get("qa", 0)
-    if idx < n_gen:
-        return "GENERAL"
-    if idx < n_gen + n_ac:
-        return "ACADEMIC"
-    if idx < n_gen + n_ac + n_qa:
-        return "QA"
-    return "OVERFLOW"  # should not occur in v3; kept as safety label for cache-paginated entries
-
-
-# Build per-query record: annotated top-20 urls, slot counts, timings
-def _build_record(query: str, urls: list[dict], slot_counts: dict, timings: dict) -> dict:
-    allocated = slot_counts.get("general", 0) + slot_counts.get("academic", 0) + slot_counts.get("qa", 0)
-    top20 = urls[:min(TARGET_TOTAL, allocated)]
-    annotated = []
-    for idx, entry in enumerate(top20):
-        annotated.append({
-            "url":             entry["url"],
-            "title":           entry.get("title", ""),
-            "engines":         entry.get("engines", []),
-            "snippet":         entry.get("snippet", ""),
-            "snippet_source":  entry.get("snippet_source") or "",
-            "snippet_display": entry.get("snippet_display") or "",
-            "og":              entry.get("og") or "",
-            "meta":            entry.get("meta") or "",
-            "snippets":        entry.get("snippets") or {},
-            "class":           _slot_label(idx, slot_counts),
-        })
-    slots: dict[str, int] = {"GENERAL": 0, "ACADEMIC": 0, "QA": 0}
-    for a in annotated:
-        label = a["class"]
-        if label in slots:
-            slots[label] += 1
+# Build per-query record: total URL count, per-engine URL contribution counts, timings
+def _build_record(query: str, urls: list[dict], timings: dict) -> dict:
+    engine_url_counts: dict[str, int] = {}
+    for entry in urls:
+        for eng in entry.get("engines", []):
+            engine_url_counts[eng] = engine_url_counts.get(eng, 0) + 1
     return {
-        "query":       query,
-        "urls":        annotated,
-        "total_urls":  len(annotated),
-        "slots":       slots,
-        "slot_counts": slot_counts,
-        "timings":     timings,
+        "query":             query,
+        "total_urls":        len(urls),
+        "engine_url_counts": engine_url_counts,
+        "timings":           timings,
     }
 
 
@@ -160,90 +138,45 @@ def _render_header(records: list[dict], language: str, ts: str) -> list[str]:
     ]
 
 
-# Render static engine class definitions table and notes block
-def _render_class_defs() -> list[str]:
-    return [
-        "## Engine Class Definitions",
-        "",
-        "| Class    | Engines                               | Output slots |",
-        "|----------|---------------------------------------|-------------|",
-        "| GENERAL  | google, duckduckgo, mojeek            | 12 |",
-        "| ACADEMIC | google_scholar, openalex, crossref    |  6 |",
-        "| QA       | stack_exchange, lobsters              |  2 |",
-        "",
-        "> Slot position labels are derived from `slot_counts` in the cache entry (position-based),",
-        "> not deduced from the `engines` field. Total target: 20. Underflow = output < 20 when",
-        "> a class has insufficient supply. No overflow slots — v3 hard allocation.",
-        "",
-        "---",
-        "",
-    ]
-
-
-# Render summary table header and one row per query record
+# Render lean summary table: query index, truncated query, total URLs in cache result
 def _render_summary(records: list[dict]) -> list[str]:
     L: list[str] = [
         "## Summary",
         "",
-        "| # | Query | Total | GENERAL | ACADEMIC | QA |",
-        "|---|-------|-------|---------|----------|----|",
+        "| # | Query | URLs returned |",
+        "|---|-------|--------------|",
     ]
     for i, r in enumerate(records, 1):
-        q = r["query"][:55].replace("|", "\\|")
-        s = r["slots"]
-        L.append(
-            f"| {i} | {q} | {r['total_urls']} "
-            f"| {s['GENERAL']} | {s['ACADEMIC']} | {s['QA']} |"
-        )
+        q = r["query"][:65].replace("|", "\\|")
+        L.append(f"| {i} | {q} | {r['total_urls']} |")
     return L
 
 
-# Render per-query URL block with slot-fill, engine timing footer and separator
-def _render_query_block(r: dict, qi: int) -> list[str]:
-    L: list[str] = [f"## Q{qi}: {r['query']}", ""]
-    if not r["urls"]:
-        return L + ["*No results returned.*", "", "---", ""]
-    sc = r["slot_counts"]
-    t  = r["timings"]
-    for idx, a in enumerate(r["urls"], 1):
-        title       = a["title"] if a["title"] else "(no title)"
-        engines_str = ", ".join(a["engines"])
-        src         = a["snippet_source"] or "—"
-        display     = (a["snippet_display"] or "")[:400].replace("\n", " ")
-        og_val      = (a["og"]   or "—")[:300].replace("\n", " ")
-        meta_val    = (a["meta"] or "—")[:300].replace("\n", " ")
-        L += [
-            f"{idx}. **[{a['class']}]** {title}",
-            f"   URL: {a['url']}",
-            f"   Engines: {engines_str}",
-            f"   source: {src} | display: {display!r}",
-            f"   og: {og_val} | meta: {meta_val}",
-        ]
-        for eng, snip in sorted(a["snippets"].items()):
-            L.append(f"   {eng}: {snip[:300].replace(chr(10), ' ')!r}")
+# Render per-query engine breakdown: one small table per query showing URLs / status / hint / ms
+def _render_per_query_engine_breakdown(records: list[dict]) -> list[str]:
+    L: list[str] = ["## Per-Query Engine Breakdown", ""]
+    for qi, r in enumerate(records, 1):
+        L.append(f"### Q{qi}: {r['query']}")
         L.append("")
-    gen_target = sc.get("general", TARGET_GENERAL)
-    ac_target  = sc.get("academic", TARGET_ACADEMIC)
-    qa_target  = sc.get("qa", TARGET_QA)
-    L.append(
-        f"Slot fill: GENERAL {gen_target}/{TARGET_GENERAL}, "
-        f"ACADEMIC {ac_target}/{TARGET_ACADEMIC}, "
-        f"QA {qa_target}/{TARGET_QA}, "
-        f"total {r['total_urls']}/{TARGET_TOTAL}"
-    )
-    engine_details = t.get("engine_details", {})
-    if engine_details:
-        parts = [f"{name}={d['status']}/{d['ms']}ms" for name, d in engine_details.items()]
-        L.append(f"Engines: {' '.join(parts)}")
-    L += [
-        "",
-        f"Timing: total={t.get('total_ms')}ms  fanout={t.get('engine_fanout_ms')}ms  "
-        f"merge={t.get('merge_rank_ms')}ms  preview={t.get('preview_ms')}ms  "
-        f"snippet_select={t.get('select_snippet_ms')}ms  cache_write={t.get('cache_write_ms')}ms",
-        "",
-        "---",
-        "",
-    ]
+        det = (r["timings"] or {}).get("engine_details", {})
+        if not det:
+            L += ["*No engine data.*", ""]
+            continue
+        eu = r["engine_url_counts"]
+        rows: list[tuple] = []
+        for eng, info in det.items():
+            status = info.get("status", "")
+            ms     = info.get("ms", 0)
+            n      = eu.get(eng, 0)
+            reason = _STATUS_HINTS.get(status, "") if status != "OK" else ""
+            rows.append((n, eng, status, reason, ms))
+        # Sort by n_urls desc, then engine name asc
+        rows.sort(key=lambda x: (-x[0], x[1]))
+        L.append("| Engine | URLs | Status | Reason | ms |")
+        L.append("|--------|-----:|--------|--------|----|")
+        for n, eng, status, reason, ms in rows:
+            L.append(f"| {eng} | {n} | {status} | {reason} | {ms} |")
+        L.append("")
     return L
 
 
@@ -267,13 +200,15 @@ def _render_timing_section(records: list[dict]) -> list[str]:
             f"| {t.get('select_snippet_ms', '—')} | {t.get('cache_write_ms', '—')} |"
         )
     if all_total_ms:
+        srt = sorted(all_total_ms)
+        p90 = srt[int(len(srt) * 0.9)]
         L += [
             "",
             "### Aggregate (total_ms across all queries)",
             "",
-            f"| min | median | mean | max |",
-            f"|-----|--------|------|-----|",
-            f"| {min(all_total_ms)} | {round(statistics.median(all_total_ms))} "
+            "| min | median | p90 | mean | max |",
+            "|-----|--------|-----|------|-----|",
+            f"| {min(all_total_ms)} | {round(statistics.median(all_total_ms))} | {p90} "
             f"| {round(statistics.mean(all_total_ms))} | {max(all_total_ms)} |",
         ]
     return L
@@ -297,31 +232,6 @@ def _render_timing_checkpoints(checkpoints: list[dict]) -> list[str]:
         )
     return L
 
-
-# Render per-engine status aggregate section across all queries
-def _render_engine_status(records: list[dict]) -> list[str]:
-    status_counts: dict[str, dict[str, int]] = {}
-    for r in records:
-        det = (r["timings"] or {}).get("engine_details", {})
-        for eng, info in det.items():
-            if eng not in status_counts:
-                status_counts[eng] = {"OK": 0, "EMPTY": 0, "TIMEOUT": 0, "ERROR": 0}
-            status_counts[eng][info["status"]] = status_counts[eng].get(info["status"], 0) + 1
-    if not status_counts:
-        return []
-    L: list[str] = [
-        "",
-        "## Per-Engine Status Aggregate",
-        "",
-        "| Engine | OK | EMPTY | TIMEOUT | ERROR |",
-        "|--------|----|-------|---------|-------|",
-    ]
-    for eng in sorted(status_counts):
-        c = status_counts[eng]
-        L.append(
-            f"| {eng} | {c.get('OK', 0)} | {c.get('EMPTY', 0)} | {c.get('TIMEOUT', 0)} | {c.get('ERROR', 0)} |"
-        )
-    return L
 
 
 # Per-engine reliability baseline: full status breakdown, mean/p95 search_ms for OK entries
@@ -425,16 +335,13 @@ def _write_report(records: list[dict], language: str, checkpoints: list[dict], p
     path = REPORT_DIR / f"{prefix}_{ts}.md"
     lines = (
         _render_header(records, language, ts)
-        + _render_class_defs()
         + _render_summary(records)
         + _render_timing_checkpoints(checkpoints)
         + ["", "---", ""]
+        + _render_per_query_engine_breakdown(records)
+        + _render_timing_section(records)
+        + _render_engine_reliability(records)
     )
-    for qi, r in enumerate(records, 1):
-        lines += _render_query_block(r, qi)
-    lines += _render_timing_section(records)
-    lines += _render_engine_status(records)
-    lines += _render_engine_reliability(records)
     lines.append("")
     path.write_text("\n".join(lines), encoding="utf-8")
     return path
@@ -442,7 +349,7 @@ def _write_report(records: list[dict], language: str, checkpoints: list[dict], p
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(
-        description="Full pipeline smoke: search_web_workflow per query, timings + snippet source + slot labels."
+        description="Full pipeline smoke: search_web_workflow per query, engine-reliability focus."
     )
     parser.add_argument(
         "--max-queries",
