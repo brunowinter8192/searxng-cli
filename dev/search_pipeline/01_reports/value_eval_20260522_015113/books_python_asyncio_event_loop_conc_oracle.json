@@ -1,0 +1,32 @@
+{
+  "mode": "books",
+  "query": "python asyncio event loop concurrency",
+  "selection_method": "LLM oracle (Sonnet, value-eval-b2)",
+  "undersized_pool": false,
+  "pool_size": 10,
+  "top_10": [
+    "https://www.manning.com/books/python-concurrency-with-asyncio",
+    "https://www.oreilly.com/library/view/python-concurrency-with/9781617298660/",
+    "https://superfastpython.com/asyncio-event-loop-separate-thread/",
+    "https://superfastpython.com/asyncio-multiple-event-loops/",
+    "https://books.google.com/books/about/Python_Concurrency_with_asyncio.html?id=M9xdEAAAQBAJ",
+    "https://pythonbooks.org/python-concurrency-with-asyncio/",
+    "https://pybitesbooks.com/books/On9dEAAAQBAJ",
+    "https://superfastpython.com/python-asyncio-books/",
+    "https://www.amazon.com/Python-Concurrency-asyncio-Matthew-Fowler/dp/1617298662",
+    "https://www.simonandschuster.com/books/Python-Concurrency-with-asyncio/Matthew-Fowler/9781617298660"
+  ],
+  "rationale": {
+    "https://www.manning.com/books/python-concurrency-with-asyncio": "Manning publisher page — canonical source for 'Python Concurrency with asyncio' (Fowler), the definitive book on this exact topic. Authoritative primary source.",
+    "https://www.oreilly.com/library/view/python-concurrency-with/9781617298660/": "O'Reilly canonical listing — second-most authoritative book platform, full coverage of asyncio event loop model and concurrency landscape.",
+    "https://superfastpython.com/asyncio-event-loop-separate-thread/": "Direct tutorial on asyncio event loop in separate thread — precisely on-topic for 'event loop concurrency'. Free content, high practical value.",
+    "https://superfastpython.com/asyncio-multiple-event-loops/": "Direct tutorial on running multiple concurrent event loops — core scalability concern in asyncio concurrency. On-topic.",
+    "https://books.google.com/books/about/Python_Concurrency_with_asyncio.html?id=M9xdEAAAQBAJ": "Google Books entry — broad accessibility, same authoritative book. Useful for users who want preview/overview.",
+    "https://pythonbooks.org/python-concurrency-with-asyncio/": "Book review and summary on pythonbooks.org — useful editorial perspective on the book's scope and content.",
+    "https://pybitesbooks.com/books/On9dEAAAQBAJ": "Pybites Books listing with community context — another platform covering the Fowler asyncio book. Lower uniqueness than publisher pages.",
+    "https://superfastpython.com/python-asyncio-books/": "Curated list of asyncio books — meta-resource that points to the field's key references. Useful for discovery beyond the Fowler book.",
+    "https://www.amazon.com/Python-Concurrency-asyncio-Matthew-Fowler/dp/1617298662": "Amazon product page — retail listing, reader reviews, table of contents. Lower informational value than publisher/O'Reilly pages.",
+    "https://www.simonandschuster.com/books/Python-Concurrency-with-asyncio/Matthew-Fowler/9781617298662": "Simon & Schuster publisher retail page — lowest uniqueness of the set, but valid on-topic listing."
+  },
+  "notes": "Pool is extremely homogeneous — 7 of 10 URLs are variations of the same 'Python Concurrency with asyncio' (Fowler) book across retail/platform pages. Ranking prioritizes publisher/authoritative platforms first, then SuperFastPython tutorials (unique content), then retail duplicates. All 10 included since pool size equals top-10 limit."
+}
