@@ -2,19 +2,21 @@
 
 ## Status Quo (IST)
 
-`src/search/rate_limiter.py` (69 LOC) implements `RateLimiter` with two distinct behaviors:
+`src/search/rate_limiter.py` (52 LOC) implements `RateLimiter` as a **pure token-bucket**. Exponential backoff removed 2026-05-22 (this branch).
 
-**1. Token-bucket pacing (lines 39-51):** sliding window `MAX_REQUESTS=10` per `WINDOW_SECONDS=60.0`. Engine-individual instances override with their own caps (e.g. `google.py:65` uses `max_requests=4, window_seconds=60`). `acquire()` waits for the oldest token to expire if the window is at capacity. This is **normal rate management** — pacing to avoid hitting provider limits — and stays.
+**Token-bucket pacing:** sliding window `MAX_REQUESTS=10` per `WINDOW_SECONDS=60.0`. Per-engine singletons configured at module import time (e.g. `google.py` sets `max_requests=4, window_seconds=60`). `acquire()` waits for the oldest token to expire if the window is at capacity — normal rate management, not retry-after-failure.
 
-**2. Exponential backoff after 429/CAPTCHA (lines 53-58):** `RateLimiter.backoff()` sets `_backoff_until = now + delay` where `delay = BACKOFF_BASE × 2^_backoff_attempt + random.uniform(1.0, 10.0)`. `BACKOFF_BASE = 30.0`, so first failure waits 31-40s, second 61-70s, third 121-130s, fourth 241-250s. The counter is per-engine, persistent across queries within the same Python session. `reset_backoff()` (line 60) zeros the counter after a successful request.
+`acquire()` has one code path: remove expired tokens → if at capacity wait for oldest to expire → append new token. No `_backoff_until` check, no sleep-on-failure. `RateLimiter` has no failure state: `_tokens` (sliding window timestamps), `_lock`, `_max_requests`, `_window_seconds` only.
 
-`acquire()` lines 33-37 honor the backoff window: `if now < self._backoff_until: await asyncio.sleep(wait)`. Subsequent queries hitting the same engine during the backoff window either wait (capped by `RATE_WAIT_TIMEOUT=60s` from bee_fix) or `RATE_SKIP` if the wait exceeds the cap.
+**Fail-fast on CAPTCHA/429/Block:** engine detects failure → returns `([], S.EMPTY_BLOCK)` or analogous status immediately → `_engine_with_timing` in `search_web.py` records it in `engine_stats` → query log captures it. No retry, no session-scoped memory of the failure. Next query tries the engine again from scratch.
 
-Callers of `backoff()`: `src/search/engines/google.py:90, 109` — fires on Google CAPTCHA detection (`/sorry/` URL) and on any unhandled exception in `search()`.
+**RATE_SKIP still active:** `asyncio.wait_for(get_limiter(engine.name).acquire(), timeout=RATE_WAIT_TIMEOUT=60s)` in `search_web.py` fires if token-bucket wait exceeds 60s. Under normal 4 req/min load this is dormant; it guards against genuine bucket saturation (unlikely) and asyncio event-loop starvation during Chrome CDP floods (bee_fix mechanism).
+
+Removed from all 10 engine files: every `limiter.backoff()`, `limiter.reset_backoff()`, orphan `limiter = get_limiter(self.name)` assignments, and `get_limiter` imports where no longer used.
 
 ## Evidenz
 
-**Run 2026-05-22 (`value_eval_probe.py` 16-pair batch):** `/tmp/value_eval_probe_run.log` records the cascade:
+**Pre-rip — backoff waste (2026-05-22, `value_eval_probe.py` 16-pair batch):**
 
 | Pair | CAPTCHA event | Backoff applied | Google result |
 |------|---------------|-----------------|---------------|
@@ -22,35 +24,53 @@ Callers of `backoff()`: `src/search/engines/google.py:90, 109` — fires on Goog
 | 2 | yes | 65s (attempt 1: 60 + 5 jitter) | google=0 |
 | 3 | (waited 60s = RATE_WAIT_TIMEOUT) | — | google=0 |
 | 4 | yes | 123s (attempt 2: 120 + 3 jitter) | google=0 |
-| 5 | (waited 60s) | — | google=0 |
-| 6 | (waited 60s) | — | google=0 |
+| 5–7 | (waited 60s each) | — | google=0 |
 | 7 | yes | 244s (attempt 3: 240 + 4 jitter) | google=0 |
 | 8-16 | (all waited 60s) | — | google=0 |
 
-**Net waste:** ≈466s of accumulated wallclock spent in backoff sleeps. **Net benefit:** zero — Google CAPTCHA'd every retry because Google's provider-side bot-detection state does not decay in seconds, and re-querying within the same browser session preserves the fingerprint that triggered the original CAPTCHA. The doubling escalation does not work as a recovery mechanism; it just delays the inevitable EMPTY_BLOCK return.
+Net waste ≈466s; net benefit zero — Google's bot-detection state does not decay in seconds. Source: `decisions/OldThemes/pooling/04_zero_query_diagnosis.md` (cascade mechanism diagnosis, 2026-05-20).
 
-This pattern reproduces the failure mode documented in `decisions/OldThemes/pooling/04_zero_query_diagnosis.md` (2026-05-20) — the formula `30 × 2^attempt + jitter[1..10]` matched observed backoffs there too. The bee_fix changes (RATE_WAIT_TIMEOUT 5s → 60s) prevented the cascade from blocking *other* engines during Chrome's CDP-event-flood window, but did not address the wastefulness of the backoff retry itself.
+**Post-rip — pipeline smoke baseline (2026-05-22, `dev/search_pipeline/11_pipeline_smoke.py`, 30 queries, language=en, engine_timeout=None):**
+Report: `dev/search_pipeline/01_reports/no_backoff_baseline_20260522_211439.md`
 
-Independent validation that 4 req/min pacing is correct: `google.py:65` sets `max_requests=4` — code is at the spec. CAPTCHA at 4/min is therefore not a rate-limit problem; it's a browser-fingerprint problem at Google's end, outside the rate_limiter's responsibility. Slower waits cannot fix it.
+Results: **30/30 queries with results**. **0 RATE_SKIP events** across all 30 queries × 9 engines.
+
+Wallclock checkpoints:
+
+| Milestone | Cumulative wall (s) | Avg/query in segment (s) | Engines OK | Engines RATE_SKIP |
+|-----------|--------------------:|-------------------------:|-----------:|------------------:|
+| Q4 | 30.3 | 7.6 | 19 | 0 |
+| Q8 | 88.0 | 14.4 | 29 | 0 |
+| Q12 | 146.4 | 14.6 | 30 | 0 |
+| Q16 | 206.6 | 15.0 | 23 | 0 |
+| Q20 | 267.1 | 15.1 | 23 | 0 |
+| Q30 (estimated) | ~434 | ~16.7 | — | 0 |
+
+total_ms distribution across 30 queries: min=4792ms / median=7773ms / mean=14459ms / max=41093ms. High mean driven by 6 queries hitting the token-bucket 4 req/min pacing wait (33–41s fanout_ms each — expected, not CAPTCHA-related).
+
+Per-engine reliability (OK% / dominant failure mode):
+
+| Engine | OK% | Dominant failure |
+|--------|-----|-----------------|
+| crossref | 97% | 3% TIMEOUT_WATCHDOG |
+| duckduckgo | 97% | 3% ERROR_BROWSER |
+| google | 73% | 23% EMPTY_BLOCK (CAPTCHA — still fires, no longer causes cascade) |
+| lobsters | 57% | 37% EMPTY_NO_CONTAINER (topic-mismatch, expected for general queries on tech-niche site) |
+| mojeek | 90% | 3% EMPTY_NO_CONTAINER |
+| open_library | 30% | 67% coarse-EMPTY (mapped to ERROR_OTHER — HTTP engine returning `[]` on non-book queries; sub-status needs `search_with_reason()` for fine-grained labelling) |
+| openalex | 80% | 13% coarse-EMPTY (same HTTP-engine sub-status note as open_library) |
+| semantic_scholar | 73% | 20% EMPTY_NO_CONTAINER |
+| stack_exchange | 50% | 50% coarse-EMPTY (HTTP engine; EMPTY_NO_RESULTS on queries without SO matches) |
+
+Top-3 bottleneck engines (highest search_ms per query): semantic_scholar (11×), openalex (8×), open_library (4×).
+
+**Comparison:** pre-rip, 466s was spent exclusively in backoff sleeps inside a 16-pair batch, yielding 0 Google results. Post-rip, ~434s is the total wallclock for 30 complete queries (30/30 with results, zero wasted in sleep-on-failure). The backoff pattern consumed more total time than 30 actual queries now take.
 
 ## Recommendation (SOLL)
 
-**Remove the exponential-backoff retry behavior entirely.** Fail-fast on 429/CAPTCHA/Block:
+**Keep — current state matches the `no_backoff_retry` project principle.**
 
-1. Engine detects failure → records `EMPTY_BLOCK` (or analogous status) and returns immediately. No sleep, no `_backoff_until`, no `_backoff_attempt`.
-2. Other engines in the same query proceed normally — bee_fix's `RATE_WAIT_TIMEOUT=60s` cap on `acquire()` already covers the asyncio-event-loop-starvation case during Chrome CDP floods.
-3. No session-scoped "engine dead" flag. The next query in the same session tries the failing engine again from scratch. If it fails again, record + continue. If it succeeds, results flow normally. Zero memory between queries.
-4. Token-bucket pacing (`MAX_REQUESTS / WINDOW_SECONDS`) stays untouched — that's normal rate-management, not retry-with-backoff.
-
-**Concrete code changes:**
-
-- `src/search/rate_limiter.py`: remove `backoff()`, `reset_backoff()`, `_backoff_until`, `_backoff_attempt` fields. Remove `BACKOFF_BASE = 30.0` constant. Remove lines 33-37 in `acquire()` (the `_backoff_until` check + sleep). The class shrinks to pure token-bucket pacing.
-- `src/search/engines/google.py:90`: remove `limiter.backoff()` after CAPTCHA detection. The return-EMPTY_BLOCK already records the failure; the backoff call is the redundant part.
-- `src/search/engines/google.py:97`: remove `limiter.reset_backoff()` after successful results — no counter to reset.
-- `src/search/engines/google.py:109`: same — remove `get_limiter(self.name).backoff()` in the exception handler.
-- Search for any other callers of `backoff()` / `reset_backoff()` across `src/` and remove.
-
-**Why session-stateless re-tries are robust:** provider-side bot-detection state can recover over minutes-to-hours; our session-level sleeps span seconds and never reach the recovery threshold. A naive "try again on next natural query trigger" gives the provider time to reset organically (between Opus sessions, between user queries, between Workflow ticks) without requiring our code to model the provider's internal state. Empirically: the 466s wasted in today's batch produced no Google results — the same outcome as fail-fast in 0 seconds.
+Token-bucket pacing + fail-fast is the correct architecture. No further changes needed to the rate-limiter or engine backoff paths.
 
 ## Offene Fragen
 

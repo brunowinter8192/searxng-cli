@@ -6,7 +6,7 @@ from urllib.parse import quote_plus, urlparse, parse_qs
 
 from src.search.browser import new_tab
 from src.search.engines.base import BaseEngine
-from src.search.rate_limiter import RateLimiter, get_limiter, _limiters
+from src.search.rate_limiter import RateLimiter, _limiters
 from src.search.result import SearchResult
 from src.search import status as S
 
@@ -47,21 +47,18 @@ class DuckDuckGoEngine(BaseEngine):
     # Full search logic with empty-reason diagnosis; exceptions propagate to _engine_with_timing
     async def search_with_reason(self, query: str, language: str = "en", max_results: int = 10) -> tuple[list[SearchResult], str | None]:
         logger.info("DuckDuckGo search: %s", query)
-        limiter = get_limiter(self.name)
         tab = await new_tab()
         search_url = _build_url(query)
         try:
             await tab.go_to(search_url, timeout=3.0)
             if await _has_captcha(tab):
                 logger.warning("DuckDuckGo CAPTCHA detected for: %s", query)
-                limiter.backoff()
                 return [], S.EMPTY_BLOCK
             if not await _wait_for_results(tab):
                 reason = await _diagnose_empty(tab)
                 logger.warning("DuckDuckGo empty (%s) for: %s", reason, query)
                 return [], reason
             results = await _parse_results(tab, max_results)
-            limiter.reset_backoff()
             return results, (None if results else S.EMPTY_NO_RESULTS)
         finally:
             await tab.close()
@@ -73,7 +70,6 @@ class DuckDuckGoEngine(BaseEngine):
             return results
         except Exception as e:
             logger.error("DuckDuckGo search failed: %s", e)
-            get_limiter(self.name).backoff()
             return []
 
 

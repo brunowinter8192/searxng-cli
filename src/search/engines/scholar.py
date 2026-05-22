@@ -6,7 +6,7 @@ import httpx
 from lxml import html as lhtml
 
 from src.search.engines.base import BaseEngine
-from src.search.rate_limiter import RateLimiter, get_limiter, _limiters
+from src.search.rate_limiter import RateLimiter, _limiters
 from src.search.result import SearchResult
 from src.search import status as S
 
@@ -40,7 +40,6 @@ class ScholarEngine(BaseEngine):
     # Full HTTP search logic; returns (results, reason); exceptions propagate to _engine_with_timing
     async def search_with_reason(self, query: str, language: str = "en", max_results: int = 10) -> tuple[list[SearchResult], str | None]:
         logger.info("Scholar search: %s", query)
-        limiter = get_limiter(self.name)
         url = _build_url(query, language, max_results)
         r = await _fetch(url)
 
@@ -48,16 +47,11 @@ class ScholarEngine(BaseEngine):
         if r.status_code in (301, 302, 303, 307, 308):
             location = r.headers.get("Location", "")
             logger.warning("Scholar redirect → %s", location)
-            limiter.backoff()
             return [], S.EMPTY_BLOCK
 
         r.raise_for_status()
 
         results, reason = _parse_response(r.text, max_results)
-        if reason == S.EMPTY_BLOCK:
-            limiter.backoff()
-        else:
-            limiter.reset_backoff()
         return results, reason
 
     # Legacy thin wrapper — delegates to search_with_reason; swallows exceptions for dev-script compat
@@ -67,7 +61,6 @@ class ScholarEngine(BaseEngine):
             return results
         except Exception as e:
             logger.error("Scholar search failed: %s", e)
-            get_limiter(self.name).backoff()
             return []
 
 

@@ -7,7 +7,7 @@ import re
 import httpx
 
 from src.search.engines.base import BaseEngine
-from src.search.rate_limiter import RateLimiter, _limiters, get_limiter
+from src.search.rate_limiter import RateLimiter, _limiters
 from src.search.result import SearchResult
 
 logger = logging.getLogger(__name__)
@@ -26,12 +26,9 @@ class CrossRefEngine(BaseEngine):
     name = "crossref"
 
     async def search(self, query: str, language: str = "en", max_results: int = 10) -> list[SearchResult]:
-        limiter = get_limiter(self.name)
         items = await _fetch_results(query, max_results)
         if items is None:
-            limiter.backoff()
             return []
-        limiter.reset_backoff()
         return _parse_results(items)
 
 
