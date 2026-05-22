@@ -1,0 +1,49 @@
+{
+  "mode": "pdf",
+  "query": "python asyncio event loop concurrency",
+  "google_count": 0,
+  "pool_size": 384,
+  "capped_pool_size": 59,
+  "filtered_pool_size": 5,
+  "filtered_capped_pool_size": 5,
+  "oracle_pool_size": 5,
+  "c1": [
+    "https://media.githubusercontent.com/media/Rishabh-creator601/Books/refs/heads/master/python_books/Python_Concurrency_with_asyncio_Matthew_Fowler.pdf",
+    "https://link.springer.com/content/pdf/10.1007/978-3-030-25943-3_34.pdf",
+    "https://archive.org/download/python-programming-collection-pdf-ebooks-all-you-need/Using%20Asyncio%20in%20Python%203_%20Understanding%20Python%27s%20Asynchronous%20Programming%20Features%20%28CONV%29%20-%20Caleb%20Hattingh%20%28O%27Reilly%20Media%3BFree%20Programming%20Ebooks%3B2018%29.pdf",
+    "https://indico.gsi.de/event/17490/contributions/71045/attachments/43482/61031/Event-driven%20Programming%20with%20Python%20asyncio.pdf",
+    "https://sschwarzer.com/download/concurrency_pycon_de2018.pdf"
+  ],
+  "c1_ms": 0,
+  "c2": [
+    "https://media.githubusercontent.com/media/Rishabh-creator601/Books/refs/heads/master/python_books/Python_Concurrency_with_asyncio_Matthew_Fowler.pdf",
+    "https://link.springer.com/content/pdf/10.1007/978-3-030-25943-3_34.pdf",
+    "https://sschwarzer.com/download/concurrency_pycon_de2018.pdf",
+    "https://archive.org/download/python-programming-collection-pdf-ebooks-all-you-need/Using%20Asyncio%20in%20Python%203_%20Understanding%20Python%27s%20Asynchronous%20Programming%20Features%20%28CONV%29%20-%20Caleb%20Hattingh%20%28O%27Reilly%20Media%3BFree%20Programming%20Ebooks%3B2018%29.pdf",
+    "https://indico.gsi.de/event/17490/contributions/71045/attachments/43482/61031/Event-driven%20Programming%20with%20Python%20asyncio.pdf"
+  ],
+  "c2_ms": 0,
+  "c2p": [
+    "https://media.githubusercontent.com/media/Rishabh-creator601/Books/refs/heads/master/python_books/Python_Concurrency_with_asyncio_Matthew_Fowler.pdf",
+    "https://link.springer.com/content/pdf/10.1007/978-3-030-25943-3_34.pdf",
+    "https://sschwarzer.com/download/concurrency_pycon_de2018.pdf",
+    "https://archive.org/download/python-programming-collection-pdf-ebooks-all-you-need/Using%20Asyncio%20in%20Python%203_%20Understanding%20Python%27s%20Asynchronous%20Programming%20Features%20%28CONV%29%20-%20Caleb%20Hattingh%20%28O%27Reilly%20Media%3BFree%20Programming%20Ebooks%3B2018%29.pdf",
+    "https://indico.gsi.de/event/17490/contributions/71045/attachments/43482/61031/Event-driven%20Programming%20with%20Python%20asyncio.pdf"
+  ],
+  "c2p_ms": 0,
+  "c3": [
+    "https://media.githubusercontent.com/media/Rishabh-creator601/Books/refs/heads/master/python_books/Python_Concurrency_with_asyncio_Matthew_Fowler.pdf",
+    "https://link.springer.com/content/pdf/10.1007/978-3-030-25943-3_34.pdf",
+    "https://sschwarzer.com/download/concurrency_pycon_de2018.pdf",
+    "https://indico.gsi.de/event/17490/contributions/71045/attachments/43482/61031/Event-driven%20Programming%20with%20Python%20asyncio.pdf",
+    "https://archive.org/download/python-programming-collection-pdf-ebooks-all-you-need/Using%20Asyncio%20in%20Python%203_%20Understanding%20Python%27s%20Asynchronous%20Programming%20Features%20%28CONV%29%20-%20Caleb%20Hattingh%20%28O%27Reilly%20Media%3BFree%20Programming%20Ebooks%3B2018%29.pdf"
+  ],
+  "c3_ms": 184,
+  "method_pool_sizes": {
+    "c1": 5,
+    "c2": 5,
+    "c2p": 5,
+    "c3": 5
+  },
+  "fetch_ms": 3184
+}

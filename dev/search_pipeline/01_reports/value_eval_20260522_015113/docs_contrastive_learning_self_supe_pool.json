@@ -1,0 +1,172 @@
+{
+  "mode": "docs",
+  "query": "contrastive learning self-supervised representations",
+  "pool_size": 33,
+  "pool": [
+    {
+      "url": "http://ai.googleblog.com/2021/01/google-research-looking-back-at-2020.html",
+      "title": "Google Research: Looking Back at 2020, and Forward to 2021",
+      "snippet": "ai.googleblog.com"
+    },
+    {
+      "url": "http://keg.cs.tsinghua.edu.cn/jietang/publications/TKDE21-Liu-et-al-Self-supervised-Learning-Generative-or-Contrastive.pdf",
+      "title": "PDF Self-supervised Learning: Generative or Contrastive",
+      "snippet": "Self-supervised representation learning leverages input data itself as supervision and benefits almost all types of downstream tasks. In this survey, we take a look into new self-supervised learning methods for representation in computer vision, natural language processing, and graph learning."
+    },
+    {
+      "url": "https://aclanthology.org/2021.findings-emnlp.3/",
+      "title": "Self-supervised Contrastive Cross-Modality Representation",
+      "snippet": "... we propose novel training schemes for spoken question answering with a self-supervised training stage and a contrastive representation learning stage."
+    },
+    {
+      "url": "https://arxiv.org/html/2509.11316v1",
+      "title": "Contrastive Network Representation Learning",
+      "snippet": "Contrastive learning is a self-supervised approach that learns meaningful representations by teaching models to distinguish between similar (positive ..."
+    },
+    {
+      "url": "https://arxiv.org/html/2603.06180v1",
+      "title": "Contrastive-to-Self-Supervised: A Two-Stage Framework for",
+      "snippet": "2.0.2 Contrastive and Self-Supervised Representation Learning. ... Contrastive-to-Self-Supervised: A Two-Stage Framework for Script Similarity ..."
+    },
+    {
+      "url": "https://arxiv.org/pdf/2510.10572",
+      "title": "Understanding Self-supervised Contrastive Learning through Supervised ...",
+      "snippet": "Our derivation naturally introduces the concepts of prototype representation bias and a balanced contrastive loss, which help explain and improve the behavior of self-supervised learning algorithms. We further show how components of our theoretical framework correspond to established practices in contrastive learning."
+    },
+    {
+      "url": "https://asci-cbl-practicals2025.readthedocs.io/en/latest/notebooks/5_Self_Supervised_Learning.html",
+      "title": "Practical 5: Self-Supervised Contrastive Learning with SimCLR",
+      "snippet": "Within the last two years, a lot of new approaches have been proposed for self-supervised learning, in particular for images, that have resulted in great improvements over supervised models when few labels are available. The subfield that we will focus on in this tutorial is contrastive learning."
+    },
+    {
+      "url": "https://deepai.org/publication/multi-view-contrastive-self-supervised-learning-of-accounting-data-representations-for-downstream-audit-tasks",
+      "title": "Multi-view Contrastive Self-Supervised Learning of Accounting",
+      "snippet": "Multi-view Contrastive Self-Supervised Learning of Accounting Data Representations for Downstream Audit Tasks ... contrastive self- supervised ..."
+    },
+    {
+      "url": "https://dell.scholars.harvard.edu/publications/linking-representations-multimodal-contrastive-learning",
+      "title": "Linking Representations with Multimodal Contrastive Learning |",
+      "snippet": "... and language bi-encoders, aligned through contrastive language-image pre-training, to learn a metric space where the pooled image-text representation ..."
+    },
+    {
+      "url": "https://doi.org/10.1016/j.sigpro.2021.108310",
+      "title": "Negative sampling strategies for contrastive self-supervised learning of graph representations",
+      "snippet": "Hafidi, H. et al. (2022), Signal Processing"
+    },
+    {
+      "url": "https://doi.org/10.1101/2020.09.04.283929",
+      "title": "Self-Supervised Contrastive Learning of Protein Representations By Mutual Information Maximization",
+      "snippet": "Abstract Pretrained embedding representations of biological sequences which capture meaningful properties can alleviate many problems associated with supervised learning in biology. We apply the principle of mutual information maximization between local and global information as a self-supervised pretraining signal for protein embeddings. To do so, we divide protein sequences into fixed size fragments, and train an autoregressive model to distinguish between subsequent fragments from the same protein and fragments from random proteins. Our model, CPCProt, achieves comparable performance to state-of-the-art self-supervised models for protein sequence embeddings on various downstream tasks, but reduces the number of parameters down to 2% to 10% of benchmarked models. Further, we explore how downstream assessment protocols affect embedding evaluation, and the effect of contrastive learning hyperparameters on empirical performance. We hope that these results will inform the development of contrastive learning methods in protein biology and other modalities."
+    },
+    {
+      "url": "https://doi.org/10.1109/cvprw53098.2021.00129",
+      "title": "Self-Supervised Learning of Remote Sensing Scene Representations Using Contrastive Multiview Coding",
+      "snippet": "Stojnic, V. et al. (2021), 2021 IEEE/CVF Conference on Computer Vision and Pattern Recognition Workshops (CVPRW)"
+    },
+    {
+      "url": "https://doi.org/10.1109/slt54892.2023.10022552",
+      "title": "CCC-WAV2VEC 2.0: Clustering AIDED Cross Contrastive Self-Supervised Learning of Speech Representations",
+      "snippet": "Lodagala, V. et al. (2023), 2022 IEEE Spoken Language Technology Workshop (SLT)"
+    },
+    {
+      "url": "https://doi.org/10.2139/ssrn.4967469",
+      "title": "Self-Supervised Contrastive Learning of Multiple Molecular Graph Representations for Molecular Property Prediction",
+      "snippet": "yunwu, l. et al. (2024)"
+    },
+    {
+      "url": "https://doi.org/10.2139/ssrn.5095806",
+      "title": "Contrastive Learning with Only Positive Pairs for Enhancing Content Representations of Self-Supervised Speech Models",
+      "snippet": "Meghanani, A. et al. (2025)"
+    },
+    {
+      "url": "https://doi.org/10.21437/interspeech.2022-11141",
+      "title": "Non-contrastive self-supervised learning of utterance-level speech representations",
+      "snippet": "Cho, J. et al. (2022), Interspeech 2022"
+    },
+    {
+      "url": "https://doi.org/10.32470/uqprhu8",
+      "title": "Human-aligned Universal Audio Representations with Contrastive-Equivariant Self-Supervised Learning",
+      "snippet": "Griffith, I. et al. (2026), Proceedings of Cognitive Computational Neuroscience 2026"
+    },
+    {
+      "url": "https://doi.org/10.59275/j.melba.2022-f9a1",
+      "title": "Learning Representations with Contrastive Self-Supervised Learning for Histopathology Applications",
+      "snippet": "Unsupervised learning has made substantial progress over the last few years, especially by means of contrastive self-supervised learning. The dominating dataset for benchmarking self-supervised learning has been ImageNet, for which recent methods are approaching the performance achieved by fully supervised training. The ImageNet dataset is however largely object-centric, and it is not clear yet what potential those methods have on widely different datasets and tasks that are not object-centric, such as in digital pathology. While self-supervised learning has started to be explored within this area with encouraging results, there is reason to look closer at how this setting differs from natural images and ImageNet. In this paper we make an in-depth analysis of contrastive learning for histopathology, pin-pointing how the contrastive objective will behave differently due to the characteristics of histopathology data. Using SimCLR and HE stained images as a representative setting for contrastive self-supervised learning in histopathology, we bring forward a number of considerations, such as view generation for the contrastive objective and hyper-parameter tuning. In a large battery of experiments, we analyze how the downstream performance in tissue classification will be affected by these considerations. The results point to how contrastive learning can reduce the annotation effort within digital pathology, but that the specific dataset characteristics need to be considered. To take full advantage of the contrastive learning objective, different calibrations of view generation and hyper-parameters are required. Our results pave the way for realizing the full potential of self-supervised learning for histopathology applications. Code and trained models are available at a href='https://github.com/k-stacke/ssl-pathology'https://github.com/k-stacke/ssl-pathology/a"
+    },
+    {
+      "url": "https://doi.org/10.7717/peerjcs.1045/table-5",
+      "title": "Table 5: Summary of contrastive self-supervised learning methods in medical imaging.",
+      "snippet": ""
+    },
+    {
+      "url": "https://eugeneyan.com/writing/llm-patterns/",
+      "title": "Patterns for Building LLM-based Systems & Products",
+      "snippet": "eugeneyan.com"
+    },
+    {
+      "url": "https://ieeexplore.ieee.org/document/9711402",
+      "title": "Contrasting Contrastive Self-Supervised Representation Learning ...",
+      "snippet": "In the past few years, we have witnessed remarkable breakthroughs in self-supervised representation learning. Despite the success and adoption of representations learned through this paradigm, much is yet to be understood about how different training methods and datasets influence performance on downstream tasks. In this paper, we analyze contrastive approaches as one of the most successful ..."
+    },
+    {
+      "url": "https://jonathanbgn.com/2021/10/30/hubert-visually-explained.html",
+      "title": "HuBERT: How to Apply BERT to Speech, Visually Explained",
+      "snippet": "jonathanbgn.com"
+    },
+    {
+      "url": "https://keras.io/examples/vision/simsiam/",
+      "title": "Self-supervised contrastive learning with SimSiam",
+      "snippet": "... Learning Image classification with ... Self-supervised learning (SSL) is an interesting branch of study in the field of representation learning."
+    },
+    {
+      "url": "https://lightning.ai/docs/pytorch/1.8.1/notebooks/course_UvA-DL/13-contrastive-learning.html",
+      "title": "Tutorial 13: Self-Supervised Contrastive Learning with SimCLR ¶",
+      "snippet": "In this tutorial, we will take a closer look at self-supervised contrastive learning. Self-supervised learning, or also sometimes called unsupervised learning, describes the scenario where we have given input data, but no accompanying labels to train in a classical supervised way."
+    },
+    {
+      "url": "https://lilianweng.github.io/posts/2023-03-15-prompt-engineering/",
+      "title": "Prompt Engineering",
+      "snippet": "lilianweng.github.io"
+    },
+    {
+      "url": "https://link.springer.com/article/10.1007/s13735-022-00245-6",
+      "title": "Contrastive self-supervised learning: review, progress ... - Springer",
+      "snippet": "Incorporating contrastive learning (CL) for self-supervised learning (SSL) has turned out as an effective alternative. In this paper, a comprehensive review of CL methodology in terms of its approaches, encoding techniques and loss functions is provided."
+    },
+    {
+      "url": "https://openaccess.thecvf.com/content/ICCV2021/papers/Kotar_Contrasting_Contrastive_Self-Supervised_Representation_Learning_Pipelines_ICCV_2021_paper.pdf",
+      "title": "PDF Contrasting Contrastive Self-Supervised Representation Learning Pipelines",
+      "snippet": "Among the most successful approaches are contrastive self-supervised learning methods that achieve results close to their supervised counterparts. These methods typically learn by contrasting latent representations of different aug-mentations, transformations or cluster assignments of im-ages."
+    },
+    {
+      "url": "https://people.idsia.ch/~juergen/deep-learning-history.html",
+      "title": "Annotated history of modern AI and deep neural networks",
+      "snippet": "people.idsia.ch"
+    },
+    {
+      "url": "https://scholarworks.utrgv.edu/etd/1218/",
+      "title": "\"Self-Supervised Representation Learning for Motion Time",
+      "snippet": "In addition, we will describe how the newest and most efficient self-supervised learning framework for visual representations to this date works ..."
+    },
+    {
+      "url": "https://sigport.org/documents/contrastive-separative-coding-self-supervised-representation-learning",
+      "title": "CONTRASTIVE SEPARATIVE CODING FOR SELF-SUPERVISED",
+      "snippet": "...  ... Available at: https://sigport.org/documents/contrastive-separative-coding-self-supervised-representation-learning."
+    },
+    {
+      "url": "https://www.nature.com/articles/s41586-023-06004-9",
+      "title": "Faster sorting algorithms discovered using deep reinforcement learning",
+      "snippet": "nature.com"
+    },
+    {
+      "url": "https://www.researchsquare.com/article/rs-5058251/v1",
+      "title": "Self-supervised representation learning for clinical decision",
+      "snippet": "The widespread adoption of Electronic Health Records (EHRs) and deep learning, particularly through Self-Supervised Representation Learning (SSRL ..."
+    },
+    {
+      "url": "https://www.sciencedirect.com/science/article/pii/S0167865522000502",
+      "title": "Mixing up contrastive learning: Self-supervised representation learning ...",
+      "snippet": "Contrastive learning is a type of self-supervised representation learning where the task is to discriminate between different views of the sample, where the different views are created through data augmentation that exploit prior information about the structure in the data."
+    }
+  ]
+}

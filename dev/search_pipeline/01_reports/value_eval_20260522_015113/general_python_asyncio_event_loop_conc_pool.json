@@ -1,0 +1,287 @@
+{
+  "mode": "general",
+  "query": "python asyncio event loop concurrency",
+  "pool_size": 56,
+  "pool": [
+    {
+      "url": "http://aosabook.org/en/500L/a-web-crawler-with-asyncio-coroutines.html",
+      "title": "A Web Crawler With asyncio Coroutines",
+      "snippet": "aosabook.org"
+    },
+    {
+      "url": "http://techspot.zzzeek.org/2015/02/15/asynchronous-python-and-databases/",
+      "title": "Asynchronous Python and Databases",
+      "snippet": "techspot.zzzeek.org"
+    },
+    {
+      "url": "https://blog.nelhage.com/post/concurrent-error-handling/",
+      "title": "From error-handling to structured concurrency",
+      "snippet": "blog.nelhage.com"
+    },
+    {
+      "url": "https://charlesleifer.com/blog/asyncio/",
+      "title": "AsyncIO Thoughts",
+      "snippet": "charlesleifer.com"
+    },
+    {
+      "url": "https://dev.to/imsushant12/asyncio-architecture-in-python-event-loops-tasks-and-futures-explained-4pn3",
+      "title": "Asyncio Architecture in Python: Event Loops, Tasks, and Futures ...",
+      "snippet": "Asyncio: Single thread, single process. It uses an event loop to run many tasks concurrently by switching between them when one task is waiting (for example, waiting for network or file I/O). It is best for I/O-bound workloads along with high-concurrency workloads. Memory and overhead Threads: Light, but still need stack memory."
+    },
+    {
+      "url": "https://dhirendrabiswal.com/advanced-python-concurrency-asyncio-event-loop-optimization-and-concurrent-futures-patterns/",
+      "title": "Advanced Python Concurrency: Asyncio Event Loop Optimization and ...",
+      "snippet": "TL;DR: In this guide, I dive deep into advanced Python concurrency using asyncio and concurrent.futures. You'll learn how to optimize the event loop for high-performance I/O-bound and mixed workloads, implement custom event loop management, and combine asyncio with thread/process pools for CPU-bound tasks."
+    },
+    {
+      "url": "https://docs.python.org/3/library/asyncio-eventloop.html",
+      "title": "Event loop — Python 3.14.5 documentation",
+      "snippet": "Preface The event loop is the core of every asyncio application. Event loops run asynchronous tasks and callbacks, perform network IO operations, and run subprocesses. Application developers should typically use the high-level asyncio functions, such as asyncio.run(), and should rarely need to reference the loop object or call its methods."
+    },
+    {
+      "url": "https://doi.org/10.1007/978-1-4842-3742-7_9",
+      "title": "Applications with asyncio and Twisted",
+      "snippet": "Williams, M. et al. (2019), Expert Twisted"
+    },
+    {
+      "url": "https://doi.org/10.1007/978-1-4842-4401-2_2",
+      "title": "Working with Event Loops",
+      "snippet": "Python version 3.4 has adopted a powerful framework to support concurrent execution of code: asyncio. This framework uses event loops to orchestrate the callbacks and asynchronous tasks. Event loops live in the context of event loop policies—a concept singular to asyncio. The interplay among coroutines, event loops, and policies is illustrated in Figure 2-1."
+    },
+    {
+      "url": "https://doi.org/10.1007/978-1-4842-8140-6_1",
+      "title": "(A)synchronous Python",
+      "snippet": "de Groot, C. (2022), Asynchronous Python Programming with Asyncio and Async/await"
+    },
+    {
+      "url": "https://doi.org/10.1007/978-1-4842-8140-6_13",
+      "title": "Testing",
+      "snippet": "de Groot, C. (2022), Asynchronous Python Programming with Asyncio and Async/await"
+    },
+    {
+      "url": "https://doi.org/10.1007/978-1-4842-8140-6_2",
+      "title": "Modern Asynchronous Python The Building Blocks",
+      "snippet": "de Groot, C. (2022), Asynchronous Python Programming with Asyncio and Async/await"
+    },
+    {
+      "url": "https://doi.org/10.1007/978-1-4842-8140-6_6",
+      "title": "asyncio Streams",
+      "snippet": "de Groot, C. (2022), Asynchronous Python Programming with Asyncio and Async/await"
+    },
+    {
+      "url": "https://doi.org/10.1007/978-3-030-25943-3_34",
+      "title": "Concurrency with AsyncIO",
+      "snippet": "Hunt, J. (2019), Undergraduate Topics in Computer Science"
+    },
+    {
+      "url": "https://doi.org/10.1007/978-3-031-40336-1",
+      "title": "Advanced Guide to Python 3 Programming",
+      "snippet": ""
+    },
+    {
+      "url": "https://doi.org/10.1007/978-3-031-40336-1_43",
+      "title": "Concurrency with AsyncIO",
+      "snippet": "Hunt, J. (2023), Undergraduate Topics in Computer Science"
+    },
+    {
+      "url": "https://doi.org/10.1007/979-8-8688-0196-9_28",
+      "title": "Activity 4: Asynchronous Programming with asyncio",
+      "snippet": "Hetland, M. et al. (2024), Beginning Python"
+    },
+    {
+      "url": "https://doi.org/10.1007/979-8-8688-1261-3_16",
+      "title": "Asyncio",
+      "snippet": "Divakaran, A. (2025), Deep Dive Python"
+    },
+    {
+      "url": "https://doi.org/10.1007/s41781-021-00053-3",
+      "title": "Performance of Julia for High Energy Physics Analyses",
+      "snippet": ""
+    },
+    {
+      "url": "https://doi.org/10.1109/access.2020.3008954",
+      "title": "Control and Visualisation of a Software Defined Radio System on the Xilinx RFSoC Platform Using the PYNQ Framework",
+      "snippet": "The availability of commercial Radio Frequency System on Chip (RFSoC) devices brings new possibilities for implementing Software Defined Radio (SDR) systems. Such systems are of increasing interest given the pace of innovation in wireless technology, and the pressure on RF spectrum resources, leading to a growing need to access the spectrum in more dynamic and innovative ways. In this paper, we present an SDR demonstration system based on the Xilinx RFSoC platform, which leverages the Python-based `PYNQ' (Python Productivity for Zynq) software framework. In doing so, we highlight features that can be extremely useful for prototyping radio system design. Notably, our developed system features Python-based control of hardware processing blocks and Radio Frequency (RF) data converters, as well as direct visualisation of communications signals captured within the chip. The system architecture is reviewed, hardware and software components are discussed, functionality is demonstrated, and aspects of the system's performance are evaluated. Finally, it is noted that this combined RFSoC + PYNQ approach is readily extensible for other SDR systems; we highlight our online shared resources, and invite other engineers to investigate and build upon our work."
+    },
+    {
+      "url": "https://doi.org/10.1109/ojits.2023.3266800",
+      "title": "Infrastructure-Based Digital Twins for Cooperative, Connected, Automated Driving and Smart Road Services",
+      "snippet": "Driving requires continuous decision making from a driver taking into account all available relevant information. Automating driving tasks also automates the related decisions. However, humans are very good at dealing with bad quality, fuzzy, informal and incomplete information, whereas machines generally require solid quality information in a formalized format. Therefore, the development of automated driving functions relies on the availability of machine-usable information. A digital twin contains quality controlled information collected and augmented from different sources, ready to be supplied to such an automated driving function. An information model that describes all conceivably relevant information is necessary. To this end, a list of requirements that such an information model should meet is proposed and each requirement is argued for. Based on the anticipated services and applications that such a system should support, a collection of requirements for system architecture is derived. Information modeling is performed for selected relevant information groups. A system architecture has been proposed and validated with three different implementations, addressing several different applications to support decisions at a highway tunnel construction site in Austria and throughout the Test Bed Lower Saxony in Germany. (Cited 51×)"
+    },
+    {
+      "url": "https://doi.org/10.1145/3445814.3446701",
+      "title": "Nightcore: efficient and scalable serverless computing for latency-sensitive, interactive microservices",
+      "snippet": "The microservice architecture is a popular software engineering approach for building flexible, large-scale online services. Serverless functions, or function as a service (FaaS), provide a simple programming model of stateless functions which are a natural substrate for implementing the stateless RPC handlers of microservices, as an alternative to containerized RPC servers. However, current serverless platforms have millisecond-scale runtime overheads, making them unable to meet the strict sub-millisecond latency targets required by existing interactive microservices. (Cited 204×)"
+    },
+    {
+      "url": "https://doi.org/10.3390/en13153770",
+      "title": "Distributed Power Hardware-in-the-Loop Testing Using a Grid-Forming Converter as Power Interface",
+      "snippet": "This paper presents an approach to extend the capabilities of smart grid laboratories through the concept of Power Hardware-in-the-Loop (PHiL) testing by re-purposing existing grid-forming converters. A simple and cost-effective power interface, paired with a remotely located Digital Real-time Simulator (DRTS), facilitates Geographically Distributed Power Hardware Loop (GD-PHiL) in a quasi-static operating regime. In this study, a DRTS simulator was interfaced via the public internet with a grid-forming ship-to-shore converter located in a smart-grid testing laboratory, approximately 40 km away from the simulator. A case study based on the IEEE 13-bus distribution network, an on-load-tap-changer (OLTC) controller and a controllable load in the laboratory demonstrated the feasibility of such a setup. A simple compensation method applicable to this multi-rate setup is proposed and evaluated. Experimental results indicate that this compensation method significantly enhances the voltage response, whereas the conservation of energy at the coupling point still poses a challenge. Findings also show that, due to inherent limitations of the converter’s Modbus interface, a separate measurement setup is preferable. This can help achieve higher measurement fidelity, while simultaneously increasing the loop rate of the PHiL setup."
+    },
+    {
+      "url": "https://doi.org/10.4018/ijswis.2016100102",
+      "title": "Managing Large Amounts of Data Generated by a Smart City Internet of Things Deployment",
+      "snippet": "The Smart City concept is being developed from a lot of different axes encompassing multiple areas of social and technical sciences. However, something that is common to all these approaches is the central role that the capacity of sharing information has. Hence, Information and Communication Technologies (ICT) are seen as key enablers for the transformation of urban regions into Smart Cities. Two of these technologies, namely Internet of Things and Big Data, have a predominant position among them. The capacity to “sense the city” and access all this information and provide added-value services based on knowledge derived from it are critical to achieving the Smart City vision. This paper reports on the specification and implementation of a software platform enabling the management and exposure of the large amount of information that is continuously generated by the IoT deployment in the city of Santander."
+    },
+    {
+      "url": "https://doi.org/10.47667/ijpasr.v4i2.202",
+      "title": "Python TCP/IP libraries: A Review",
+      "snippet": "The Internet's core is TCP/IP, which stands for Transmission Control Protocol/Internet Protocol. It connects network devices on the internet via communication protocols. Python has several TCP/IP packages due to its popularity and flexibility. This paper describes the most popular Python libraries for TCP/IP protocol implementation, including socket, asyncio, Twisted, and Scapy. To help developers choose a library, we compare its benefits, cons, and areas of use, including criteria other than speed and memory utilization. When making web apps, choose wisely."
+    },
+    {
+      "url": "https://doi.org/10.7256/2454-0714.2018.2.25851",
+      "title": "Савостин П.А., Ефремова Н.Э. Практическое применение асинхронного программирования на языке Python при помощи пакета Asyncio",
+      "snippet": "(2018), Программные системы и вычислительные методы"
+    },
+    {
+      "url": "https://emptysqua.re/blog/why-should-async-get-all-the-love/",
+      "title": "Why Should Async Get All The Love?: Advanced Control Flow With Threads",
+      "snippet": "emptysqua.re"
+    },
+    {
+      "url": "https://fractalideas.com/blog/sans-io-when-rubber-meets-road/",
+      "title": "Sans I/O when rubber meets the road",
+      "snippet": "fractalideas.com"
+    },
+    {
+      "url": "https://medium.com/@yeraydiazdiaz/asyncio-for-the-working-python-developer-5c468e6e2e8e",
+      "title": "AsyncIO for the Working Python Developer",
+      "snippet": "medium.com/@yeraydiazdiaz"
+    },
+    {
+      "url": "https://realpython.com/async-io-python/",
+      "title": "Python's asyncio: A Hands-On Walkthrough - Real Python",
+      "snippet": "Python's asyncio library enables you to write concurrent code using the async and await keywords. The core building blocks of async I/O in Python are awaitable objects—most often coroutines—that an event loop schedules and executes asynchronously. This programming model lets you efficiently manage multiple I/O-bound tasks within a single thread of execution. In this tutorial, you'll ..."
+    },
+    {
+      "url": "https://stackoverflow.com/questions/26270681/can-an-asyncio-event-loop-run-in-the-background-without-suspending-the-python-in",
+      "title": "concurrency - Can an asyncio event loop run in the background",
+      "snippet": "Can an asyncio event loop run in the background without suspending the Python interpreter? ... Note that you must call asyncio.set_event_loop on the ..."
+    },
+    {
+      "url": "https://stackoverflow.com/questions/29269370/how-to-properly-create-and-run-concurrent-tasks-using-pythons-asyncio-module",
+      "title": "How to properly create and run concurrent tasks using python's asyncio module?",
+      "snippet": "I am trying to properly understand and implement two concurrently running Task objects using Python 3's relatively new asyncio module. In a nutshell, asyncio seems designed to handle asynchronous processes and concurrent Task execution over an event loop. It promotes the use of await (applied in async functions) as a callback-free way to wait for and use a result, without blocking the event loop. (Futures and callbacks are still a viable alternative.) It also provides the asyncio.Task() class, a"
+    },
+    {
+      "url": "https://stackoverflow.com/questions/48483348/how-to-limit-concurrency-with-python-asyncio",
+      "title": "How to limit concurrency with Python asyncio? - Stack Overflow",
+      "snippet": "This pauses the generator when there are enough active tasks, and lets the event loop clean up finished tasks. Note, for older python versions, replace create_task with ensure_future."
+    },
+    {
+      "url": "https://stackoverflow.com/questions/49584561/run-infinite-loop-in-asyncio-event-loop-running-off-the-main-thread",
+      "title": "python - run infinite loop in asyncio event loop running off",
+      "snippet": "Instead, you can await an asyncio.Event , and set it using something like loop.call_soon_threadsafe(event.set) from the other thread."
+    },
+    {
+      "url": "https://stackoverflow.com/questions/53268438/python-asyncio-within-multiprocessing-one-event-loop-per-process",
+      "title": "Python asyncio within Multiprocessing. One event loop per process",
+      "snippet": "I am writing a function for my team that will download some data from the cloud. The function itself is a regular python function but under the hood, it uses asyncio. So, I create an event loop with in my function and have async coroutines do the downloading concurrently. After the data is downloaded, I process it and return the results. My function works as expected when I call it from any other Python function. But, when I try to parallelize it using multiprocessing, I am occasionally seeing s"
+    },
+    {
+      "url": "https://stackoverflow.com/questions/57024533/trouble-in-optimizing-asyncio-with-concurrent-futures",
+      "title": "Trouble in Optimizing asyncio with concurrent futures",
+      "snippet": "I'm trying to run asyncio task concurrently on each worker thread of concurrent.futures Threadpool. However, I couldn't achieve the desired outcome. async def say_after(delay, message): logging.info(f\"{message} received\") await asyncio.sleep(delay) logging.info(f\"Printing {message}\") async def main(): logging.info(\"Main started\") await asyncio.gather(say_after(2, \"TWO\"), say_after(3, \"THREE\")) logging.info(\"Main Ended\") await main() Output: 20:12:26:MainThread:Main started 20:12:26:MainThread:TW"
+    },
+    {
+      "url": "https://stackoverflow.com/questions/66247720/understanding-behavior-of-asyncio-set-result-as-it-relates-to-slow-callback-dura",
+      "title": "Understanding behavior of asyncio set_result as it relates to slow_callback_duration",
+      "snippet": "I'm attempting to debug performance of a running production python web service, built on top of tornado using uvloop as the asyncio event loop. In trying to improve the concurrency, I'm looking to find places where synchronous code is being executed that blocks the event loop. To this end, I've configured by service with debug and a slow_callback_duration as such: uvloop.install() loop = asyncio.get_event_loop() loop.set_debug(True) loop.slow_callback_duration = 0.05 server() With this code enab"
+    },
+    {
+      "url": "https://stackoverflow.com/questions/72919537/runtimeerror-event-loop-is-closed-asyncio-aiohttp-concurrent-request",
+      "title": "Runtimeerror: Event loop is closed - asyncio, aiohttp, concurrent request",
+      "snippet": "I am very new to async programming. Environment- Win11,Python 3.10.5. I am trying to make concurrent requests and obtain the results in a list simply. I've tried going through the suggestions on stackoverflow to troubleshoot the issue but couldn't get what exactly is causing it. Though I can see the result, still getting the Runtimeerror: Event loop is closed. Here is my code import asyncio import aiohttp import time names = [\"rahul\"]*4 def get_tasks(session): tasks = [] for name in names: tasks"
+    },
+    {
+      "url": "https://stackoverflow.com/questions/75471729/use-cases-for-threading-and-asyncio-in-python",
+      "title": "Use cases for threading and asyncio in python",
+      "snippet": "I've read quite a few articles on threading and asyncio modules in python and the major difference I can seem to draw (correct me if I'm wrong) is that in, threading : multiple threads can be used to execute the python program and these threads are juggled by the OS itself. Further only when non blocking I/O is happening on a thread the GIL lock can be released to allow another thread to use it (since GIL makes python interpreter single threaded). This is also more resource intensive than asynci"
+    },
+    {
+      "url": "https://stackoverflow.com/questions/75988992/how-can-i-inspect-the-internal-state-of-an-asyncio-event-loop",
+      "title": "How can I inspect the internal state of an asyncio event loop?",
+      "snippet": "I have a Python program that uses asyncio . When concurrency is high, a particular part of the program hangs. I would like to inspect the state of the asyncio event loop myself, to try and understand the problem, which I have also detailed below. What can I do? The part of the program that hangs looks something like the below... async def poll_buffer(self): while True: try: val = self.buffer.get(block=False) # hangs here await asyncio.gather(*[ cb(val) for cb in self.callbacks ]) except Empty: a"
+    },
+    {
+      "url": "https://stackoverflow.com/questions/78171567/is-uvicorn-used-for-an-external-threadpool-or-an-internal-event-loop-which-runs",
+      "title": "Is uvicorn used for an external threadpool or an internal event loop which runs in the main (single) thread",
+      "snippet": "FastAPI uses uvicorn package to run the script: main:app --reload The docs explain that: Uvicorn is an ASGI web server implementation for Python... The ASGI specification fills this gap, and means we're now able to start building a common set of tooling usable across all async frameworks. ...will install uvicorn with \"Cython-based\" dependencies (where possible) and other \"optional extras\".In this context, \"Cython-based\" means the following: the event loop uvloop will be installed and used if pos"
+    },
+    {
+      "url": "https://stackoverflow.com/questions/79626334/what-happens-to-the-asyncio-event-loop-when-multiple-cpu-bound-tasks-run-concurr",
+      "title": "What happens to the asyncio event loop when multiple CPU-bound tasks run concurrently in a ThreadPoolExecutor given Python’s GIL?",
+      "snippet": "I'm working on an asynchronous Python application (using FastAPI/Starlette/asyncio) that needs to offload synchronous, CPU-bound tasks to a thread pool ( ThreadPoolExecutor ) to avoid blocking the event loop. I understand that Python's Global Interpreter Lock (GIL) allows only one thread to execute Python bytecode at a time per process. But I want to clarify how this affects the asyncio event loop when multiple CPU-bound tasks (say 10) are submitted concurrently to the thread pool. Scenario The"
+    },
+    {
+      "url": "https://superfastpython.com/asyncio-event-loop-separate-thread/",
+      "title": "Asyncio Event Loop in Separate Thread - Super Fast Python",
+      "snippet": "We can create coroutines and send them to the event loop for execution via the asyncio.run_coroutine_threadsafe() method."
+    },
+    {
+      "url": "https://superfastpython.com/asyncio-multiple-event-loops/",
+      "title": "Asyncio Run Multiple Concurrent Event Loops - Super Fast Python",
+      "snippet": "We can run multiple concurrent asyncio event loops by starting and running each new event loop in a separate thread. Each thread can host and manage one event loop."
+    },
+    {
+      "url": "https://superfastpython.com/category/asyncio/page/3/",
+      "title": "Python Asyncio Archives - Page 3 of 20 - Super Fast Python",
+      "snippet": "Tutorials on the asyncio module for concurrency in Python. ... We can run an asyncio event loop \" forever \" , until explicitly stopped or ..."
+    },
+    {
+      "url": "https://trent.me/articles/pytorch-and-python-free-threading/",
+      "title": "PyTorch and Python Free-Threading: Unlocking multi-threaded parallel inference on PyTorch models",
+      "snippet": "trent.me"
+    },
+    {
+      "url": "https://tutorialedge.net/python/concurrency/asyncio-event-loops-tutorial/",
+      "title": "Asyncio Event Loops Tutorial | TutorialEdge.net",
+      "snippet": "The main component of any asyncio based Python program has to be the underlying event loop. ... event loop we ’ ll use asyncio.get_event_loop() ..."
+    },
+    {
+      "url": "https://www.aeracode.org/2018/02/19/python-async-simplified/",
+      "title": "Python & Async Simplified",
+      "snippet": "aeracode.org"
+    },
+    {
+      "url": "https://www.c-sharpcorner.com/article/python-asyncio-complete-practical-guide-for-concurrent-io/",
+      "title": "Python asyncio — Complete Practical Guide for Concurrent I/O",
+      "snippet": "Unlock Python's concurrency potential with asyncio! This practical guide covers coroutines, event loops, and non-blocking I/O for building high-performance applications. Learn to handle multiple tasks efficiently, from web requests with aiohttp to producer-consumer patterns, and safely run blocking code."
+    },
+    {
+      "url": "https://www.codersjungle.com/2025/09/11/how-to-understand-and-use-the-asyncio-event-loop-in-python/",
+      "title": "How to understand and use the asyncio event loop in Python",
+      "snippet": "The asyncio event loop is at the heart of asynchronous programming in Python. ... www.pythonfaq.net/how-to-understand-and-use-the-asyncio-event-loop ..."
+    },
+    {
+      "url": "https://www.educative.io/blog/concurrency-in-python",
+      "title": "Python Concurrency: Making sense of asyncio - Educative",
+      "snippet": "Python's asyncio module achieves high concurrency on a single thread by using an event loop that switches between tasks at await points, avoiding the complexity of thread-safe code and the memory overhead of OS threads. Modern Python (3.5+) provides native coroutines via async/await syntax, while legacy codebases rely on generator-based coroutines with yield from and the @asyncio.coroutine ..."
+    },
+    {
+      "url": "https://www.iamraghuveer.com/posts/python-asyncio-event-loop-internals/",
+      "title": "I am Raghuveer | Python AsyncIO: Event Loop Internals and",
+      "snippet": "Home / Python / Python AsyncIO: Event Loop Internals and Practi... ... AsyncIO is Python's built-in concurrency model for I/O-bound workloads."
+    },
+    {
+      "url": "https://www.inexture.com/blog/python-async-await-concurrency-optimization/",
+      "title": "Python AsyncIO & Concurrency Guide | async/await, Tasks",
+      "snippet": "Learn how to use Python AsyncIO for high-performance applications. Covers async/await, event loops, tasks, concurrency models, FastAPI, async databases, benchmarks, and best practices."
+    },
+    {
+      "url": "https://www.pythonfaq.net/how-to-understand-and-use-the-asyncio-event-loop-in-python/",
+      "title": "How to understand and use the asyncio event loop in Python",
+      "snippet": "The asyncio event loop is at the heart of asynchronous programming in Python. ... into asyncio, consider how coroutines interact with event loops and ..."
+    },
+    {
+      "url": "https://www.pythontutorial.net/python-concurrency/python-event-loop/",
+      "title": "Python Event Loop",
+      "snippet": "Python Event Loop Summary: in this tutorial, you'll learn about the Python event loop and how Python uses it to achieve the concurrency model using a single thread. Introduction to the Python event loop Concurrency means multiple tasks can run at the same time. The asyncio built-in package allows you to run tasks concurrently using a single ..."
+    },
+    {
+      "url": "https://yoric.github.io/post/quite-a-few-words-about-async/",
+      "title": "(Quite) A Few Words About Async",
+      "snippet": "yoric.github.io"
+    }
+  ]
+}

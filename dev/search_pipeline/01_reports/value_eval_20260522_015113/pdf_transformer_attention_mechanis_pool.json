@@ -1,0 +1,77 @@
+{
+  "mode": "pdf",
+  "query": "transformer attention mechanism",
+  "pool_size": 14,
+  "pool": [
+    {
+      "url": "https://aclanthology.org/D19-1443/",
+      "title": "Transformer Dissection: An Unified Understanding for",
+      "snippet": "At the core of the Transformer is the attention mechanism, which concurrently processes all inputs in the streams. ... the Transformer{ }s attention ..."
+    },
+    {
+      "url": "https://arxiv.org/abs/2003.04974",
+      "title": "[2003.04974] Transformer++",
+      "snippet": "Transformer using attention mechanism solely achieved state-of-the-art results in sequence modeling. ... translation based on the attention mechanism ..."
+    },
+    {
+      "url": "https://arxiv.org/html/2604.00965v1",
+      "title": "Understanding Transformers and Attention Mechanisms: An",
+      "snippet": "Attention mechanisms, the building blocks of the Transformer architecture [ Vas+17 ] , allow encoding of semantic information between tokens through ..."
+    },
+    {
+      "url": "https://arxiv.org/pdf/2312.00752",
+      "title": "Mamba: Linear-Time Sequence Modeling with Selective State Spaces",
+      "snippet": "arxiv.org"
+    },
+    {
+      "url": "https://arxiv.org/pdf/2406.02528",
+      "title": "Scalable MatMul-free Language Modeling",
+      "snippet": "arxiv.org"
+    },
+    {
+      "url": "https://arxiv.org/pdf/2601.03329",
+      "title": "Attention mechanisms in neural networks - arXiv.org",
+      "snippet": "Applications in natural language processing, computer vision, and multimodal learning demonstrate the versatility of attention mechanisms. We examine language modeling with autoregressive transformers, bidirectional encoders for representation learning, sequence-to-sequence translation, Vision Transformers for image classification, and cross-modal attention for vision-language tasks. Empirical ..."
+    },
+    {
+      "url": "https://cl-illc.github.io/semantics-2023/resources/slides/attention_and_transformers.pdf",
+      "title": "PDF Attention & Transformers - GitHub Pages",
+      "snippet": "Hierarchical attention networks for document classification. In Proceedings of the 2016 conference of the North American chapter of the association for computational linguistics: human language technologies (pp. 1480-1489)."
+    },
+    {
+      "url": "https://courses.cs.duke.edu/compsci570/fall24/Attention.pdf",
+      "title": "PDF Attention and Transformers",
+      "snippet": "• A: Learn and \"attention\" function that selects only a fixed number of relevant things from previous inputs • Cool idea, but how do you do this? Notional attention mechanism From n words, create n \"annotations\" (possibly including a learned state too) next state"
+    },
+    {
+      "url": "https://cs231n.stanford.edu/slides/2025/lecture_8.pdf",
+      "title": "PDF Lecture 8: Attention and Transformers - cs231n.stanford.edu",
+      "snippet": "Today: Attention + Transformers Attention: A new primitive that Transformer: A neural operates on sets of vectors network architecture that uses attention everywhere Transformers are used everywhere today!"
+    },
+    {
+      "url": "https://engineering.purdue.edu/DeepLearn/pdf-kak/Transformers.pdf",
+      "title": "PDF Transformers: Learning with Purely Attention Based Networks",
+      "snippet": "Now that you understand the basics of the attention mechanism in a transformer, it is time to jump to a higher perspective on the overall architecture of a transformer."
+    },
+    {
+      "url": "https://faculty.ist.psu.edu/vhonavar/Courses/dsmethods/transformer.pdf",
+      "title": "PDF Attention Mechanism, Transformers, BERT, and GPT: Tutorial and Survey",
+      "snippet": "Abstract This is a tutorial and survey paper on the atten-tion mechanism, transformers, BERT, and GPT. We first explain attention mechanism, sequence-to-sequence model without and with attention, self-attention, and attention in different areas such as natural language processing and com-puter vision."
+    },
+    {
+      "url": "https://fenix.tecnico.ulisboa.pt/downloadFile/1970943312377766/lecture_10.pdf",
+      "title": "PDF Lecture 10: Attention Mechanisms and Transformers - ULisboa",
+      "snippet": "Lecture 10: Attention Mechanisms and Transformers Andre Martins, Francisco Melo, Mario Figueiredo Deep Learning Course, Winter 2022-2023"
+    },
+    {
+      "url": "https://momath.org/wp-content/uploads/2023/06/Rohan_Mehta_compressed.pdf",
+      "title": "PDF The Attention Mechanism Demystified - National Museum of Mathematics",
+      "snippet": "But while there is an abundance of online material describing the transformer architecture, its crucial theoretical contribution 3 the key, query, and value attention mechanism 3 lacks a clear, accessible explanation, especially from the and demonstrate why the attention mechanism is so powerful."
+    },
+    {
+      "url": "https://research.colfax-intl.com/wp-content/uploads/2024/03/intro-to-transformers.pdf",
+      "title": "PDF Attention and the Transformer Architecture",
+      "snippet": "At the time, the attention mechanism was introduced in conjunction with RNNs to model large-scale dependencies within data. A key insight of \"Attention Is All You Need\" was to dispense with recurrence and rely entirely on attention."
+    }
+  ]
+}

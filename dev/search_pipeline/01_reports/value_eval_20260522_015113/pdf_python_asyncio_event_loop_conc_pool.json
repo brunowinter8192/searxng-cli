@@ -1,0 +1,32 @@
+{
+  "mode": "pdf",
+  "query": "python asyncio event loop concurrency",
+  "pool_size": 5,
+  "pool": [
+    {
+      "url": "https://archive.org/download/python-programming-collection-pdf-ebooks-all-you-need/Using%20Asyncio%20in%20Python%203_%20Understanding%20Python%27s%20Asynchronous%20Programming%20Features%20%28CONV%29%20-%20Caleb%20Hattingh%20%28O%27Reilly%20Media%3BFree%20Programming%20Ebooks%3B2018%29.pdf",
+      "title": "PDF Using Asyncio in Python 3 - Archive.org",
+      "snippet": "More practical information for shutdown handling is presented later in the book. asyncio in Python exposes a great deal of the underlying machinery around the event loop— and requires you to be aware of things like the event loop and its lifetime management."
+    },
+    {
+      "url": "https://indico.gsi.de/event/17490/contributions/71045/attachments/43482/61031/Event-driven%20Programming%20with%20Python%20asyncio.pdf",
+      "title": "PDF Event-driven Programming with Python asyncio",
+      "snippet": "Event-driven programming techniques are as relevant and important as ever in a lot of problem domains which motivates ﬁrst class language and standard library support Introduced Python's Native Coroutine concept, and its standard support module asyncio"
+    },
+    {
+      "url": "https://link.springer.com/content/pdf/10.1007/978-3-030-25943-3_34.pdf",
+      "title": "PDF Concurrency with AsyncIO - Springer",
+      "snippet": "The asyncio.run() function was introduced in Python 3.7 (older versions of Python such as Python 3.6 required you to explicitly obtain a reference to the Event Loop and to run the root async function via that). One point to note about this function is that it has been marked as being provisional in Python 3.7."
+    },
+    {
+      "url": "https://media.githubusercontent.com/media/Rishabh-creator601/Books/refs/heads/master/python_books/Python_Concurrency_with_asyncio_Matthew_Fowler.pdf",
+      "title": "PDF Python Concurrency with asyncio",
+      "snippet": "This makes asynchronous code easy to read and understand, as it looks like the sequential flow most software engineers are familiar with. asyncio is a library to execute these coroutines in an asynchronous fashion using a concurrency model known as a single-threaded event loop."
+    },
+    {
+      "url": "https://sschwarzer.com/download/concurrency_pycon_de2018.pdf",
+      "title": "PDF Concurrency in Python Concepts, frameworks and best practices - 1emPyCon DE",
+      "snippet": "Control returns to the main loop after the handler execution. Code looks sequential, but execution is switched to other code if the event loop has to wait for I/O. Both variants may be used in the same program. An event loop implementation is in the package asyncio in the standard library."
+    }
+  ]
+}

@@ -1,0 +1,57 @@
+{
+  "mode": "general",
+  "query": "contrastive learning self-supervised representations",
+  "selection_method": "LLM oracle (Sonnet, value-eval-b1)",
+  "top_10": [
+    {
+      "rank": 1,
+      "url": "https://doi.org/10.48550/arxiv.2002.05709",
+      "rationale": "SimCLR: 'A Simple Framework for Contrastive Learning of Visual Representations' (Chen et al., 7321 citations) — the seminal and most-cited paper defining the modern contrastive self-supervised learning paradigm."
+    },
+    {
+      "rank": 2,
+      "url": "https://doi.org/10.3390/technologies9010002",
+      "rationale": "'A Survey on Contrastive Self-Supervised Learning' (1509 citations) — comprehensive review of pretext tasks, architectures, and performance comparisons across vision, NLP, and other domains."
+    },
+    {
+      "rank": 3,
+      "url": "https://lilianweng.github.io/posts/2019-11-10-self-supervised/",
+      "rationale": "Lilian Weng's 'Self-Supervised Representation Learning' blog — authoritative survey covering generative and contrastive SSL methods, widely referenced practitioner and researcher reference."
+    },
+    {
+      "rank": 4,
+      "url": "https://arxiv.org/abs/2004.11362",
+      "rationale": "'Supervised Contrastive Learning' (Khosla et al.) — extends self-supervised contrastive learning to the supervised setting, foundational paper for understanding the broader contrastive framework."
+    },
+    {
+      "rank": 5,
+      "url": "https://arxiv.org/abs/2011.00362",
+      "rationale": "'A Survey on Contrastive Self-supervised Learning' — systematic survey of self-defined pseudo-label methods and downstream task transfer, provides architectural taxonomy."
+    },
+    {
+      "rank": 6,
+      "url": "https://www.sciencedirect.com/science/article/pii/S0925231224014164",
+      "rationale": "Comprehensive survey on contrastive learning — recent 2024 survey covering main ideas, developments, and applications in CV and NLP."
+    },
+    {
+      "rank": 7,
+      "url": "https://ankeshanand.com/blog/2020/01/26/contrative-self-supervised-learning.html",
+      "rationale": "Ankesh Anand's blog on contrastive self-supervised learning — clear explanation of the principle (learning by encoding what makes two things similar/different), accessible entry point."
+    },
+    {
+      "rank": 8,
+      "url": "https://arxiv.org/pdf/2510.10572",
+      "rationale": "Theoretical understanding of self-supervised contrastive learning — introduces prototype representation bias and balanced contrastive loss, explains the theoretical underpinning of established practices."
+    },
+    {
+      "rank": 9,
+      "url": "https://doi.org/10.48550/arxiv.2007.08025",
+      "rationale": "GraphCL: Contrastive Self-Supervised Learning of Graph Representations — extends the framework to graph data, demonstrating the approach's generality beyond vision."
+    },
+    {
+      "rank": 10,
+      "url": "https://dl.acm.org/doi/abs/10.5555/3495724.3497291",
+      "rationale": "Supervised Contrastive Learning (NeurIPS 2020 proceedings version) — conference-published version of the supervised extension to contrastive learning."
+    }
+  ]
+}

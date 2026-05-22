@@ -1,0 +1,17 @@
+{
+  "mode": "pdf",
+  "query": "postgresql index types btree gin gist performance",
+  "pool_size": 2,
+  "pool": [
+    {
+      "url": "https://minervadb.xyz/wp-content/uploads/2025/04/Optimal-Indexing-for-PostgreSQL-Performance.pdf",
+      "title": "PDF Optimal Indexing for PostgreSQL Performance",
+      "snippet": "Both GiST and SP-GiST index types excel in specialized domains where traditional B-tree indexes are inefficient or unsuitable. These indexes enable PostgreSQL to compete with specialized database systems for very specific workload requirements, extending its functionality beyond standard relational data."
+    },
+    {
+      "url": "https://momjian.us/main/writings/pgsql/indexing.pdf",
+      "title": "PDF Flexible Indexing with Postgres - Momjian",
+      "snippet": "GIST range-type indexing uses large ranges at the top level of the index, with ranges decreasing in size at lower levels, just like how R-tree bounding boxes are indexed."
+    }
+  ]
+}

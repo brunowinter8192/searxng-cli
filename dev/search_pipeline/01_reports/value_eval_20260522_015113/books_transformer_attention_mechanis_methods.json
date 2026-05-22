@@ -1,0 +1,45 @@
+{
+  "mode": "books",
+  "query": "transformer attention mechanism",
+  "google_count": 0,
+  "pool_size": 441,
+  "capped_pool_size": 62,
+  "filtered_pool_size": 4,
+  "filtered_capped_pool_size": 4,
+  "oracle_pool_size": 4,
+  "c1": [
+    "https://openlibrary.org/works/OL18481636W",
+    "https://openlibrary.org/works/OL1618262W",
+    "https://openlibrary.org/works/OL15311250W",
+    "https://openlibrary.org/works/OL12439399W"
+  ],
+  "c1_ms": 0,
+  "c2": [
+    "https://openlibrary.org/works/OL18481636W",
+    "https://openlibrary.org/works/OL1618262W",
+    "https://openlibrary.org/works/OL15311250W",
+    "https://openlibrary.org/works/OL12439399W"
+  ],
+  "c2_ms": 0,
+  "c2p": [
+    "https://openlibrary.org/works/OL18481636W",
+    "https://openlibrary.org/works/OL1618262W",
+    "https://openlibrary.org/works/OL15311250W",
+    "https://openlibrary.org/works/OL12439399W"
+  ],
+  "c2p_ms": 0,
+  "c3": [
+    "https://openlibrary.org/works/OL18481636W",
+    "https://openlibrary.org/works/OL15311250W",
+    "https://openlibrary.org/works/OL12439399W",
+    "https://openlibrary.org/works/OL1618262W"
+  ],
+  "c3_ms": 111,
+  "method_pool_sizes": {
+    "c1": 4,
+    "c2": 4,
+    "c2p": 4,
+    "c3": 4
+  },
+  "fetch_ms": 60002
+}

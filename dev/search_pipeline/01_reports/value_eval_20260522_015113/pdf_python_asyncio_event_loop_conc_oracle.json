@@ -1,0 +1,34 @@
+{
+  "mode": "pdf",
+  "query": "python asyncio event loop concurrency",
+  "selection_method": "LLM oracle (Sonnet, value-eval-b1)",
+  "undersized_pool": true,
+  "pool_size": 5,
+  "top_10": [
+    {
+      "rank": 1,
+      "url": "https://media.githubusercontent.com/media/Rishabh-creator601/Books/refs/heads/master/python_books/Python_Concurrency_with_asyncio_Matthew_Fowler.pdf",
+      "rationale": "Matthew Fowler 'Python Concurrency with asyncio' (O'Reilly) — full book PDF covering coroutines, event loop lifecycle, tasks, single-threaded event loop concurrency model in depth."
+    },
+    {
+      "rank": 2,
+      "url": "https://archive.org/download/python-programming-collection-pdf-ebooks-all-you-need/Using%20Asyncio%20in%20Python%203_%20Understanding%20Python%27s%20Asynchronous%20Programming%20Features%20%28CONV%29%20-%20Caleb%20Hattingh%20%28O%27Reilly%20Media%3BFree%20Programming%20Ebooks%3B2018%29.pdf",
+      "rationale": "Caleb Hattingh 'Using Asyncio in Python 3' (O'Reilly 2018) — book PDF specifically covering the event loop, its lifetime management, and asyncio's async programming model."
+    },
+    {
+      "rank": 3,
+      "url": "https://link.springer.com/content/pdf/10.1007/978-3-030-25943-3_34.pdf",
+      "rationale": "Springer book chapter 'Concurrency with AsyncIO' — covers asyncio.run(), event loop references, and concurrent task execution with a textbook-quality explanation."
+    },
+    {
+      "rank": 4,
+      "url": "https://indico.gsi.de/event/17490/contributions/71045/attachments/43482/61031/Event-driven%20Programming%20with%20Python%20asyncio.pdf",
+      "rationale": "Conference slides PDF 'Event-driven Programming with Python asyncio' — covers native coroutine concepts and standard asyncio support for event-driven concurrency."
+    },
+    {
+      "rank": 5,
+      "url": "https://sschwarzer.com/download/concurrency_pycon_de2018.pdf",
+      "rationale": "PyCon DE 2018 'Concurrency in Python: concepts, frameworks, and best practices' PDF — explains event loop-based concurrency, asyncio's role, and I/O switching semantics."
+    }
+  ]
+}

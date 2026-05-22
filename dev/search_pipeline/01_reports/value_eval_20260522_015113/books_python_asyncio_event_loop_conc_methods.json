@@ -1,0 +1,69 @@
+{
+  "mode": "books",
+  "query": "python asyncio event loop concurrency",
+  "google_count": 0,
+  "pool_size": 384,
+  "capped_pool_size": 59,
+  "filtered_pool_size": 10,
+  "filtered_capped_pool_size": 10,
+  "oracle_pool_size": 10,
+  "c1": [
+    "https://www.manning.com/books/python-concurrency-with-asyncio",
+    "https://www.oreilly.com/library/view/python-concurrency-with/9781617298660/",
+    "https://superfastpython.com/asyncio-multiple-event-loops/",
+    "https://books.google.com/books/about/Python_Concurrency_with_asyncio.html?id=M9xdEAAAQBAJ",
+    "https://superfastpython.com/asyncio-event-loop-separate-thread/",
+    "https://www.amazon.com/Python-Concurrency-asyncio-Matthew-Fowler/dp/1617298662",
+    "https://www.simonandschuster.com/books/Python-Concurrency-with-asyncio/Matthew-Fowler/9781617298660",
+    "https://superfastpython.com/python-asyncio-books/",
+    "https://pythonbooks.org/python-concurrency-with-asyncio/",
+    "https://pybitesbooks.com/books/On9dEAAAQBAJ"
+  ],
+  "c1_ms": 0,
+  "c2": [
+    "https://superfastpython.com/asyncio-event-loop-separate-thread/",
+    "https://pythonbooks.org/python-concurrency-with-asyncio/",
+    "https://www.manning.com/books/python-concurrency-with-asyncio",
+    "https://superfastpython.com/python-asyncio-books/",
+    "https://www.simonandschuster.com/books/Python-Concurrency-with-asyncio/Matthew-Fowler/9781617298660",
+    "https://pybitesbooks.com/books/On9dEAAAQBAJ",
+    "https://www.amazon.com/Python-Concurrency-asyncio-Matthew-Fowler/dp/1617298662",
+    "https://www.oreilly.com/library/view/python-concurrency-with/9781617298660/",
+    "https://books.google.com/books/about/Python_Concurrency_with_asyncio.html?id=M9xdEAAAQBAJ",
+    "https://superfastpython.com/asyncio-multiple-event-loops/"
+  ],
+  "c2_ms": 0,
+  "c2p": [
+    "https://superfastpython.com/asyncio-event-loop-separate-thread/",
+    "https://pythonbooks.org/python-concurrency-with-asyncio/",
+    "https://www.manning.com/books/python-concurrency-with-asyncio",
+    "https://superfastpython.com/python-asyncio-books/",
+    "https://www.simonandschuster.com/books/Python-Concurrency-with-asyncio/Matthew-Fowler/9781617298660",
+    "https://pybitesbooks.com/books/On9dEAAAQBAJ",
+    "https://www.amazon.com/Python-Concurrency-asyncio-Matthew-Fowler/dp/1617298662",
+    "https://www.oreilly.com/library/view/python-concurrency-with/9781617298660/",
+    "https://books.google.com/books/about/Python_Concurrency_with_asyncio.html?id=M9xdEAAAQBAJ",
+    "https://superfastpython.com/asyncio-multiple-event-loops/"
+  ],
+  "c2p_ms": 0,
+  "c3": [
+    "https://www.manning.com/books/python-concurrency-with-asyncio",
+    "https://pythonbooks.org/python-concurrency-with-asyncio/",
+    "https://www.simonandschuster.com/books/Python-Concurrency-with-asyncio/Matthew-Fowler/9781617298660",
+    "https://superfastpython.com/asyncio-multiple-event-loops/",
+    "https://superfastpython.com/python-asyncio-books/",
+    "https://pybitesbooks.com/books/On9dEAAAQBAJ",
+    "https://books.google.com/books/about/Python_Concurrency_with_asyncio.html?id=M9xdEAAAQBAJ",
+    "https://www.amazon.com/Python-Concurrency-asyncio-Matthew-Fowler/dp/1617298662",
+    "https://www.oreilly.com/library/view/python-concurrency-with/9781617298660/",
+    "https://superfastpython.com/asyncio-event-loop-separate-thread/"
+  ],
+  "c3_ms": 338,
+  "method_pool_sizes": {
+    "c1": 10,
+    "c2": 10,
+    "c2p": 10,
+    "c3": 10
+  },
+  "fetch_ms": 60002
+}

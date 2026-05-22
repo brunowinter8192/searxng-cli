@@ -1,0 +1,69 @@
+{
+  "mode": "docs",
+  "query": "contrastive learning self-supervised representations",
+  "google_count": 0,
+  "pool_size": 228,
+  "capped_pool_size": 38,
+  "filtered_pool_size": 223,
+  "filtered_capped_pool_size": 33,
+  "oracle_pool_size": 33,
+  "c1": [
+    "https://doi.org/10.2139/ssrn.5095806",
+    "https://arxiv.org/pdf/2510.10572",
+    "https://sigport.org/documents/contrastive-separative-coding-self-supervised-representation-learning",
+    "https://people.idsia.ch/~juergen/deep-learning-history.html",
+    "https://doi.org/10.1101/2020.09.04.283929",
+    "https://aclanthology.org/2021.findings-emnlp.3/",
+    "https://doi.org/10.59275/j.melba.2022-f9a1",
+    "https://lightning.ai/docs/pytorch/1.8.1/notebooks/course_UvA-DL/13-contrastive-learning.html",
+    "https://arxiv.org/html/2509.11316v1",
+    "http://ai.googleblog.com/2021/01/google-research-looking-back-at-2020.html"
+  ],
+  "c1_ms": 0,
+  "c2": [
+    "https://deepai.org/publication/multi-view-contrastive-self-supervised-learning-of-accounting-data-representations-for-downstream-audit-tasks",
+    "https://arxiv.org/html/2509.11316v1",
+    "https://doi.org/10.5772/intechopen.104785",
+    "https://openaccess.thecvf.com/content/ICCV2021/papers/Kotar_Contrasting_Contrastive_Self-Supervised_Representation_Learning_Pipelines_ICCV_2021_paper.pdf",
+    "https://doi.org/10.2139/ssrn.6552061",
+    "https://ieeexplore.ieee.org/document/9711402",
+    "https://doi.org/10.2139/ssrn.5095806",
+    "https://doi.org/10.21437/interspeech.2022-11141",
+    "https://doi.org/10.1016/j.sigpro.2021.108310",
+    "https://doi.org/10.2139/ssrn.4967469"
+  ],
+  "c2_ms": 8,
+  "c2p": [
+    "https://deepai.org/publication/multi-view-contrastive-self-supervised-learning-of-accounting-data-representations-for-downstream-audit-tasks",
+    "https://arxiv.org/html/2509.11316v1",
+    "https://openaccess.thecvf.com/content/ICCV2021/papers/Kotar_Contrasting_Contrastive_Self-Supervised_Representation_Learning_Pipelines_ICCV_2021_paper.pdf",
+    "https://doi.org/10.2139/ssrn.5095806",
+    "https://doi.org/10.21437/interspeech.2022-11141",
+    "https://doi.org/10.1016/j.sigpro.2021.108310",
+    "https://doi.org/10.2139/ssrn.4967469",
+    "https://arxiv.org/html/2603.06180v1",
+    "https://keras.io/examples/vision/simsiam/",
+    "https://lightning.ai/docs/pytorch/1.8.1/notebooks/course_UvA-DL/13-contrastive-learning.html"
+  ],
+  "c2p_ms": 1,
+  "c3": [
+    "https://sigport.org/documents/contrastive-separative-coding-self-supervised-representation-learning",
+    "https://www.sciencedirect.com/science/article/pii/S0167865522000502",
+    "https://arxiv.org/html/2603.06180v1",
+    "https://arxiv.org/html/2509.11316v1",
+    "https://arxiv.org/pdf/2510.10572",
+    "https://aclanthology.org/2021.findings-emnlp.3/",
+    "https://link.springer.com/article/10.1007/s13735-022-00245-6",
+    "https://openaccess.thecvf.com/content/ICCV2021/papers/Kotar_Contrasting_Contrastive_Self-Supervised_Representation_Learning_Pipelines_ICCV_2021_paper.pdf",
+    "https://keras.io/examples/vision/simsiam/",
+    "https://doi.org/10.2139/ssrn.5095806"
+  ],
+  "c3_ms": 1018,
+  "method_pool_sizes": {
+    "c1": 33,
+    "c2": 223,
+    "c2p": 33,
+    "c3": 33
+  },
+  "fetch_ms": 60002
+}

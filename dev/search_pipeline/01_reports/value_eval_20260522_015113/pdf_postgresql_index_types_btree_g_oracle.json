@@ -1,0 +1,19 @@
+{
+  "mode": "pdf",
+  "query": "postgresql index types btree gin gist performance",
+  "selection_method": "LLM oracle (Sonnet, value-eval-b1)",
+  "undersized_pool": true,
+  "pool_size": 2,
+  "top_10": [
+    {
+      "rank": 1,
+      "url": "https://momjian.us/main/writings/pgsql/indexing.pdf",
+      "rationale": "Bruce Momjian (core PostgreSQL developer) 'Flexible Indexing with Postgres' PDF — authoritative practitioner reference covering GiST R-tree indexing, index types, and performance characteristics from a core PG contributor."
+    },
+    {
+      "rank": 2,
+      "url": "https://minervadb.xyz/wp-content/uploads/2025/04/Optimal-Indexing-for-PostgreSQL-Performance.pdf",
+      "rationale": "MinervaDB 'Optimal Indexing for PostgreSQL Performance' PDF — practical guide covering B-tree, GiST, SP-GiST, GIN, and performance trade-offs including when non-B-tree indexes are superior."
+    }
+  ]
+}

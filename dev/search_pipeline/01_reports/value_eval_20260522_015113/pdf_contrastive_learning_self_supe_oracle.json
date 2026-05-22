@@ -1,0 +1,57 @@
+{
+  "mode": "pdf",
+  "query": "contrastive learning self-supervised representations",
+  "selection_method": "LLM oracle (Sonnet, value-eval-b1)",
+  "top_10": [
+    {
+      "rank": 1,
+      "url": "https://proceedings.mlr.press/v119/chen20j/chen20j.pdf",
+      "rationale": "SimCLR PDF (ICML 2020) — the defining contrastive self-supervised learning paper, direct PDF from the proceedings, canonical and most-cited primary source."
+    },
+    {
+      "rank": 2,
+      "url": "https://proceedings.neurips.cc/paper_files/paper/2020/file/d89a66c7c80a29b1bdbab0f2a1a94af8-Paper.pdf",
+      "rationale": "Supervised Contrastive Learning PDF (NeurIPS 2020) — extends contrastive SSL to supervised setting, foundational paper available as direct PDF from NeurIPS proceedings."
+    },
+    {
+      "rank": 3,
+      "url": "http://keg.cs.tsinghua.edu.cn/jietang/publications/TKDE21-Liu-et-al-Self-supervised-Learning-Generative-or-Contrastive.pdf",
+      "rationale": "TKDE survey PDF 'Self-supervised Learning: Generative or Contrastive' — comprehensive review of SSL methods across CV, NLP, and graph learning; authoritative survey PDF."
+    },
+    {
+      "rank": 4,
+      "url": "https://nips.cc/media/neurips-2021/Slides/21895.pdf",
+      "rationale": "NeurIPS 2021 Tutorial on Self-Supervised Learning PDF — tutorial slides from NeurIPS covering self-prediction and contrastive methods, authoritative conference tutorial."
+    },
+    {
+      "rank": 5,
+      "url": "https://marslanm.github.io/assets/pdf/Contrastive_Self-Supervised_Learning_A_Survey_on_Different_Architectures.pdf",
+      "rationale": "Survey PDF 'Contrastive Self-Supervised Learning: A Survey on Different Architectures' — covers generative and contrastive SSL integration and architectural trade-offs."
+    },
+    {
+      "rank": 6,
+      "url": "https://arxiv.org/pdf/2510.10572",
+      "rationale": "arxiv PDF 'Understanding Self-supervised Contrastive Learning through Supervised...' — theoretical framework explaining prototype representation bias and balanced contrastive loss."
+    },
+    {
+      "rank": 7,
+      "url": "https://link.springer.com/content/pdf/10.1007/s11633-021-1297-9.pdf",
+      "rationale": "Springer PDF on contrastive self-supervised representation learning with synthetic data — peer-reviewed PDF covering the learning framework for discriminative representations."
+    },
+    {
+      "rank": 8,
+      "url": "https://openaccess.thecvf.com/content/CVPR2024/papers/Li_Self-Supervised_Representation_Learning_from_Arbitrary_Scenarios_CVPR_2024_paper.pdf",
+      "rationale": "CVPR 2024 paper PDF on self-supervised representation learning from arbitrary scenarios — combines contrastive learning and masked image modeling, state-of-the-art 2024 approach."
+    },
+    {
+      "rank": 9,
+      "url": "https://arxiv.org/abs/2203.07004",
+      "rationale": "arxiv 'Rethinking Minimal Sufficient Representation in Contrastive Learning' — examines theoretical foundations of view-based contrastive self-supervised representation learning."
+    },
+    {
+      "rank": 10,
+      "url": "https://arxiv.org/abs/2004.11362",
+      "rationale": "arxiv version of Supervised Contrastive Learning — complements the NeurIPS PDF with the preprint version, ensuring coverage of this key paper."
+    }
+  ]
+}

@@ -1,0 +1,122 @@
+{
+  "mode": "docs",
+  "query": "postgresql index types btree gin gist performance",
+  "pool_size": 23,
+  "pool": [
+    {
+      "url": "https://blog.devops.dev/how-to-choose-between-index-types-b-tree-gin-gist-in-postgresql-2954638ec4b6",
+      "title": "How to Choose Between Index Types (B-tree, GIN, GiST) in PostgreSQL",
+      "snippet": "Choosing the right index type in PostgreSQL can make the difference between blazing-fast queries and sluggish performance. While B-tree indexes are the default and work for most situations, GIN and GiST indexes unlock powerful capabilities for specific data types and query patterns."
+    },
+    {
+      "url": "https://doi.org/10.1007/978-1-4842-5663-3",
+      "title": "PostgreSQL Configuration",
+      "snippet": "Shaik, B. (2020)"
+    },
+    {
+      "url": "https://doi.org/10.1007/978-1-4842-5663-3_1",
+      "title": "Best Ways to Install PostgreSQL",
+      "snippet": "Shaik, B. (2020), PostgreSQL Configuration"
+    },
+    {
+      "url": "https://doi.org/10.1007/978-1-4842-5663-3_5",
+      "title": "Enable Logging of Your Database and Monitoring PostgreSQL Instances",
+      "snippet": "Shaik, B. (2020), PostgreSQL Configuration"
+    },
+    {
+      "url": "https://doi.org/10.1007/s10707-020-00407-w",
+      "title": "MongoDB Vs PostgreSQL: A comparative study on performance aspects",
+      "snippet": "Abstract Several modern day problems need to deal with large amounts of spatio-temporal data. As such, in order to meet the application requirements, more and more systems are adapting to the specificities of those data. The most prominent case is perhaps the data storage systems, that have developed a large number of functionalities to efficiently support spatio-temporal data operations. This work is motivated by the question of which of those data storage systems is better suited to address the needs of industrial applications. In particular, the work conducted, set to identify the most efficient data store system in terms of response times, comparing two of the most representative of the two categories (NoSQL and relational), i.e. MongoDB and PostgreSQL. The evaluation is based upon real, business scenarios and their subsequent queries as well as their underlying infrastructures and concludes in confirming the superiority of PostgreSQL in almost all cases with the exception of the polygon intersection queries. Furthermore, the average response time is radically reduced with the use of indexes, especially in the case of MongoDB. (Cited 71×)"
+    },
+    {
+      "url": "https://doi.org/10.1007/springerreference_62191",
+      "title": "GiST Index",
+      "snippet": ""
+    },
+    {
+      "url": "https://doi.org/10.1088/1742-6596/944/1/012022",
+      "title": "Improving generalized inverted index lock wait times",
+      "snippet": "Concurrent operations on tree like data structures is a cornerstone of any database system. Concurrent operations intended for improving read\\write performance and usually implemented via some way of locking. Deadlock-free methods of concurrency control are known as tree locking protocols. These protocols provide basic operations(verbs) and algorithm (ways of operation invocations) for applying it to any tree-like data structure. These algorithms operate on data, managed by storage engine which are very different among RDBMS implementations. In this paper, we discuss tree locking protocol implementation for General inverted index (Gin) applied to multiversion concurrency control (MVCC) storage engine inside PostgreSQL RDBMS. After that we introduce improvements to locking protocol and provide usage statistics about evaluation of our improvement in very high load environment in one of the world's largest IT company."
+    },
+    {
+      "url": "https://doi.org/10.1097/01.ana.0000187778.94201.f7",
+      "title": "Performance of the Bispectral Index During Electrocautery",
+      "snippet": "T, G. et al. (2005), Journal of Neurosurgical Anesthesiology"
+    },
+    {
+      "url": "https://doi.org/10.1109/informatics47936.2019.9119265",
+      "title": "An implementation of the M-tree index structure for PostgreSQL using GiST",
+      "snippet": "Donko, I. et al. (2019), 2019 IEEE 15th International Scientific Conference on Informatics"
+    },
+    {
+      "url": "https://doi.org/10.1515/9781503604100-012",
+      "title": "INDEX",
+      "snippet": "(2020), The Gist of Reading"
+    },
+    {
+      "url": "https://doi.org/10.20944/preprints202511.2170.v1",
+      "title": "Indexing in PostgreSQL: Performance Evaluation and Use Cases",
+      "snippet": "Efficient indexing remains a central factor in achieving predictable performance in modern relational database systems. PostgreSQL provides six native index types—B-Tree, Hash, GiST, SP-GiST, GIN, and BRIN—yet their relative behaviour under different workloads has been characterized in a variety of empirical studies, technical reports and official documentation rather than within a single unified benchmark. This paper presents a comparative, literaturebased analysis of these index types across transactional (OLTP), analytical (OLAP), full-text, JSONB, spatial and time-series workloads. Drawing from existing benchmarks and evaluations, the study synthesizes reported insights on index build time, query latency, storage footprint, maintenance overhead, and index bloat across PostgreSQL deployments. Prior work consistently finds that B-Tree remains the most robust default choice for OLTP equality and range workloads; GIN provides the lowest latency for fulltext and JSONB containment queries at the cost of substantial maintenance overhead and index bloat; GiST and SP-GiST dominate spatial workloads; and BRIN offers the best scalability for append-only analytical and time-series tables due to compact block-range summarization. The analysis highlights that index selection in PostgreSQL must be guided by workload semantics, update intensity, and storage constraints rather than by generic heuristics. Based on the synthesized findings, the paper proposes a practical recommendation matrix that maps workloads to suitable index types, providing actionable guidelines for database practitioners. By consolidating previously fragmented benchmark evidence into a single coherent review, the study clarifies when each native PostgreSQL index type is likely to be the most effective choice in practice."
+    },
+    {
+      "url": "https://doi.org/10.3139/9783446473157.bm",
+      "title": "Index",
+      "snippet": "Fröhlich, L. (2022), PostgreSQL"
+    },
+    {
+      "url": "https://doi.org/10.48550/arxiv.2307.06621",
+      "title": "cjdb: a simple, fast, and lean database solution for the CityGML data model",
+      "snippet": "When it comes to storing 3D city models in a database, the implementation of the CityGML data model can be quite demanding and often results in complicated schemas. As an example, 3DCityDB, a widely used solution, depends on a schema having 66 tables, mapping closely the CityGML architecture. In this paper, we propose an alternative (called cjdb) for storing CityGML models efficiently in PostgreSQL with a much simpler table structure and data model design (only 3 tables are necessary). This is achieved by storing the attributes and geometries of the objects directly in JSON. In the case of the geometries we thus adopt the Simple Feature paradigm and we use the structure of CityJSON. We compare our solution against 3DCityDB with large real-world 3D city models, and we find that cjdb has significantly lower demands in storage space (around a factor of 10), allows for faster import/export of data, and has a comparable data retrieval speed with some queries being faster and some slower. The accompanying software (importer and exporter) is available at https://github.com/cityjson/cjdb/ under a permissive open-source license."
+    },
+    {
+      "url": "https://doi.org/10.64149/j.ijesrt.15.4.22-31",
+      "title": "A COMPARATIVE EXPERIMENTAL STUDY OF INDEX PERFORMANCE IN MONGODB AND POSTGRESQL",
+      "snippet": "The continuous growth in data volumes, combined with the increasing complexity of modern enterprise information systems, requires database management systems (DBMS) to guarantee ever faster response times. In this context, query performance optimization has become a major challenge for improving operational efficiency and organizational productivity. Among the most widely used DBMS, PostgreSQL and MongoDB stand out for their ability to manage large amounts of complex data while offering advanced performance optimization mechanisms. These systems notably integrate indexing techniques that significantly accelerate query processing, even in environments characterized by very large data volumes. In the context of this study, we analyze the impact of different indexing techniques applied to queries executed on these two reference DBMS. More specifically, we evaluate the performance of three types of indexes: single index, composite index, and text index. The indexing strategies were applied to different data manipulation operations, including retrieval, update, and deletion. The results obtained highlight the effectiveness of indexing techniques in optimizing query performance and confirm their essential role in the efficient management of large databases within modern information systems."
+    },
+    {
+      "url": "https://explain.technical.li/postgres-indexes-beyond-b-tree/",
+      "title": "Postgres Indexes Beyond B-Tree—GIN, GiST, BRIN, SP-GiST",
+      "snippet": "Master PostgreSQL's advanced indexes: GIN, GiST, BRIN, SP-GiST with real queries. Boost performance 20-1000x vs B-tree. Practical examples included."
+    },
+    {
+      "url": "https://habr.com/en/companies/postgrespro/articles/448746/",
+      "title": "Indexes in PostgreSQL — 7 (GIN) / Habr",
+      "snippet": "... with PostgreSQL indexing engine and the interface of access methods and discussed hash indexes , B-trees , as well as GiST and SP-GiST indexes."
+    },
+    {
+      "url": "https://openalex.org/W2612672839",
+      "title": "PostgreSQL database performance optimization",
+      "snippet": "The thesis was request by Marlevo software Oy for a general description of the PostgreSQL database and its performance optimization technics. Its purpose was to help new PostgreSQL users to quickly understand the system and to assist DBAs to improve the database performance.\r\\n\r\\nThe thesis was divided into two parts. The first part described PostgreSQL database optimization technics in theory. In additional popular tools were also introduced. This part was based on PostgreSQL documentation, relevant books and other online resources. The second part demonstrates the optimization process in practice with 3 test cases. Each case was created from a different aspect.\r\\n\r\\nThe thesis concludes PostgreSQL database optimization is different from others. Users should have enough knowledge about it before performing database optimization tasks. Especially for those who come from SQL server and DB2 world."
+    },
+    {
+      "url": "https://openalex.org/W2896189947",
+      "title": "Highly Efficient Search In Linguistic Data",
+      "snippet": "Electronic dictionaries and online learning services have become a common tool for translators, linguistics and people trying to learn a new language.This master's thesis work has been carried out in the company Kielikone.The company owns an online learning service called Sanakirja.fi,which helps in studying and teaching foreign languages with the help of a dictionary search service, where people can make bidirectional searches for headwords in multiple languages (over 40).The goal of this thesis is to analyse and develop a unified interface to search entries from different dictionary resources.In this master's thesis work we try to develop a 'standard' information retrieval system on linguistic data.Although the system uses many different methods existing in Information Retrieval Systems, it also contains facilities, optimized for linguistic data.We have tried to compare and use different techniques of information retrieval and learning to rank to store, retrieve and rank information from a very large data source, containing around 80 million records.The system also supports approximate search which has been implemented using wild card searching algorithm and ranks results according to the degree of closeness to the query.In the end we implement a learning to rank system which learns from user feedback and the results are passed to a logistic regression classifier.The classifier predicts the feature coefficients and those, combined with the real weight features are used to improve the ranking of the system."
+    },
+    {
+      "url": "https://postgrespro.com/docs/postgresql/14/indexes-types",
+      "title": "PostgreSQL : Documentation: 14: 11.2. Index Types",
+      "snippet": "PostgreSQL provides several index types: B-tree, Hash, GiST, SP-GiST, GIN, BRIN, and the extension bloom. Each index type uses a different algorithm that is best suited to different types of indexable clauses. By default, the CREATE INDEX command creates B-tree indexes, which fit the most common situations. The other index types are selected by writing the keyword USING followed by the index ..."
+    },
+    {
+      "url": "https://www.meerako.com/blogs/postgresql-indexing-strategies-btree-gin-gist-guide",
+      "title": "PostgreSQL Indexing Deep Dive | Meerako",
+      "snippet": "PostgreSQL Indexing Deep Dive: B-Tree, GIN, GiST, and When to Use Them Slow queries? The right index is magic. Our Postgres experts explain different index types (B-Tree, GIN, GiST) and how to optimize your queries."
+    },
+    {
+      "url": "https://www.postgresql.org/docs/current/gin.html",
+      "title": "PostgreSQL: Documentation: 18: 65.4. GIN Indexes",
+      "snippet": "One advantage of GIN is that it allows the development of custom data types with the appropriate access methods, by an expert in the domain of the ..."
+    },
+    {
+      "url": "https://www.postgresql.org/docs/current/indexes-types.html",
+      "title": "PostgreSQL: Documentation: 18: 11.2. Index Types",
+      "snippet": "PostgreSQL provides several index types: B-tree, Hash, GiST, SP-GiST, GIN, BRIN, and the extension bloom. Each index type uses a different algorithm that is best suited to different types of indexable clauses. By default, the CREATE INDEX command creates B-tree indexes, which fit the most common situations. The other index types are selected by writing the keyword USING followed by the index ..."
+    },
+    {
+      "url": "https://www.thenile.dev/docs/extensions/btree_gin",
+      "title": "Btree_gin - Nile Documentation",
+      "snippet": "The btree_gin extension in PostgreSQL enables GIN indexes to support B-tree indexable data types. ... GIN index with btree_gin is useful when ..."
+    }
+  ]
+}
