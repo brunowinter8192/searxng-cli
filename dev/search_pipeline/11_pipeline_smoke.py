@@ -9,6 +9,7 @@ import sys
 import time
 from datetime import datetime
 from pathlib import Path
+from typing import Any
 
 sys.path.insert(0, str(Path(__file__).parent.parent.parent))
 
@@ -29,7 +30,7 @@ TARGET_TOTAL    = 20
 # ORCHESTRATOR
 
 # Run search_web_workflow per query (with timings), read structured cache data, write report
-async def run_pipeline_smoke(max_queries: int | None, language: str, engine_timeout: float | None = None) -> None:
+async def run_pipeline_smoke(max_queries: int | None, language: str, engine_timeout: float | None = None, report_prefix: str = "pipeline_smoke") -> None:
     queries = _load_queries(QUERIES_FILE, max_queries)
     print(f"Pipeline smoke | Queries: {len(queries)} | Language: {language}", file=sys.stderr)
     records = []
@@ -85,7 +86,7 @@ async def run_pipeline_smoke(max_queries: int | None, language: str, engine_time
     finally:
         await close_browser()
     REPORT_DIR.mkdir(parents=True, exist_ok=True)
-    path = _write_report(records, language, checkpoints)
+    path = _write_report(records, language, checkpoints, report_prefix)
     ok = sum(1 for r in records if r["total_urls"] > 0)
     print(f"\nReport: {path}", file=sys.stderr)
     print(f"Done: {ok}/{len(records)} queries with results", file=sys.stderr)
@@ -323,10 +324,105 @@ def _render_engine_status(records: list[dict]) -> list[str]:
     return L
 
 
-# Write markdown report to 01_reports/pipeline_smoke_<ts>.md, return path
-def _write_report(records: list[dict], language: str, checkpoints: list[dict]) -> Path:
+# Per-engine reliability baseline: full status breakdown, mean/p95 search_ms for OK entries
+def _render_engine_reliability(records: list[dict]) -> list[str]:
+    # Collect per-engine: status counts, OK search_ms list
+    STATUS_KEYS = [
+        "OK",
+        "EMPTY_NO_RESULTS", "EMPTY_NO_CONTAINER", "EMPTY_CONSENT",
+        "EMPTY_BLOCK", "EMPTY_CONCURRENT_RACE",
+        "TIMEOUT_WATCHDOG", "TIMEOUT_NONCOOP", "TIMEOUT_HTTPX",
+        "ERROR_BROWSER", "ERROR_HTTP", "ERROR_PARSE", "ERROR_OTHER",
+        "RATE_SKIP",
+    ]
+    engine_data: dict[str, dict[str, Any]] = {}
+    for r in records:
+        det = (r["timings"] or {}).get("engine_details", {})
+        for eng, info in det.items():
+            if eng not in engine_data:
+                engine_data[eng] = {"counts": {k: 0 for k in STATUS_KEYS}, "ok_ms": []}
+            st = info.get("status", "ERROR_OTHER")
+            key = st if st in engine_data[eng]["counts"] else "ERROR_OTHER"
+            engine_data[eng]["counts"][key] += 1
+            if st == "OK":
+                engine_data[eng]["ok_ms"].append(info.get("ms", 0))
+    if not engine_data:
+        return []
+
+    # Header
+    cols = [
+        "Engine", "n",
+        "OK%", "NO_RES%", "NO_CONT%", "CONSENT%", "BLOCK%", "RACE%",
+        "T_WD%", "T_NC%", "T_HX%",
+        "E_BR%", "E_HT%", "E_PA%", "E_OT%",
+        "RS%", "mean_ms(OK)", "p95_ms",
+    ]
+    sep = "|" + "|".join(["---"] * len(cols)) + "|"
+    header = "|" + "|".join(cols) + "|"
+    L: list[str] = [
+        "",
+        "## Per-Engine Reliability Baseline",
+        "",
+        "> Source: `records[i]['timings']['engine_details']` (in-memory, identical to query_log.jsonl).",
+        "> Percentages = count / n_queries × 100. mean_ms and p95_ms computed on OK entries only.",
+        "",
+        header,
+        sep,
+    ]
+
+    # Bottleneck tracking
+    bottleneck_counts: dict[str, int] = {}
+
+    for eng in sorted(engine_data):
+        d = engine_data[eng]
+        c = d["counts"]
+        n = sum(c.values())
+        if n == 0:
+            continue
+
+        def pct(k: str) -> str:
+            v = c.get(k, 0)
+            return f"{round(v / n * 100)}" if v else "0"
+
+        ok_ms = d["ok_ms"]
+        if ok_ms:
+            mean_ms = round(statistics.mean(ok_ms))
+            p95_ms = round(statistics.quantiles(ok_ms, n=20)[18]) if len(ok_ms) >= 2 else ok_ms[0]
+        else:
+            mean_ms = "—"
+            p95_ms = "—"
+
+        L.append(
+            f"| {eng} | {n} "
+            f"| {pct('OK')} | {pct('EMPTY_NO_RESULTS')} | {pct('EMPTY_NO_CONTAINER')} "
+            f"| {pct('EMPTY_CONSENT')} | {pct('EMPTY_BLOCK')} | {pct('EMPTY_CONCURRENT_RACE')} "
+            f"| {pct('TIMEOUT_WATCHDOG')} | {pct('TIMEOUT_NONCOOP')} | {pct('TIMEOUT_HTTPX')} "
+            f"| {pct('ERROR_BROWSER')} | {pct('ERROR_HTTP')} | {pct('ERROR_PARSE')} | {pct('ERROR_OTHER')} "
+            f"| {pct('RATE_SKIP')} | {mean_ms} | {p95_ms} |"
+        )
+
+    # Top-3 bottleneck engines: which engine had highest search_ms most often per query
+    for r in records:
+        det = (r["timings"] or {}).get("engine_details", {})
+        if not det:
+            continue
+        slowest = max(det, key=lambda e: det[e].get("ms", 0))
+        bottleneck_counts[slowest] = bottleneck_counts.get(slowest, 0) + 1
+    top3 = sorted(bottleneck_counts, key=lambda e: bottleneck_counts[e], reverse=True)[:3]
+    top3_str = ", ".join(f"{e} ({bottleneck_counts[e]}×)" for e in top3) if top3 else "—"
+
+    L += [
+        "",
+        f"**Top-3 bottleneck engines** (most queries where this engine had highest search_ms): {top3_str}",
+        "",
+    ]
+    return L
+
+
+# Write markdown report to 01_reports/<prefix>_<ts>.md, return path
+def _write_report(records: list[dict], language: str, checkpoints: list[dict], prefix: str = "pipeline_smoke") -> Path:
     ts   = datetime.now().strftime("%Y%m%d_%H%M%S")
-    path = REPORT_DIR / f"pipeline_smoke_{ts}.md"
+    path = REPORT_DIR / f"{prefix}_{ts}.md"
     lines = (
         _render_header(records, language, ts)
         + _render_class_defs()
@@ -338,6 +434,7 @@ def _write_report(records: list[dict], language: str, checkpoints: list[dict]) -
         lines += _render_query_block(r, qi)
     lines += _render_timing_section(records)
     lines += _render_engine_status(records)
+    lines += _render_engine_reliability(records)
     lines.append("")
     path.write_text("\n".join(lines), encoding="utf-8")
     return path
@@ -366,5 +463,11 @@ if __name__ == "__main__":
         default=None,
         help="Hard timeout per engine call in seconds, e.g. 8.0 (default: None = no timeout)",
     )
+    parser.add_argument(
+        "--report-prefix",
+        dest="report_prefix",
+        default="pipeline_smoke",
+        help="Report filename prefix (default: pipeline_smoke → pipeline_smoke_<ts>.md)",
+    )
     args = parser.parse_args()
-    asyncio.run(run_pipeline_smoke(args.max_queries, args.language, args.engine_timeout))
+    asyncio.run(run_pipeline_smoke(args.max_queries, args.language, args.engine_timeout, args.report_prefix))

@@ -30,9 +30,41 @@ Removed from all 10 engine files: every `limiter.backoff()`, `limiter.reset_back
 
 Net waste ≈466s; net benefit zero — Google's bot-detection state does not decay in seconds. Source: `decisions/OldThemes/pooling/04_zero_query_diagnosis.md` (cascade mechanism diagnosis, 2026-05-20).
 
-**Post-rip — pipeline smoke baseline (2026-05-22, `11_pipeline_smoke.py`, 30 queries):**
+**Post-rip — pipeline smoke baseline (2026-05-22, `dev/search_pipeline/11_pipeline_smoke.py`, 30 queries, language=en, engine_timeout=None):**
+Report: `dev/search_pipeline/01_reports/no_backoff_baseline_20260522_211439.md`
 
-*Evidenz block — to be filled after Phase C smoke run completes. Placeholder: see report at `dev/search_pipeline/01_reports/no_backoff_baseline_<ts>.md`.*
+Results: **30/30 queries with results**. **0 RATE_SKIP events** across all 30 queries × 9 engines.
+
+Wallclock checkpoints:
+
+| Milestone | Cumulative wall (s) | Avg/query in segment (s) | Engines OK | Engines RATE_SKIP |
+|-----------|--------------------:|-------------------------:|-----------:|------------------:|
+| Q4 | 30.3 | 7.6 | 19 | 0 |
+| Q8 | 88.0 | 14.4 | 29 | 0 |
+| Q12 | 146.4 | 14.6 | 30 | 0 |
+| Q16 | 206.6 | 15.0 | 23 | 0 |
+| Q20 | 267.1 | 15.1 | 23 | 0 |
+| Q30 (estimated) | ~434 | ~16.7 | — | 0 |
+
+total_ms distribution across 30 queries: min=4792ms / median=7773ms / mean=14459ms / max=41093ms. High mean driven by 6 queries hitting the token-bucket 4 req/min pacing wait (33–41s fanout_ms each — expected, not CAPTCHA-related).
+
+Per-engine reliability (OK% / dominant failure mode):
+
+| Engine | OK% | Dominant failure |
+|--------|-----|-----------------|
+| crossref | 97% | 3% TIMEOUT_WATCHDOG |
+| duckduckgo | 97% | 3% ERROR_BROWSER |
+| google | 73% | 23% EMPTY_BLOCK (CAPTCHA — still fires, no longer causes cascade) |
+| lobsters | 57% | 37% EMPTY_NO_CONTAINER (topic-mismatch, expected for general queries on tech-niche site) |
+| mojeek | 90% | 3% EMPTY_NO_CONTAINER |
+| open_library | 30% | 67% coarse-EMPTY (mapped to ERROR_OTHER — HTTP engine returning `[]` on non-book queries; sub-status needs `search_with_reason()` for fine-grained labelling) |
+| openalex | 80% | 13% coarse-EMPTY (same HTTP-engine sub-status note as open_library) |
+| semantic_scholar | 73% | 20% EMPTY_NO_CONTAINER |
+| stack_exchange | 50% | 50% coarse-EMPTY (HTTP engine; EMPTY_NO_RESULTS on queries without SO matches) |
+
+Top-3 bottleneck engines (highest search_ms per query): semantic_scholar (11×), openalex (8×), open_library (4×).
+
+**Comparison:** pre-rip, 466s was spent exclusively in backoff sleeps inside a 16-pair batch, yielding 0 Google results. Post-rip, ~434s is the total wallclock for 30 complete queries (30/30 with results, zero wasted in sleep-on-failure). The backoff pattern consumed more total time than 30 actual queries now take.
 
 ## Recommendation (SOLL)
 
