@@ -1,0 +1,68 @@
+{
+  "mode": "books",
+  "query": "transformer attention mechanism",
+  "google_count": 0,
+  "pool_size": 474,
+  "capped_pool_size": 62,
+  "filtered_pool_size": 441,
+  "filtered_capped_pool_size": 62,
+  "oracle_pool_size": 62,
+  "c1": [
+    "https://jalammar.github.io/illustrated-transformer/",
+    "https://d2l.ai/chapter_attention-mechanisms-and-transformers/index.html",
+    "https://deeprevision.github.io/posts/001-transformer/",
+    "https://doi.org/10.1007/s10792-026-03966-3",
+    "https://doi.org/10.1016/j.ymssp.2021.108616",
+    "https://link.springer.com/chapter/10.1007/978-3-032-10738-1_9",
+    "https://machinelearningmastery.com/the-transformer-attention-mechanism/",
+    "https://openlibrary.org/works/OL18481636W",
+    "https://stackoverflow.com/questions/72567409/one-head-attention-mechanism-pytorch",
+    "https://arxiv.org/abs/1706.03762"
+  ],
+  "c1_ms": 0,
+  "c2": [
+    "https://www.deeplearningdaily.com/the-transformer-attention-mechanism/",
+    "https://www.billparker.ai/2024/10/transformer-attention-simple-guide-to-q.html",
+    "https://machinelearningmastery.com/the-transformer-attention-mechanism/",
+    "https://doi.org/10.31219/osf.io/mru2x",
+    "https://doi.org/10.31219/osf.io/m6gcn",
+    "https://doi.org/10.1007/s10792-026-03966-3",
+    "https://vitalflux.com/attention-mechanism-workflow-example/",
+    "https://faculty.ist.psu.edu/vhonavar/Courses/dsmethods/transformer.pdf",
+    "https://github.com/takara-ai/go-attention",
+    "https://stackoverflow.com/questions/65543593/why-doesnt-the-transformer-use-positional-encoding-in-every-layer"
+  ],
+  "c2_ms": 14,
+  "c2p": [
+    "https://www.deeplearningdaily.com/the-transformer-attention-mechanism/",
+    "https://www.billparker.ai/2024/10/transformer-attention-simple-guide-to-q.html",
+    "https://machinelearningmastery.com/the-transformer-attention-mechanism/",
+    "https://doi.org/10.1007/s10792-026-03966-3",
+    "https://vitalflux.com/attention-mechanism-workflow-example/",
+    "https://faculty.ist.psu.edu/vhonavar/Courses/dsmethods/transformer.pdf",
+    "https://doi.org/10.31219/osf.io/m6gcn",
+    "https://doi.org/10.31224/2476",
+    "https://datasciencedojo.com/blog/understanding-attention-mechanism/",
+    "https://doi.org/10.7717/peerj-cs.3536/fig-5"
+  ],
+  "c2p_ms": 1,
+  "c3": [
+    "https://machinelearningmastery.com/the-transformer-attention-mechanism/",
+    "https://vitalflux.com/attention-mechanism-workflow-example/",
+    "https://link.springer.com/chapter/10.1007/978-3-032-10738-1_9",
+    "https://www.deeplearningdaily.com/the-transformer-attention-mechanism/",
+    "https://datasciencedojo.com/blog/understanding-attention-mechanism/",
+    "https://vitalflux.com/attention-mechanism-in-transformers-examples/",
+    "https://www.billparker.ai/2024/10/transformer-attention-simple-guide-to-q.html",
+    "https://faculty.ist.psu.edu/vhonavar/Courses/dsmethods/transformer.pdf",
+    "https://datasciencedojo.com/newsletter/transformers-attention-mechanisms/",
+    "https://doi.org/10.21203/rs.3.rs-3545247/v1"
+  ],
+  "c3_ms": 2302,
+  "method_pool_sizes": {
+    "c1": 62,
+    "c2": 441,
+    "c2p": 62,
+    "c3": 62
+  }
+}

@@ -1,0 +1,68 @@
+{
+  "mode": "general",
+  "query": "contrastive learning self-supervised representations",
+  "google_count": 0,
+  "pool_size": 438,
+  "capped_pool_size": 55,
+  "filtered_pool_size": 416,
+  "filtered_capped_pool_size": 55,
+  "oracle_pool_size": 55,
+  "c1": [
+    "https://doi.org/10.1101/2020.09.04.283929",
+    "https://doi.org/10.59275/j.melba.2022-f9a1",
+    "https://doi.org/10.1016/j.sigpro.2021.108310",
+    "https://arxiv.org/pdf/2510.10572",
+    "https://deepai.org/publication/learning-representations-with-contrastive-self-supervised-learning-for-histopathology-applications",
+    "https://doi.org/10.2139/ssrn.5095806",
+    "https://doi.org/10.48550/arxiv.2002.05709",
+    "https://people.idsia.ch/~juergen/deep-learning-history.html",
+    "https://www.semanticscholar.org/paper/wav2vec-2.0%3A-A-Framework-for-Self-Supervised-of-Baevski-Zhou/49a049dc85e2380dde80501a984878341dd8efdf",
+    "https://deepai.org/publication/learning-weakly-supervised-contrastive-representations"
+  ],
+  "c1_ms": 0,
+  "c2": [
+    "https://deepai.org/publication/learning-representations-with-contrastive-self-supervised-learning-for-histopathology-applications",
+    "https://deepai.org/publication/learning-weakly-supervised-contrastive-representations",
+    "https://ieeexplore.ieee.org/document/10233092",
+    "https://ankeshanand.com/blog/2020/01/26/contrative-self-supervised-learning.html",
+    "https://www.semanticscholar.org/paper/Conditional-Contrastive-Learning%3A-Removing-in-Tsai-Ma/c03a3dc40550a8075d233a827fd184d62b93b274",
+    "https://www.mdpi.com/2227-7080/9/1/2",
+    "https://openalex.org/W3168770756",
+    "https://doi.org/10.5772/intechopen.104785",
+    "https://link.springer.com/article/10.1007/s11633-021-1297-9",
+    "https://doi.org/10.2139/ssrn.6552061"
+  ],
+  "c2_ms": 15,
+  "c2p": [
+    "https://deepai.org/publication/learning-representations-with-contrastive-self-supervised-learning-for-histopathology-applications",
+    "https://deepai.org/publication/learning-weakly-supervised-contrastive-representations",
+    "https://ankeshanand.com/blog/2020/01/26/contrative-self-supervised-learning.html",
+    "https://ieeexplore.ieee.org/document/10233092",
+    "https://www.semanticscholar.org/paper/Conditional-Contrastive-Learning%3A-Removing-in-Tsai-Ma/c03a3dc40550a8075d233a827fd184d62b93b274",
+    "https://www.mdpi.com/2227-7080/9/1/2",
+    "https://www.semanticscholar.org/paper/vox2vec%3A-A-Framework-for-Self-supervised-Learning-Goncharov-Soboleva/7ec0cbbe2d920727d8e862e1981e1f8351d8f639",
+    "https://link.springer.com/article/10.1007/s11633-021-1297-9",
+    "https://www.semanticscholar.org/paper/Supervised-Contrastive-Learning-Khosla-Teterwak/38643c2926b10f6f74f122a7037e2cd20d77c0f1",
+    "https://arxiv.org/abs/2011.00362"
+  ],
+  "c2p_ms": 1,
+  "c3": [
+    "https://www.thebravemillennial.com/contrastive-learning-and-the-future-of-self-supervised-representation-learning/",
+    "https://arxiv.org/abs/2004.11362",
+    "https://www.semanticscholar.org/paper/Mixing-Up-Contrastive-Learning%3A-Self-Supervised-for-Wickstr%C3%B8m-Kampffmeyer/7f36d87c89afa1eb39554bc21d125b4b2609262b",
+    "https://deepai.org/publication/learning-weakly-supervised-contrastive-representations",
+    "https://ankeshanand.com/blog/2020/01/26/contrative-self-supervised-learning.html",
+    "https://www.sciencedirect.com/science/article/pii/S0925231224014164",
+    "https://www.semanticscholar.org/paper/Conditional-Contrastive-Learning%3A-Removing-in-Tsai-Ma/c03a3dc40550a8075d233a827fd184d62b93b274",
+    "https://sigport.org/documents/contrastive-separative-coding-self-supervised-representation-learning",
+    "https://doi.org/10.48550/arxiv.2007.08025",
+    "https://arxiv.org/pdf/2510.10572"
+  ],
+  "c3_ms": 1917,
+  "method_pool_sizes": {
+    "c1": 55,
+    "c2": 416,
+    "c2p": 55,
+    "c3": 55
+  }
+}

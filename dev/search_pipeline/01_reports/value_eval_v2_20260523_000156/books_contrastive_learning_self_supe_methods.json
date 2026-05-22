@@ -1,0 +1,68 @@
+{
+  "mode": "books",
+  "query": "contrastive learning self-supervised representations",
+  "google_count": 0,
+  "pool_size": 428,
+  "capped_pool_size": 45,
+  "filtered_pool_size": 406,
+  "filtered_capped_pool_size": 45,
+  "oracle_pool_size": 45,
+  "c1": [
+    "https://doi.org/10.1101/2020.09.04.283929",
+    "https://doi.org/10.59275/j.melba.2022-f9a1",
+    "https://doi.org/10.1016/j.sigpro.2021.108310",
+    "https://arxiv.org/html/2406.00262v2",
+    "https://arxiv.org/pdf/2510.10572",
+    "https://doi.org/10.2139/ssrn.5095806",
+    "https://doi.org/10.48550/arxiv.2002.05709",
+    "https://people.idsia.ch/~juergen/deep-learning-history.html",
+    "https://arxiv.org/html/2507.04554v2",
+    "https://github.com/zziz/pwc"
+  ],
+  "c1_ms": 0,
+  "c2": [
+    "https://www.deepchecks.com/question/is-contrastive-learning-unsupervised-or-self-supervised/",
+    "https://openalex.org/W3168770756",
+    "https://doi.org/10.5772/intechopen.104785",
+    "https://doi.org/10.2139/ssrn.6552061",
+    "https://doi.org/10.48550/arxiv.2002.05709",
+    "https://doi.org/10.57702/iuuvgtaz",
+    "https://arxiv.org/html/2507.04554v2",
+    "https://www.intechopen.com/chapters/81791",
+    "https://doi.org/10.1109/iccv48922.2021.00348",
+    "https://doi.org/10.48550/arxiv.2007.08025"
+  ],
+  "c2_ms": 14,
+  "c2p": [
+    "https://www.deepchecks.com/question/is-contrastive-learning-unsupervised-or-self-supervised/",
+    "https://arxiv.org/html/2507.04554v2",
+    "https://www.intechopen.com/chapters/81791",
+    "https://doi.org/10.1016/j.sigpro.2021.108310",
+    "https://doi.org/10.2139/ssrn.4967469",
+    "https://doi.org/10.2139/ssrn.5095806",
+    "https://doi.org/10.21437/interspeech.2022-11141",
+    "https://doi.org/10.48550/arxiv.2007.08025",
+    "https://doi.org/10.48550/arxiv.2002.05709",
+    "https://doi.org/10.57702/iuuvgtaz"
+  ],
+  "c2p_ms": 1,
+  "c3": [
+    "https://www.deepchecks.com/question/is-contrastive-learning-unsupervised-or-self-supervised/",
+    "https://www.researchgate.net/publication/360867376_Self-Supervised_Contrastive_Representation_Learning_in_Computer_Vision",
+    "https://link.springer.com/chapter/10.1007/978-981-97-7244-5_22",
+    "https://www.sciencedirect.com/science/article/pii/S0925231224014164",
+    "https://www.intechopen.com/chapters/81791",
+    "https://doi.org/10.48550/arxiv.2007.08025",
+    "https://arxiv.org/pdf/2510.10572",
+    "https://doi.org/10.3390/technologies9010002",
+    "https://doi.org/10.2139/ssrn.5095806",
+    "https://www.deeplearningdaily.com/a-detailed-study-of-self-supervised-contrastive-loss-and-supervised-contrastive-loss/"
+  ],
+  "c3_ms": 1595,
+  "method_pool_sizes": {
+    "c1": 45,
+    "c2": 406,
+    "c2p": 45,
+    "c3": 45
+  }
+}

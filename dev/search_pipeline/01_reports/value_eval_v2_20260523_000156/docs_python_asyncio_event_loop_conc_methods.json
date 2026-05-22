@@ -1,0 +1,68 @@
+{
+  "mode": "docs",
+  "query": "python asyncio event loop concurrency",
+  "google_count": 0,
+  "pool_size": 396,
+  "capped_pool_size": 69,
+  "filtered_pool_size": 394,
+  "filtered_capped_pool_size": 69,
+  "oracle_pool_size": 69,
+  "c1": [
+    "https://doi.org/10.1007/978-1-4842-3742-7_9",
+    "http://aosabook.org/en/500L/a-web-crawler-with-asyncio-coroutines.html",
+    "https://docs.python.org/3/library/asyncio.html",
+    "https://doi.org/10.1007/978-3-030-25943-3_34",
+    "https://doi.org/10.1145/3445814.3446701",
+    "https://stackoverflow.com/questions/79626334/what-happens-to-the-asyncio-event-loop-when-multiple-cpu-bound-tasks-run-concurr",
+    "https://tutorialedge.net/python/concurrency/asyncio-event-loops-tutorial/",
+    "https://www.semanticscholar.org/paper/Applications-with-asyncio-and-Twisted-Williams-Benfield/870ec0448ec1f037b837438dbd59b59cc740230b",
+    "https://doi.org/10.1007/978-3-031-40336-1_43",
+    "https://doi.org/10.1109/ojits.2023.3266800"
+  ],
+  "c1_ms": 0,
+  "c2": [
+    "https://pymotw.com/3/asyncio/index.html",
+    "https://proxiesapi.com/articles/asyncio-concurrency-in-python-unlocking-asynchronous-magic",
+    "https://stackoverflow.com/questions/26270681/can-an-asyncio-event-loop-run-in-the-background-without-suspending-the-python-in",
+    "https://www.stanza.dev/courses/python-concurrency/mastering-asyncio/python-concurrency-event-loop-coroutines",
+    "https://async-concurrency.com/asyncio-fundamentals-event-loop-architecture/event-loop-configuration/how-to-properly-configure-asyncio-event-loops-for-production/",
+    "https://drcodes.com/posts/mastering-asyncio-pythons-powerful-concurrency-library",
+    "https://stackoverflow.com/questions/68251786/when-await-will-suspend-the-execution-of-an-awaitable-object-in-python",
+    "https://stackoverflow.com/questions/60461433/python3-asyncio-there-is-no-current-event-loop-in-thread-when-spawn-a-new-thread",
+    "https://stackoverflow.com/questions/66247720/understanding-behavior-of-asyncio-set-result-as-it-relates-to-slow-callback-dura",
+    "https://codezup.com/mastering-python-asyncio-high-performance-concurrent-programming/"
+  ],
+  "c2_ms": 13,
+  "c2p": [
+    "https://proxiesapi.com/articles/asyncio-concurrency-in-python-unlocking-asynchronous-magic",
+    "https://pymotw.com/3/asyncio/index.html",
+    "https://stackoverflow.com/questions/26270681/can-an-asyncio-event-loop-run-in-the-background-without-suspending-the-python-in",
+    "https://www.stanza.dev/courses/python-concurrency/mastering-asyncio/python-concurrency-event-loop-coroutines",
+    "https://stackoverflow.com/questions/60461433/python3-asyncio-there-is-no-current-event-loop-in-thread-when-spawn-a-new-thread",
+    "https://codezup.com/mastering-python-asyncio-high-performance-concurrent-programming/",
+    "https://tutorialedge.net/python/concurrency/asyncio-event-loops-tutorial/",
+    "https://drcodes.com/posts/mastering-asyncio-pythons-powerful-concurrency-library",
+    "https://async-concurrency.com/asyncio-fundamentals-event-loop-architecture/event-loop-configuration/how-to-properly-configure-asyncio-event-loops-for-production/",
+    "https://docs.python.org/3/library/asyncio-eventloop.html"
+  ],
+  "c2p_ms": 1,
+  "c3": [
+    "https://www.stanza.dev/courses/python-concurrency/mastering-asyncio/python-concurrency-event-loop-coroutines",
+    "https://proxiesapi.com/articles/asyncio-concurrency-in-python-unlocking-asynchronous-magic",
+    "https://doi.org/10.1007/978-1-4842-4401-2_2",
+    "https://stackoverflow.com/questions/29269370/how-to-properly-create-and-run-concurrent-tasks-using-pythons-asyncio-module",
+    "https://realpython.com/async-io-python/",
+    "https://drcodes.com/posts/mastering-asyncio-pythons-powerful-concurrency-library",
+    "https://dev.to/imsushant12/asyncio-architecture-in-python-event-loops-tasks-and-futures-explained-4pn3",
+    "https://www.c-sharpcorner.com/article/python-asyncio-complete-practical-guide-for-concurrent-io/",
+    "https://pymotw.com/3/asyncio/index.html",
+    "https://stackoverflow.com/questions/26270681/can-an-asyncio-event-loop-run-in-the-background-without-suspending-the-python-in"
+  ],
+  "c3_ms": 2239,
+  "method_pool_sizes": {
+    "c1": 69,
+    "c2": 394,
+    "c2p": 69,
+    "c3": 69
+  }
+}
