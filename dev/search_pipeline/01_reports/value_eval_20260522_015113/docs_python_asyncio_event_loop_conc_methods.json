@@ -1,0 +1,69 @@
+{
+  "mode": "docs",
+  "query": "python asyncio event loop concurrency",
+  "google_count": 0,
+  "pool_size": 384,
+  "capped_pool_size": 59,
+  "filtered_pool_size": 341,
+  "filtered_capped_pool_size": 40,
+  "oracle_pool_size": 40,
+  "c1": [
+    "https://doi.org/10.1007/978-1-4842-3742-7_9",
+    "https://doi.org/10.1007/978-3-030-25943-3_34",
+    "https://docs.python.org/3/library/asyncio.html",
+    "https://tutorialedge.net/python/concurrency/asyncio-event-loops-tutorial/",
+    "http://aosabook.org/en/500L/a-web-crawler-with-asyncio-coroutines.html",
+    "https://doi.org/10.1145/3445814.3446701",
+    "https://doi.org/10.1007/978-3-031-40336-1_43",
+    "https://realpython.com/async-io-python/",
+    "https://doi.org/10.1109/ojits.2023.3266800",
+    "https://doi.org/10.1007/978-1-4842-8140-6_6"
+  ],
+  "c1_ms": 0,
+  "c2": [
+    "https://pymotw.com/3/asyncio/index.html",
+    "https://proxiesapi.com/articles/asyncio-concurrency-in-python-unlocking-asynchronous-magic",
+    "https://www.stanza.dev/courses/python-concurrency/mastering-asyncio/python-concurrency-event-loop-coroutines",
+    "https://async-concurrency.com/asyncio-fundamentals-event-loop-architecture/event-loop-configuration/how-to-properly-configure-asyncio-event-loops-for-production/",
+    "https://tutorialedge.net/python/concurrency/asyncio-event-loops-tutorial/",
+    "https://docs.python.org/3/library/asyncio-eventloop.html",
+    "https://blog.apify.com/python-asyncio-tutorial/",
+    "https://lucumr.pocoo.org/2016/10/30/i-dont-understand-asyncio/",
+    "https://docs.python.org/3/library/asyncio-dev.html",
+    "https://www.c-sharpcorner.com/article/python-asyncio-complete-practical-guide-for-concurrent-io/"
+  ],
+  "c2_ms": 10,
+  "c2p": [
+    "https://proxiesapi.com/articles/asyncio-concurrency-in-python-unlocking-asynchronous-magic",
+    "https://pymotw.com/3/asyncio/index.html",
+    "https://www.stanza.dev/courses/python-concurrency/mastering-asyncio/python-concurrency-event-loop-coroutines",
+    "https://tutorialedge.net/python/concurrency/asyncio-event-loops-tutorial/",
+    "https://async-concurrency.com/asyncio-fundamentals-event-loop-architecture/event-loop-configuration/how-to-properly-configure-asyncio-event-loops-for-production/",
+    "https://docs.python.org/3/library/asyncio-eventloop.html",
+    "https://blog.apify.com/python-asyncio-tutorial/",
+    "https://lucumr.pocoo.org/2016/10/30/i-dont-understand-asyncio/",
+    "https://docs.python.org/3/library/asyncio-dev.html",
+    "https://doi.org/10.1007/978-1-4842-4401-2_2"
+  ],
+  "c2p_ms": 1,
+  "c3": [
+    "https://www.stanza.dev/courses/python-concurrency/mastering-asyncio/python-concurrency-event-loop-coroutines",
+    "https://proxiesapi.com/articles/asyncio-concurrency-in-python-unlocking-asynchronous-magic",
+    "https://doi.org/10.1007/978-1-4842-4401-2_2",
+    "https://realpython.com/async-io-python/",
+    "https://www.c-sharpcorner.com/article/python-asyncio-complete-practical-guide-for-concurrent-io/",
+    "https://pymotw.com/3/asyncio/index.html",
+    "https://tutorialedge.net/python/concurrency/asyncio-event-loops-tutorial/",
+    "https://docs.kanaries.net/topics/Python/python-asyncio",
+    "https://blog.apify.com/python-asyncio-tutorial/",
+    "https://async-concurrency.com/asyncio-fundamentals-event-loop-architecture/event-loop-configuration/how-to-properly-configure-asyncio-event-loops-for-production/"
+  ],
+  "c3_ms": 1236,
+  "method_pool_sizes": {
+    "c1": 40,
+    "c2": 341,
+    "c2p": 40,
+    "c3": 40
+  },
+  "fetch_ms": 60002
+}

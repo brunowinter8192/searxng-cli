@@ -1,0 +1,207 @@
+{
+  "mode": "docs",
+  "query": "python asyncio event loop concurrency",
+  "pool_size": 40,
+  "pool": [
+    {
+      "url": "http://aosabook.org/en/500L/a-web-crawler-with-asyncio-coroutines.html",
+      "title": "A Web Crawler With asyncio Coroutines",
+      "snippet": "aosabook.org"
+    },
+    {
+      "url": "http://techspot.zzzeek.org/2015/02/15/asynchronous-python-and-databases/",
+      "title": "Asynchronous Python and Databases",
+      "snippet": "techspot.zzzeek.org"
+    },
+    {
+      "url": "https://async-concurrency.com/asyncio-fundamentals-event-loop-architecture/event-loop-configuration/how-to-properly-configure-asyncio-event-loops-for-production/",
+      "title": "How to Configure Asyncio Event Loops for Production - Python Async ...",
+      "snippet": "Transitioning asyncio from local development to production requires deliberate event loop configuration to prevent thread starvation, eliminate debug-mode overhead, and guarantee deterministic shutdown behavior. This guide details the exact API calls, policy swaps, and executor tuning required to harden the event loop for high-concurrency workloads."
+    },
+    {
+      "url": "https://asyncio-notes.readthedocs.io/en/latest/3_asyncio-eventloops.html",
+      "title": "Event loops — asyncio developer notes documentation",
+      "snippet": "Event loop management is abstracted with a policy pattern, to provide maximal flexibility for custom platforms and frameworks. Throughout the execution of a process, a single global policy object manages the event loops available to the process based on the calling context."
+    },
+    {
+      "url": "https://blog.apify.com/python-asyncio-tutorial/",
+      "title": "Python asyncio tutorial with 3 examples",
+      "snippet": "In asyncio an event loop manages and distributes the execution of different tasks in an async Python program, ensuring they run seamlessly without ..."
+    },
+    {
+      "url": "https://blog.nelhage.com/post/concurrent-error-handling/",
+      "title": "From error-handling to structured concurrency",
+      "snippet": "blog.nelhage.com"
+    },
+    {
+      "url": "https://docs.kanaries.net/topics/Python/python-asyncio",
+      "title": "Python asyncio: Complete Guide to Asynchronous Programming",
+      "snippet": "Master Python asyncio with practical examples covering async/await, tasks, gather, event loops, aiohttp, concurrent execution, and real-world async patterns."
+    },
+    {
+      "url": "https://docs.python.org/3/library/asyncio-dev.html",
+      "title": "Developing with asyncio — Python 3.14.4 documentation",
+      "snippet": "In addition, asyncio’s Subprocess APIs provide a way to start a process and communicate with it from the event loop."
+    },
+    {
+      "url": "https://docs.python.org/3/library/asyncio-eventloop.html",
+      "title": "Event Loop — Python 3.14.3 documentation",
+      "snippet": "The asyncio policy system is deprecated and will be removed in Python 3.16; from there on, this function will return the current running event loop ..."
+    },
+    {
+      "url": "https://docs.python.org/3/library/asyncio.html",
+      "title": "asyncio — Asynchronous I/O — Python 3.14.5 documentation",
+      "snippet": "asyncio is a library to write concurrent code using the async/await syntax. asyncio is used as a foundation for multiple Python asynchronous frameworks that provide high-performance network and web-servers, database connection libraries, distributed task queues, etc. asyncio is often a perfect fit for IO-bound and high-level structured network code."
+    },
+    {
+      "url": "https://doi.org/10.1007/978-1-4842-3742-7_9",
+      "title": "Applications with asyncio and Twisted",
+      "snippet": "Williams, M. et al. (2019), Expert Twisted"
+    },
+    {
+      "url": "https://doi.org/10.1007/978-1-4842-4401-2_2",
+      "title": "Working with Event Loops",
+      "snippet": "Python version 3.4 has adopted a powerful framework to support concurrent execution of code: asyncio. This framework uses event loops to orchestrate the callbacks and asynchronous tasks. Event loops live in the context of event loop policies—a concept singular to asyncio. The interplay among coroutines, event loops, and policies is illustrated in Figure 2-1."
+    },
+    {
+      "url": "https://doi.org/10.1007/978-1-4842-8140-6_1",
+      "title": "(A)synchronous Python",
+      "snippet": "de Groot, C. (2022), Asynchronous Python Programming with Asyncio and Async/await"
+    },
+    {
+      "url": "https://doi.org/10.1007/978-1-4842-8140-6_13",
+      "title": "Testing",
+      "snippet": "de Groot, C. (2022), Asynchronous Python Programming with Asyncio and Async/await"
+    },
+    {
+      "url": "https://doi.org/10.1007/978-1-4842-8140-6_2",
+      "title": "Modern Asynchronous Python The Building Blocks",
+      "snippet": "de Groot, C. (2022), Asynchronous Python Programming with Asyncio and Async/await"
+    },
+    {
+      "url": "https://doi.org/10.1007/978-1-4842-8140-6_6",
+      "title": "asyncio Streams",
+      "snippet": "de Groot, C. (2022), Asynchronous Python Programming with Asyncio and Async/await"
+    },
+    {
+      "url": "https://doi.org/10.1007/978-3-030-25943-3_34",
+      "title": "Concurrency with AsyncIO",
+      "snippet": "Hunt, J. (2019), Undergraduate Topics in Computer Science"
+    },
+    {
+      "url": "https://doi.org/10.1007/978-3-031-40336-1",
+      "title": "Advanced Guide to Python 3 Programming",
+      "snippet": ""
+    },
+    {
+      "url": "https://doi.org/10.1007/978-3-031-40336-1_43",
+      "title": "Concurrency with AsyncIO",
+      "snippet": "Hunt, J. (2023), Undergraduate Topics in Computer Science"
+    },
+    {
+      "url": "https://doi.org/10.1007/979-8-8688-0196-9_28",
+      "title": "Activity 4: Asynchronous Programming with asyncio",
+      "snippet": "Hetland, M. et al. (2024), Beginning Python"
+    },
+    {
+      "url": "https://doi.org/10.1007/979-8-8688-1261-3_16",
+      "title": "Asyncio",
+      "snippet": "Divakaran, A. (2025), Deep Dive Python"
+    },
+    {
+      "url": "https://doi.org/10.1007/s41781-021-00053-3",
+      "title": "Performance of Julia for High Energy Physics Analyses",
+      "snippet": ""
+    },
+    {
+      "url": "https://doi.org/10.1109/access.2020.3008954",
+      "title": "Control and Visualisation of a Software Defined Radio System on the Xilinx RFSoC Platform Using the PYNQ Framework",
+      "snippet": "The availability of commercial Radio Frequency System on Chip (RFSoC) devices brings new possibilities for implementing Software Defined Radio (SDR) systems. Such systems are of increasing interest given the pace of innovation in wireless technology, and the pressure on RF spectrum resources, leading to a growing need to access the spectrum in more dynamic and innovative ways. In this paper, we present an SDR demonstration system based on the Xilinx RFSoC platform, which leverages the Python-based `PYNQ' (Python Productivity for Zynq) software framework. In doing so, we highlight features that can be extremely useful for prototyping radio system design. Notably, our developed system features Python-based control of hardware processing blocks and Radio Frequency (RF) data converters, as well as direct visualisation of communications signals captured within the chip. The system architecture is reviewed, hardware and software components are discussed, functionality is demonstrated, and aspects of the system's performance are evaluated. Finally, it is noted that this combined RFSoC + PYNQ approach is readily extensible for other SDR systems; we highlight our online shared resources, and invite other engineers to investigate and build upon our work."
+    },
+    {
+      "url": "https://doi.org/10.1109/ojits.2023.3266800",
+      "title": "Infrastructure-Based Digital Twins for Cooperative, Connected, Automated Driving and Smart Road Services",
+      "snippet": "Driving requires continuous decision making from a driver taking into account all available relevant information. Automating driving tasks also automates the related decisions. However, humans are very good at dealing with bad quality, fuzzy, informal and incomplete information, whereas machines generally require solid quality information in a formalized format. Therefore, the development of automated driving functions relies on the availability of machine-usable information. A digital twin contains quality controlled information collected and augmented from different sources, ready to be supplied to such an automated driving function. An information model that describes all conceivably relevant information is necessary. To this end, a list of requirements that such an information model should meet is proposed and each requirement is argued for. Based on the anticipated services and applications that such a system should support, a collection of requirements for system architecture is derived. Information modeling is performed for selected relevant information groups. A system architecture has been proposed and validated with three different implementations, addressing several different applications to support decisions at a highway tunnel construction site in Austria and throughout the Test Bed Lower Saxony in Germany. (Cited 51×)"
+    },
+    {
+      "url": "https://doi.org/10.1145/3445814.3446701",
+      "title": "Nightcore: efficient and scalable serverless computing for latency-sensitive, interactive microservices",
+      "snippet": "The microservice architecture is a popular software engineering approach for building flexible, large-scale online services. Serverless functions, or function as a service (FaaS), provide a simple programming model of stateless functions which are a natural substrate for implementing the stateless RPC handlers of microservices, as an alternative to containerized RPC servers. However, current serverless platforms have millisecond-scale runtime overheads, making them unable to meet the strict sub-millisecond latency targets required by existing interactive microservices. (Cited 204×)"
+    },
+    {
+      "url": "https://doi.org/10.3390/en13153770",
+      "title": "Distributed Power Hardware-in-the-Loop Testing Using a Grid-Forming Converter as Power Interface",
+      "snippet": "This paper presents an approach to extend the capabilities of smart grid laboratories through the concept of Power Hardware-in-the-Loop (PHiL) testing by re-purposing existing grid-forming converters. A simple and cost-effective power interface, paired with a remotely located Digital Real-time Simulator (DRTS), facilitates Geographically Distributed Power Hardware Loop (GD-PHiL) in a quasi-static operating regime. In this study, a DRTS simulator was interfaced via the public internet with a grid-forming ship-to-shore converter located in a smart-grid testing laboratory, approximately 40 km away from the simulator. A case study based on the IEEE 13-bus distribution network, an on-load-tap-changer (OLTC) controller and a controllable load in the laboratory demonstrated the feasibility of such a setup. A simple compensation method applicable to this multi-rate setup is proposed and evaluated. Experimental results indicate that this compensation method significantly enhances the voltage response, whereas the conservation of energy at the coupling point still poses a challenge. Findings also show that, due to inherent limitations of the converter’s Modbus interface, a separate measurement setup is preferable. This can help achieve higher measurement fidelity, while simultaneously increasing the loop rate of the PHiL setup."
+    },
+    {
+      "url": "https://doi.org/10.4018/ijswis.2016100102",
+      "title": "Managing Large Amounts of Data Generated by a Smart City Internet of Things Deployment",
+      "snippet": "The Smart City concept is being developed from a lot of different axes encompassing multiple areas of social and technical sciences. However, something that is common to all these approaches is the central role that the capacity of sharing information has. Hence, Information and Communication Technologies (ICT) are seen as key enablers for the transformation of urban regions into Smart Cities. Two of these technologies, namely Internet of Things and Big Data, have a predominant position among them. The capacity to “sense the city” and access all this information and provide added-value services based on knowledge derived from it are critical to achieving the Smart City vision. This paper reports on the specification and implementation of a software platform enabling the management and exposure of the large amount of information that is continuously generated by the IoT deployment in the city of Santander."
+    },
+    {
+      "url": "https://doi.org/10.47667/ijpasr.v4i2.202",
+      "title": "Python TCP/IP libraries: A Review",
+      "snippet": "The Internet's core is TCP/IP, which stands for Transmission Control Protocol/Internet Protocol. It connects network devices on the internet via communication protocols. Python has several TCP/IP packages due to its popularity and flexibility. This paper describes the most popular Python libraries for TCP/IP protocol implementation, including socket, asyncio, Twisted, and Scapy. To help developers choose a library, we compare its benefits, cons, and areas of use, including criteria other than speed and memory utilization. When making web apps, choose wisely."
+    },
+    {
+      "url": "https://doi.org/10.7256/2454-0714.2018.2.25851",
+      "title": "Савостин П.А., Ефремова Н.Э. Практическое применение асинхронного программирования на языке Python при помощи пакета Asyncio",
+      "snippet": "(2018), Программные системы и вычислительные методы"
+    },
+    {
+      "url": "https://lucumr.pocoo.org/2016/10/30/i-dont-understand-asyncio/",
+      "title": "I don’t understand Python’s Asyncio | Armin Ronacher's",
+      "snippet": "Such an event loop can be created with the asyncio.new_event_loop() function. ... Secondly asyncio does not require event loops to be bound to the ..."
+    },
+    {
+      "url": "https://proxiesapi.com/articles/asyncio-concurrency-in-python-unlocking-asynchronous-magic",
+      "title": "Asyncio Concurrency in Python: Unlocking Asynchronous Magic |",
+      "snippet": "Asyncio provides an event loop, coroutines and tasks to enable asynchronous concurrency in Python. ... Python concurrency asynchronous programming ..."
+    },
+    {
+      "url": "https://pymotw.com/3/asyncio/index.html",
+      "title": "asyncio — Asynchronous I/O, event loop, and concurrency tools",
+      "snippet": "asyncio — Asynchronous I/O, event loop, and concurrency ... The New asyncio Module in Python 3.4: Event Loops – Article by Gastón Hillar in Dr."
+    },
+    {
+      "url": "https://realpython.com/async-io-python/",
+      "title": "Python's asyncio: A Hands-On Walkthrough - Real Python",
+      "snippet": "Python's asyncio provides a framework for writing single-threaded concurrent code using coroutines, event loops, and non-blocking I/O operations. For I/O-bound tasks, async I/O can often outperform multithreading —especially when managing a large number of concurrent tasks—because it avoids the overhead of thread management."
+    },
+    {
+      "url": "https://trent.me/articles/pytorch-and-python-free-threading/",
+      "title": "PyTorch and Python Free-Threading: Unlocking multi-threaded parallel inference on PyTorch models",
+      "snippet": "trent.me"
+    },
+    {
+      "url": "https://tutorialedge.net/python/concurrency/asyncio-event-loops-tutorial/",
+      "title": "Asyncio Event Loops Tutorial | TutorialEdge.net",
+      "snippet": "The main component of any asyncio based Python program has to be the underlying event loop. ... event loop we ’ ll use asyncio.get_event_loop() ..."
+    },
+    {
+      "url": "https://www.aeracode.org/2018/02/19/python-async-simplified/",
+      "title": "Python & Async Simplified",
+      "snippet": "aeracode.org"
+    },
+    {
+      "url": "https://www.c-sharpcorner.com/article/python-asyncio-complete-practical-guide-for-concurrent-io/",
+      "title": "Python asyncio — Complete Practical Guide for Concurrent I/O",
+      "snippet": "Unlock Python's concurrency potential with asyncio! This practical guide covers coroutines, event loops, and non-blocking I/O for building high-performance applications. Learn to handle multiple tasks efficiently, from web requests with aiohttp to producer-consumer patterns, and safely run blocking code."
+    },
+    {
+      "url": "https://www.datacamp.com/tutorial/python-async-programming",
+      "title": "Python Async Programming: The Complete Guide - DataCamp",
+      "snippet": "Speed up your code with Python async programming. A step-by-step guide to asyncio, concurrency, efficient HTTP requests, and database integration."
+    },
+    {
+      "url": "https://www.stanza.dev/courses/python-concurrency/mastering-asyncio/python-concurrency-event-loop-coroutines",
+      "title": "The Event Loop & Coroutines - Python Concurrency: Asyncio & Free ...",
+      "snippet": "Introduction At the heart of Python's asyncio library is the event loop, a scheduler that juggles thousands of tasks on a single thread without blocking. Combined with coroutines, it enables you to write code that reads sequentially but executes concurrently. This lesson covers how the event loop works, what coroutines are, and how cooperative multitasking lets multiple tasks make progress."
+    },
+    {
+      "url": "https://yoric.github.io/post/quite-a-few-words-about-async/",
+      "title": "(Quite) A Few Words About Async",
+      "snippet": "yoric.github.io"
+    }
+  ]
+}

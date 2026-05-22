@@ -1,0 +1,27 @@
+{
+  "mode": "books",
+  "query": "transformer attention mechanism",
+  "pool_size": 4,
+  "pool": [
+    {
+      "url": "https://openlibrary.org/works/OL12439399W",
+      "title": "Cartesian meditations",
+      "snippet": "Edmund Husserl (1960) — 13 eds, ebook: no_ebook"
+    },
+    {
+      "url": "https://openlibrary.org/works/OL15311250W",
+      "title": "The origin of ideas",
+      "snippet": "Antonio Rosmini (1883) — 7 eds, ebook: public"
+    },
+    {
+      "url": "https://openlibrary.org/works/OL1618262W",
+      "title": "History of the World's Fair",
+      "snippet": "Benjamin Cummings Truman (1893) — 5 eds, ebook: public"
+    },
+    {
+      "url": "https://openlibrary.org/works/OL18481636W",
+      "title": "Understanding events",
+      "snippet": "Jeffrey M. Zacks (2007) — 3 eds, ebook: borrowable"
+    }
+  ]
+}

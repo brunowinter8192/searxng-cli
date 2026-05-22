@@ -1,0 +1,62 @@
+{
+  "mode": "pdf",
+  "query": "contrastive learning self-supervised representations",
+  "pool_size": 11,
+  "pool": [
+    {
+      "url": "http://keg.cs.tsinghua.edu.cn/jietang/publications/TKDE21-Liu-et-al-Self-supervised-Learning-Generative-or-Contrastive.pdf",
+      "title": "PDF Self-supervised Learning: Generative or Contrastive",
+      "snippet": "Self-supervised representation learning leverages input data itself as supervision and benefits almost all types of downstream tasks. In this survey, we take a look into new self-supervised learning methods for representation in computer vision, natural language processing, and graph learning."
+    },
+    {
+      "url": "https://aclanthology.org/2021.findings-emnlp.3/",
+      "title": "Self-supervised Contrastive Cross-Modality Representation",
+      "snippet": "... we propose novel training schemes for spoken question answering with a self-supervised training stage and a contrastive representation learning stage."
+    },
+    {
+      "url": "https://arxiv.org/abs/2004.11362",
+      "title": "[2004.11362] Supervised Contrastive Learning",
+      "snippet": "Abstract: Contrastive learning applied to self-supervised representation learning has seen a resurgence in recent years, leading to state of the art ..."
+    },
+    {
+      "url": "https://arxiv.org/abs/2203.07004",
+      "title": "[2203.07004] Rethinking Minimal Sufficient Representation in",
+      "snippet": "Abstract: Contrastive learning between different views of the data achieves outstanding success in the field of self-supervised representation ..."
+    },
+    {
+      "url": "https://arxiv.org/pdf/2510.10572",
+      "title": "Understanding Self-supervised Contrastive Learning through Supervised ...",
+      "snippet": "Our derivation naturally introduces the concepts of prototype representation bias and a balanced contrastive loss, which help explain and improve the behavior of self-supervised learning algorithms. We further show how components of our theoretical framework correspond to established practices in contrastive learning."
+    },
+    {
+      "url": "https://link.springer.com/content/pdf/10.1007/s11633-021-1297-9.pdf",
+      "title": "PDF Contrastive Self-supervised Representation Learning Using ... - Springer",
+      "snippet": "Abstract: Learning discriminative representations with deep neural networks often relies on massive labeled data, which is expensive and difficult to obtain in many real scenarios. As an alternative, self-supervised learning that leverages input itself as supervision is strongly preferred for its soaring performance on visual representation learning. This paper introduces a contrastive self ..."
+    },
+    {
+      "url": "https://marslanm.github.io/assets/pdf/Contrastive_Self-Supervised_Learning_A_Survey_on_Different_Architectures.pdf",
+      "title": "PDF Contrastive Self-Supervised Learning: A Survey on Different Architectures",
+      "snippet": "Recently the research community shifted to integrated method of generative and contrastive techniques known as Self-Supervised Learning (SSL) [3]. Generally, SSL based approaches mitigate the challenges of traditional approaches by learning feature representation from data itself without expensive annotation. The generative pretext tasks in SSL learn features from input samples with pseudo ..."
+    },
+    {
+      "url": "https://nips.cc/media/neurips-2021/Slides/21895.pdf",
+      "title": "PDF [NeurIPS 2021 Tutorial] Self-Supervised Learning: Self-prediction and ...",
+      "snippet": "What is Self-Supervised Learning? Self-Supervised Learning (SSL) is a special type of representation learning that enables learning good data representation from unlabelled dataset."
+    },
+    {
+      "url": "https://openaccess.thecvf.com/content/CVPR2024/papers/Li_Self-Supervised_Representation_Learning_from_Arbitrary_Scenarios_CVPR_2024_paper.pdf",
+      "title": "PDF Self-Supervised Representation Learning from Arbitrary Scenarios",
+      "snippet": "Abstract Current self-supervised methods can primarily be cate-gorized into contrastive learning and masked image mod-eling. Extensive studies have demonstrated that combining these two approaches can achieve state-of-the-art perfor-mance."
+    },
+    {
+      "url": "https://proceedings.mlr.press/v119/chen20j/chen20j.pdf",
+      "title": "PDF A Simple Framework for Contrastive Learning of Visual Representations",
+      "snippet": "Abstract This paper presents SimCLR: a simple framework for contrastive learning of visual representations. We simplify recently proposed contrastive self-supervised learning algorithms without requiring specialized architectures or a memory bank."
+    },
+    {
+      "url": "https://proceedings.neurips.cc/paper_files/paper/2020/file/d89a66c7c80a29b1bdbab0f2a1a94af8-Paper.pdf",
+      "title": "PDF Supervised Contrastive Learning - NeurIPS",
+      "snippet": "Abstract Contrastive learning applied to self-supervised representation learning has seen resurgence in recent years, leading to state of the art performance in the unsu-pervised training of deep image models."
+    }
+  ]
+}

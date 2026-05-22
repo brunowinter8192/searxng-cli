@@ -1,0 +1,322 @@
+{
+  "mode": "general",
+  "query": "transformer attention mechanism",
+  "pool_size": 63,
+  "pool": [
+    {
+      "url": "https://alexzhang13.github.io/blog/2024/efficient-dl/",
+      "title": "A Meticulous Guide to Advances in Deep Learning Efficiency over the Years",
+      "snippet": "alexzhang13.github.io"
+    },
+    {
+      "url": "https://aman.ai/primers/ai/LLM/#overview",
+      "title": "Overview of Large Language Models",
+      "snippet": "aman.ai"
+    },
+    {
+      "url": "https://arxiv.org/abs/1706.03762",
+      "title": "[1706.03762] Attention Is All You Need - arXiv.org",
+      "snippet": "The dominant sequence transduction models are based on complex recurrent or convolutional neural networks in an encoder-decoder configuration. The best performing models also connect the encoder and decoder through an attention mechanism. We propose a new simple network architecture, the Transformer, based solely on attention mechanisms, dispensing with recurrence and convolutions entirely ..."
+    },
+    {
+      "url": "https://arxiv.org/html/2604.00965v1",
+      "title": "Understanding Transformers and Attention Mechanisms: An",
+      "snippet": "Attention mechanisms, the building blocks of the Transformer architecture [ Vas+17 ] , allow encoding of semantic information between tokens through ..."
+    },
+    {
+      "url": "https://arxiv.org/pdf/2312.00752",
+      "title": "Mamba: Linear-Time Sequence Modeling with Selective State Spaces",
+      "snippet": "arxiv.org"
+    },
+    {
+      "url": "https://arxiv.org/pdf/2406.02528",
+      "title": "Scalable MatMul-free Language Modeling",
+      "snippet": "arxiv.org"
+    },
+    {
+      "url": "https://d2l.ai/chapter_attention-mechanisms-and-transformers/index.html",
+      "title": "11. Attention Mechanisms and Transformers — Dive into Deep ... - D2L",
+      "snippet": "Learn how attention mechanisms and Transformers revolutionized natural language processing and vision tasks. Explore the core ideas, visualizations, and applications of these models, from the original attention mechanism to the vision Transformer and beyond."
+    },
+    {
+      "url": "https://datasciencedojo.com/blog/understanding-attention-mechanism/",
+      "title": "Revolutionary Attention Mechanism: Power of Transformers",
+      "snippet": "Attention Mechanism in NLP: Guide to ... Transformers have revolutionized natural language processing with their use of self-attention mechanisms."
+    },
+    {
+      "url": "https://deeprevision.github.io/posts/001-transformer/",
+      "title": "The Transformer Blueprint: A Holistic Guide to the Transformer Neural Network Architecture",
+      "snippet": "deeprevision.github.io"
+    },
+    {
+      "url": "https://developer.nvidia.com/blog/emulating-the-attention-mechanism-in-transformer-models-with-a-fully-convolutional-network/",
+      "title": "Emulating the Attention Mechanism in Transformer Models with a",
+      "snippet": "This post presents our recent work on emulating the attention mechanism in transformer models using a fully convolutional network."
+    },
+    {
+      "url": "https://doi.org/10.1007/s10792-026-03966-3",
+      "title": "GDPooled transformer: glaucoma detection using pooled attention based transformer with attention mechanism",
+      "snippet": "Bharathi, V. et al. (2026), International Ophthalmology"
+    },
+    {
+      "url": "https://doi.org/10.1016/j.aei.2023.102007",
+      "title": "DenseSPH-YOLOv5: An automated damage detection model based on DenseNet and Swin-Transformer prediction head-enabled YOLOv5 with attention mechanism",
+      "snippet": "(Cited 247×)"
+    },
+    {
+      "url": "https://doi.org/10.1016/j.knosys.2024.111507",
+      "title": "Transformer-based multivariate time series anomaly detection using inter-variable attention mechanism",
+      "snippet": "(Cited 116×)"
+    },
+    {
+      "url": "https://doi.org/10.1016/j.ymssp.2021.108616",
+      "title": "A novel time–frequency Transformer based on self–attention mechanism and its application in fault diagnosis of rolling bearings",
+      "snippet": "(Cited 485×)"
+    },
+    {
+      "url": "https://doi.org/10.1093/bib/bbab421",
+      "title": "MDF-SA-DDI: predicting drug–drug interaction events based on multi-source drug fusion, multi-source feature fusion and transformer self-attention mechanism",
+      "snippet": "One of the main problems with the joint use of multiple drugs is that it may cause adverse drug interactions and side effects that damage the body. Therefore, it is important to predict potential drug interactions. However, most of the available prediction methods can only predict whether two drugs interact or not, whereas few methods can predict interaction events between two drugs. Accurately predicting interaction events of two drugs is more useful for researchers to study the mechanism of the interaction of two drugs. In the present study, we propose a novel method, MDF-SA-DDI, which predicts drug-drug interaction (DDI) events based on multi-source drug fusion, multi-source feature fusion and transformer self-attention mechanism. MDF-SA-DDI is mainly composed of two parts: multi-source drug fusion and multi-source feature fusion. First, we combine two drugs in four different ways and input the combined drug feature representation into four different drug fusion networks (Siamese network, convolutional neural network and two auto-encoders) to obtain the latent feature vectors of the drug pairs, in which the two auto-encoders have the same structure, and their main difference is the number of neurons in the input layer of the two auto-encoders. Then, we use transformer blocks that include self-attention mechanism to perform latent feature fusion. We conducted experiments on three different tasks with two datasets. On the small dataset, the area under the precision-recall-curve (AUPR) and F1 scores of our method on task 1 reached 0.9737 and 0.8878, respectively, which were better than the state-of-the-art method. On the large dataset, the AUPR and F1 scores of our method on task 1 reached 0.9773 and 0.9117, respectively. In task 2 and task 3 of two datasets, our method also achieved the same or better performance as the state-of-the-art method. More importantly, the case studies on five DDI events are conducted and achieved satisfactory performance. The source codes and data are available at https://github.com/ShenggengLin/MDF-SA-DDI. (Cited 179×)"
+    },
+    {
+      "url": "https://doi.org/10.1109/tim.2022.3181933",
+      "title": "Convolutional Transformer: An Enhanced Attention Mechanism Architecture for Remaining Useful Life Estimation of Bearings",
+      "snippet": "Nowadays, deep learning (DL) methods for prognostic and health management (PHM) have vastly broadened the scope of applications in this field. Numerous approaches based on deep neural networks have been presented and applied to the remaining useful life (RUL) estimation of bearings. However, few of these methods are yet fully competent for the task of extracting degradation-related information from raw signals both locally and globally. To fill this research gap, we proposed a novel convolutional Transformer (CoT) which combines the global context capturing of attention mechanism with the local dependencies modeling of convolutional operation. Specifically, we designed a multi-scale convolutional (MSC) module with Swish activation for Transformer architecture to embed local feature learning into global sequence modeling. Our CoT fuses intra-token convolution and inter-token self-attention operations to enable simultaneous extraction of local dependencies and global interactions from the raw temporal signal into a trainable class token. Then, an end-to-end RUL estimation framework based on CoT is presented, which provides a mapping from raw vibration signals to estimated RULs. Finally, comprehensive case studies, including comparative studies and ablation experiments, fully validate the effectiveness and advancements of our CoT-based RUL estimation method. (Cited 107×)"
+    },
+    {
+      "url": "https://doi.org/10.1609/aaai.v35i12.17325",
+      "title": "Informer: Beyond Efficient Transformer for Long Sequence Time-Series Forecasting",
+      "snippet": "Many real-world applications require the prediction of long sequence time-series, such as electricity consumption planning. Long sequence time-series forecasting (LSTF) demands a high prediction capacity of the model, which is the ability to capture precise long-range dependency coupling between output and input efficiently. Recent studies have shown the potential of Transformer to increase the prediction capacity. However, there are several severe issues with Transformer that prevent it from being directly applicable to LSTF, including quadratic time complexity, high memory usage, and inherent limitation of the encoder-decoder architecture. To address these issues, we design an efficient transformer-based model for LSTF, named Informer, with three distinctive characteristics: (i) a ProbSparse self-attention mechanism, which achieves O(L log L) in time complexity and memory usage, and has comparable performance on sequences' dependency alignment. (ii) the self-attention distilling highlights dominating attention by halving cascading layer input, and efficiently handles extreme long input sequences. (iii) the generative style decoder, while conceptually simple, predicts the long time-series sequences at one forward operation rather than a step-by-step way, which drastically improves the inference speed of long-sequence predictions. Extensive experiments on four large-scale datasets demonstrate that Informer significantly outperforms existing methods and provides a new solution to the LSTF problem. (Cited 5886×)"
+    },
+    {
+      "url": "https://doi.org/10.21203/rs.3.rs-3545247/v1",
+      "title": "Easy attention: A simple self-attention mechanism for transformer-based time-series reconstruction and prediction",
+      "snippet": "Abstract To improve the robustness of transformer neural networks used for temporal-dynamics prediction of chaotic systems, we propose a novel attention mechanism called easy attention which we demonstrate in time-series reconstruction and prediction. As a consequence of the fact that self attention only makes use of the inner product of queries and keys, it is demonstrated that the keys, queries and softmax are not necessary for obtaining the attention score required to capture long-term dependencies in temporal sequences. Through the singular-value decomposition (SVD) on the softmax attention score, we further observe that self attention compresses the contributions from both queries and keys in the spanned space of the attention score. Therefore, our proposed easy-attention method directly treats the attention scores as learnable parameters. This approach produces excellent results when reconstructing and predicting the temporal dynamics of chaotic systems exhibiting more robustness and less complexity than self attention or the widely-used long short-term memory (LSTM) network. Our results show great potential for applications in more complex high-dimensional dynamical systems."
+    },
+    {
+      "url": "https://doi.org/10.21437/interspeech.2022-10066",
+      "title": "Improving Transformer-based Conversational ASR by Inter-Sentential Attention Mechanism",
+      "snippet": "Wei, K. et al. (2022), Interspeech 2022"
+    },
+    {
+      "url": "https://doi.org/10.22541/au.169769165.55793181/v1",
+      "title": "Revolutionizing Wireless Traffic Usage Forecasting: Transformer with Attention Mechanism",
+      "snippet": "Revolutionizing wireless traffic forecasting empowers proactive resource allocation, optimizing network performance and ensuring efficient utilization of resources in dynamic wireless environments. real-time traffic data from a business network with There are 470 APs.), this research provides a thorough examination of the temporal and geographical dynamics of network traffic. Time series data forecasting is given a new spin with the help of machine learning models built on the Transformer framework. This approach uses the brain’s attentional processes to analyze time series data for hidden dynamics and complex patterns. Notably, the analysis identifies high-traffic-utilization AP groups exhibiting robust seasonality patterns, alongside those devoid of such patterns. Several different types of forecasting methods are used and evaluated in this research, among them the Holt-Winters technique, a SARIMA model, a GRU model, a CNN model, and a model based on convolutional neural networks. In conclusion, the research sheds light on the complex patterns underlying network traffic and presents an innovative forecasting approach, bolstering the potential for improved wireless network resource management."
+    },
+    {
+      "url": "https://doi.org/10.22541/au.173772018.80603459/v1",
+      "title": "FCA-Transformer: A Feature Pyramid Time Series Forecasting Model Driven by Cross-Attention Mechanism",
+      "snippet": "With the swift progression of information technology, time series forecasting has become increasingly vital across various domains including finance, energy, and transportation. Traditional Recurrent Neural Networks (RNNs) and Long Short-Term Memory (LSTM) networks face challenges with long sequences, necessitating more advanced analytical approaches. Capitalizing on the efficiency of the Transformer architecture in processing lengthy sequences, this study introduces the FCA-Transformer model. This novel model integrates a feature pyramid and cross-attention mechanism to enhance predictive accuracy and computational efficiency. The FCA-Transformer constructs a feature pyramid to capture multi-scale time series features, ensuring comprehensive feature representation. Its cross-attention mechanism promotes deep interaction across sequences, effectively harnessing complex time series correlations, thus surpassing traditional models’ analytical constraints. The model’s cross-scale integration strategy further deepens the understanding and utilization of diverse time series information. Through rigorous ablation and comparative studies, the abstract verifies the pivotal role of the feature pyramid and cross-attention in improving forecasting performance. The FCA-Transformer has proven to outperform current top models, showcasing its exceptional predictive capabilities. Additionally, its successful application to an atypical physical examination dataset demonstrates the model’s robustness and broad applicability, signifying its potential for a wide range of forecasting tasks."
+    },
+    {
+      "url": "https://doi.org/10.31219/osf.io/m6gcn",
+      "title": "Attention Mechanism, Transformers, BERT, and GPT: Tutorial and Survey",
+      "snippet": "This is a tutorial and survey paper on the attention mechanism, transformers, BERT, and GPT. We first explain attention mechanism, sequence-to-sequence model without and with attention, self-attention, and attention in different areas such as natural language processing and computer vision. Then, we explain transformers which do not use any recurrence. We explain all the parts of encoder and decoder in the transformer, including positional encoding, multihead self-attention and cross-attention, and masked multihead attention. Thereafter, we introduce the Bidirectional Encoder Representations from Transformers (BERT) and Generative Pre-trained Transformer (GPT) as the stacks of encoders and decoders of transformer, respectively. We explain their characteristics and how they work. (Cited 80×)"
+    },
+    {
+      "url": "https://doi.org/10.31224/2476",
+      "title": "Generalized Attention Mechanism and Relative Position for Transformer",
+      "snippet": "Pandya, R. (2022)"
+    },
+    {
+      "url": "https://doi.org/10.32614/cran.package.transformer",
+      "title": "transformer: Implementation of Transformer Deep Neural Network with Vignettes",
+      "snippet": "Quast, B. (2023), CRAN: Contributed Packages"
+    },
+    {
+      "url": "https://doi.org/10.3390/biology12071033",
+      "title": "Transformer Architecture and Attention Mechanisms in Genome Data Analysis: A Comprehensive Review",
+      "snippet": "The emergence and rapid development of deep learning, specifically transformer-based architectures and attention mechanisms, have had transformative implications across several domains, including bioinformatics and genome data analysis. The analogous nature of genome sequences to language texts has enabled the application of techniques that have exhibited success in fields ranging from natural language processing to genomic data. This review provides a comprehensive analysis of the most recent advancements in the application of transformer architectures and attention mechanisms to genome and transcriptome data. The focus of this review is on the critical evaluation of these techniques, discussing their advantages and limitations in the context of genome data analysis. With the swift pace of development in deep learning methodologies, it becomes vital to continually assess and reflect on the current standing and future direction of the research. Therefore, this review aims to serve as a timely resource for both seasoned researchers and newcomers, offering a panoramic view of the recent advancements and elucidating the state-of-the-art applications in the field. Furthermore, this review paper serves to highlight potential areas of future investigation by critically evaluating studies from 2019 to 2023, thereby acting as a stepping-stone for further research endeavors. (Cited 196×)"
+    },
+    {
+      "url": "https://doi.org/10.3390/rs14122861",
+      "title": "Swin-Transformer-Enabled YOLOv5 with Attention Mechanism for Small Object Detection on Satellite Images",
+      "snippet": "Object detection has made tremendous progress in natural images over the last decade. However, the results are hardly satisfactory when the natural image object detection algorithm is directly applied to satellite images. This is due to the intrinsic differences in the scale and orientation of objects generated by the bird’s-eye perspective of satellite photographs. Moreover, the background of satellite images is complex and the object area is small; as a result, small objects tend to be missing due to the challenge of feature extraction. Dense objects overlap and occlusion also affects the detection performance. Although the self-attention mechanism was introduced to detect small objects, the computational complexity increased with the image’s resolution. We modified the general one-stage detector YOLOv5 to adapt the satellite images to resolve the above problems. First, new feature fusion layers and a prediction head are added from the shallow layer for small object detection for the first time because it can maximally preserve the feature information. Second, the original convolutional prediction heads are replaced with Swin Transformer Prediction Heads (SPHs) for the first time. SPH represents an advanced self-attention mechanism whose shifted window design can reduce the computational complexity to linearity. Finally, Normalization-based Attention Modules (NAMs) are integrated into YOLOv5 to improve attention performance in a normalized way. The improved YOLOv5 is termed SPH-YOLOv5. It is evaluated on the NWPU-VHR10 dataset and DOTA dataset, which are widely used for satellite image object detection evaluations. Compared with the basal YOLOv5, SPH-YOLOv5 improves the mean Average Precision (mAP) by 0.071 on the DOTA dataset. (Cited 206×)"
+    },
+    {
+      "url": "https://doi.org/10.5220/0012014800003633",
+      "title": "Combining Transformer and Reverse Attention Mechanism for Polyp Segmentation",
+      "snippet": "Lin, J. et al. (2022), Proceedings of the 4th International Conference on Biotechnology and Biomedicine"
+    },
+    {
+      "url": "https://doi.org/10.5244/c.35.86",
+      "title": "PS-Transformer: Learning Sparse Photometric Stereo Network using Self-Attention Mechanism",
+      "snippet": "Ikehata, S. (2021), Proceedings of the British Machine Vision Conference 2021"
+    },
+    {
+      "url": "https://doi.org/10.65215/2q58a426",
+      "title": "Attention Is All You Need",
+      "snippet": "The dominant sequence transduction models are based on complex recurrent or convolutional neural networks in an encoder-decoder configuration. The best performing models also connect the encoder and decoder through an attention mechanism. We propose a new simple network architecture, the Transformer, based solely on attention mechanisms, dispensing with recurrence and convolutions entirely. Experiments on two machine translation tasks show these models to be superior in quality while being more parallelizable and requiring significantly less time to train. Our model achieves 28.4 BLEU on the WMT 2014 English-to-German translation task, improving over the existing best results, including ensembles by over 2 BLEU. On the WMT 2014 English-to-French translation task, our model establishes a new single-model state-of-the-art BLEU score of 41.8 after training for 3.5 days on eight GPUs, a small fraction of the training costs of the best models from the literature. We show that the Transformer generalizes well to other tasks by applying it successfully to English constituency parsing both with large and limited training data. (Cited 6546×)"
+    },
+    {
+      "url": "https://doi.org/10.7717/peerj-cs.3536/fig-5",
+      "title": "Figure 5: Architectural diagram of the vision transformer and attention mechanism within the hybrid model.",
+      "snippet": ""
+    },
+    {
+      "url": "https://drdatascientist.com/posts/transformer-attention-mechanisms-explained/",
+      "title": "Transformer Attention Mechanisms: From Theory to Implementation",
+      "snippet": "Deep dive into transformer attention mechanisms. Understand the mathematical foundations, implement multi-head attention from scratch, and explore why transformers revolutionized AI."
+    },
+    {
+      "url": "https://e2eml.school/transformers.html",
+      "title": "Transformers from Scratch",
+      "snippet": "e2eml.school"
+    },
+    {
+      "url": "https://en.wikipedia.org/wiki/Transformer_(deep_learning)",
+      "title": "Transformer (deep learning) - Wikipedia",
+      "snippet": "The attention mechanism used in the transformer architecture are scaled dot-product attention units. For each unit, the transformer model learns three weight matrices: the query weights , the key weights , and the value weights ."
+    },
+    {
+      "url": "https://jalammar.github.io/illustrated-transformer/",
+      "title": "The Illustrated Transformer (2018)",
+      "snippet": "jalammar.github.io"
+    },
+    {
+      "url": "https://learnopencv.com/attention-mechanism-in-transformer-neural-networks/",
+      "title": "Understanding Attention Mechanism in Transformer Neural Networks",
+      "snippet": "Yet, in the next part of this series, we will see that vision transformers built using the attention mechanism work quite well for computer vision ..."
+    },
+    {
+      "url": "https://learnopencv.com/tag/what-is-self-attention-mechanism-in-transformers/",
+      "title": "What is self attention mechanism in transformers? | LearnOpenCV",
+      "snippet": "What is self attention mechanism in transformers? ... Understanding Attention Mechanism in Transformer Neural Networks"
+    },
+    {
+      "url": "https://lilianweng.github.io/posts/2018-06-24-attention/",
+      "title": "Attention? Attention",
+      "snippet": "lilianweng.github.io"
+    },
+    {
+      "url": "https://link.springer.com/chapter/10.1007/978-3-032-10738-1_9",
+      "title": "Attention Mechanism and Transformers | Springer Nature Link",
+      "snippet": "The chapter begins by introducing the attention mechanism as a data-weighting strategy and explains its role in enhancing the performance of deep learning models, particularly in sequence modeling. A major breakthrough in this area was the introduction of Transformers—models built from attention modules without any recurrence."
+    },
+    {
+      "url": "https://lucalp.dev/bitter-lesson-tokenization-and-blt",
+      "title": "The Bitter Lesson is coming for Tokenization",
+      "snippet": "lucalp.dev"
+    },
+    {
+      "url": "https://machinelearningmastery.com/the-transformer-attention-mechanism/",
+      "title": "The Transformer Attention Mechanism - MachineLearningMastery.com",
+      "snippet": "Learn how the Transformer model uses self-attention to compute representations of sequences without recurrence or convolutions. Explore the scaled dot-product attention and multi-head attention mechanisms with examples and code."
+    },
+    {
+      "url": "https://medium.com/@nitinmittapally/understanding-attention-in-transformers-a-visual-guide-df416bfe495a",
+      "title": "Understanding Attention in Transformers: A Visual Guide",
+      "snippet": "Attention mechanisms are the cornerstone of transformer models, enabling them to process sequential data with remarkable efficiency. In this post, we'll dive deep into how attention works and ..."
+    },
+    {
+      "url": "https://openlibrary.org/works/OL12439399W",
+      "title": "Cartesian meditations",
+      "snippet": "Edmund Husserl (1960) — 13 eds, ebook: no_ebook"
+    },
+    {
+      "url": "https://openlibrary.org/works/OL15311250W",
+      "title": "The origin of ideas",
+      "snippet": "Antonio Rosmini (1883) — 7 eds, ebook: public"
+    },
+    {
+      "url": "https://openlibrary.org/works/OL1618262W",
+      "title": "History of the World's Fair",
+      "snippet": "Benjamin Cummings Truman (1893) — 5 eds, ebook: public"
+    },
+    {
+      "url": "https://openlibrary.org/works/OL18481636W",
+      "title": "Understanding events",
+      "snippet": "Jeffrey M. Zacks (2007) — 3 eds, ebook: borrowable"
+    },
+    {
+      "url": "https://stackoverflow.com/questions/54232350/how-to-manipulate-encoder-state-in-a-multi-layer-bidirectional-with-attention-me",
+      "title": "How to manipulate encoder state in a multi-layer bidirectional with Attention Mechanism",
+      "snippet": "I am implementing a Seq2Seq model with multi-layer bidirectional rnn and attention mechanism and while following this tutorial https://github.com/tensorflow/nmt I got confused about how to manipulate correctly the encoder_state after the bidirectional layer. Citing the tutorial \"For multiple bidirectional layers, we need to manipulate the encoder_state a bit, see model.py, method _build_bidirectional_rnn() for more details.\" and this is the relevant part of the code ( https://github.com/tensorfl"
+    },
+    {
+      "url": "https://stackoverflow.com/questions/55491752/workaround-for-using-tf-matmul-with-two-non-constant-inputs",
+      "title": "Workaround for using tf.matmul with two non-constant inputs",
+      "snippet": "We are currently trying to convert a transformer model to a tensorflow-lite graph but it seems that the problem is the self-attention mechanism. We're not able to process the graph. Looking into tf-lite code we narrowed it down to the tf.matmul lite-version. The docs state: tf.matmul - as long as the second argument is constant and transposition is not used However, this is the case in self-attention: (source: Attention is all you need ) Is there a known workaround for such a situation?"
+    },
+    {
+      "url": "https://stackoverflow.com/questions/58007391/attention-text-generation-in-character-by-character-fashion",
+      "title": "Attention Text Generation in Character-by-Character fashion",
+      "snippet": "I am searching the web for a couple of days for any text generation model that would use only attention mechanisms. The Transformer architecture that made waves in the context of Seq-to-Seq models is actually based solely on Attention mechanisms but is mainly designed and used for translation or chat bot tasks so it doesn't fit to the purpose, but the principle does. My question is: Does anyone knows or heard of a text generation model based solely on Attention without any recurrence ? Thanks a"
+    },
+    {
+      "url": "https://stackoverflow.com/questions/58855564/how-is-the-self-attention-mechanism-in-transformers-able-to-learn-how-the-words",
+      "title": "How is the self-attention mechanism in Transformers able to learn how the words are related to each other?",
+      "snippet": "Given the sentence The animal didn't cross the street because it was too tired , how the self-attention is able to map with a higher score the word aninal intead of the word street ? I'm wondering if that might be a consequence of the word embedding vectors fed into the network, that some how already encapsulate some degree of distance among the words."
+    },
+    {
+      "url": "https://stackoverflow.com/questions/65543593/why-doesnt-the-transformer-use-positional-encoding-in-every-layer",
+      "title": "Why doesn't the transformer use positional encoding in every layer?",
+      "snippet": "Positional encoding is added to the input before it is passed into the transformer model, because otherwise the attention mechanism would be order invariant. However, both the encoder and decoder are layered, with attention being used on each layer. So if order is important for the attention mechanism, shouldn't the positional encoding be added to the input of each multiheaded attention block, instead of just once at the input to the model?"
+    },
+    {
+      "url": "https://stackoverflow.com/questions/70271797/how-to-implement-hierarchical-transformer-for-document-classification-in-keras",
+      "title": "How to implement hierarchical Transformer for document classification in Keras?",
+      "snippet": "Hierarchical attention mechanism for document classification has been presented by Yang et al. https://www.cs.cmu.edu/~./hovy/papers/16HLT-hierarchical-attention-networks.pdf Its implementation is available on https://github.com/ShawnyXiao/TextClassification-Keras Also, the implementation of the document classification with Transformer is available on https://keras.io/examples/nlp/text_classification_with_transformer But, it's not hierarchical. I have googled a lot but didn't find any implementa"
+    },
+    {
+      "url": "https://stackoverflow.com/questions/72567409/one-head-attention-mechanism-pytorch",
+      "title": "one head attention mechanism pytorch",
+      "snippet": "I am trying to implement the attention mechanism using the CIFAR10 dataset. The idea is to implement the attention layer considering only one head. Therefore, I took as reference the multi-head implementation given here: https://github.com/jadore801120/attention-is-all-you-need-pytorch/blob/5c0264915ab43485adc576f88971fc3d42b10445/transformer/SubLayers.py and here https://github.com/jadore801120/attention-is-all-you-need-pytorch/blob/5c0264915ab43485adc576f88971fc3d42b10445/transformer/SubLayers"
+    },
+    {
+      "url": "https://stackoverflow.com/questions/75224660/visualisation-attentions-transformer-based-architecture",
+      "title": "Visualisation Attentions Transformer-based Architecture",
+      "snippet": "I have a transformer based architecture, specifically I have both an encoder using Vision Transformers and a decoder using Language Models based on Transformers. We know that Transformers have a specific attention mechanism named 'Self-attention'. I was wondering, having a trained model (I am using PyTorch), what should I visualise to understand what part of the input is the most important? I suppose I have to visualise the weights of the Self-attention layer to understand what is more important"
+    },
+    {
+      "url": "https://stackoverflow.com/questions/77449999/pytorch-runtimeerror-invalid-shape-during-reshaping-for-multi-head-attention",
+      "title": "PyTorch RuntimeError: Invalid Shape During Reshaping for Multi-Head Attention",
+      "snippet": "I'm implementing a multi-head self-attention mechanism in PyTorch which is part of Text2Image model that I am trying to build and I'm encountering a runtime error when trying to reshape the output of linear transformations before splitting into multiple heads. The text embeddings from my model have a shape of [32, 26, 768] , and I'm using 8 attention heads with an embedding size of 768. However, during reshaping, I get an invalid shape error. Here I am providing various blocks(as screenshots) &"
+    },
+    {
+      "url": "https://stackoverflow.com/questions/77718720/changing-the-attention-layer-of-a-transformer",
+      "title": "Changing the Attention Layer of a Transformer",
+      "snippet": "I would like to test my own formulation of the attention mechanism for a transformer. To that end I would like to find an existing pre trained transformer that is easy to read through and that uses not too large of a dataset. I just want to take that model and replace the code of the attention mechanism with my own. I have already tried using https://www.google.com/url?sa=t&source=web&rct=j&opi=89978449&url=https://github.com/hkproj/pytorch-transformer&ved=2ahUKEwiKjpDF4q2DAxX-WUEAHXDMA8sQFnoECB"
+    },
+    {
+      "url": "https://tensorgym.com/blog/transformer-attention",
+      "title": "Complete Guide to Transformer Architecture & Attention Mechanisms ...",
+      "snippet": "This comprehensive guide demystifies transformer architectures and attention mechanisms powering ChatGPT, LLaMA, and modern AI. Learn how these groundbreaking models work, their practical implementation details, and why they've revolutionized machine learning across language, vision, and scientific applications."
+    },
+    {
+      "url": "https://vitalflux.com/attention-mechanism-in-transformers-examples/",
+      "title": "Attention Mechanism in Transformers: Examples",
+      "snippet": "Attention mechanisms in transformer ... This design is part of what makes the multi-head attention mechanism in Transformers particularly powerful."
+    },
+    {
+      "url": "https://vitalflux.com/attention-mechanism-workflow-example/",
+      "title": "Attention Mechanism Workflow & Transformer: Examples",
+      "snippet": "The attention mechanism in transformers, crucial for tasks like machine translation and text summarization , follows a multi-step workflow to enhance ..."
+    },
+    {
+      "url": "https://www.3blue1brown.com/lessons/attention/",
+      "title": "Attention in transformers, step-by-step | Deep ... | 3Blue1Brown",
+      "snippet": "Demystifying attention, the key mechanism inside transformers and LLMs."
+    },
+    {
+      "url": "https://www.baeldung.com/cs/attention-mechanism-transformers",
+      "title": "Attention Mechanism in the Transformers Model | Baeldung on",
+      "snippet": "In this article, we looked into arguably the most important part of the famous transformer architecture –  the attention module."
+    },
+    {
+      "url": "https://www.deeplearningdaily.com/the-transformer-attention-mechanism/",
+      "title": "The Transformer Attention Mechanism – Deep Learning Daily",
+      "snippet": "We will first focus on the Transformer attention mechanism in this tutorial and subsequently review the Transformer model in a separate one."
+    },
+    {
+      "url": "https://www.geeksforgeeks.org/nlp/transformer-attention-mechanism-in-nlp/",
+      "title": "Transformer Attention Mechanism in NLP - GeeksforGeeks",
+      "snippet": "Transformer model is a type of neural network architecture designed to handle sequential data primarily for tasks such as language translation, text generation and many more. Unlike traditional recurrent neural networks (RNNs) or convolutional neural networks (CNNs), Transformers uses attention mechanism to capture relationships between all words in a sentence regardless of their distance from ..."
+    },
+    {
+      "url": "https://www.gwern.net/GPT-3",
+      "title": "GPT-3 Creative Fiction",
+      "snippet": "gwern.net"
+    }
+  ]
+}

@@ -1,0 +1,37 @@
+{
+  "mode": "pdf",
+  "query": "postgresql index types btree gin gist performance",
+  "google_count": 0,
+  "pool_size": 231,
+  "capped_pool_size": 41,
+  "filtered_pool_size": 2,
+  "filtered_capped_pool_size": 2,
+  "oracle_pool_size": 2,
+  "c1": [
+    "https://momjian.us/main/writings/pgsql/indexing.pdf",
+    "https://minervadb.xyz/wp-content/uploads/2025/04/Optimal-Indexing-for-PostgreSQL-Performance.pdf"
+  ],
+  "c1_ms": 0,
+  "c2": [
+    "https://minervadb.xyz/wp-content/uploads/2025/04/Optimal-Indexing-for-PostgreSQL-Performance.pdf",
+    "https://momjian.us/main/writings/pgsql/indexing.pdf"
+  ],
+  "c2_ms": 0,
+  "c2p": [
+    "https://minervadb.xyz/wp-content/uploads/2025/04/Optimal-Indexing-for-PostgreSQL-Performance.pdf",
+    "https://momjian.us/main/writings/pgsql/indexing.pdf"
+  ],
+  "c2p_ms": 0,
+  "c3": [
+    "https://minervadb.xyz/wp-content/uploads/2025/04/Optimal-Indexing-for-PostgreSQL-Performance.pdf",
+    "https://momjian.us/main/writings/pgsql/indexing.pdf"
+  ],
+  "c3_ms": 86,
+  "method_pool_sizes": {
+    "c1": 2,
+    "c2": 2,
+    "c2p": 2,
+    "c3": 2
+  },
+  "fetch_ms": 60002
+}

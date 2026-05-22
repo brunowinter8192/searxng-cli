@@ -1,0 +1,25 @@
+{
+  "mode": "books",
+  "query": "contrastive learning self-supervised representations",
+  "google_count": 0,
+  "pool_size": 406,
+  "capped_pool_size": 45,
+  "filtered_pool_size": 0,
+  "filtered_capped_pool_size": 0,
+  "oracle_pool_size": 0,
+  "c1": [],
+  "c1_ms": 0,
+  "c2": [],
+  "c2_ms": 0,
+  "c2p": [],
+  "c2p_ms": 0,
+  "c3": [],
+  "c3_ms": 0,
+  "method_pool_sizes": {
+    "c1": 0,
+    "c2": 0,
+    "c2p": 0,
+    "c3": 0
+  },
+  "fetch_ms": 3314
+}
