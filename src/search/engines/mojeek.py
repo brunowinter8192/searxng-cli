@@ -6,7 +6,7 @@ from urllib.parse import quote_plus
 
 from src.search.browser import new_tab
 from src.search.engines.base import BaseEngine
-from src.search.rate_limiter import RateLimiter, get_limiter, _limiters
+from src.search.rate_limiter import RateLimiter, _limiters
 from src.search.result import SearchResult
 from src.search import status as S
 
@@ -45,7 +45,6 @@ class MojeekEngine(BaseEngine):
     # Full search logic with empty-reason diagnosis; exceptions propagate to _engine_with_timing
     async def search_with_reason(self, query: str, language: str = "en", max_results: int = 10) -> tuple[list[SearchResult], str | None]:
         logger.info("Mojeek search: %s", query)
-        limiter = get_limiter(self.name)
         tab = await new_tab()
         search_url = _build_url(query)
         try:
@@ -55,7 +54,6 @@ class MojeekEngine(BaseEngine):
                 logger.warning("Mojeek empty (%s) for: %s", reason, query)
                 return [], reason
             results = await _parse_results(tab, max_results)
-            limiter.reset_backoff()
             return results, (None if results else S.EMPTY_NO_RESULTS)
         finally:
             await tab.close()
@@ -67,7 +65,6 @@ class MojeekEngine(BaseEngine):
             return results
         except Exception as e:
             logger.error("Mojeek search failed: %s", e)
-            get_limiter(self.name).backoff()
             return []
 
 

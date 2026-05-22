@@ -9,7 +9,7 @@ from pydoll.protocol.network.types import CookieSameSite
 
 from src.search.browser import new_tab
 from src.search.engines.base import BaseEngine
-from src.search.rate_limiter import RateLimiter, get_limiter, _limiters
+from src.search.rate_limiter import RateLimiter, _limiters
 from src.search.result import SearchResult
 from src.search import status as S
 
@@ -74,7 +74,6 @@ class GoogleEngine(BaseEngine):
     # Full search logic with empty-reason diagnosis; exceptions propagate to _engine_with_timing
     async def search_with_reason(self, query: str, language: str = "en", max_results: int = 10) -> tuple[list[SearchResult], str | None]:
         logger.info("Google search: %s", query)
-        limiter = get_limiter(self.name)
         tab = await new_tab()
         await _inject_socs_cookie(tab)
         search_url = _build_url(query, language, max_results)
@@ -87,14 +86,12 @@ class GoogleEngine(BaseEngine):
                 current = await tab.current_url
             if CAPTCHA_PATH in current:
                 logger.warning("Google CAPTCHA detected for: %s", query)
-                limiter.backoff()
                 return [], S.EMPTY_BLOCK
             if not await _wait_for_results(tab):
                 reason = await _diagnose_empty(tab)
                 logger.warning("Google empty (%s) for: %s", reason, query)
                 return [], reason
             results = await _parse_results(tab, max_results)
-            limiter.reset_backoff()
             return results, (None if results else S.EMPTY_NO_RESULTS)
         finally:
             await tab.close()
@@ -106,7 +103,6 @@ class GoogleEngine(BaseEngine):
             return results
         except Exception as e:
             logger.error("Google search failed: %s", e)
-            get_limiter(self.name).backoff()
             return []
 
 
