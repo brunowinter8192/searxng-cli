@@ -1,0 +1,17 @@
+{
+  "mode": "general",
+  "query": "python asyncio event loop concurrency",
+  "selection_method": "LLM oracle (Sonnet, oracle-worker no-filter run)",
+  "top_10": [
+    {"rank": 1, "url": "https://docs.python.org/3/library/asyncio-eventloop.html", "rationale": "Official Python documentation — Event Loop reference. The canonical primary source: event loop is the core of every asyncio application, covers run/stop/callbacks/subprocesses."},
+    {"rank": 2, "url": "https://realpython.com/async-io-python/", "rationale": "Real Python 'Python's asyncio: A Hands-On Walkthrough' — comprehensive tutorial covering coroutines, event loops, awaitable objects, and concurrent I/O-bound task management."},
+    {"rank": 3, "url": "http://aosabook.org/en/500L/a-web-crawler-with-asyncio-coroutines.html", "rationale": "'A Web Crawler With asyncio Coroutines' from Architecture of Open Source Applications — classic foundational tutorial showing asyncio event loop concurrency in practice."},
+    {"rank": 4, "url": "https://www.pythontutorial.net/python-concurrency/python-event-loop/", "rationale": "'Python Event Loop' — tutorial specifically focused on the Python event loop and how Python uses it to achieve the concurrency model using a single thread."},
+    {"rank": 5, "url": "https://superfastpython.com/asyncio-event-loop-separate-thread/", "rationale": "SuperFastPython 'Asyncio Event Loop in Separate Thread' — covers running event loops in background threads using asyncio.run_coroutine_threadsafe(). Practical concurrency pattern."},
+    {"rank": 6, "url": "https://www.iamraghuveer.com/posts/python-asyncio-event-loop-internals/", "rationale": "'Python AsyncIO: Event Loop Internals and Practices' — covers event loop internals and practical patterns for I/O-bound workloads in Python asyncio."},
+    {"rank": 7, "url": "https://superfastpython.com/asyncio-multiple-event-loops/", "rationale": "SuperFastPython 'Asyncio Run Multiple Concurrent Event Loops' — covers running multiple asyncio event loops concurrently by starting each in a separate thread."},
+    {"rank": 8, "url": "https://www.educative.io/blog/concurrency-in-python", "rationale": "Educative 'Python Concurrency: Making sense of asyncio' — explains asyncio event loop concurrency model on a single thread, how it switches between tasks at await points."},
+    {"rank": 9, "url": "https://dhirendrabiswal.com/advanced-python-concurrency-asyncio-event-loop-optimization-and-concurrent-futures-patterns/", "rationale": "'Advanced Python Concurrency: Asyncio Event Loop Optimization and Concurrent Futures Patterns' — deep guide on optimizing the event loop for high-performance I/O-bound and mixed workloads."},
+    {"rank": 10, "url": "https://dev.to/imsushant12/asyncio-architecture-in-python-event-loops-tasks-and-futures-explained-4pn3", "rationale": "'Asyncio Architecture in Python: Event Loops, Tasks, and Futures Explained' — covers event loop architecture, single-threaded concurrency, and how asyncio manages I/O waiting."}
+  ]
+}
