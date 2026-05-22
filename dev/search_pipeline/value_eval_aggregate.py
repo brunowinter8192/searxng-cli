@@ -97,8 +97,15 @@ def _load_and_score_pair(
     oracle_data = None
     if not no_oracle and oracle_path.exists():
         oracle_data = json.loads(oracle_path.read_text())
+        # Skip empty-pool pairs (undersized_pool=True AND pool_size=0) in scoring
+        if oracle_data.get("undersized_pool") and oracle_data.get("pool_size", -1) == 0:
+            oracle_data = None
 
-    oracle_urls = [item["url"] for item in oracle_data["oracle_top10"]] if oracle_data else []
+    # top_10 items may be dicts {"url":...} (B1 format) or plain strings (B2 format)
+    def _extract_url(item) -> str:
+        return item["url"] if isinstance(item, dict) else item
+
+    oracle_urls = [_extract_url(item) for item in oracle_data.get("top_10", [])] if oracle_data else []
     overlaps    = {key: _jaccard(oracle_urls, methods_data.get(key, [])) for key in METHOD_KEYS}
 
     return {
@@ -146,10 +153,12 @@ def _write_query_md(result: dict, ts: str) -> Path:
     # Oracle selection
     lines += ["## Oracle Selection", ""]
     if result["oracle_data"]:
-        for i, item in enumerate(result["oracle_data"]["oracle_top10"], 1):
+        for i, item in enumerate(result["oracle_data"].get("top_10", []), 1):
+            url = item["url"] if isinstance(item, dict) else item
+            rationale = item.get("rationale", "") if isinstance(item, dict) else ""
             lines += [
-                f"{i}. {item['url']}",
-                f"   Rationale: {item.get('rationale', '')}",
+                f"{i}. {url}",
+                f"   Rationale: {rationale}",
                 "",
             ]
     else:
