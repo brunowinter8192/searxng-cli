@@ -1,0 +1,57 @@
+{
+  "mode": "general",
+  "query": "transformer attention mechanism",
+  "selection_method": "LLM oracle (Sonnet, value-eval-b1)",
+  "top_10": [
+    {
+      "rank": 1,
+      "url": "https://arxiv.org/abs/1706.03762",
+      "rationale": "Original 'Attention Is All You Need' paper (Vaswani et al.) — the canonical primary source defining the transformer and its attention mechanism."
+    },
+    {
+      "rank": 2,
+      "url": "https://jalammar.github.io/illustrated-transformer/",
+      "rationale": "Jay Alammar's Illustrated Transformer — the most widely referenced visual walk-through of the attention mechanism; authoritative community standard for understanding."
+    },
+    {
+      "rank": 3,
+      "url": "https://lilianweng.github.io/posts/2018-06-24-attention/",
+      "rationale": "Lilian Weng's 'Attention? Attention' blog post — canonical, detailed survey of attention mechanisms from Bahdanau through self-attention, highly cited practitioner reference."
+    },
+    {
+      "rank": 4,
+      "url": "https://d2l.ai/chapter_attention-mechanisms-and-transformers/index.html",
+      "rationale": "Dive into Deep Learning textbook chapter on attention and transformers — comprehensive interactive textbook with code, visualizations, and mathematical grounding."
+    },
+    {
+      "rank": 5,
+      "url": "https://www.3blue1brown.com/lessons/attention/",
+      "rationale": "3Blue1Brown step-by-step attention lesson — outstanding geometric/visual explanation of scaled dot-product attention, highly accessible and accurate."
+    },
+    {
+      "rank": 6,
+      "url": "https://machinelearningmastery.com/the-transformer-attention-mechanism/",
+      "rationale": "Machine Learning Mastery guide to transformer attention — practical implementation-focused explanation with code for scaled dot-product and multi-head attention."
+    },
+    {
+      "rank": 7,
+      "url": "https://en.wikipedia.org/wiki/Transformer_(deep_learning)",
+      "rationale": "Wikipedia article on the Transformer — solid overview of the architecture including scaled dot-product attention formulation and architectural context."
+    },
+    {
+      "rank": 8,
+      "url": "https://arxiv.org/html/2604.00965v1",
+      "rationale": "Survey 'Understanding Transformers and Attention Mechanisms' — recent comprehensive academic survey, title directly matches query intent."
+    },
+    {
+      "rank": 9,
+      "url": "https://doi.org/10.31219/osf.io/m6gcn",
+      "rationale": "Tutorial and survey covering attention mechanism, transformers, BERT, and GPT — broad scope maps well to someone seeking a structured overview."
+    },
+    {
+      "rank": 10,
+      "url": "https://tensorgym.com/blog/transformer-attention",
+      "rationale": "Complete guide to transformer architecture and attention — covers theory through implementation including multi-head attention and positional encoding in one comprehensive post."
+    }
+  ]
+}

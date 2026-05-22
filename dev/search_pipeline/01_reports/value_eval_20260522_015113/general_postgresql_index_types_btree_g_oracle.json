@@ -1,0 +1,57 @@
+{
+  "mode": "general",
+  "query": "postgresql index types btree gin gist performance",
+  "selection_method": "LLM oracle (Sonnet, value-eval-b1)",
+  "top_10": [
+    {
+      "rank": 1,
+      "url": "https://www.postgresql.org/docs/current/indexes-types.html",
+      "rationale": "Official PostgreSQL documentation on index types — canonical primary reference covering B-tree, Hash, GiST, SP-GiST, GIN, and BRIN with algorithm descriptions."
+    },
+    {
+      "rank": 2,
+      "url": "https://doi.org/10.20944/preprints202511.2170.v1",
+      "rationale": "Empirical comparative study of all six native PostgreSQL index types across OLTP, OLAP, full-text, JSONB, spatial, and time-series workloads — synthesizes benchmark evidence into a recommendation matrix."
+    },
+    {
+      "rank": 3,
+      "url": "https://appmaster.io/blog/btree-gin-gist-index-decision-table",
+      "rationale": "Practical decision table comparing B-tree, GIN, and GiST indexes — directly addresses the query with actionable guidance for filters, JSONB, geo queries, and high-cardinality columns."
+    },
+    {
+      "rank": 4,
+      "url": "https://blog.devops.dev/how-to-choose-between-index-types-b-tree-gin-gist-in-postgresql-2954638ec4b6",
+      "rationale": "How to choose between B-tree, GIN, and GiST — directly named to the query, explains performance trade-offs and use-case matching."
+    },
+    {
+      "rank": 5,
+      "url": "https://www.elysiate.com/blog/best-postgresql-indexes-for-performance",
+      "rationale": "Comprehensive performance guide covering B-tree, GIN, GiST, BRIN, partial, multicolumn, covering, and expression indexes — performance-oriented, directly answers the query."
+    },
+    {
+      "rank": 6,
+      "url": "https://hakibenita.com/postgresql-hash-index",
+      "rationale": "Haki Benita (PostgreSQL expert practitioner) on hash indexes vs. B-tree — authoritative real-world performance comparison from a well-known PG specialist blog."
+    },
+    {
+      "rank": 7,
+      "url": "https://elephanttamer.net/?p=9",
+      "rationale": "GiST vs GIN comparison for LIKE/trigram searches — specific empirical benchmark, actionable takeaway (always GIN for trigram indexing)."
+    },
+    {
+      "rank": 8,
+      "url": "https://stackoverflow.com/questions/40780825/btree-vs-gin-vs-gist-index",
+      "rationale": "Stack Overflow canonical answer comparing B-tree, GIN, and GiST — cites official documentation and summarizes the operator-class differences clearly."
+    },
+    {
+      "rank": 9,
+      "url": "https://habr.com/ru/company/postgrespro/blog/441962/",
+      "rationale": "PostgresPro (core PostgreSQL team) deep-dive on indexes — authoritative source from the development community."
+    },
+    {
+      "rank": 10,
+      "url": "https://www.meerako.com/blogs/postgresql-indexing-strategies-btree-gin-gist-guide",
+      "rationale": "PostgreSQL indexing deep dive specifically on B-Tree, GIN, and GiST strategies — title and content directly match the query terms."
+    }
+  ]
+}
