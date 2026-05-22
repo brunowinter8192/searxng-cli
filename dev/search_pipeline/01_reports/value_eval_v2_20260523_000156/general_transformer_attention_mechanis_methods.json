@@ -1,0 +1,68 @@
+{
+  "mode": "general",
+  "query": "transformer attention mechanism",
+  "google_count": 11,
+  "pool_size": 485,
+  "capped_pool_size": 76,
+  "filtered_pool_size": 450,
+  "filtered_capped_pool_size": 76,
+  "oracle_pool_size": 76,
+  "c1": [
+    "https://machinelearningmastery.com/the-transformer-attention-mechanism/",
+    "https://en.wikipedia.org/wiki/Transformer_(deep_learning)",
+    "https://www.geeksforgeeks.org/nlp/transformer-attention-mechanism-in-nlp/",
+    "https://deeprevision.github.io/posts/001-transformer/",
+    "https://doi.org/10.1007/s10792-026-03966-3",
+    "https://doi.org/10.1016/j.ymssp.2021.108616",
+    "https://medium.com/@kalra.rakshit/introduction-to-transformers-and-attention-mechanisms-c29d252ea2c5",
+    "https://openlibrary.org/works/OL18481636W",
+    "https://stackoverflow.com/questions/72567409/one-head-attention-mechanism-pytorch",
+    "https://www.3blue1brown.com/lessons/attention/"
+  ],
+  "c1_ms": 0,
+  "c2": [
+    "https://scholar.google.de/scholar?q=transformer+attention+mechanism&hl=en&as_sdt=0&as_vis=1&oi=scholart",
+    "https://www.deeplearningdaily.com/the-transformer-attention-mechanism/",
+    "https://www.geeksforgeeks.org/nlp/transformer-attention-mechanism-in-nlp/",
+    "https://learnopencv.com/tag/what-is-self-attention-mechanism-in-transformers/",
+    "https://developer.nvidia.com/blog/emulating-the-attention-mechanism-in-transformer-models-with-a-fully-convolutional-network/",
+    "https://vitalflux.com/attention-mechanism-in-transformers-examples/",
+    "https://doi.org/10.31219/osf.io/mru2x",
+    "https://doi.org/10.31219/osf.io/m6gcn",
+    "https://doi.org/10.1007/s10792-026-03966-3",
+    "https://machinelearningmastery.com/the-transformer-attention-mechanism/"
+  ],
+  "c2_ms": 12,
+  "c2p": [
+    "https://scholar.google.de/scholar?q=transformer+attention+mechanism&hl=en&as_sdt=0&as_vis=1&oi=scholart",
+    "https://www.deeplearningdaily.com/the-transformer-attention-mechanism/",
+    "https://learnopencv.com/tag/what-is-self-attention-mechanism-in-transformers/",
+    "https://www.geeksforgeeks.org/nlp/transformer-attention-mechanism-in-nlp/",
+    "https://developer.nvidia.com/blog/emulating-the-attention-mechanism-in-transformer-models-with-a-fully-convolutional-network/",
+    "https://vitalflux.com/attention-mechanism-in-transformers-examples/",
+    "https://doi.org/10.1007/s10792-026-03966-3",
+    "https://vitalflux.com/attention-mechanism-workflow-example/",
+    "https://machinelearningmastery.com/the-transformer-attention-mechanism/",
+    "https://doi.org/10.31224/2476"
+  ],
+  "c2p_ms": 1,
+  "c3": [
+    "https://vitalflux.com/attention-mechanism-in-transformers-examples/",
+    "https://datasciencedojo.com/blog/understanding-attention-mechanism/",
+    "https://vitalflux.com/attention-mechanism-workflow-example/",
+    "https://mljourney.com/beginners-guide-to-understanding-attention-mechanism-in-transformers/",
+    "https://link.springer.com/chapter/10.1007/978-3-032-10738-1_9",
+    "https://machinelearningmastery.com/the-transformer-attention-mechanism/",
+    "https://www.deeplearningdaily.com/the-transformer-attention-mechanism/",
+    "https://hakia.com/tech-insights/attention-mechanisms/",
+    "https://www.baeldung.com/cs/attention-mechanism-transformers",
+    "https://developer.nvidia.com/blog/emulating-the-attention-mechanism-in-transformer-models-with-a-fully-convolutional-network/"
+  ],
+  "c3_ms": 2761,
+  "method_pool_sizes": {
+    "c1": 76,
+    "c2": 450,
+    "c2p": 76,
+    "c3": 76
+  }
+}

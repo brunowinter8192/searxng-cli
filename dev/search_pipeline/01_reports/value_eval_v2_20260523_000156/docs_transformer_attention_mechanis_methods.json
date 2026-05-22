@@ -1,0 +1,68 @@
+{
+  "mode": "docs",
+  "query": "transformer attention mechanism",
+  "google_count": 0,
+  "pool_size": 474,
+  "capped_pool_size": 63,
+  "filtered_pool_size": 442,
+  "filtered_capped_pool_size": 63,
+  "oracle_pool_size": 63,
+  "c1": [
+    "https://d2l.ai/chapter_attention-mechanisms-and-transformers/index.html",
+    "https://arxiv.org/html/2604.00965v1",
+    "https://deeprevision.github.io/posts/001-transformer/",
+    "https://doi.org/10.1007/s10792-026-03966-3",
+    "https://doi.org/10.1016/j.ymssp.2021.108616",
+    "https://openlibrary.org/works/OL18481636W",
+    "https://stackoverflow.com/questions/72567409/one-head-attention-mechanism-pytorch",
+    "https://arxiv.org/html/2302.07730v4",
+    "https://arxiv.org/pdf/2312.00752",
+    "https://docs.nvidia.com/deeplearning/transformer-engine/user-guide/examples/attention/attention.html"
+  ],
+  "c1_ms": 0,
+  "c2": [
+    "https://www.deeplearningdaily.com/the-transformer-attention-mechanism/",
+    "https://www.codecademy.com/article/transformer-architecture-self-attention-mechanism",
+    "https://doi.org/10.31219/osf.io/mru2x",
+    "https://doi.org/10.31219/osf.io/m6gcn",
+    "https://doi.org/10.1007/s10792-026-03966-3",
+    "https://github.com/takara-ai/go-attention",
+    "https://stackoverflow.com/questions/65543593/why-doesnt-the-transformer-use-positional-encoding-in-every-layer",
+    "https://stackoverflow.com/questions/77718720/changing-the-attention-layer-of-a-transformer",
+    "https://stackoverflow.com/questions/72567409/one-head-attention-mechanism-pytorch",
+    "https://doi.org/10.3390/math14071133"
+  ],
+  "c2_ms": 13,
+  "c2p": [
+    "https://www.deeplearningdaily.com/the-transformer-attention-mechanism/",
+    "https://www.codecademy.com/article/transformer-architecture-self-attention-mechanism",
+    "https://doi.org/10.1007/s10792-026-03966-3",
+    "https://doi.org/10.31219/osf.io/m6gcn",
+    "https://doi.org/10.31224/2476",
+    "https://arxiv.org/html/2604.00965v1",
+    "https://www.baeldung.com/cs/attention-mechanism-transformers",
+    "https://doi.org/10.7717/peerj-cs.3536/fig-5",
+    "https://stackoverflow.com/questions/65543593/why-doesnt-the-transformer-use-positional-encoding-in-every-layer",
+    "https://stackoverflow.com/questions/72567409/one-head-attention-mechanism-pytorch"
+  ],
+  "c2p_ms": 1,
+  "c3": [
+    "https://arxiv.org/html/2604.00965v1",
+    "https://www.deeplearningdaily.com/the-transformer-attention-mechanism/",
+    "https://huggingface.co/blog/Esmail-AGumaan/attention-is-all-you-need",
+    "https://www.baeldung.com/cs/attention-mechanism-transformers",
+    "https://www.askhandle.com/blog/transformers-and-attention-mechanisms-in-ai-training",
+    "https://medium.com/@nitinmittapally/understanding-attention-in-transformers-a-visual-guide-df416bfe495a",
+    "https://www.codecademy.com/article/transformer-architecture-self-attention-mechanism",
+    "https://arxiv.org/pdf/2512.03377",
+    "https://oriolac.github.io/posts/20241029-attention/",
+    "https://www.geeksforgeeks.org/nlp/transformer-attention-mechanism-in-nlp/"
+  ],
+  "c3_ms": 2336,
+  "method_pool_sizes": {
+    "c1": 63,
+    "c2": 442,
+    "c2p": 63,
+    "c3": 63
+  }
+}

@@ -1,0 +1,68 @@
+{
+  "mode": "pdf",
+  "query": "postgresql index types btree gin gist performance",
+  "google_count": 0,
+  "pool_size": 239,
+  "capped_pool_size": 49,
+  "filtered_pool_size": 239,
+  "filtered_capped_pool_size": 49,
+  "oracle_pool_size": 49,
+  "c1": [
+    "https://doi.org/10.1007/s10707-020-00407-w",
+    "https://doi.org/10.1109/informatics47936.2019.9119265",
+    "https://habr.com/ru/company/postgrespro/blog/441962/",
+    "https://stackoverflow.com/questions/1540374/why-are-postgresql-text-search-gist-indexes-so-much-slower-than-gin-indexes",
+    "https://www.postgresql.org/docs/current/indexes-types.html",
+    "https://www.semanticscholar.org/paper/Comparative-analysis-of-indexing-strategies-in-load-Zolotukhina/a1bcf6c3ddb11cd3dc7cb9cafbbae31fd2c222f7",
+    "https://doi.org/10.1007/978-1-4842-5663-3_1",
+    "https://doi.org/10.1088/1742-6596/944/1/012022",
+    "https://hakibenita.com/postgresql-correlation-brin-multi-minmax",
+    "https://stackoverflow.com/questions/12738997/postgres-gist-vs-btree-index"
+  ],
+  "c1_ms": 0,
+  "c2": [
+    "https://stackoverflow.com/questions/1540374/why-are-postgresql-text-search-gist-indexes-so-much-slower-than-gin-indexes",
+    "https://blog.devops.dev/how-to-choose-between-index-types-b-tree-gin-gist-in-postgresql-2954638ec4b6",
+    "https://www.preprints.org/manuscript/202511.2170",
+    "https://www.scribd.com/document/831033974/Index",
+    "https://stackoverflow.com/questions/40780825/btree-vs-gin-vs-gist-index",
+    "https://www.meerako.com/blogs/postgresql-indexing-strategies-btree-gin-gist-guide",
+    "https://postgrespro.com/docs/postgresql/current/indexes-types",
+    "https://www.postgresql.org/docs/current/indexes-types.html",
+    "https://stackoverflow.com/questions/12738997/postgres-gist-vs-btree-index",
+    "https://wiki.postgresql.org/wiki/GSoC_2017"
+  ],
+  "c2_ms": 2,
+  "c2p": [
+    "https://stackoverflow.com/questions/1540374/why-are-postgresql-text-search-gist-indexes-so-much-slower-than-gin-indexes",
+    "https://blog.devops.dev/how-to-choose-between-index-types-b-tree-gin-gist-in-postgresql-2954638ec4b6",
+    "https://www.preprints.org/manuscript/202511.2170",
+    "https://www.scribd.com/document/831033974/Index",
+    "https://stackoverflow.com/questions/40780825/btree-vs-gin-vs-gist-index",
+    "https://www.meerako.com/blogs/postgresql-indexing-strategies-btree-gin-gist-guide",
+    "https://postgrespro.com/docs/postgresql/current/indexes-types",
+    "https://www.postgresql.org/docs/current/indexes-types.html",
+    "https://stackoverflow.com/questions/12738997/postgres-gist-vs-btree-index",
+    "https://wiki.postgresql.org/wiki/GSoC_2017"
+  ],
+  "c2p_ms": 1,
+  "c3": [
+    "https://blog.devops.dev/how-to-choose-between-index-types-b-tree-gin-gist-in-postgresql-2954638ec4b6",
+    "https://www.preprints.org/manuscript/202511.2170",
+    "https://www.meerako.com/blogs/postgresql-indexing-strategies-btree-gin-gist-guide",
+    "https://www.scribd.com/document/831033974/Index",
+    "https://doi.org/10.20944/preprints202511.2170.v1",
+    "https://www.postgresql.org/docs/current/indexes-types.html",
+    "https://stackoverflow.com/questions/40780825/btree-vs-gin-vs-gist-index",
+    "https://stackoverflow.com/questions/1540374/why-are-postgresql-text-search-gist-indexes-so-much-slower-than-gin-indexes",
+    "https://stackoverflow.com/questions/12738997/postgres-gist-vs-btree-index",
+    "https://minervadb.xyz/wp-content/uploads/2025/04/Optimal-Indexing-for-PostgreSQL-Performance.pdf"
+  ],
+  "c3_ms": 1689,
+  "method_pool_sizes": {
+    "c1": 49,
+    "c2": 239,
+    "c2p": 49,
+    "c3": 49
+  }
+}

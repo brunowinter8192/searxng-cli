@@ -1,0 +1,68 @@
+{
+  "mode": "pdf",
+  "query": "transformer attention mechanism",
+  "google_count": 0,
+  "pool_size": 484,
+  "capped_pool_size": 74,
+  "filtered_pool_size": 453,
+  "filtered_capped_pool_size": 74,
+  "oracle_pool_size": 74,
+  "c1": [
+    "https://deeprevision.github.io/posts/001-transformer/",
+    "https://doi.org/10.1007/s10792-026-03966-3",
+    "https://doi.org/10.1016/j.ymssp.2021.108616",
+    "https://faculty.ist.psu.edu/vhonavar/Courses/dsmethods/transformer.pdf",
+    "https://openlibrary.org/works/OL18481636W",
+    "https://stackoverflow.com/questions/72567409/one-head-attention-mechanism-pytorch",
+    "https://www.semanticscholar.org/paper/Energy-efficient-tugboat-scheduling%3A-A-hybrid-and-Pitakaso-Sethanan/40205636069c955aadd1688a43ef86cf2bd160fb",
+    "https://www.slideshare.net/slideshow/attention-is-all-you-need-pdf-attention-is-all-you-need-pdfattention-is-all-you-need-pdf/274757188",
+    "https://arxiv.org/pdf/2312.00752",
+    "https://cs231n.stanford.edu/slides/2025/lecture_8.pdf"
+  ],
+  "c1_ms": 0,
+  "c2": [
+    "https://www.deeplearningdaily.com/the-transformer-attention-mechanism/",
+    "https://arxiv.org/abs/2003.04974",
+    "https://machinelearningmastery.com/the-transformer-attention-mechanism/",
+    "https://aclanthology.org/D19-1443/",
+    "https://www.semanticscholar.org/paper/A-PV-cell-defect-detector-combined-with-transformer-Lang-Lv/ef8d75f1de8d16411fef405c34c77639a2d266b1",
+    "https://doi.org/10.31219/osf.io/mru2x",
+    "https://doi.org/10.31219/osf.io/m6gcn",
+    "https://www.semanticscholar.org/paper/Unsupervised-Word-Sense-Disambiguation-Using-Ion-Pais/7ef322ab846ce64873a2f8434076c61bfe0a8508",
+    "https://doi.org/10.1007/s10792-026-03966-3",
+    "https://engineering.purdue.edu/DeepLearn/pdf-kak/Transformers.pdf"
+  ],
+  "c2_ms": 13,
+  "c2p": [
+    "https://www.deeplearningdaily.com/the-transformer-attention-mechanism/",
+    "https://arxiv.org/abs/2003.04974",
+    "https://aclanthology.org/D19-1443/",
+    "https://machinelearningmastery.com/the-transformer-attention-mechanism/",
+    "https://doi.org/10.1007/s10792-026-03966-3",
+    "https://www.semanticscholar.org/paper/A-PV-cell-defect-detector-combined-with-transformer-Lang-Lv/ef8d75f1de8d16411fef405c34c77639a2d266b1",
+    "https://www.semanticscholar.org/paper/Unsupervised-Word-Sense-Disambiguation-Using-Ion-Pais/7ef322ab846ce64873a2f8434076c61bfe0a8508",
+    "https://engineering.purdue.edu/DeepLearn/pdf-kak/Transformers.pdf",
+    "https://myrtle.ai/resources/blogs/leo-1-low-earth-orbit-satellites/",
+    "https://doi.org/10.31224/2476"
+  ],
+  "c2p_ms": 1,
+  "c3": [
+    "https://machinelearningmastery.com/the-transformer-attention-mechanism/",
+    "https://www.deeplearningdaily.com/the-transformer-attention-mechanism/",
+    "https://datasciencedojo.com/blog/understanding-attention-mechanism/",
+    "https://faculty.ist.psu.edu/vhonavar/Courses/dsmethods/transformer.pdf",
+    "https://arxiv.org/abs/2003.04974",
+    "https://www.researchgate.net/publication/347623569_Attention_Mechanism_Transformers_BERT_and_GPT_Tutorial_and_Survey",
+    "https://engineering.purdue.edu/DeepLearn/pdf-kak/Transformers.pdf",
+    "https://fenix.tecnico.ulisboa.pt/downloadFile/1970943312377766/lecture_10.pdf",
+    "https://arxiv.org/html/2604.00965v1",
+    "https://doi.org/10.21203/rs.3.rs-3545247/v1"
+  ],
+  "c3_ms": 2620,
+  "method_pool_sizes": {
+    "c1": 74,
+    "c2": 453,
+    "c2p": 74,
+    "c3": 74
+  }
+}
