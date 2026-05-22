@@ -1,0 +1,17 @@
+{
+  "mode": "pdf",
+  "query": "transformer attention mechanism",
+  "selection_method": "LLM oracle (Sonnet, oracle-worker no-filter run)",
+  "top_10": [
+    {"rank": 1, "url": "https://cs231n.stanford.edu/slides/2025/lecture_8.pdf", "rationale": "Direct Stanford CS231n PDF — 'Lecture 8: Attention and Transformers'. Authoritative Stanford course lecture PDF covering attention as a primitive and transformer architecture. Top university course PDF."},
+    {"rank": 2, "url": "https://faculty.ist.psu.edu/vhonavar/Courses/dsmethods/transformer.pdf", "rationale": "Direct university-hosted PDF — 'Attention Mechanism, Transformers, BERT, and GPT: Tutorial and Survey'. Comprehensive tutorial PDF directly covering attention mechanism, self-attention, encoder-decoder, BERT, GPT."},
+    {"rank": 3, "url": "https://engineering.purdue.edu/DeepLearn/pdf-kak/Transformers.pdf", "rationale": "Direct Purdue University PDF — 'Transformers: Learning with Purely Attention Based Networks'. Detailed PDF covering attention mechanism basics, multi-head attention, and transformer architecture overview."},
+    {"rank": 4, "url": "https://arxiv.org/pdf/2601.03329", "rationale": "Direct arXiv PDF — 'Attention mechanisms in neural networks'. Comprehensive coverage of attention mechanisms across NLP, computer vision, and multimodal learning with transformer context."},
+    {"rank": 5, "url": "https://courses.cs.duke.edu/compsci570/fall24/Attention.pdf", "rationale": "Direct Duke University course PDF — 'Attention and Transformers'. Covers the attention function, key/query/value formulation, and how attention selects relevant inputs."},
+    {"rank": 6, "url": "https://courses.cs.washington.edu/courses/cse543/22sp/schedule/lecture15_transformer.pdf", "rationale": "Direct UW course PDF — 'Lecture 15: Multi-headed Attention'. Covers multi-headed attention vs. single-headed, Q/K/V in Rd×d, and what makes multi-head attention powerful."},
+    {"rank": 7, "url": "https://cl-illc.github.io/semantics-2023/resources/slides/attention_and_transformers.pdf", "rationale": "Direct GitHub Pages PDF — 'Attention & Transformers' lecture slides. Covers hierarchical attention networks and transformer attention mechanisms."},
+    {"rank": 8, "url": "https://fenix.tecnico.ulisboa.pt/downloadFile/1970943312377766/lecture_10.pdf", "rationale": "Direct ULisboa course PDF — 'Lecture 10: Attention Mechanisms and Transformers'. Deep Learning course lecture PDF covering the full attention + transformer topic."},
+    {"rank": 9, "url": "https://momath.org/wp-content/uploads/2023/06/Rohan_Mehta_compressed.pdf", "rationale": "Direct PDF — 'The Attention Mechanism Demystified' (National Museum of Mathematics). Provides clear theoretical explanation of key/query/value attention mechanism that other online material lacks."},
+    {"rank": 10, "url": "https://aclanthology.org/D19-1443/", "rationale": "ACL Anthology page for 'Transformer Dissection: An Unified Understanding' (EMNLP 2019). Has direct PDF download; provides unified understanding of the transformer's attention mechanism."}
+  ]
+}
