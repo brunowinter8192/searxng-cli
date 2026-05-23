@@ -92,18 +92,21 @@ async def scrape_test_pairs(test_pairs: list[tuple[str, str]]) -> list[dict]:
     for i, (category, url) in enumerate(test_pairs):
         print(f"[{i + 1}/{len(test_pairs)}] {category}: {url[:80]}", file=sys.stderr)
 
-        content, garbage_type, status_code = await try_scrape(
+        content, m1 = await try_scrape(
             browser_config, None, markdown_generator, url, "networkidle"
         )
+        garbage_type = m1.get("garbage_type")
+        status_code = m1.get("status_code")
         fallback_used = False
         if not content:
-            content, garbage_type2, status_code2 = await try_scrape(
+            c2, m2 = await try_scrape(
                 browser_config, None, markdown_generator, url, "domcontentloaded"
             )
-            if garbage_type2:
-                garbage_type = garbage_type2
-            if status_code2:
-                status_code = status_code2
+            if m2.get("garbage_type"):
+                garbage_type = m2["garbage_type"]
+            if m2.get("status_code"):
+                status_code = m2["status_code"]
+            content = c2
             fallback_used = True
 
         logged = not content
