@@ -107,11 +107,20 @@ Returns plugin hint only for domains with dedicated MCP plugins (uses `PLUGIN_RO
 - `parse_citation_pdf_url(body) → str | None` — regex search on HTML body string, returns citation_pdf_url value or None.
 - `extract_citation_pdf_url(url) → str | None` — Hop 1: sync `requests.get` with 32KB read cap + 10s timeout, calls `parse_citation_pdf_url`. Returns URL or None on any failure.
 
+## download_logger.py
+
+**Purpose:** Per-URL structured logging for `download_pdf_workflow`. Emits one JSONL record to `src/logs/download_log.jsonl` per call — chain resolution stages attempted, per-stage timings, outcome, http_status, bytes_downloaded. No sidecar files (the PDF is already on disk at `output_path`).
+**Public interface:** `log_download(record: dict)`.
+**Reads:** `SEARXNG_DOWNLOAD_LOG_PATH` env var (fallback `src/logs/download_log.jsonl`).
+**Writes:** `src/logs/download_log.jsonl` (one line per call, gitignored via `src/logs/`).
+**Called by:** `download_pdf.py` (`download_pdf_workflow` — once per call at every return path).
+**Calls out:** none (stdlib only).
+
 ## download_pdf.py
 
 **Purpose:** PDF file download. Uses `requests.get()` with streaming. Chain-resolves the URL via `pdf_chain.py` before downloading: BLACKLIST check → GitHub blob check → TIER1 transform → DIRECT `.pdf` path → MULTI_STEP `citation_pdf_url` two-hop. Also called automatically by `cli.py` when `scrape_url` or `scrape_url_raw` detects a TIER1 domain or direct `.pdf` URL (`should_download_as_pdf()`).
 **Input:** URL string and optional output directory (default `~/Downloads/`).
-**Output:** TextContent with file path and human-readable file size on success, or error message on failure (blocked domain, GitHub blob, no PDF path, HTTP error).
+**Output:** TextContent with file path and human-readable file size on success, or error message on failure (blocked domain, GitHub blob, no PDF path, HTTP error). Side effect: writes one JSONL record to `download_log.jsonl` via `download_logger` at every return path.
 
 ## Architecture
 
