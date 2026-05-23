@@ -99,11 +99,16 @@ async def search_web_workflow(
     pools = build_engine_pools(filtered)
     pool_build_ms = round((time.perf_counter() - t0) * 1000)
 
-    formatted_text = _format_breakdown(query, pools, list(selected.keys()))
+    google_count = len(pools.get("google", []))
+    K = google_count if google_count > 0 else 10
+    capped_pools = {eng: pool[:K] for eng, pool in pools.items()}
+    logger.info("Pool cap K=%d (google_count=%d)", K, google_count)
+
+    formatted_text = _format_breakdown(query, capped_pools, list(selected.keys()))
 
     key = cache_key(query, language, engines, time_range, modifier_id=mode)
     t0 = time.perf_counter()
-    cache_write(key, pools, query, language, engines, time_range)
+    cache_write(key, capped_pools, query, language, engines, time_range)
     cache_write_ms = round((time.perf_counter() - t0) * 1000)
 
     total_ms = round((time.perf_counter() - t_total) * 1000)
