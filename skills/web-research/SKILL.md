@@ -95,6 +95,8 @@ Engine breakdown for "rust async runtime":
 Use `searxng-cli search_engine_drilldown "rust async runtime" --engine <name>` to see URLs per engine.
 ```
 
+**Pool cap:** pool sizes per engine are capped at K = google's result count (fallback 10 if google returned 0 or wasn't queried). If google returns 8 URLs, every engine is capped at 8. If google was CAPTCHA'd or not in the engine set, every engine is capped at 10. Engines that naturally return fewer than K URLs are unaffected. Cap prevents a single API engine (CrossRef, OpenAlex, Stack Exchange) from flooding a drilldown with 200 URLs.
+
 **Engine set (9 active):** google, duckduckgo, mojeek, lobsters, semantic_scholar, openalex, crossref, stack_exchange, open_library.
 
 Use `--engines` to restrict to specific engines (e.g. `--engines "openalex,crossref"` for academic-only searches).

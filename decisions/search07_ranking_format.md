@@ -15,6 +15,14 @@
 
 **Filter modes:** `--books` / `--pdf` / `--docs` apply `filter_urls_by_mode(raw_results, mode)` on the flat raw result list BEFORE `build_engine_pools`. Filtered-out URLs never reach any engine's pool. Breakdown counts reflect post-filter state.
 
+**Pool Cap (post-dedup):** applied in `search_web_workflow` after `build_engine_pools` returns:
+```python
+google_count = len(pools.get("google", []))
+K = google_count if google_count > 0 else 10
+capped_pools = {eng: pool[:K] for eng, pool in pools.items()}
+```
+Each engine's pool is trimmed to `pool[:K]`. Engines with fewer than K URLs are unaffected. K = google's dedup-pool size; fallback K=10 when google returned 0 results (CAPTCHA) or was not in the selected engine set. Both `_format_breakdown` and `cache_write` receive `capped_pools`. Rationale: CrossRef/OpenAlex return up to 200 URLs, Stack Exchange up to 100, Open Library up to 100 — uncapped drilldown would flood context. The google-anchored K provides a natural, query-adaptive bound (typical 8-11 URLs). The capped-pool idea originates from `decisions/OldThemes/pooling/05_capped_pool_probe.md` (Phase 9 probe, K=google_count architecture) — not shipped then because the broader pooling investigation was abandoned; reintroduced now in the two-call architecture as a sanity bound on drilldown context size.
+
 **Cache schema (`~/.cache/searxng/<key>.json`, 1h TTL, atomic write):**
 ```json
 {
