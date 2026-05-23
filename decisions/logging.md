@@ -1,0 +1,72 @@
+# decisions/logging.md — Python Logger Setup
+
+## Status Quo (IST)
+
+`cli.py` installs a `FileHandler`-only logging config at startup, before any `src.*` imports:
+
+```python
+_log_path = Path(__file__).parent / "src" / "logs" / "cli.log"
+_log_path.parent.mkdir(parents=True, exist_ok=True)
+logging.basicConfig(
+    level=logging.DEBUG,
+    format="%(asctime)s [%(levelname)s] %(name)s:%(lineno)d - %(message)s",
+    handlers=[logging.FileHandler(_log_path, mode="a", encoding="utf-8")],
+)
+```
+
+- **Handler:** FileHandler only — `src/logs/cli.log`, append mode, UTF-8
+- **Root logger level:** DEBUG (captures all named loggers regardless of their own level)
+- **Format:** `%(asctime)s [%(levelname)s] %(name)s:%(lineno)d - %(message)s`
+- **StreamHandler:** none installed — `basicConfig(handlers=[...])` with explicit handler list never adds the default StreamHandler
+- **Gitignore:** `src/logs/` pattern in `.gitignore` covers `src/logs/cli.log`
+
+**Call-site taxonomy enforced as of 2026-05-24 audit (`dev/logging_audit/01_reports/audit_20260523T233444Z.md`):**
+
+| Category | Level | Examples |
+|---|---|---|
+| Per-engine-empty | DEBUG | "Engine X empty (%s) for: %s" — redundant with `query_log.jsonl` |
+| Config state | INFO | "STACK_EXCHANGE_API_KEY not set — anonymous quota" |
+| Mode-flag precedence | INFO | "Multiple mode flags set — pdf takes precedence" |
+| CAPTCHA / block detection | WARNING | "Google CAPTCHA detected for: %s" |
+| Rate-limited (HTTP 429) | WARNING | "CrossRef rate limited: %d" |
+| Engine exception | ERROR | "DuckDuckGo search failed: %s" |
+| I/O failure (log write) | WARNING | "scrape_log write failed: %s" |
+| Genuine scrape failure | WARNING | "Failed to scrape %s: %s" |
+| Per-URL verbose trace | DEBUG | fast-path hit, consent strip, chain resolution steps |
+
+Standalone invocations (`python src/crawler/crawl_site.py`, `python src/crawler/explore_site.py`) each call `logging.basicConfig(level=INFO, format="%(message)s")` inside their own `if __name__ == "__main__"` guard — unaffected by this config (fires in standalone mode only).
+
+## Evidenz
+
+Symptom observed: `searxng-cli search_web "X"` produced warning lines before the breakdown table in tool_result (Claude Code Bash merges stdout+stderr):
+
+```
+STACK_EXCHANGE_API_KEY not set — anonymous quota (300 req/day)
+Lobsters empty (EMPTY_NO_CONTAINER) for: X
+```
+
+Audit script: `dev/logging_audit/01_audit.py`
+Report: `dev/logging_audit/01_reports/audit_20260523T233444Z.md`
+Scope: 114 call-sites across 24 `src/` files
+
+Key findings from audit:
+- 5 WARNING "engine empty" calls → reclassified DEBUG (structural duplicate of `query_log.jsonl` `engine_run` records)
+- 3 WARNING "config state" calls → reclassified INFO (STACK_EXCHANGE_API_KEY, filter_modes precedence)
+- 13 INFO verbose progress calls → reclassified DEBUG (per-URL/per-iteration crawler+scraper traces)
+- 93 calls unchanged (already correct level or genuine WARNING/ERROR/INFO)
+
+Options evaluated: see `decisions/OldThemes/logging_isolation/initial_audit_2026-05-24.md`.
+
+## Recommendation (SOLL)
+
+Keep (matches IST after migration).
+
+**Future consideration:** if an MCP-server entry-point is ever added (currently no `server.py`), it would need the same FileHandler-only config at its startup path. The `basicConfig` call in `cli.py` covers only the CLI path.
+
+## Offene Fragen
+
+None currently. Rate-limited (HTTP 429) calls stay WARNING — distinct from "engine empty" (no results, normal operation). If 429s become frequent enough to be noise, revisit.
+
+## Quellen
+
+Internal architectural decision — no external references.

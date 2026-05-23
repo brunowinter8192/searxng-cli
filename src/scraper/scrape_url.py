@@ -74,7 +74,7 @@ async def scrape_url_workflow(url: str, max_content_length: int = DEFAULT_MAX_CO
     phases_attempted.append("fastpath")
 
     if md:
-        logger.info("Markdown fast-path hit: %s (%d chars)", url, len(md))
+        logger.debug("Markdown fast-path hit: %s (%d chars)", url, len(md))
         phase_used = "fastpath"
         final = truncate_content(md, max_content_length)
         content_path = write_sidecar(url, ts, final, "ok", "filtered")
@@ -257,7 +257,7 @@ async def try_scrape(browser_config, crawler_strategy, markdown_generator, url: 
         if garbage_type == "cookie_wall":
             stripped = strip_consent_prefix(content)
             if stripped != content and is_garbage_content(stripped) is None:
-                logger.info("Consent prefix stripped: %s (%d chars removed)", url, len(content) - len(stripped))
+                logger.debug("Consent prefix stripped: %s (%d chars removed)", url, len(content) - len(stripped))
                 return stripped, {**meta, "consent_stripped": True}
         if garbage_type:
             logger.warning("Garbage detected [%s]: %s", garbage_type, url)

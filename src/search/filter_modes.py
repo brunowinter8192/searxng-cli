@@ -47,11 +47,11 @@ def apply_filter_mode(
 ) -> tuple[dict, dict[str, Callable] | None, str | None, dict[str, str]]:
     if sum([books, pdf, docs]) > 1:
         if pdf:
-            logger.warning("Multiple mode flags set — pdf takes precedence; ignoring books/docs")
+            logger.info("Multiple mode flags set — pdf takes precedence; ignoring books/docs")
             books = False
             docs = False
         elif docs:
-            logger.warning("Multiple mode flags set — docs takes precedence; ignoring books")
+            logger.info("Multiple mode flags set — docs takes precedence; ignoring books")
             books = False
     if books:
         query_modifier_map = {name: _BOOKS_MODIFIER for name in _BOOKS_ENGINES if name != "open_library"}

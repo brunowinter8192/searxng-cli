@@ -50,7 +50,7 @@ class LobstersEngine(BaseEngine):
             await tab.go_to(search_url, timeout=3.0)
             if not await _wait_for_results(tab):
                 reason = await _diagnose_empty(tab)
-                logger.warning("Lobsters empty (%s) for: %s", reason, query)
+                logger.debug("Lobsters empty (%s) for: %s", reason, query)
                 return [], reason
             results = await _parse_results(tab, max_results)
             return results, (None if results else S.EMPTY_NO_RESULTS)

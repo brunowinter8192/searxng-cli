@@ -73,7 +73,7 @@ async def explore_site_workflow(url: str, strategy: str, max_pages: int, output:
     if append:
         existing = load_existing_urls(output)
         new_urls = [u for u in urls if u not in existing]
-        logger.info("New URLs: %d (filtered %d duplicates)", len(new_urls), len(urls) - len(new_urls))
+        logger.debug("New URLs: %d (filtered %d duplicates)", len(new_urls), len(urls) - len(new_urls))
         urls = new_urls
 
     print_url_samples(urls)
@@ -123,9 +123,9 @@ def print_url_samples(urls: list[str], max_samples: int = 15) -> None:
         for i in range(5):
             indices.add(min(i * step, total - 1))
     sorted_indices = sorted(indices)[:max_samples]
-    logger.info("=== URL Samples (%d of %d) ===", len(sorted_indices), total)
+    logger.debug("=== URL Samples (%d of %d) ===", len(sorted_indices), total)
     for i in sorted_indices:
-        logger.info("[%4d] %s", i + 1, urls[i])
+        logger.debug("[%4d] %s", i + 1, urls[i])
 
 
 # Load existing URLs from file (for dedup on append)

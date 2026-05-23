@@ -83,7 +83,7 @@ def download_pdf_workflow(url: str, output_dir: str = str(Path.home() / "Downloa
     if transformed:
         fetch_url = transformed
         chain_resolution = "tier1"
-        logger.info("TIER1 transform: %s → %s", url, fetch_url)
+        logger.debug("TIER1 transform: %s → %s", url, fetch_url)
     else:
         fetch_url = url
         domain = _base_domain(fetch_url)
@@ -102,7 +102,7 @@ def download_pdf_workflow(url: str, output_dir: str = str(Path.home() / "Downloa
             timings_ms["citation_pdf_url_hop1"] = round((time.perf_counter() - t0) * 1000)
             chain_attempted.append("citation_pdf_url_hop1")
             if citation_url:
-                logger.info("Multi-step citation_pdf_url: %s → %s", fetch_url, citation_url)
+                logger.debug("Multi-step citation_pdf_url: %s → %s", fetch_url, citation_url)
                 fetch_url = citation_url
                 chain_resolution = "multi_step"
             else:
