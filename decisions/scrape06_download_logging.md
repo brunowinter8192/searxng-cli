@@ -4,7 +4,7 @@
 
 **Architecture:** Structured JSONL log only — no sidecar files. Every `download_pdf_workflow` call emits one record to `src/logs/download_log.jsonl`. The PDF itself is the artifact; its path is recorded in `output_path`.
 
-**Log path:** `SEARXNG_DOWNLOAD_LOG_PATH` env var → fallback `src/logs/download_log.jsonl`. Gitignored via `src/logs/`. Fail-soft: write errors are logged as WARNING, download result still reaches caller.
+**Log path:** `SEARXNG_DOWNLOAD_LOG_PATH` env var → fallback `src/logs/download_log.jsonl`. Gitignored. Fail-soft: write errors are logged as WARNING, download result still reaches caller.
 
 **Implementation:** `src/scraper/download_logger.py` — `log_download(record: dict)`. Called at every return path of `download_pdf_workflow` via the `_emit(outcome, **kwargs)` inner helper.
 
