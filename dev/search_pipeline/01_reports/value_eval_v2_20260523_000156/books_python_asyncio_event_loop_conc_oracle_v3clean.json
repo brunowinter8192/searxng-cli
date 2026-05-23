@@ -1,0 +1,63 @@
+{
+  "mode": "books",
+  "query": "python asyncio event loop concurrency",
+  "selection_method": "LLM oracle (Sonnet, oracle-worker no-filter run)",
+  "source": "v3clean",
+  "drop_engines": [
+    "google",
+    "semantic_scholar"
+  ],
+  "replacements": [],
+  "top_10": [
+    {
+      "rank": 1,
+      "url": "https://www.oreilly.com/library/view/python-concurrency-with/9781617298660/",
+      "rationale": "O'Reilly publisher page for 'Python Concurrency with asyncio' by Matthew Fowler — the canonical book on asyncio event loop concurrency in Python. Top publisher, directly on topic."
+    },
+    {
+      "rank": 2,
+      "url": "https://www.manning.com/books/python-concurrency-with-asyncio",
+      "rationale": "Manning publisher page for 'Python Concurrency with asyncio' — same definitive book, publisher's own page with full description of event loop, single-threaded concurrency, and asyncio API coverage."
+    },
+    {
+      "rank": 3,
+      "url": "https://www.simonandschuster.com/books/Python-Concurrency-with-asyncio/Matthew-Fowler/9781617298660",
+      "rationale": "Simon & Schuster official publisher page for 'Python Concurrency with asyncio' by Matthew Fowler — third publisher listing for the definitive book on the query topic."
+    },
+    {
+      "rank": 4,
+      "url": "https://books.google.com/books/about/Python_Concurrency_with_asyncio.html?id=M9xdEAAAQBAJ",
+      "rationale": "Google Books catalog entry for 'Python Concurrency with asyncio' — covers asyncio with the entire Python concurrency landscape including multiprocessing and multithreading."
+    },
+    {
+      "rank": 5,
+      "url": "https://doi.org/10.1007/978-1-4842-4401-2_2",
+      "rationale": "Book chapter 'Working with Event Loops' — directly covers asyncio event loop orchestration in Python 3.4+, directly matching the 'event loop' component of the query."
+    },
+    {
+      "rank": 6,
+      "url": "https://doi.org/10.1007/978-1-4842-8140-6_2",
+      "rationale": "Book chapter 'Modern Asynchronous Python The Building Blocks' from 'Asynchronous Python Programming with Asyncio and Async/await' (de Groot, 2022) — covers core building blocks of asyncio concurrency."
+    },
+    {
+      "rank": 7,
+      "url": "https://doi.org/10.1007/978-1-4842-8140-6_1",
+      "rationale": "Book chapter '(A)synchronous Python' — Chapter 1 from 'Asynchronous Python Programming with Asyncio and Async/await' (de Groot, 2022), foundational introduction to async Python and event loop model."
+    },
+    {
+      "rank": 8,
+      "url": "https://doi.org/10.1007/978-3-031-40336-1_43",
+      "rationale": "Book chapter 'Concurrency with AsyncIO' from 'Advanced Guide to Python 3 Programming' (Hunt, 2023) — directly covers asyncio concurrency in a published Springer book."
+    },
+    {
+      "rank": 9,
+      "url": "https://doi.org/10.1007/979-8-8688-1261-3_16",
+      "rationale": "Book chapter 'Asyncio' from 'Deep Dive Python' (Divakaran, 2025) — most recent Springer book chapter on asyncio, published 2025."
+    },
+    {
+      "rank": 10,
+      "url": "https://doi.org/10.1007/978-3-031-40336-1",
+      "rationale": "'Advanced Guide to Python 3 Programming' (Hunt, 2023) — full Springer book with a dedicated asyncio concurrency chapter; the book-level entry for comprehensive Python 3 concurrency coverage."
+    }
+  ]
+}

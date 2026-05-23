@@ -1,0 +1,63 @@
+{
+  "mode": "docs",
+  "query": "python asyncio event loop concurrency",
+  "selection_method": "LLM oracle (Sonnet, oracle-worker no-filter run)",
+  "source": "v3clean",
+  "drop_engines": [
+    "google",
+    "semantic_scholar"
+  ],
+  "replacements": [],
+  "top_10": [
+    {
+      "rank": 1,
+      "url": "https://docs.python.org/3/library/asyncio.html",
+      "rationale": "Official Python documentation — asyncio module overview. The canonical entry-point for the asyncio library covering async/await syntax, concurrency, and the asyncio ecosystem."
+    },
+    {
+      "rank": 2,
+      "url": "https://docs.python.org/3/library/asyncio-eventloop.html",
+      "rationale": "Official Python documentation — Event Loop reference page. Direct coverage of event loop management, policies, and the asyncio.run() entry point; most relevant to the 'event loop' part of the query."
+    },
+    {
+      "rank": 3,
+      "url": "https://docs.python.org/3/library/asyncio-dev.html",
+      "rationale": "Official Python documentation — 'Developing with asyncio'. Covers debug mode, subprocess API interaction with event loop, and development best practices."
+    },
+    {
+      "rank": 4,
+      "url": "https://asyncio-notes.readthedocs.io/en/latest/3_asyncio-eventloops.html",
+      "rationale": "ReadTheDocs 'asyncio developer notes' — dedicated documentation on event loop management with the policy pattern, covering global policy objects and asyncio abstractions."
+    },
+    {
+      "rank": 5,
+      "url": "https://pymotw.com/3/asyncio/index.html",
+      "rationale": "PyMOTW (Python Module of the Week) — asyncio: Asynchronous I/O, event loop, and concurrency tools. Well-established comprehensive reference for Python stdlib modules."
+    },
+    {
+      "rank": 6,
+      "url": "https://realpython.com/async-io-python/",
+      "rationale": "Real Python 'Python's asyncio: A Hands-On Walkthrough' — high-quality, thorough tutorial covering coroutines, event loops, and efficient I/O-bound task management with interactive quiz."
+    },
+    {
+      "rank": 7,
+      "url": "https://www.w3schools.com/python/ref_module_asyncio.asp",
+      "rationale": "W3Schools asyncio module reference — concise reference documentation covering event loop, tasks, and I/O primitives for concurrent code."
+    },
+    {
+      "rank": 8,
+      "url": "https://tutorialedge.net/python/concurrency/asyncio-event-loops-tutorial/",
+      "rationale": "'Asyncio Event Loops Tutorial' — tutorial focused specifically on the event loop, covering asyncio.get_event_loop() and event loop architecture for asyncio programs."
+    },
+    {
+      "rank": 9,
+      "url": "https://www.stanza.dev/courses/python-concurrency/mastering-asyncio/python-concurrency-event-loop-coroutines",
+      "rationale": "'The Event Loop & Coroutines - Python Concurrency: Asyncio' — dedicated coverage of event loop architecture, scheduler, and coroutine integration for concurrency on a single thread."
+    },
+    {
+      "rank": 10,
+      "url": "https://www.datacamp.com/tutorial/python-async-programming",
+      "rationale": "DataCamp 'Python Async Programming: The Complete Guide' — step-by-step guide covering asyncio, concurrency, HTTP requests, and database integration from a reputable learning platform."
+    }
+  ]
+}
