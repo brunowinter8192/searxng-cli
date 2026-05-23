@@ -211,6 +211,30 @@ Detailed findings → `06_q14_pool_dump.md`. Production migration BLOCKED — M�
 
 Next-session direction: solve top-URL identification automation first. Lobsters-boost as structural prior is the leading hypothesis (cheap, broadly applicable).
 
+## Phase 12 (executed 2026-05-23)
+
+No-filter v2 eval — URL filter removed from Stage 1 (BM25/Cross-Encoder handle relevance from title+snippet; filter was host/path-based only, query-blind). Methodology refactored from combined `value_eval_probe.py` into three separate scripts: `stage1_pool_fetch.py` (pool fetch), `stage3_method_run.py` (C-methods), `stage4_aggregate.py` (Jaccard). Dynamic reranker URL via `ensure_ready/find_server_url`. Google CAPTCHA'd all 16 pairs again (backoff cascade); 8-engine eval (same as Phase 11 in practice). C3 Cross-Encoder wins all 4 modes.
+
+Full methodology + findings → `08_no_filter_eval.md`.
+
+## Phase 13-Prep (executed 2026-05-23)
+
+Pre-work for 8-method extended eval (Methods 2-5 RRF variants need per-engine positions explicitly).
+
+**Schema extension (stage1 v3):** `stage1_pool_fetch.py` updated — `_attach_positions()` computes `{engine: rank}` from raw results after `_build_pool()`, attaches to each entry in both `pool` and `pool_full`. Invariants: `set(engines)==set(positions.keys())`, `min_position==min(positions.values())`. 16-pair re-fetch → `value_eval_v3_20260523_021216/`. Pool-diff vs v2 (`pool_diff_v2_v3.py`): mean URL-overlap **80.0%** (0 pairs below 50%). Key engine deltas: Google 6%→**81%** OK (CAPTCHA cascade from v2 resolved), Semantic Scholar 56%→**100%** OK. Pool-diff artifacts: `pool_diff_v2_vs_v3.md`.
+
+**SS+Google identified as session-variant:** Phase 11 and 12 both had Google CAPTCHA'd; Phase 13-Prep v3 run shows recovery. SS similarly variable. For a stable 7-engine eval (drop `{google, semantic_scholar}`), 5 oracle picks were lost across 4 pairs (3.1% of 160 total — 12 pairs unbeschadet).
+
+**Oracle cleanup:** `clean_pool.py` — importable `filter_pool(pool, drop_engines)` + script mode. Backfill on 4 loss-pairs (replacement picks from filtered pool, same oracle criterion: authoritative/canonical, not SEO):
+- `general_transformer_attention_mechanis`: deeprevision.github.io (rank 9), aman.ai (rank 10)
+- `general_postgresql_index_types_btree_g`: habr.com/postgrespro (rank 10)
+- `pdf_postgresql_index_types_btree_g`: habr.com/postgrespro (rank 10)
+- `docs_contrastive_learning_self_supe`: arxiv.org/pdf/2510.10572 (rank 10)
+
+All 16 pairs output as `<pair>_oracle_v3clean.json` in `value_eval_v2_20260523_000156/`. Summary: `oracle_v3clean_summary.md`.
+
+**Next:** `stage2_rrf_sweep.py` — Methods 2-5 RRF variants using `positions` field from v3 pools vs `oracle_v3clean.json`.
+
 ## Phase 11 (executed 2026-05-22)
 
 LLM-as-Oracle value-eval — 4 modes (general/pdf/books/docs) × 4 queries (strict from canonical 20) × 4 C-methods (C1 Overlap, C2 BM25, C2' BM25-Capped, C3 Cross-Encoder). Worker (Sonnet) reads each pool independently, picks Top-10, scripted Jaccard computes overlap with each C-method.
