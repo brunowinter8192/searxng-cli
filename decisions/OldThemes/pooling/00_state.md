@@ -235,6 +235,36 @@ All 16 pairs output as `<pair>_oracle_v3clean.json` in `value_eval_v2_20260523_0
 
 **Next:** `stage2_rrf_sweep.py` — Methods 2-5 RRF variants using `positions` field from v3 pools vs `oracle_v3clean.json`.
 
+## Phase 13 (executed 2026-05-23)
+
+12-method eval — 16 pairs (4 modes × 4 queries), 7-engine pool (google+SS filtered via `clean_pool.py`), `oracle_v3clean.json` as ground truth. Scripts: `stage3_method_run_v3.py` + `stage4_aggregate_v3.py`. Artifacts in `value_eval_v3_20260523_021216/`. Detailed findings → `09_12_method_eval.md`.
+
+**Results (overall mean Jaccard):**
+
+| Method | Jaccard | Latency | Notes |
+|---|---|---|---|
+| M11 C3→LLM-Filter | **0.259** | ~7.4s | WINNER (quality) |
+| M9 SPLADE | 0.252 | ~2s | GPU-available alternative |
+| M10 SPLADE+C3 | 0.252 | ~3.5s | no improvement over M9 alone |
+| M7 C3+InstrPrefix | 0.246 | ~2s | RECOMMENDED default |
+| M6 C3 vanilla | 0.204 | ~2s | baseline cross-encoder |
+| M12 LLM-Selector | 0.192 | ~8s | worse than M11 (4B model overloaded) |
+| M8 RRF+C3 | 0.155 | ~2.5s | hybrid hurts C3 quality — avoid |
+| M5 BM25-Capped | 0.142 | ~1ms | no-GPU ceiling |
+| M1–M3 cheap | 0.133–0.135 | ~1ms | Overlap/RRF/Struct-URL tied at floor |
+| M4 BM25 | 0.139 | ~13ms | no meaningful BM25 improvement |
+
+**Key findings:**
+- SPLADE surprise competitive in general+docs (0.329 general mode) — matches M7 on overall Jaccard at lower cost than M11
+- Instruction prefix adds +0.042 Jaccard at ~80ms overhead over C3 vanilla → M7 strictly dominates M6
+- M12 LLM-Selector underperforms M11: too many candidates for 4B model to discriminate; 2-stage (C3 pre-filter → LLM) substantially better than 1-stage (LLM-only)
+- RRF+C3 hybrid (M8) is strictly worse than C3 vanilla (M6) — RRF signal adds noise, not signal
+
+**Production recommendation:**
+- **M7 default** (C3+InstrPrefix, ~2s, Jaccard 0.246) — best quality/latency for standard use
+- **M11 premium opt-in** (two-stage C3+LLM-Filter, ~7.4s, +0.013 vs M7) — when latency budget allows
+- **M9 fallback** (SPLADE standalone, ~2s, 0.252) — GPU-available alternative; competitive with M7
+
 ## Phase 11 (executed 2026-05-22)
 
 LLM-as-Oracle value-eval — 4 modes (general/pdf/books/docs) × 4 queries (strict from canonical 20) × 4 C-methods (C1 Overlap, C2 BM25, C2' BM25-Capped, C3 Cross-Encoder). Worker (Sonnet) reads each pool independently, picks Top-10, scripted Jaccard computes overlap with each C-method.
