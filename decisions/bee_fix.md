@@ -50,8 +50,6 @@ Keep (no change needed). Fix verified by smoke. The three changes together elimi
 
 **Follow-up (g82 pooling-rework — separate scope):** Scholar re-integration requires a Google-free pool constant in `filter_modes.py`. `scholar.py` HTTP logic is intact and ready. Blocked on g82 design, not on this fix.
 
-**Hygiene (merge.py — separate scope):** `ACADEMIC = {"google_scholar", ...}` and `ACADEMIC_PRIORITY = {"google_scholar": 2, ...}` in `src/search/merge.py` reference the removed engine. These are inert (no results carry `engine="google_scholar"`) but stale. Clean up in a follow-up hygiene pass.
-
 ## Offene Fragen
 
 - g82 pooling-rework: which pool definitions place Scholar in a Google-free set? What inter-session CAPTCHA behavior is expected at 4/min in a Scholar-only pool?
