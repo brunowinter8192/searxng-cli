@@ -13,7 +13,7 @@ Production-mode smoke test suite for all 9 active search engines. Each per-engin
 | `01_google_smoke.py` | Google production-mode smoke — imports `GoogleEngine` from `src/`, calls `.search()` per query, rate-limiter active (4 req/60s), writes `google_smoke_<ts>.md` to `01_reports/`. Status: OK / EMPTY / ERROR |
 | `02_burst_smoke.py` | Burst smoke against the production CLI — invokes `searxng-cli search_batch` per batch (one subprocess per N queries, warm Chrome amortized) and writes `burst_<ts>.md` to `01_reports/`. Exists to validate the prod CLI path under the architectural rate pattern (4 queries per burst, optional cooldown). CLI flags: `--queries-per-burst N` (default 4), `--cooldown S` (default 60), `--max-queries N` (default all from queries.txt). |
 | `04_ddg_smoke.py` | DuckDuckGo production-mode smoke — imports `DuckDuckGoEngine` from `src/`, calls `.search()` per query, rate-limiter active (4 req/60s), writes `ddg_smoke_<ts>.md` to `01_reports/`. Status: OK / EMPTY / ERROR |
-| `05_search_smoke.py` | Multi-engine comparison smoke — imports all 8 engine classes from `src/`, fans out per-engine in parallel via `asyncio.gather`, merges by URL preserving per-engine snippets, fetches previews via `src/search/preview.py`, writes `search_smoke_<ts>.md` to `01_reports/`. CLI flags: `--engines` (default: google duckduckgo), `--max-queries N`. |
+| `05_search_smoke.py` | Multi-engine comparison smoke — imports all 8 engine classes from `src/`, fans out per-engine in parallel via `asyncio.gather`, merges by URL preserving per-engine snippets, writes `search_smoke_<ts>.md` to `01_reports/`. CLI flags: `--engines` (default: google duckduckgo), `--max-queries N`. |
 | `06_mojeek_smoke.py` | Mojeek production-mode smoke — imports `MojeekEngine` from `src/`, calls `.search()` per query, rate-limiter active (4 req/60s), writes `mojeek_smoke_<ts>.md` to `01_reports/`. Status: OK / EMPTY / ERROR |
 | `07_lobsters_smoke.py` | Lobsters production-mode smoke — imports `LobstersEngine` from `src/`, calls `.search()` per query, rate-limiter active (4 req/60s), writes `lobsters_smoke_<ts>.md` to `01_reports/`. Status: OK / EMPTY / ERROR |
 | `08_scholar_smoke.py` | Google Scholar smoke runner — imports `ScholarEngine` from `src/`, calls `.search()` directly (pydoll browser managed by `src/search/browser.py` singleton), runs 30 baseline queries. Rate limiter is engine-internal (4 req/60s → ~7.5 min total). Writes `scholar_smoke_<ts>.md` to `01_reports/`. Status taxonomy: OK (≥3 results) / EMPTY / SUSPECT / ERROR. |
@@ -118,7 +118,7 @@ Production-mode smoke test suite for all 9 active search engines. Each per-engin
 #### 05 — Multi-engine comparison
 - **Script:** `05_search_smoke.py` — imports from `src/` (not standalone), uses production engine instances
 - **Design:** per-engine fanout avoids `search_web_workflow` merge so per-engine snippets are preserved for comparison
-- **Preview:** calls `src/search/preview.py fetch_previews()` per query on the URL union — adds og/meta block per URL
+- **Preview:** preview fetch removed (preview.py deleted 2026-05-23 drilldown-mig migration)
 - **Report:** `01_reports/search_smoke_<ts>.md` — per-query section with engine-set badges, per-engine snippets, preview block
 
 ## Running

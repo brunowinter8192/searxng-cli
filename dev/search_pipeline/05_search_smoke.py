@@ -21,7 +21,6 @@ from src.search.engines.scholar import ScholarEngine
 from src.search.engines.crossref import CrossRefEngine
 from src.search.engines.openalex import OpenAlexEngine
 from src.search.engines.stack_exchange import StackExchangeEngine
-from src.search.preview import fetch_previews, PREVIEW_TOP_N
 from src.search.result import SearchResult
 
 SCRIPT_DIR = Path(__file__).parent
@@ -97,7 +96,7 @@ async def _run_query(query: str, engines: dict) -> dict:
         SearchResult(url=url, title=data["title"], snippet="", engine="", position=i)
         for i, (url, data) in enumerate(merged.items())
     ]
-    flat_with_previews = await fetch_previews(flat, top_n=PREVIEW_TOP_N)
+    flat_with_previews = flat
 
     # Write preview data back into merged dict
     preview_ok = 0
