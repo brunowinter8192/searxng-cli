@@ -1,0 +1,63 @@
+{
+  "mode": "general",
+  "query": "contrastive learning self-supervised representations",
+  "selection_method": "LLM oracle (Sonnet, oracle-worker no-filter run)",
+  "source": "v3clean",
+  "drop_engines": [
+    "google",
+    "semantic_scholar"
+  ],
+  "replacements": [],
+  "top_10": [
+    {
+      "rank": 1,
+      "url": "https://doi.org/10.48550/arxiv.2002.05709",
+      "rationale": "SimCLR (Chen et al., 2020) — the canonical contrastive self-supervised learning framework. The primary source for understanding contrastive representation learning."
+    },
+    {
+      "rank": 2,
+      "url": "https://lilianweng.github.io/posts/2019-11-10-self-supervised/",
+      "rationale": "Lil'Log 'Self-Supervised Representation Learning' — Lilian Weng's authoritative overview covering contrastive methods, pretext tasks, and the state of self-supervised learning. One of the most widely cited tutorials on the topic."
+    },
+    {
+      "rank": 3,
+      "url": "https://arxiv.org/abs/2011.00362",
+      "rationale": "arXiv survey 'A Survey on Contrastive Self-supervised Learning' — comprehensive survey covering pseudo labels, self-supervised learning frameworks, and downstream task applications."
+    },
+    {
+      "rank": 4,
+      "url": "https://arxiv.org/abs/2004.11362",
+      "rationale": "arXiv 'Supervised Contrastive Learning' (Khosla et al.) — important extension of contrastive learning to supervised settings, consistently outperforming cross-entropy; key paper in the contrastive learning literature."
+    },
+    {
+      "rank": 5,
+      "url": "https://www.sciencedirect.com/science/article/pii/S0925231224014164",
+      "rationale": "ScienceDirect 'A comprehensive survey on contrastive learning' — Elsevier journal publication with broad coverage of contrastive self-supervised representation learning methods."
+    },
+    {
+      "rank": 6,
+      "url": "https://www.mdpi.com/2227-7080/9/1/2",
+      "rationale": "MDPI Technologies 'A Survey on Contrastive Self-Supervised Learning' — open-access survey covering pseudolabels, self-defined supervision, and contrastive objectives."
+    },
+    {
+      "rank": 7,
+      "url": "https://doi.org/10.48550/arxiv.2007.08025",
+      "rationale": "GraphCL (You et al.) — contrastive self-supervised learning for graph representations. Key extension of contrastive SSL to graph-structured data."
+    },
+    {
+      "rank": 8,
+      "url": "https://ankeshanand.com/blog/2020/01/26/contrative-self-supervised-learning.html",
+      "rationale": "'Contrastive Self-Supervised Learning' by Ankesh Anand — well-written blog post explaining how contrastive SSL techniques build representations by learning to encode what makes two things similar."
+    },
+    {
+      "rank": 9,
+      "url": "https://dl.acm.org/doi/abs/10.5555/3495724.3497291",
+      "rationale": "ACM DL 'Supervised contrastive learning' — NeurIPS proceedings paper on supervised contrastive learning; formal publication venue for the key extension to supervised setting."
+    },
+    {
+      "rank": 10,
+      "url": "https://link.springer.com/article/10.1007/s11633-021-1297-9",
+      "rationale": "Springer 'Contrastive Self-supervised Representation Learning Using Synthetic Data' — peer-reviewed article on contrastive SSL with synthetic data augmentation, covering discriminative representation learning."
+    }
+  ]
+}

@@ -1,0 +1,69 @@
+{
+  "mode": "docs",
+  "query": "contrastive learning self-supervised representations",
+  "selection_method": "LLM oracle (Sonnet, oracle-worker no-filter run)",
+  "source": "v3clean",
+  "drop_engines": [
+    "google",
+    "semantic_scholar"
+  ],
+  "replacements": [
+    {
+      "replaced_url": "https://www.semanticscholar.org/paper/Supervised-Contrastive-Learning-Khosla-Teterwak/38643c2926b10f6f74f122a7037e2cd20d77c0f1",
+      "new_url": "https://arxiv.org/pdf/2510.10572",
+      "rationale": "arXiv 2510.10572 'Understanding Self-supervised Contrastive Learning through Supervised ...' — primary research source directly on the query topic (DuckDuckGo pos=1). Replaces the dropped SemanticScholar Supervised Contrastive Learning paper with its underlying arXiv primary source."
+    }
+  ],
+  "top_10": [
+    {
+      "rank": 1,
+      "url": "https://keras.io/examples/vision/nnclr/",
+      "rationale": "Official Keras documentation — example 'Self-supervised contrastive learning with NNCLR'. Official library documentation showing contrastive learning implementation directly on topic."
+    },
+    {
+      "rank": 2,
+      "url": "https://keras.io/examples/vision/simsiam/",
+      "rationale": "Official Keras documentation — example 'Self-supervised contrastive learning with SimSiam'. Second official Keras contrastive learning example, covering non-contrastive variant of SSL."
+    },
+    {
+      "rank": 3,
+      "url": "https://lightning.ai/docs/pytorch/1.8.1/notebooks/course_UvA-DL/13-contrastive-learning.html",
+      "rationale": "Official PyTorch Lightning documentation — Tutorial 13 on Self-Supervised Contrastive Learning with SimCLR. Official library docs with full tutorial and code."
+    },
+    {
+      "rank": 4,
+      "url": "https://uvadlc-notebooks.readthedocs.io/en/latest/tutorial_notebooks/tutorial17/SimCLR.html",
+      "rationale": "ReadTheDocs official UvA Deep Learning course notebooks — Tutorial 17 on Self-Supervised Contrastive Learning with SimCLR. Official course documentation with comprehensive implementation."
+    },
+    {
+      "rank": 5,
+      "url": "https://doi.org/10.48550/arxiv.2002.05709",
+      "rationale": "SimCLR (Chen et al.) — canonical reference paper for contrastive self-supervised learning of visual representations. The primary technical reference for the topic."
+    },
+    {
+      "rank": 6,
+      "url": "http://keg.cs.tsinghua.edu.cn/jietang/publications/TKDE21-Liu-et-al-Self-supervised-Learning-Generative-or-Contrastive.pdf",
+      "rationale": "Comprehensive PDF survey 'Self-supervised Learning: Generative or Contrastive' — the authoritative survey reference covering the full landscape of SSL including contrastive methods."
+    },
+    {
+      "rank": 7,
+      "url": "https://openaccess.thecvf.com/content/ICCV2021/papers/Kotar_Contrasting_Contrastive_Self-Supervised_Representation_Learning_Pipelines_ICCV_2021_paper.pdf",
+      "rationale": "CVPR Open Access PDF 'Contrasting Contrastive Self-Supervised Representation Learning Pipelines' — systematic analysis of contrastive SSL pipelines, directly addressing pipeline-level understanding."
+    },
+    {
+      "rank": 8,
+      "url": "https://doi.org/10.3390/technologies9010002",
+      "rationale": "MDPI open-access survey 'A Survey on Contrastive Self-Supervised Learning' — comprehensive survey covering objectives, augmentations, and applications of contrastive SSL."
+    },
+    {
+      "rank": 9,
+      "url": "https://ieeexplore.ieee.org/document/9711402",
+      "rationale": "IEEE 'Contrasting Contrastive Self-Supervised Representation Learning' — analytical study examining what drives success in contrastive SSL, authoritative peer-reviewed reference."
+    },
+    {
+      "rank": 10,
+      "url": "https://arxiv.org/pdf/2510.10572",
+      "rationale": "arXiv 2510.10572 'Understanding Self-supervised Contrastive Learning through Supervised ...' — primary research source directly on the query topic (DuckDuckGo pos=1). Replaces the dropped SemanticScholar Supervised Contrastive Learning paper with its underlying arXiv primary source."
+    }
+  ]
+}

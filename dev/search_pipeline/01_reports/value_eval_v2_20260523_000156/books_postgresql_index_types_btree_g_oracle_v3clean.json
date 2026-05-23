@@ -1,0 +1,63 @@
+{
+  "mode": "books",
+  "query": "postgresql index types btree gin gist performance",
+  "selection_method": "LLM oracle (Sonnet, oracle-worker no-filter run)",
+  "source": "v3clean",
+  "drop_engines": [
+    "google",
+    "semantic_scholar"
+  ],
+  "replacements": [],
+  "top_10": [
+    {
+      "rank": 1,
+      "url": "https://doi.org/10.1007/978-1-4842-5663-3",
+      "rationale": "Apress published book 'PostgreSQL Configuration' by Shaik (2020) — explicit book entry (ISBN-based Springer/Apress DOI), covers PostgreSQL performance configuration including indexing."
+    },
+    {
+      "rank": 2,
+      "url": "https://doi.org/10.1007/springerreference_62191",
+      "rationale": "Springer Reference entry for 'GiST Index' — authoritative reference work entry directly covering one of the core index types in the query (GiST)."
+    },
+    {
+      "rank": 3,
+      "url": "https://en.wikibooks.org/wiki/PostgreSQL/Indices",
+      "rationale": "Wikibooks 'PostgreSQL/Indices' — open book format, directly covers GIN, GiST, B-tree index types in PostgreSQL; Wikibooks is an explicitly book-structured resource."
+    },
+    {
+      "rank": 4,
+      "url": "https://doi.org/10.20944/preprints202511.2170.v1",
+      "rationale": "Preprint 'Indexing in PostgreSQL: Performance Evaluation and Use Cases' — covers all six native index types (B-Tree, Hash, GiST, SP-GiST, GIN, BRIN) with performance evaluation, directly matching the query."
+    },
+    {
+      "rank": 5,
+      "url": "https://openalex.org/W2612672839",
+      "rationale": "Master's thesis 'PostgreSQL database performance optimization' — academic book-adjacent work covering PostgreSQL performance optimization techniques including indexing."
+    },
+    {
+      "rank": 6,
+      "url": "https://www.postgresql.org/docs/current/indexes-types.html",
+      "rationale": "Official PostgreSQL documentation on Index Types — the canonical authoritative reference covering B-tree, Hash, GiST, SP-GiST, GIN, BRIN. Authoritative reference material appropriate for book-mode queries."
+    },
+    {
+      "rank": 7,
+      "url": "https://vladmihalcea.com/postgresql-index-types/",
+      "rationale": "Vlad Mihalcea 'PostgreSQL Index Types' — comprehensive expert guide covering B+Tree, Hash, GIN, GiST, BRIN by a well-known PostgreSQL/JPA authority; depth matches a book chapter."
+    },
+    {
+      "rank": 8,
+      "url": "https://www.youngju.dev/blog/database/2026-03-10-postgresql-advanced-indexing-gin-gist-brin.en",
+      "rationale": "Deep dive 'PostgreSQL Advanced Indexing Guide: GIN, GiST, BRIN, and Partial Index' — covers internals, real-world use cases, and performance characteristics of all query-relevant index types."
+    },
+    {
+      "rank": 9,
+      "url": "https://severalnines.com/blog/postgresql-database-indexing-overview/",
+      "rationale": "Severalnines 'Database Indexing in PostgreSQL' — comprehensive overview from B-tree to GiST spatial indexes to full-text search/JSON/array GIN, covering the full query scope."
+    },
+    {
+      "rank": 10,
+      "url": "https://pganalyze.com/blog/gin-index",
+      "rationale": "pganalyze 'Understanding Postgres GIN Indexes: The Good and the Bad' — detailed treatment of GIN index internals and performance trade-offs, directly relevant to the query's GIN/GiST/performance focus."
+    }
+  ]
+}

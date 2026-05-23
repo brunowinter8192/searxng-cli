@@ -1,0 +1,69 @@
+{
+  "mode": "pdf",
+  "query": "postgresql index types btree gin gist performance",
+  "selection_method": "LLM oracle (Sonnet, oracle-worker no-filter run)",
+  "source": "v3clean",
+  "drop_engines": [
+    "google",
+    "semantic_scholar"
+  ],
+  "replacements": [
+    {
+      "replaced_url": "https://www.semanticscholar.org/paper/Intra-page-Indexing-in-Generalized-Search-Trees-of-Borodin-Mirvoda/a402de1fc7c031608b9a55083b5084aaf4390e97",
+      "new_url": "https://habr.com/ru/company/postgrespro/blog/441962/",
+      "rationale": "Habr/PostgresPro 'Indexes in PostgreSQL' — authored by PostgreSQL Pro (vendor documentation quality), Lobsters-surfaced (pos=1). Replaces the dropped SemanticScholar intra-page indexing paper; directly covers PostgreSQL index type performance (B-tree, GIN, GiST) matching the query."
+    }
+  ],
+  "top_10": [
+    {
+      "rank": 1,
+      "url": "https://momjian.us/main/writings/pgsql/indexing.pdf",
+      "rationale": "Direct PDF — 'Flexible Indexing with Postgres' by Bruce Momjian, PostgreSQL core committer. Covers GiST range-type indexing, R-tree bounding boxes, and index type selection. Authoritative direct PDF from a primary PostgreSQL contributor."
+    },
+    {
+      "rank": 2,
+      "url": "https://minervadb.xyz/wp-content/uploads/2025/04/Optimal-Indexing-for-PostgreSQL-Performance.pdf",
+      "rationale": "Direct PDF — 'Optimal Indexing for PostgreSQL Performance'. Covers GiST, SP-GiST, GIN for specialized domains where B-tree is inefficient. Direct PDF with performance focus."
+    },
+    {
+      "rank": 3,
+      "url": "https://doi.org/10.20944/preprints202511.2170.v1",
+      "rationale": "Academic preprint 'Indexing in PostgreSQL: Performance Evaluation and Use Cases' — comprehensive coverage of all six native index types (B-Tree, Hash, GiST, SP-GiST, GIN, BRIN) with performance evaluation. Has PDF download."
+    },
+    {
+      "rank": 4,
+      "url": "https://doi.org/10.64149/j.ijesrt.15.4.22-31",
+      "rationale": "'A Comparative Experimental Study of Index Performance in MongoDB and PostgreSQL' — empirical performance study with academic PDF available, covering PostgreSQL index performance under various loads."
+    },
+    {
+      "rank": 5,
+      "url": "https://doi.org/10.1088/1742-6596/944/1/012022",
+      "rationale": "'Improving generalized inverted index lock wait times' — academic paper on GIN index concurrent performance improvements. Open-access IOP journal paper with PDF available."
+    },
+    {
+      "rank": 6,
+      "url": "https://doi.org/10.1109/informatics47936.2019.9119265",
+      "rationale": "'An implementation of the M-tree index structure for PostgreSQL using GiST' — IEEE paper on GiST extensibility and custom index implementation. Academic PDF on GiST mechanics."
+    },
+    {
+      "rank": 7,
+      "url": "https://www.scribd.com/document/831033974/Index",
+      "rationale": "Scribd 'PostgreSQL Index Types and Optimization | PDF' — document discussing index type performance and optimization, covering B-tree, GIN, GiST overhead and when to use each."
+    },
+    {
+      "rank": 8,
+      "url": "https://www.slideshare.net/slideshow/explain-the-index-of-postgresql-indexes/27810834",
+      "rationale": "SlideShare 'Indexing Complex PostgreSQL Data Types | PDF' — presentation by Jonathan Katz covering B-trees, GiST, and GIN applications for complex data types."
+    },
+    {
+      "rank": 9,
+      "url": "https://www.postgresql.org/docs/current/indexes-types.html",
+      "rationale": "Official PostgreSQL documentation on Index Types — canonical reference even in PDF mode; covers all index types with authoritative algorithm descriptions."
+    },
+    {
+      "rank": 10,
+      "url": "https://habr.com/ru/company/postgrespro/blog/441962/",
+      "rationale": "Habr/PostgresPro 'Indexes in PostgreSQL' — authored by PostgreSQL Pro (vendor documentation quality), Lobsters-surfaced (pos=1). Replaces the dropped SemanticScholar intra-page indexing paper; directly covers PostgreSQL index type performance (B-tree, GIN, GiST) matching the query."
+    }
+  ]
+}
