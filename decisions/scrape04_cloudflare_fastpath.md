@@ -49,7 +49,7 @@ Keep current implementation (no change needed). The probe-on-every-scrape strate
 
 ## Offene Fragen
 
-- Does `x-markdown-tokens` count match what our downstream cleanup-and-index chunking would compute? Could be used to influence chunk size dynamically when present.
+- Does `x-markdown-tokens` count match what our downstream cleanup + index pipeline chunking would compute? Could be used to influence chunk size dynamically when present.
 - Adoption tracking: re-run the probe quarterly. Track whether the May 2026 baseline (~24% of probe set) grows. The probe script is the persistent measurement artifact.
 - Other multi-vendor edges that might already implement this pattern (Fastly, AWS CloudFront)? Out of scope for now — let the probe surface them when they appear.
 
