@@ -9,17 +9,32 @@
 | M1 C1 Overlap-Count | 0 |
 | M2 RRF post-bucket | 0 |
 | M3 Structural URL | 0 |
-| M4 BM25 vanilla | 12 |
+| M4 BM25 vanilla | 13 |
 | M5 BM25-Capped | 1 |
-| M6 C3 Cross-Encoder | 1712 |
-| M7 C3+InstrPrefix | 1773 |
+| M6 C3 Cross-Encoder | 1702 |
+| M7 C3+InstrPrefix | 1776 |
 | M8 RRF+C3 Hybrid | 0 |
-| M9 SPLADE | 1606 |
+| M9 SPLADE | 1068 |
 | M10 SPLADE+C3 | 0 |
-| M11 C3→LLM-Filter | 7654 |
-| M12 LLM-Selector | 10730 |
+| M11 C3→LLM-Filter | 6034 |
+| M12 LLM-Selector | 6557 |
 
-_Oracle not yet selected._
+## Jaccard vs Oracle (v3clean)
+
+| Method | Jaccard | Oracle captured |
+|--------|---------|-----------------|
+| M1 C1 Overlap-Count | 0.053 | 1/10 |
+| M2 RRF post-bucket | 0.053 | 1/10 |
+| M3 Structural URL | 0.111 | 2/10 |
+| M4 BM25 vanilla | 0.250 | 4/10 |
+| M5 BM25-Capped | 0.250 | 4/10 |
+| M6 C3 Cross-Encoder | 0.250 | 4/10 |
+| M7 C3+InstrPrefix | 0.429 | 6/10 |
+| M8 RRF+C3 Hybrid | 0.111 | 2/10 |
+| M9 SPLADE | 0.333 | 5/10 |
+| M10 SPLADE+C3 | 0.333 | 5/10 |
+| M11 C3→LLM-Filter | 0.429 | 6/10 |
+| M12 LLM-Selector | 0.111 | 2/10 |
 
 ## Pool (oracle input — url/title/snippet)
 

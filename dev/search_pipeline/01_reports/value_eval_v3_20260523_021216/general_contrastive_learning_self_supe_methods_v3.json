@@ -54,7 +54,7 @@
     "https://doi.org/10.2139/ssrn.6552061",
     "https://doi.org/10.48550/arxiv.2002.05709"
   ],
-  "m4_ms": 12,
+  "m4_ms": 13,
   "m5": [
     "https://deepai.org/publication/learning-representations-with-contrastive-self-supervised-learning-for-histopathology-applications",
     "https://deepai.org/publication/learning-weakly-supervised-contrastive-representations",
@@ -80,7 +80,7 @@
     "https://www.mdpi.com/2227-7080/9/1/2",
     "https://www.frontiersin.org/journals/neuroscience/articles/10.3389/fnins.2023.1225312/full"
   ],
-  "m6_ms": 1712,
+  "m6_ms": 1702,
   "m7": [
     "https://arxiv.org/abs/2004.11362",
     "https://www.thebravemillennial.com/contrastive-learning-and-the-future-of-self-supervised-representation-learning/",
@@ -93,7 +93,7 @@
     "https://www.frontiersin.org/journals/neuroscience/articles/10.3389/fnins.2023.1225312/full",
     "https://dl.acm.org/doi/abs/10.5555/3495724.3497291"
   ],
-  "m7_ms": 1773,
+  "m7_ms": 1776,
   "m8": [
     "https://doi.org/10.1101/2020.09.04.283929",
     "https://doi.org/10.1016/j.sigpro.2021.108310",
@@ -119,7 +119,7 @@
     "https://www.mdpi.com/2227-7080/9/1/2",
     "https://doi.org/10.1101/2020.09.04.283929"
   ],
-  "m9_ms": 1606,
+  "m9_ms": 1068,
   "m10": [
     "https://ieeexplore.ieee.org/document/10233092",
     "https://doi.org/10.3390/technologies9010002",
@@ -145,7 +145,7 @@
     "https://ieeexplore.ieee.org/document/10233092",
     "https://openaccess.thecvf.com/content/CVPR2024/papers/Li_Self-Supervised_Representation_Learning_from_Arbitrary_Scenarios_CVPR_2024_paper.pdf"
   ],
-  "m11_ms": 7654,
+  "m11_ms": 6034,
   "m11_tokens_in": 1597,
   "m11_tokens_out": 283,
   "m12": [
@@ -160,7 +160,7 @@
     "https://doi.org/10.1109/iccv48922.2021.00784",
     "https://doi.org/10.1109/iccv48922.2021.01000"
   ],
-  "m12_ms": 10730,
+  "m12_ms": 6557,
   "m12_tokens_in": 3362,
   "m12_tokens_out": 297
 }
