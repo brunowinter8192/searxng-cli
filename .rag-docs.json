@@ -1,24 +1,15 @@
 {
-  "collections": [
-    {
-      "name": "searxng-meta",
-      "include": [
-        "DOCS.md",
-        "src/DOCS.md",
-        "src/*/DOCS.md",
-        "dev/DOCS.md",
-        "dev/*/DOCS.md",
-        "dev/*/*/DOCS.md",
-        "decisions/*.md",
-        "sources/sources.md"
-      ]
-    },
-    {
-      "name": "searxng-features",
-      "include": [
-        "decisions/OldThemes/*.md",
-        "decisions/OldThemes/**/*.md"
-      ]
-    }
+  "collection": "searxng-docs",
+  "include": [
+    "DOCS.md",
+    "src/DOCS.md",
+    "src/*/DOCS.md",
+    "dev/DOCS.md",
+    "dev/*/DOCS.md",
+    "dev/*/*/DOCS.md",
+    "decisions/*.md",
+    "decisions/OldThemes/*.md",
+    "decisions/OldThemes/**/*.md",
+    "sources/sources.md"
   ]
 }
