@@ -2,11 +2,20 @@
 
 URL scraping and site exploration tools powered by Crawl4AI for SearXNG MCP server.
 
+## scrape_logger.py
+
+**Purpose:** Per-URL structured logging for scrape_url and scrape_url_raw. Two outputs per scrape call: (1) one JSONL record appended to `src/logs/scrape_log.jsonl`, (2) one sidecar `.md` file under `src/logs/scrape_content/` containing the exact content the caller received. No sidecar on error/timeout/empty outcomes; sidecar IS written on garbage outcome (content that triggered classification is preserved for inspection).
+**Public interface:** `log_scrape(record: dict)`, `write_sidecar(url, ts, content, outcome, mode) -> str | None`.
+**Reads:** `SEARXNG_SCRAPE_LOG_PATH` env var (fallback `src/logs/scrape_log.jsonl`). Sidecar dir = `<log_dir>/scrape_content/`.
+**Writes:** `src/logs/scrape_log.jsonl` (one line per call), `src/logs/scrape_content/<ts>_<slug>.md` (per-call content sidecar). Both gitignored via `src/logs/` entry.
+**Called by:** `scrape_url.py` (end of `scrape_url_workflow`), `scrape_url_raw.py` (end of `scrape_url_raw_workflow`).
+**Calls out:** none (stdlib only).
+
 ## scrape_url.py
 
 **Purpose:** URL scraping orchestrator. Uses Crawl4AI's AsyncWebCrawler with PruningContentFilter to extract clean page content as markdown. Two-phase browser strategy: normal browser first, stealth fallback for anti-bot sites.
 **Input:** URL string and optional maximum content length (default 15000).
-**Output:** Filtered markdown content wrapped in TextContent, or error message with plugin hint on failure.
+**Output:** Filtered markdown content wrapped in TextContent, or error message with plugin hint on failure. Side effect: writes one JSONL record to `scrape_log.jsonl` + one sidecar `.md` via `scrape_logger`.
 
 ### scrape_url_workflow()
 
@@ -22,7 +31,7 @@ On empty result, returns error message with plugin hint if URL matches a known d
 
 ### fetch_markdown_fastpath()
 
-HTTP probe for server-side markdown availability (Phase 0). Sends `Accept: text/markdown, text/html` via `httpx.AsyncClient` with `follow_redirects=True` and `MD_FASTPATH_TIMEOUT` (5.0s). Returns the markdown body string when ALL conditions hold: HTTP 200, Content-Type contains `text/markdown`, body length ≥ `MD_FASTPATH_MIN_BYTES` (200). Returns `None` on any miss (non-200, wrong content-type, sub-threshold body, network exception). Logs at info-level on hit; debug-level on miss/error so the production log isn't flooded by non-supporting hosts.
+HTTP probe for server-side markdown availability (Phase 0). Sends `Accept: text/markdown, text/html` via `httpx.AsyncClient` with `follow_redirects=True` and `MD_FASTPATH_TIMEOUT` (5.0s). Returns `(content, status_code, content_type, miss_reason)` 4-tuple. On hit: `(body, 200, ct, None)`. On miss: `(None, status_code_or_None, ct_or_None, reason)` where reason ∈ `{"http_error", "wrong_content_type", "sub_threshold", "network_error"}`. Hit conditions: HTTP 200 + `text/markdown` content-type + body ≥ `MD_FASTPATH_MIN_BYTES` (200 bytes). Logs at info-level on hit; debug-level on miss/error. Imported by `scrape_url_raw.py` for reuse.
 
 The 200-byte threshold guards against redirect-stub responses (anomaly observed at docs.anthropic.com returning 12 bytes during the 2026-05-07 adoption probe). The 5s timeout is generous enough for cold-edge CDN routing while still being tighter than the typical Crawl4AI browser-launch path, so the probe never delays the fallback meaningfully.
 
@@ -30,7 +39,7 @@ Imported from `scrape_url_raw.py` for reuse across both scraper entry points.
 
 ### try_scrape()
 
-Attempts a single scrape with given browser config, optional crawler strategy, and wait strategy. Returns `(content, garbage_type, status_code)` tuple. Checks `result.status_code` first — if >= 400, returns `("", "http_error", status_code)` immediately without content analysis (catches padded 404 pages). Content selection: `fit_markdown` if >= 200 chars (MIN_CONTENT_THRESHOLD), otherwise falls back to `raw_markdown`. This prevents PruningContentFilter from destroying table-heavy content (e.g. Wikipedia). Checks content via `is_garbage_content()` — if `cookie_wall` is detected, attempts `strip_consent_prefix()` first: if stripping yields different content that passes garbage detection, returns stripped content as success. All other garbage types (and cookie_wall when stripping fails) return empty string to trigger fallback chain.
+Attempts a single scrape with given browser config, optional crawler strategy, and wait strategy. Returns `(content, meta)` where `meta` is a dict with keys: `garbage_type`, `status_code`, `content_type`, `fallback_to_raw`, `consent_stripped`, `garbage_content` (content that triggered garbage detection — written to sidecar on garbage outcome), `raw_markdown_bytes` (raw_markdown length before filter/fallback — used for `bytes_raw_markdown` log field). Checks `result.status_code` first — if >= 400, returns `("", meta_with_garbage_type="http_error")`. Content selection: `fit_markdown` if >= 200 chars (MIN_CONTENT_THRESHOLD), otherwise falls back to `raw_markdown` (`fallback_to_raw=True`). Checks content via `is_garbage_content()` — if `cookie_wall` is detected, attempts `strip_consent_prefix()` first: if stripping yields different content that passes garbage detection, returns stripped content with `consent_stripped=True`. All other garbage types (and cookie_wall when stripping fails) return empty string with `garbage_content` populated for sidecar logging.
 
 ### is_garbage_content()
 
@@ -78,7 +87,7 @@ Returns plugin hint only for domains with dedicated MCP plugins (uses `PLUGIN_RO
 
 **Purpose:** Raw markdown scraping orchestrator for RAG indexing. Same two-phase browser strategy as `scrape_url.py` (normal → stealth fallback) but uses `DefaultMarkdownGenerator()` without PruningContentFilter and saves `raw_markdown` output to a .md file with `<!-- source: URL -->` header. Generates safe filename from URL (domain + path, max 120 chars).
 **Input:** URL string and output directory path.
-**Output:** TextContent with file path and char count on success, or error message on failure (Cloudflare-specific message when CF-protected).
+**Output:** TextContent with file path and char count on success, or error message on failure (Cloudflare-specific message when CF-protected). Side effect: writes one JSONL record to `scrape_log.jsonl` + one sidecar `.md` via `scrape_logger`. Sidecar content = same raw markdown saved to `output_dir`. Raw-mode fields `fallback_to_raw`, `truncated`, `consent_stripped` are null (not applicable).
 
 ## pdf_chain.py
 
