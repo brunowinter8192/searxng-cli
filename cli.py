@@ -14,7 +14,7 @@ from urllib.parse import urlparse
 from src.routing import check_plugin_routed
 from src.search.search_web import search_web_workflow, search_batch_workflow
 from src.search.browser import close_browser, kill_stale_chrome
-from src.search.cache import cache_key, cache_read, format_cached_slice
+from src.search.cache import cache_key, cache_read, format_engine_pool
 from src.scraper.scrape_url import scrape_url_workflow
 from src.scraper.scrape_url_raw import scrape_url_raw_workflow
 from src.crawler.explore_site import explore_site_workflow
@@ -35,61 +35,59 @@ def main():
     # ── search_web ────────────────────────────────────────────────────────────
     p = sub.add_parser(
         "search_web",
-        help="Search the web across 8 engines (Google, DDG, Mojeek, Lobsters, Scholar, CrossRef, OpenAlex, StackExchange)."
+        help="Search across 9 engines. Returns engine breakdown table — use search_engine_drilldown to see URLs per engine."
     )
     p.add_argument("query", help="Search query (2-5 keywords)")
     p.add_argument("--language", default="en", help="ISO language code (e.g. 'de')")
     p.add_argument("--time-range", dest="time_range", choices=["day", "month", "year"], default=None)
     p.add_argument("--engines", default=None,
-                   help="Comma-separated engine list (e.g. 'google,duckduckgo' or 'google scholar,crossref')")
-    p.add_argument("--general",  action="store_true", help="Restrict output slots to GENERAL class")
-    p.add_argument("--academic", action="store_true", help="Restrict output slots to ACADEMIC class")
-    p.add_argument("--qa",       action="store_true", help="Restrict output slots to QA class")
+                   help="Comma-separated engine list (e.g. 'google,duckduckgo,openalex')")
     mode_sw = p.add_mutually_exclusive_group()
     mode_sw.add_argument("--books", action="store_true",
-                   help="Restrict to book-domain whitelist (Google, DDG, Mojeek only, +book modifier)")
+                   help="Restrict to book-domain whitelist (+book modifier). Mutually exclusive with --pdf / --docs")
     mode_sw.add_argument("--pdf", action="store_true",
-                   help="Restrict to PDF-domain whitelist (Google, DDG, Mojeek, Scholar only, +pdf modifier)")
+                   help="Restrict to PDF-domain whitelist (+pdf modifier). Mutually exclusive with --books / --docs")
     mode_sw.add_argument("--docs", action="store_true",
-                   help="Restrict to docs-mode blacklist filter (Google, DDG, Mojeek only, +documentation modifier)")
+                   help="Noise-blacklist filter (+documentation modifier). Mutually exclusive with --books / --pdf")
 
     # ── search_batch ──────────────────────────────────────────────────────────
     p = sub.add_parser(
         "search_batch",
-        help="Search multiple queries in one warm-Chrome session."
+        help="Search multiple queries in one warm-Chrome session. Returns engine breakdown per query."
     )
     p.add_argument("queries", nargs="+", help="One or more search queries")
     p.add_argument("--language", default="en", help="ISO language code (e.g. 'de')")
     p.add_argument("--time-range", dest="time_range", choices=["day", "month", "year"], default=None)
     p.add_argument("--engines", default=None,
                    help="Comma-separated engine list (e.g. 'google,duckduckgo')")
-    p.add_argument("--general",  action="store_true", help="Restrict output slots to GENERAL class")
-    p.add_argument("--academic", action="store_true", help="Restrict output slots to ACADEMIC class")
-    p.add_argument("--qa",       action="store_true", help="Restrict output slots to QA class")
     mode_sb = p.add_mutually_exclusive_group()
     mode_sb.add_argument("--books", action="store_true",
-                   help="Restrict to book-domain whitelist (Google, DDG, Mojeek only, +book modifier)")
+                   help="Restrict to book-domain whitelist (+book modifier). Mutually exclusive with --pdf / --docs")
     mode_sb.add_argument("--pdf", action="store_true",
-                   help="Restrict to PDF-domain whitelist (Google, DDG, Mojeek, Scholar only, +pdf modifier)")
+                   help="Restrict to PDF-domain whitelist (+pdf modifier). Mutually exclusive with --books / --docs")
     mode_sb.add_argument("--docs", action="store_true",
-                   help="Restrict to docs-mode blacklist filter (Google, DDG, Mojeek only, +documentation modifier)")
+                   help="Noise-blacklist filter (+documentation modifier). Mutually exclusive with --books / --pdf")
 
-    # ── search_more ───────────────────────────────────────────────────────────
+    # ── search_engine_drilldown ───────────────────────────────────────────────
     p = sub.add_parser(
-        "search_more",
-        help="Get next batch of URLs from cached search results (must follow a search_web call with the same query)."
+        "search_engine_drilldown",
+        help="Show URL list for a specific engine from cached search results (or re-runs search on cache miss)."
     )
-    p.add_argument("query", help="Search query (must match prior search_web call).")
-    p.add_argument("--count", type=int, default=10, help="How many additional URLs to return (default 10).")
+    p.add_argument("query", help="Search query (must match a prior search_web call)")
+    p.add_argument("--engine", required=True,
+                   help="Engine name: google, duckduckgo, mojeek, lobsters, semantic_scholar, "
+                        "openalex, crossref, stack_exchange, open_library")
     p.add_argument("--language", default="en")
-    p.add_argument("--engines", default=None)
+    p.add_argument("--engines", default=None,
+                   help="Must match original search_web call (part of cache key)")
     p.add_argument("--time-range", dest="time_range", choices=["day", "month", "year"], default=None)
-    p.add_argument("--general",  action="store_true", help="Must match original search_web call (part of cache key)")
-    p.add_argument("--academic", action="store_true", help="Must match original search_web call (part of cache key)")
-    p.add_argument("--qa",       action="store_true", help="Must match original search_web call (part of cache key)")
-    p.add_argument("--books",    action="store_true", help="Must match original search_web call (part of cache key)")
-    p.add_argument("--pdf",      action="store_true", help="Must match original search_web call (part of cache key)")
-    p.add_argument("--docs",     action="store_true", help="Must match original search_web call (part of cache key)")
+    mode_edd = p.add_mutually_exclusive_group()
+    mode_edd.add_argument("--books", action="store_true",
+                   help="Must match original search_web call (part of cache key)")
+    mode_edd.add_argument("--pdf", action="store_true",
+                   help="Must match original search_web call (part of cache key)")
+    mode_edd.add_argument("--docs", action="store_true",
+                   help="Must match original search_web call (part of cache key)")
 
     # ── scrape_url ────────────────────────────────────────────────────────────
     p = sub.add_parser("scrape_url", help="Scrape URL to filtered markdown (PruningContentFilter).")
@@ -123,54 +121,39 @@ def main():
     args = parser.parse_args()
 
     if args.cmd == "search_web":
-        selected = frozenset(c for c, f in [("general", args.general), ("academic", args.academic), ("qa", args.qa)] if f)
-        class_filter = selected if selected else None
         result = asyncio.run(search_web_workflow(
             args.query, args.language, args.time_range, args.engines,
-            class_filter=class_filter, books=args.books, pdf=args.pdf, docs=args.docs,
+            books=args.books, pdf=args.pdf, docs=args.docs,
         ))
 
     elif args.cmd == "search_batch":
-        selected = frozenset(c for c, f in [("general", args.general), ("academic", args.academic), ("qa", args.qa)] if f)
-        class_filter = selected if selected else None
         results = asyncio.run(search_batch_workflow(
             args.queries, args.language, args.time_range, args.engines,
-            class_filter=class_filter, books=args.books, pdf=args.pdf, docs=args.docs,
+            books=args.books, pdf=args.pdf, docs=args.docs,
         ))
         print("\n---\n".join(r[0].text for r in results))
         return
 
-    elif args.cmd == "search_more":
-        selected = frozenset(c for c, f in [("general", args.general), ("academic", args.academic), ("qa", args.qa)] if f)
-        class_filter = selected if selected else None
-        key = cache_key(args.query, args.language, args.engines, args.time_range, class_filter=class_filter,
-                        modifier_id="books" if args.books else ("pdf" if args.pdf else ("docs" if args.docs else None)))
+    elif args.cmd == "search_engine_drilldown":
+        mode = "books" if args.books else ("pdf" if args.pdf else ("docs" if args.docs else None))
+        key = cache_key(args.query, args.language, args.engines, args.time_range, modifier_id=mode)
         hit = cache_read(key)
-        if hit is not None:
-            urls = hit.get("urls", [])
-            sliced = urls[20: 20 + args.count]
-            if not sliced:
-                print("# search_more: no further URLs in cached pool")
-                return
-            header = "# search_more (cached)\n"
-            print(header + format_cached_slice(sliced, 20))
-            return
-        else:
-            # Cache miss or expired — run fresh search, cache is written as side effect
-            fresh = asyncio.run(search_web_workflow(
+        if hit is None:
+            asyncio.run(search_web_workflow(
                 args.query, args.language, args.time_range, args.engines,
-                class_filter=class_filter, books=args.books, pdf=args.pdf, docs=args.docs,
+                books=args.books, pdf=args.pdf, docs=args.docs,
             ))
-            hit2 = cache_read(key)
-            if hit2:
-                sliced = hit2.get("urls", [])[:args.count]
-                header = "# search_more (cache miss — fresh ranking, only first {} shown)\n".format(args.count)
-                print(header + format_cached_slice(sliced, 0))
-            else:
-                # fallback: show what search_web returned
-                print("# search_more (cache miss — fresh ranking)\n")
-                print(fresh[0].text)
+            hit = cache_read(key)
+        if hit is None:
+            print(f'# search_engine_drilldown: cache write failed for "{args.query}"')
             return
+        pools = hit.get("pools", {})
+        if args.engine not in pools:
+            avail = ", ".join(sorted(pools.keys())) or "(none)"
+            print(f"Engine '{args.engine}' not in cached pools. Available: {avail}")
+            return
+        print(format_engine_pool(pools[args.engine], args.engine, args.query))
+        return
 
     elif args.cmd == "scrape_url":
         if should_download_as_pdf(args.url):

@@ -14,7 +14,6 @@ from mcp.types import TextContent
 from src.search.browser import close_browser
 from src.search.cache import cache_key, cache_write
 from src.search.engines.google import GoogleEngine
-from src.search.preview import fetch_previews
 from src.search.engines.crossref import CrossRefEngine
 from src.search.engines.duckduckgo import DuckDuckGoEngine
 from src.search.engines.mojeek import MojeekEngine
@@ -25,10 +24,8 @@ from src.search.engines.semantic_scholar import SemanticScholarEngine
 from src.search.engines.open_library import OpenLibraryEngine
 from src.search.rate_limiter import get_limiter
 from src.search.result import SearchResult
-# From snippet.py: score-based snippet selection
-from src.search.snippet import _select_snippet
-# From merge.py: URL-merge and slot allocation
-from src.search.merge import _merge_and_rank
+# From merge.py: per-engine pool builder with cross-engine URL dedup
+from src.search.merge import build_engine_pools
 # From status.py: sub-status string constants
 from src.search import status as S
 # From query_logger.py: append-only JSONL query log
@@ -38,7 +35,6 @@ from src.search.filter_modes import apply_filter_mode, filter_urls_by_mode, _DEF
 
 logger = logging.getLogger(__name__)
 
-SNIPPET_LENGTH = 5000
 ENGINE_WATCHDOG_TIMEOUT: float = 3.6
 RATE_WAIT_TIMEOUT: float = 60.0
 ENGINE_WATCHDOG_OVERRIDE: dict[str, float] = {
@@ -74,14 +70,13 @@ ENGINES = {
 
 # ORCHESTRATOR
 
-# Search all enabled engines concurrently, merge+rank, preview, format, cache, log, return TextContent
+# Fan out to all enabled engines, build per-engine pools, format breakdown table, cache, log, return TextContent
 async def search_web_workflow(
     query: str,
     language: str = "en",
     time_range: str | None = None,
     engines: str | None = None,
     _with_timings: bool = False,
-    class_filter: frozenset[str] | None = None,
     engine_timeout: float | None = None,
     query_modifier_map: dict[str, Callable[[str], str]] | None = None,
     books: bool = False,
@@ -100,28 +95,19 @@ async def search_web_workflow(
     )
 
     t0 = time.perf_counter()
-    ranked, slot_counts = _merge_and_rank(raw_results, class_filter=class_filter)
-    ranked = filter_urls_by_mode(ranked, mode)
-    merge_rank_ms = round((time.perf_counter() - t0) * 1000)
+    filtered = filter_urls_by_mode(raw_results, mode)
+    pools = build_engine_pools(filtered)
+    pool_build_ms = round((time.perf_counter() - t0) * 1000)
 
-    top20, preview_stats = await fetch_previews(ranked[:20])
-    preview_ms = preview_stats["total_ms"]
+    formatted_text = _format_breakdown(query, pools, list(selected.keys()))
 
+    key = cache_key(query, language, engines, time_range, modifier_id=mode)
     t0 = time.perf_counter()
-    formatted_text, snippet_sources, snippet_texts = _format_results(query, top20)
-    select_snippet_ms = round((time.perf_counter() - t0) * 1000)
-
-    og_meta = {r.url: r.preview for r in top20 if r.preview}
-
-    key = cache_key(query, language, engines, time_range, class_filter=class_filter, modifier_id=mode)
-    t0 = time.perf_counter()
-    cache_write(key, ranked, query, language, engines, time_range,
-                snippet_sources=snippet_sources, slot_counts=slot_counts,
-                snippet_texts=snippet_texts, og_meta=og_meta)
+    cache_write(key, pools, query, language, engines, time_range)
     cache_write_ms = round((time.perf_counter() - t0) * 1000)
 
     total_ms = round((time.perf_counter() - t_total) * 1000)
-    _build_query_log_entry(query, language, selected, total_ms, engine_stats, preview_stats, all_excluded)
+    _build_query_log_entry(query, language, selected, total_ms, engine_stats, all_excluded)
 
     result = [TextContent(type="text", text=formatted_text)]
 
@@ -131,9 +117,7 @@ async def search_web_workflow(
         "engine_fanout_ms": engine_fanout_ms,
         **engine_ms,
         "engine_details": engine_details,
-        "merge_rank_ms": merge_rank_ms,
-        "preview_ms": preview_ms,
-        "select_snippet_ms": select_snippet_ms,
+        "pool_build_ms": pool_build_ms,
         "cache_write_ms": cache_write_ms,
         "total_ms": total_ms,
     }
@@ -146,7 +130,6 @@ async def search_batch_workflow(
     language: str = "en",
     time_range: str | None = None,
     engines: str | None = None,
-    class_filter: frozenset[str] | None = None,
     query_modifier_map: dict[str, Callable[[str], str]] | None = None,
     books: bool = False,
     pdf: bool = False,
@@ -157,7 +140,6 @@ async def search_batch_workflow(
         for q in queries:
             results.append(await search_web_workflow(
                 q, language, time_range, engines,
-                class_filter=class_filter,
                 query_modifier_map=query_modifier_map,
                 books=books,
                 pdf=pdf,
@@ -192,7 +174,7 @@ def fetch_search_results(
 
 # FUNCTIONS
 
-# Filter engine registry; default path returns full 9-engine set (Scholar fully removed — see decisions/bee_fix.md)
+# Filter engine registry; default path returns full 9-engine set
 # Returns (selected, excluded) — excluded maps engine.name → reason for engines not included
 def _select_engines(engines: str | None) -> tuple[dict, dict[str, str]]:
     if not engines:
@@ -341,23 +323,15 @@ async def _engine_with_timing(
         return [], rate_wait_ms, search_ms, S.ERROR_OTHER, str(e)
 
 
-# Format merged SearchResult list as plain text numbered list; returns (text, {url: source}, {url: display_text})
-def _format_results(query: str, results: list[SearchResult]) -> tuple[str, dict[str, str], dict[str, str]]:
-    if not results:
-        return f'No results found for "{query}"', {}, {}
-    lines = [f'Found {len(results)} results for "{query}"\n']
-    sources: dict[str, str] = {}
-    texts:   dict[str, str] = {}
-    for idx, r in enumerate(results, 1):
-        lines.append(f"{idx}. {r.title}")
-        lines.append(f"   URL: {r.url}")
-        snippet, source = _select_snippet(r)
-        sources[r.url] = source
-        texts[r.url]   = snippet
-        if snippet:
-            lines.append(f"   Snippet: {snippet[:SNIPPET_LENGTH]}")
-        lines.append("")
-    return "\n".join(lines), sources, texts
+# Format per-engine result counts as a breakdown table with drilldown hint
+def _format_breakdown(query: str, pools: dict[str, list[SearchResult]], all_engine_names: list[str]) -> str:
+    lines = [f'Engine breakdown for "{query}":']
+    for engine in all_engine_names:
+        count = len(pools.get(engine, []))
+        lines.append(f"  {engine:<20} {count}")
+    lines.append("")
+    lines.append(f'Use `searxng-cli search_engine_drilldown "{query}" --engine <name>` to see URLs per engine.')
+    return "\n".join(lines)
 
 
 # Build and write workflow_summary log entry after each search_web_workflow call
@@ -367,7 +341,6 @@ def _build_query_log_entry(
     selected: dict,
     total_ms: int,
     engine_stats: dict,
-    preview_stats: dict,
     engines_excluded: dict[str, str],
 ) -> None:
     bottleneck = max(engine_stats, key=lambda k: engine_stats[k]["search_ms"]) if engine_stats else None
@@ -382,5 +355,4 @@ def _build_query_log_entry(
         "total_wall_ms": total_ms,
         "bottleneck_engine": bottleneck,
         "engines": engine_stats,
-        "preview": preview_stats,
     })

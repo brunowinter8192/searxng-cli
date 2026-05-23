@@ -8,6 +8,8 @@ import time
 from pathlib import Path
 
 from src.search.result import SearchResult
+# From snippet.py: bloat-strip and truncation for drilldown display
+from src.search.snippet import _strip_bloat, _truncate, MAX_SNIPPET_LEN
 
 logger = logging.getLogger(__name__)
 
@@ -17,20 +19,17 @@ DEFAULT_TTL = 3600  # 1 hour
 
 # FUNCTIONS
 
-# SHA-256 hex of canonical input string, first 16 chars
-# modifier_id is appended when set (e.g. 'books' for --books, future 'pdf' for --pdf/x4f).
-# modifier_id=None is backward-compatible — produces identical hash to pre-modifier callers.
+# SHA-256 hex of canonical input string, first 16 chars.
+# modifier_id appended when set (e.g. 'books', 'pdf', 'docs') for cross-flag cache separation.
 def cache_key(
     query: str,
     language: str,
     engines: str | None,
     time_range: str | None,
-    class_filter: frozenset[str] | None = None,
     modifier_id: str | None = None,
 ) -> str:
-    cf = "|".join(sorted(class_filter)) if class_filter else ""
     mid = f"|{modifier_id}" if modifier_id else ""
-    canonical = f"{query.lower().strip()}|{language}|{engines or ''}|{time_range or ''}|{cf}{mid}"
+    canonical = f"{query.lower().strip()}|{language}|{engines or ''}|{time_range or ''}{mid}"
     return hashlib.sha256(canonical.encode()).hexdigest()[:16]
 
 
@@ -39,42 +38,35 @@ def cache_path(key: str) -> Path:
     return CACHE_DIR / f"{key}.json"
 
 
-# Atomic write via temp file + rename
+# Atomic write via temp file + rename.
+# pools: {engine_name → [SearchResult, ...]} — per-engine ordered lists from build_engine_pools.
 def cache_write(
     key: str,
-    ranked: list[SearchResult],
+    pools: dict[str, list[SearchResult]],
     query: str,
     language: str,
     engines: str | None,
     time_range: str | None,
-    snippet_sources: dict[str, str] | None = None,
-    slot_counts: dict | None = None,
-    snippet_texts: dict[str, str] | None = None,
-    og_meta: dict[str, dict] | None = None,
 ) -> None:
     CACHE_DIR.mkdir(parents=True, exist_ok=True)
-    payload = {
-        "query": query,
-        "language": language,
-        "engines": engines,
-        "time_range": time_range,
-        "timestamp": int(time.time()),
-        "returned_count": len(ranked),
-        "slot_counts": slot_counts,
-        "urls": [
+    serialized_pools: dict[str, list[dict]] = {}
+    for engine_name, pool in pools.items():
+        serialized_pools[engine_name] = [
             {
-                "url": r.url,
-                "title": r.title,
-                "snippet": r.snippet,
-                "engines": r.engines,
-                "snippets": r.snippets,
-                "snippet_source": snippet_sources.get(r.url) if snippet_sources else None,
-                "snippet_display": snippet_texts.get(r.url) if snippet_texts else None,
-                "og":   (og_meta.get(r.url) or {}).get("og")   if og_meta else None,
-                "meta": (og_meta.get(r.url) or {}).get("meta") if og_meta else None,
+                "url":      r.url,
+                "title":    r.title,
+                "snippet":  r.snippet,
+                "position": r.position,
             }
-            for r in ranked
-        ],
+            for r in pool
+        ]
+    payload = {
+        "query":      query,
+        "language":   language,
+        "engines":    engines,
+        "time_range": time_range,
+        "timestamp":  int(time.time()),
+        "pools":      serialized_pools,
     }
     target = cache_path(key)
     fd, tmp = tempfile.mkstemp(dir=CACHE_DIR, suffix=".json.tmp")
@@ -82,12 +74,13 @@ def cache_write(
         with os.fdopen(fd, "w", encoding="utf-8") as f:
             json.dump(payload, f, ensure_ascii=False, indent=2)
         os.replace(tmp, target)
-        logger.debug("Cache written: %s (%d urls)", target, len(ranked))
+        total = sum(len(p) for p in serialized_pools.values())
+        logger.debug("Cache written: %s (%d urls across %d engines)", target, total, len(serialized_pools))
     except Exception:
         try:
             os.unlink(tmp)
         except OSError:
-            pass
+            logger.warning("Failed to remove temp file %s", tmp)
         raise
 
 
@@ -107,14 +100,18 @@ def cache_read(key: str, ttl_seconds: int = DEFAULT_TTL) -> dict | None:
         return None
 
 
-# Format a slice of cached url-dicts as a numbered plain-text list
-def format_cached_slice(urls: list[dict], start_index: int) -> str:
-    lines = []
-    for i, entry in enumerate(urls, start_index + 1):
-        lines.append(f"{i}. {entry['title']}")
+# Format one engine's pool from cache as a numbered plain-text list with stripped snippet.
+def format_engine_pool(pool: list[dict], engine_name: str, query: str) -> str:
+    if not pool:
+        return f'No results from {engine_name} for "{query}"'
+    lines = [f'Results from {engine_name} for "{query}"\n']
+    for entry in pool:
+        lines.append(f"{entry['position']}. {entry['title']}")
         lines.append(f"   URL: {entry['url']}")
-        snippet = entry.get("snippet", "")
-        if snippet:
-            lines.append(f"   Snippet: {snippet[:5000]}")
+        raw = entry.get("snippet") or ""
+        if raw:
+            snippet = _truncate(_strip_bloat(raw), MAX_SNIPPET_LEN)
+            if snippet:
+                lines.append(f"   Snippet: {snippet}")
         lines.append("")
     return "\n".join(lines)

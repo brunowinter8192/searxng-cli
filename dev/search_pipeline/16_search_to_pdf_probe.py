@@ -27,7 +27,7 @@ from src.scraper.pdf_chain import (
     parse_citation_pdf_url,
 )
 from src.search.browser import close_browser
-from src.search.merge import _merge_and_rank
+from src.search.merge import build_engine_pools
 from src.search.result import SearchResult
 from src.search.search_web import _query_engines_concurrent, _select_engines
 
@@ -79,10 +79,11 @@ async def run_probe(queries: list[str], top_n: int) -> None:
 async def _run_query(client: httpx.AsyncClient, query: str, top_n: int) -> dict:
     t0 = time.monotonic()
 
-    selected = _select_engines(None)
+    selected, _ = _select_engines(None)
     print(f"  [search] engines={list(selected)}", file=sys.stderr)
     raw = await _query_engines_concurrent(query, "en", 100, selected)
-    ranked, slot_counts = _merge_and_rank(raw)
+    pools = build_engine_pools(raw)
+    ranked = [r for pool in pools.values() for r in pool]
     candidates = ranked[:top_n]
     print(f"  [search] raw={len(raw)} merged={len(ranked)} top_n={len(candidates)}", file=sys.stderr)
 
@@ -100,7 +101,7 @@ async def _run_query(client: httpx.AsyncClient, query: str, top_n: int) -> dict:
         "query": query,
         "rows": [r for r in rows if r is not None],
         "wall_secs": time.monotonic() - t0,
-        "slot_counts": slot_counts,
+        "slot_counts": {e: len(p) for e, p in pools.items()},
     }
 
 

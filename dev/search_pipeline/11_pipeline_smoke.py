@@ -57,8 +57,8 @@ async def run_pipeline_smoke(max_queries: int | None, language: str, engine_time
             _, timings = await search_web_workflow(query, language, None, None, _with_timings=True, engine_timeout=engine_timeout)
             key  = cache_key(query, language, None, None)
             hit  = cache_read(key)
-            urls = hit.get("urls", []) if hit else []
-            record = _build_record(query, urls, timings)
+            pools = hit.get("pools", {}) if hit else {}
+            record = _build_record(query, pools, timings)
             records.append(record)
             print(
                 f"[{qi}/{len(queries)}] {query!r} -> urls={record['total_urls']} "
@@ -112,15 +112,12 @@ def _load_queries(path: Path, max_queries: int | None) -> list[str]:
     return qs[:max_queries] if max_queries else qs
 
 
-# Build per-query record: total URL count, per-engine URL contribution counts, timings
-def _build_record(query: str, urls: list[dict], timings: dict) -> dict:
-    engine_url_counts: dict[str, int] = {}
-    for entry in urls:
-        for eng in entry.get("engines", []):
-            engine_url_counts[eng] = engine_url_counts.get(eng, 0) + 1
+# Build per-query record: total URL count, per-engine URL counts from pools, timings
+def _build_record(query: str, pools: dict, timings: dict) -> dict:
+    engine_url_counts = {eng: len(pool) for eng, pool in pools.items()}
     return {
         "query":             query,
-        "total_urls":        len(urls),
+        "total_urls":        sum(engine_url_counts.values()),
         "engine_url_counts": engine_url_counts,
         "timings":           timings,
     }
@@ -188,16 +185,15 @@ def _render_timing_section(records: list[dict]) -> list[str]:
         "",
         "### Per-Query",
         "",
-        "| # | Query | total_ms | fanout_ms | merge_ms | preview_ms | snippet_ms | cache_ms |",
-        "|---|-------|----------|-----------|----------|------------|------------|----------|",
+        "| # | Query | total_ms | fanout_ms | pool_ms | cache_ms |",
+        "|---|-------|----------|---------|---------|---------|",
     ]
     for i, r in enumerate(records, 1):
         t = r["timings"]
         q = r["query"][:40].replace("|", "\\|")
         L.append(
             f"| {i} | {q} | {t.get('total_ms', '—')} | {t.get('engine_fanout_ms', '—')} "
-            f"| {t.get('merge_rank_ms', '—')} | {t.get('preview_ms', '—')} "
-            f"| {t.get('select_snippet_ms', '—')} | {t.get('cache_write_ms', '—')} |"
+            f"| {t.get('pool_build_ms', '—')} | {t.get('cache_write_ms', '—')} |"
         )
     if all_total_ms:
         srt = sorted(all_total_ms)
