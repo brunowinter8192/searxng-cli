@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-Stage 1 — Pool Fetch (value_eval_v2).
+Stage 1 — Pool Fetch (value_eval_v3).
 
 Fetches results for 16 (mode, query) pairs (4 modes × 4 queries).
 Writes per-pair pool.json + engine_report.md, then engine_report_summary.md.
@@ -10,10 +10,13 @@ title+snippet. Query modifier (+book / +pdf / +documentation) still biases engin
 
 pool.json schema:
   pool      — oracle input + C1/C2'/C3: capped_pool sorted by URL, ALL fields
-               (url / title / snippet / engines / min_position)
+               (url / title / snippet / engines / min_position / positions)
   pool_full — C2 BM25 vanilla: full_pool (all deduped results) sorted by URL, ALL fields
 
-Oracle workers: read pool[*].{url, title, snippet} only — ignore engines and min_position.
+positions: {engine_name: rank} — per-engine position (additive v3 field; Methods 2-5 RRF).
+Invariants: set(engines)==set(positions.keys()), min_position==min(positions.values()).
+
+Oracle workers: read pool[*].{url, title, snippet} only — ignore engines/min_position/positions.
 
 Usage:
   ./venv/bin/python dev/search_pipeline/stage1_pool_fetch.py [--smoke] [--ts-dir PATH]
@@ -85,7 +88,7 @@ _MODE_ENGINES = frozenset({"google", "duckduckgo", "mojeek"})
 
 async def run_pool_fetch(smoke: bool, ts_dir_arg: Path | None) -> Path:
     ts     = datetime.now().strftime("%Y%m%d_%H%M%S")
-    ts_dir = ts_dir_arg or (REPORT_DIR / f"value_eval_v2_{ts}")
+    ts_dir = ts_dir_arg or (REPORT_DIR / f"value_eval_v3_{ts}")
     ts_dir.mkdir(parents=True, exist_ok=True)
 
     pairs   = [(SMOKE_MODE, SMOKE_QUERY)] if smoke else [(m, q) for m in MODES for q in QUERIES]
@@ -136,6 +139,18 @@ def _build_capped_pool(raw_results: list, K: int) -> list[dict]:
     return _build_pool([r for r in raw_results if r.position <= K])
 
 
+# Attach positions: {engine: rank} to each pool entry from the matching raw_results slice
+def _attach_positions(raw_results: list, pool: list[dict]) -> None:
+    pos_map: dict[str, dict[str, int]] = {}
+    for r in raw_results:
+        if r.url not in pos_map:
+            pos_map[r.url] = {}
+        eng = pos_map[r.url]
+        eng[r.engine] = min(eng.get(r.engine, 999), r.position)
+    for m in pool:
+        m["positions"] = pos_map.get(m["url"], {})
+
+
 # Fetch + save pool.json + engine_report.md for one pair; return summary metadata
 async def _run_one_pair(ts_dir: Path, mode: str, query: str, selected: dict) -> dict:
     qmm = _modifier_map(mode)
@@ -151,7 +166,10 @@ async def _run_one_pair(ts_dir: Path, mode: str, query: str, selected: dict) -> 
     K            = google_count if google_count > 0 else 10
 
     full_pool   = _build_pool(raw_results)
-    capped_pool = _build_capped_pool(raw_results, K)
+    capped_raw  = [r for r in raw_results if r.position <= K]
+    capped_pool = _build_pool(capped_raw)
+    _attach_positions(raw_results, full_pool)
+    _attach_positions(capped_raw, capped_pool)
     oracle_pool = sorted(capped_pool, key=lambda m: m["url"])
 
     slug = _query_slug(query)
@@ -189,6 +207,7 @@ def _save_pool_json(
             "snippet":      (m.get("snippet") or "").strip(),
             "engines":      m.get("engines", []),
             "min_position": m.get("min_position", 999),
+            "positions":    m.get("positions", {}),
         }
 
     data = {
