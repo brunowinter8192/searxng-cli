@@ -35,8 +35,6 @@ HTTP probe for server-side markdown availability (Phase 0). Sends `Accept: text/
 
 The 200-byte threshold guards against redirect-stub responses (anomaly observed at docs.anthropic.com returning 12 bytes during the 2026-05-07 adoption probe). The 5s timeout is generous enough for cold-edge CDN routing while still being tighter than the typical Crawl4AI browser-launch path, so the probe never delays the fallback meaningfully.
 
-Imported from `scrape_url_raw.py` for reuse across both scraper entry points.
-
 ### try_scrape()
 
 Attempts a single scrape with given browser config, optional crawler strategy, and wait strategy. Returns `(content, meta)` where `meta` is a dict with keys: `garbage_type`, `status_code`, `content_type`, `fallback_to_raw`, `consent_stripped`, `garbage_content` (content that triggered garbage detection — written to sidecar on garbage outcome), `raw_markdown_bytes` (raw_markdown length before filter/fallback — used for `bytes_raw_markdown` log field). Checks `result.status_code` first — if >= 400, returns `("", meta_with_garbage_type="http_error")`. Content selection: `fit_markdown` if >= 200 chars (MIN_CONTENT_THRESHOLD), otherwise falls back to `raw_markdown` (`fallback_to_raw=True`). Checks content via `is_garbage_content()` — if `cookie_wall` is detected, attempts `strip_consent_prefix()` first: if stripping yields different content that passes garbage detection, returns stripped content with `consent_stripped=True`. All other garbage types (and cookie_wall when stripping fails) return empty string with `garbage_content` populated for sidecar logging.
