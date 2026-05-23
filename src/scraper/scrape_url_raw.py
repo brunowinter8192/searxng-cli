@@ -43,7 +43,7 @@ async def scrape_url_raw_workflow(url: str, output_dir: str) -> list[TextContent
     phases_attempted.append("fastpath")
 
     if md:
-        logger.info("Markdown fast-path hit: %s (%d chars)", url, len(md))
+        logger.debug("Markdown fast-path hit: %s (%d chars)", url, len(md))
         parsed = urlparse(url)
         path = parsed.netloc + parsed.path
         safe_name = re.sub(r'[^\w\-.]', '_', path).strip('_')[:120] + ".md"

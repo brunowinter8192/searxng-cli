@@ -53,13 +53,13 @@ async def crawl_site_workflow(url: str, output_dir: str, depth: int, max_pages: 
         logger.info("Prefetch: %d URLs", len(urls))
         results = await crawl_urls(urls)
     elif strategy == "auto":
-        logger.info("Auto-detection: trying sitemap...")
+        logger.debug("Auto-detection: trying sitemap...")
         urls = await discover_urls_sitemap(domain, include_patterns)
         if urls:
             logger.info("Sitemap: %d URLs", len(urls))
             results = await crawl_urls(urls)
         else:
-            logger.info("No sitemap. Trying prefetch BFS...")
+            logger.debug("No sitemap. Trying prefetch BFS...")
             urls = await discover_urls(url, domain, depth, max_pages, exclude_patterns, include_patterns)
             if len(urls) > 1:
                 logger.info("Prefetch: %d URLs", len(urls))
@@ -219,7 +219,7 @@ def deduplicate(results: list) -> list:
             continue
         seen.add(normalized)
         unique.append(r)
-    logger.info("Unique after dedup: %d", len(unique))
+    logger.debug("Unique after dedup: %d", len(unique))
     return unique
 
 
@@ -232,10 +232,10 @@ def save_markdown(results: list, seed_url: str, output_dir: Path) -> int:
         if not url or not raw_md:
             continue
         if r.status_code and r.status_code >= 400:
-            logger.info("skip %s (HTTP %d)", url, r.status_code)
+            logger.debug("skip %s (HTTP %d)", url, r.status_code)
             continue
         if is_garbage_content(raw_md):
-            logger.info("skip %s (garbage content)", url)
+            logger.debug("skip %s (garbage content)", url)
             continue
 
         clean_md = PERMALINK_PATTERN.sub('', raw_md)

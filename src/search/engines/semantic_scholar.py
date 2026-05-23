@@ -65,7 +65,7 @@ class SemanticScholarEngine(BaseEngine):
                 return [], S.EMPTY_BLOCK
             if not await _wait_for_results(tab):
                 reason = await _diagnose_empty(tab)
-                logger.warning("Semantic Scholar empty (%s) for: %s", reason, query)
+                logger.debug("Semantic Scholar empty (%s) for: %s", reason, query)
                 return [], reason
             results = await _parse_results(tab, max_results)
             return results, (None if results else S.EMPTY_NO_RESULTS)

@@ -6,6 +6,19 @@ from pathlib import Path
 # Ensure src.* imports resolve regardless of working directory
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 
+import logging
+
+# Central logging config — FileHandler only, no StreamHandler.
+# Placed before src.* imports: module-load-time log calls route to file, not stderr.
+# basicConfig with explicit handlers= never installs the default StreamHandler.
+_log_path = Path(__file__).parent / "src" / "logs" / "cli.log"
+_log_path.parent.mkdir(parents=True, exist_ok=True)
+logging.basicConfig(
+    level=logging.DEBUG,
+    format="%(asctime)s [%(levelname)s] %(name)s:%(lineno)d - %(message)s",
+    handlers=[logging.FileHandler(_log_path, mode="a", encoding="utf-8")],
+)
+
 import argparse
 import asyncio
 import atexit
