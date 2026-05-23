@@ -4,10 +4,10 @@ URL scraping and site exploration tools powered by Crawl4AI for SearXNG MCP serv
 
 ## scrape_logger.py
 
-**Purpose:** Per-URL structured logging for scrape_url and scrape_url_raw. Two outputs per scrape call: (1) one JSONL record appended to `src/logs/scrape_log.jsonl`, (2) one sidecar `.md` file under `src/logs/scrape_content/` containing the exact content the caller received. No sidecar on error/timeout/empty outcomes; sidecar IS written on garbage outcome (content that triggered classification is preserved for inspection).
+**Purpose:** Per-URL structured logging for scrape_url and scrape_url_raw. Two outputs per scrape call: (1) one JSONL record appended to `src/logs/scrape_log.jsonl`, (2) one sidecar `.md` file under the `scrape_content/` subdir of the log dir (gitignored) containing the exact content the caller received. No sidecar on error/timeout/empty outcomes; sidecar IS written on garbage outcome (content that triggered classification is preserved for inspection).
 **Public interface:** `log_scrape(record: dict)`, `write_sidecar(url, ts, content, outcome, mode) -> str | None`.
 **Reads:** `SEARXNG_SCRAPE_LOG_PATH` env var (fallback `src/logs/scrape_log.jsonl`). Sidecar dir = `<log_dir>/scrape_content/`.
-**Writes:** `src/logs/scrape_log.jsonl` (one line per call), `src/logs/scrape_content/<ts>_<slug>.md` (per-call content sidecar). Both gitignored via `src/logs/` entry.
+**Writes:** `src/logs/scrape_log.jsonl` (one line per call), `<log_dir>/scrape_content/<ts>_<slug>.md` (per-call content sidecar). Both gitignored.
 **Called by:** `scrape_url.py` (end of `scrape_url_workflow`), `scrape_url_raw.py` (end of `scrape_url_raw_workflow`).
 **Calls out:** none (stdlib only).
 
@@ -112,7 +112,7 @@ Returns plugin hint only for domains with dedicated MCP plugins (uses `PLUGIN_RO
 **Purpose:** Per-URL structured logging for `download_pdf_workflow`. Emits one JSONL record to `src/logs/download_log.jsonl` per call — chain resolution stages attempted, per-stage timings, outcome, http_status, bytes_downloaded. No sidecar files (the PDF is already on disk at `output_path`).
 **Public interface:** `log_download(record: dict)`.
 **Reads:** `SEARXNG_DOWNLOAD_LOG_PATH` env var (fallback `src/logs/download_log.jsonl`).
-**Writes:** `src/logs/download_log.jsonl` (one line per call, gitignored via `src/logs/`).
+**Writes:** `src/logs/download_log.jsonl` (one line per call, gitignored).
 **Called by:** `download_pdf.py` (`download_pdf_workflow` — once per call at every return path).
 **Calls out:** none (stdlib only).
 

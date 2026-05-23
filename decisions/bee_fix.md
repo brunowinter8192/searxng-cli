@@ -32,7 +32,7 @@ All 9 engines enter `acquire()`, acquire lock, sleep in `asyncio.sleep(wait)`, c
 - **Type 2 (6/18):** tokencap (8 engines) + Google backoff (1 engine). Following a CAPTCHA, Google-only fires backoff; other 8 hit tokencap independently.  
 Immune engines (crossref, openalex, stack_exchange, open_library) NEVER fired backoff branch — 0 `backoff_sleep_attempt` across all 18 queries. Phase 2 multi-engine-backoff narrative INCORRECT.
 
-**Fix verification** (`dev/search_pipeline/01_reports/pipeline_smoke_20260521_200557.md`, 20 queries)
+**Fix verification** (20-query smoke run, 2026-05-21)
 
 | Milestone | Cumulative wall (s) | Avg/query in segment (s) | Engines OK | Engines RATE_SKIP |
 |-----------|--------------------:|-------------------------:|-----------:|------------------:|
@@ -63,4 +63,3 @@ Keep (no change needed). Fix verified by smoke. The three changes together elimi
 | `decisions/OldThemes/bee_cdp_starvation/02_acquire_probe.md` | Phase 2: A-sleep confirmed, lock clean |
 | `decisions/OldThemes/bee_cdp_starvation/03_branch_probe.md` | Phase 3: tokencap-path verdict |
 | `decisions/OldThemes/scholar_decoupling/20260509.md` | Scholar HTTP migration + Google decoupling history |
-| `dev/search_pipeline/01_reports/pipeline_smoke_20260521_200557.md` | Fix verification: 20 queries, 0 RATE_SKIP |

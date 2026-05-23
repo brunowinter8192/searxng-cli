@@ -3,7 +3,7 @@
 ## Status Quo (IST)
 
 **Architecture:** Sidecar split. Every `scrape_url` and `scrape_url_raw` call emits two artifacts:
-1. One structured JSONL record → `src/logs/scrape_log.jsonl` (append-only, gitignored via `src/logs/`)
+1. One structured JSONL record → `src/logs/scrape_log.jsonl` (append-only, gitignored)
 2. One content sidecar → `src/logs/scrape_content/<ts>_<url_slug>.md` — the exact final content the caller received
 
 **What is logged:** the FINAL output the caller receives, not intermediate state. For `scrape_url` (filtered mode): the truncated `fit_markdown` (or `raw_markdown` after fallback), after `truncate_content` is applied. For `scrape_url_raw`: the full `raw_markdown` that gets saved to `output_dir`. Pre-filter and pre-truncation content is NOT logged as sidecar — only the bytes the agent sees.
@@ -95,7 +95,7 @@ Keep — architecture is the IST.
 
 ## Offene Fragen
 
-- **Rotation policy:** `src/logs/scrape_content/` grows unboundedly. No rotation or cleanup logic exists. To be addressed if the directory becomes uncomfortable (> N GB). Options: TTL-based cleanup script, size cap with LRU eviction, move old sidecars to cold storage.
+- **Rotation policy:** The per-scrape content sidecar directory grows unboundedly (gitignored, not committed). No rotation or cleanup logic exists. To be addressed if storage becomes uncomfortable (> N GB). Options: TTL-based cleanup script, size cap with LRU eviction, move old sidecars to cold storage.
 - **Schema versioning:** no version field in the record schema. If future analysis surfaces fields to add/rename, existing records won't have the new fields. Options: add `"schema_v": 1` to all records, or handle missing fields in analysis scripts. Unresolved.
 - **Raw mode garbage outcome:** `try_scrape_raw` returns `""` for garbage content (garbage → next phase tried), so garbage can never be an explicit `outcome` in raw mode — it manifests as `"empty"` if all phases fail. If distinguishing garbage-as-empty is needed for raw mode, `try_scrape_raw` would need a garbage sentinel (analog to `CLOUDFLARE_SENTINEL`).
 

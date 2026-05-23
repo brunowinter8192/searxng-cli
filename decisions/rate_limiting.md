@@ -74,7 +74,7 @@ Token-bucket pacing + fail-fast is the correct architecture. No further changes 
 
 ## Offene Fragen
 
-- **Should we add an explicit "engine-failed-this-query" status that propagates to the query log?** Currently `EMPTY_BLOCK` is the umbrella reason. A separate `BLOCKED_CAPTCHA` / `BLOCKED_429` would help debugging without re-introducing retry logic. Not blocking the cleanup itself; can follow in a subsequent commit.
+- **Should we add an explicit "engine-failed-this-query" status that propagates to the query log?** Currently `EMPTY_BLOCK` is the umbrella reason (covers both CAPTCHA and HTTP-429 block-page detection). Per-type sub-statuses would help debugging without re-introducing retry logic. Not blocking the cleanup itself; can follow in a subsequent commit.
 - **Should the cross-encoder service (port 8082) and other downstream HTTP services follow the same fail-fast policy?** Yes — the project-wide principle in `decisions/OldThemes/no_backoff_retry.md` applies to every external service call. Concrete change to RAG-server-call paths in `search_web.py` / `preview.py` if any retry-with-backoff has crept in.
 
 ## Quellen
