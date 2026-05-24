@@ -6,11 +6,11 @@ Test suite for the log_janitor algorithm (mirrors `src/log_janitor.py`). Verifie
 
 ## Scripts
 
-### p1_log_janitor.py (83 LOC)
+### p1_log_janitor.py (88 LOC)
 
 **Purpose:** Dev-isolated mirror of `src/log_janitor.py`. Stdlib-only. Provides `maybe_prune_jsonl`, `maybe_prune_sidecars`, `get_retention_days`. Imported by `01_prune_test.py`.
 
-### 01_prune_test.py (97 LOC)
+### 01_prune_test.py (119 LOC)
 
 **Purpose:** Self-contained synthetic prune test. Creates a temp dir, writes 5 JSONL entries (2 × 20d-old, 3 × 2d-recent) + 3 sidecar files (2 × mtime 20d-ago, 1 recent), runs three scenarios, asserts outcomes, exits 0 on all-pass / 1 on any failure.
 
