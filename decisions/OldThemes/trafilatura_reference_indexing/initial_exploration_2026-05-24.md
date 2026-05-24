@@ -96,3 +96,7 @@ All design questions are resolved:
 - `skills/web-research/SKILL.md` — Mode 1 Web-MD pipeline (consolidated 2026-05-23 from former `cleanup-and-index` skill)
 - `decisions/logging.md` — central FileHandler-only config that ensures the upcoming worker run won't pollute stdout with crawl4ai or per-engine warnings (2026-05-24)
 - This file's RAG location: `searxng-docs` collection (indexed automatically by `rag-cli update_docs`)
+
+---
+
+**Superseded 2026-05-24:** collection name corrected from `Trafilatura_Reference` to `searxng_reference` per project convention. See `02_collection_naming_recovery_2026-05-24.md`.

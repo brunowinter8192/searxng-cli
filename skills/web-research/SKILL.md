@@ -431,9 +431,14 @@ Proceed with the cleanup + index phases of Mode 1 on the trimmed `/tmp/example_u
 
 Review PDF candidates with the user. Skip paywalls, redundant copies, off-topic PDFs. Build a list of paths (or URLs to download first via `searxng-cli download_pdf`).
 
-**3. Decide Collection Name**
+**3. Confirm Collection Target with User (MANDATORY ASK)**
 
-PascalCase, descriptive: `SearXNG_Docs`, `Crawl4AI_Reference`, `RAG_Survey_2024`. Becomes the RAG collection name.
+Convention: one RAG collection per project, named `<current_project>_reference` (lowercase, underscore). All reference material for the project lives in this single collection — never create per-source collections.
+
+Before writing the worker spawn prompt, ASK the user explicitly:
+> "Target collection: `<project>_reference`. OUTPUT_DIR: `~/Documents/ai/Meta/ClaudeCode/MCP/RAG/data/documents/<project>_reference/`. Confirm or override?"
+
+NEVER pick a collection name on your own. The default-per-convention is a suggestion to the user, not a decision Opus makes alone.
 
 #### Common Inputs
 
