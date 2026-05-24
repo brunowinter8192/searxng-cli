@@ -7,6 +7,7 @@ from urllib.parse import urlparse
 
 import requests
 from src.crawler.crawl_site import discover_urls, discover_urls_sitemap
+from src.crawler.filter_urls import match_any
 
 logger = logging.getLogger(__name__)
 
@@ -38,6 +39,10 @@ async def explore_site_workflow(url: str, strategy: str, max_pages: int, output:
     if strategy == "sitemap":
         urls = await discover_urls_sitemap(domain, include_patterns)
         urls = filter_sitemap_by_seed_path(urls, seed_path)
+        if exclude_patterns:
+            before = len(urls)
+            urls = [u for u in urls if not match_any(u, exclude_patterns)]
+            logger.info("exclude_patterns: dropped %d URLs", before - len(urls))
         strategy_used = "sitemap"
         duration = time.time() - start
         logger.info("Sitemap: %d URLs found in %.1fs", len(urls), duration)
@@ -49,6 +54,10 @@ async def explore_site_workflow(url: str, strategy: str, max_pages: int, output:
     else:
         sitemap_urls = await discover_urls_sitemap(domain, include_patterns)
         sitemap_urls = filter_sitemap_by_seed_path(sitemap_urls, seed_path)
+        if exclude_patterns:
+            before = len(sitemap_urls)
+            sitemap_urls = [u for u in sitemap_urls if not match_any(u, exclude_patterns)]
+            logger.info("exclude_patterns: dropped %d URLs", before - len(sitemap_urls))
 
         if len(sitemap_urls) >= SITEMAP_MIN_THRESHOLD:
             urls = sitemap_urls

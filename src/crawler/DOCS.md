@@ -62,3 +62,28 @@ python -m src.crawler.explore_site --url "https://docs.example.com" --max-pages 
 # Force prefetch with depth limit
 python -m src.crawler.explore_site --url "https://docs.example.com" --strategy prefetch --depth 5
 ```
+
+## filter_urls.py
+
+**Purpose:** In-place URL list filter. Reads a URL-per-line file, drops lines matching any fnmatch glob pattern in `--exclude-patterns`, atomically rewrites the file. `--dry-run` prints dropped URLs + kept count to stderr without touching the file. Provides `match_any(url, patterns_str) -> bool` — the shared glob-match helper used by both this module and `explore_site.py` (sitemap-path post-filter).
+**Input:** URL list file path, comma-separated exclude-patterns string, optional dry-run flag.
+**Output:** Rewrites file in-place (atomic via tmpfile + os.replace); summary to stderr.
+
+### CLI
+
+| Flag | Default | Description |
+|------|---------|-------------|
+| `file` | required | Path to URL list file (one URL per line) |
+| `--exclude-patterns` | required | Comma-separated glob patterns to drop |
+| `--dry-run` | false | Preview mode — print dropped URLs, do not modify file |
+
+```bash
+# Preview: see what would be dropped
+searxng-cli filter_urls /tmp/example_urls.txt --exclude-patterns "*/genindex.html,*/_modules/*" --dry-run
+
+# Apply in-place
+searxng-cli filter_urls /tmp/example_urls.txt --exclude-patterns "*/genindex.html,*/_modules/*"
+
+# Exact URL (zero-wildcard) works as literal match
+searxng-cli filter_urls /tmp/example_urls.txt --exclude-patterns "https://docs.example.com/en/old/index.html"
+```
