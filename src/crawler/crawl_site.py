@@ -136,6 +136,7 @@ async def discover_urls(url: str, domain: str, depth: int, max_pages: int,
         cache_mode=CacheMode.BYPASS,
         wait_until="domcontentloaded",
         prefetch=True,
+        verbose=False,
     )
 
     async with AsyncWebCrawler(config=browser_config) as crawler:
@@ -181,6 +182,7 @@ async def crawl_bfs(url: str, domain: str, depth: int, max_pages: int,
         cache_mode=CacheMode.BYPASS,
         wait_until="networkidle",
         markdown_generator=DefaultMarkdownGenerator(),
+        verbose=False,
     )
 
     async with AsyncWebCrawler(config=browser_config) as crawler:
@@ -199,6 +201,7 @@ async def crawl_urls(urls: list[str]) -> list:
         cache_mode=CacheMode.BYPASS,
         wait_until="networkidle",
         markdown_generator=DefaultMarkdownGenerator(),
+        verbose=False,
     )
 
     dispatcher = SemaphoreDispatcher(max_session_permit=DEFAULT_CONCURRENCY)

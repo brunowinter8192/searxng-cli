@@ -223,6 +223,7 @@ async def try_scrape(browser_config, crawler_strategy, markdown_generator, url: 
         wait_until=wait_until,
         excluded_selector=COOKIE_CONSENT_SELECTOR,
         markdown_generator=markdown_generator,
+        verbose=False,
     )
     _empty_meta: dict = {
         "garbage_type": None, "status_code": None, "content_type": None,
