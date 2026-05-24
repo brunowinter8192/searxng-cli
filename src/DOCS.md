@@ -2,6 +2,11 @@
 
 Python packages for web search, scraping, and crawling. Utility script for spawning Claude Code workers.
 
+## log_janitor.py
+
+**Purpose:** 14-day log retention janitor. On-write trigger with 1h marker-throttled slow-path. Three public functions: `get_retention_days()` (env override), `maybe_prune_jsonl(log_path)` (ts-based JSONL filter + atomic rewrite), `maybe_prune_sidecars(sidecar_dir)` (mtime-based `.md` unlink). All failures logged as WARNING and swallowed. Called by `query_logger.py`, `scrape_logger.py`, `download_logger.py`. `cli.py` imports `get_retention_days` for `TimedRotatingFileHandler` backupCount.
+**Called by:** `src/search/query_logger.py`, `src/scraper/scrape_logger.py`, `src/scraper/download_logger.py`, `cli.py`.
+
 ## routing.py
 
 **Purpose:** Plugin domain routing. Maps known domains that must be accessed via dedicated MCP plugins (GitHub, Reddit, arXiv, YouTube) and returns a blocking TextContent error when a scrape is attempted on those domains.

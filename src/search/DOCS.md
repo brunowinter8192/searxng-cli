@@ -63,6 +63,7 @@ pydoll-based parallel search pipeline. Exposes `search_web_workflow()` (single-q
 
 **Purpose:** Append-only JSONL query log. `log_query(record: dict)` writes one JSON line. Path from `SEARXNG_QUERY_LOG_PATH` env var, fallback `src/logs/query_log.jsonl`. **Two record types:** `engine_run` (written by `_query_engines_concurrent` for every call) and `workflow_summary` (written by `search_web_workflow` after pool-build — no `preview` field in new architecture). Inspector: `dev/search_pipeline/inspect_query_log.py --tail N`.
 **Record fields:** `ts`, `query`, `language`, `engines_requested`, `engines_excluded`, `total_wall_ms`, `bottleneck_engine`, `engines` ({name: {rate_wait_ms, search_ms, status, result_count, drop_reason}}).
+**Calls out:** `src/log_janitor.py` (`maybe_prune_jsonl`).
 
 ## result.py
 

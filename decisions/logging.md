@@ -36,6 +36,8 @@ logging.basicConfig(
 
 Standalone invocations (`python src/crawler/crawl_site.py`, `python src/crawler/explore_site.py`) each call `logging.basicConfig(level=INFO, format="%(message)s")` inside their own `if __name__ == "__main__"` guard — unaffected by this config (fires in standalone mode only).
 
+**Janitor (since 2026-05-24):** 14-day uniform retention, on-write trigger only, 1h marker throttle on slow-path. `SEARXNG_LOG_RETENTION_DAYS` env override (read at call time, not module load). `cli.log` uses `TimedRotatingFileHandler` (daily rotation, `backupCount=get_retention_days()`, stdlib auto-deletes older rotated files). Three JSONL surfaces (`query_log.jsonl`, `scrape_log.jsonl`, `download_log.jsonl`) use `maybe_prune_jsonl()` — ts-based filter, atomic rewrite via `.tmp + os.replace`. Sidecar dir (`scrape_content/`) uses `maybe_prune_sidecars()` — file-level mtime-based `unlink`. All failures logged as WARNING and swallowed — calling logger never receives an exception.
+
 ## Evidenz
 
 Symptom observed: `searxng-cli search_web "X"` produced warning lines before the breakdown table in tool_result (Claude Code Bash merges stdout+stderr):
@@ -70,3 +72,5 @@ None currently. Rate-limited (HTTP 429) calls stay WARNING — distinct from "en
 ## Quellen
 
 Internal architectural decision — no external references.
+
+Implementation: `src/log_janitor.py`, `dev/log_janitor/01_prune_test.py`, `dev/log_janitor/DOCS.md`.

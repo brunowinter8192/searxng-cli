@@ -9,7 +9,7 @@ URL scraping and site exploration tools powered by Crawl4AI for SearXNG MCP serv
 **Reads:** `SEARXNG_SCRAPE_LOG_PATH` env var (fallback `src/logs/scrape_log.jsonl`). Sidecar dir = `<log_dir>/scrape_content/`.
 **Writes:** `src/logs/scrape_log.jsonl` (one line per call), `<log_dir>/scrape_content/<ts>_<slug>.md` (per-call content sidecar). Both gitignored.
 **Called by:** `scrape_url.py` (end of `scrape_url_workflow`), `scrape_url_raw.py` (end of `scrape_url_raw_workflow`).
-**Calls out:** none (stdlib only).
+**Calls out:** `src/log_janitor.py` (`maybe_prune_jsonl`, `maybe_prune_sidecars`).
 
 ## scrape_url.py
 
@@ -114,7 +114,7 @@ Returns plugin hint only for domains with dedicated MCP plugins (uses `PLUGIN_RO
 **Reads:** `SEARXNG_DOWNLOAD_LOG_PATH` env var (fallback `src/logs/download_log.jsonl`).
 **Writes:** `src/logs/download_log.jsonl` (one line per call, gitignored).
 **Called by:** `download_pdf.py` (`download_pdf_workflow` — once per call at every return path).
-**Calls out:** none (stdlib only).
+**Calls out:** `src/log_janitor.py` (`maybe_prune_jsonl`).
 
 ## download_pdf.py
 

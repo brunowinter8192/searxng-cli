@@ -7,16 +7,22 @@ from pathlib import Path
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 
 import logging
+from logging.handlers import TimedRotatingFileHandler
+from src.log_janitor import get_retention_days
 
-# Central logging config — FileHandler only, no StreamHandler.
+# Central logging config — daily-rotating handler, no StreamHandler.
 # Placed before src.* imports: module-load-time log calls route to file, not stderr.
 # basicConfig with explicit handlers= never installs the default StreamHandler.
 _log_path = Path(__file__).parent / "src" / "logs" / "cli.log"
 _log_path.parent.mkdir(parents=True, exist_ok=True)
+_handler = TimedRotatingFileHandler(
+    _log_path, when="midnight", interval=1,
+    backupCount=get_retention_days(), encoding="utf-8",
+)
 logging.basicConfig(
     level=logging.DEBUG,
     format="%(asctime)s [%(levelname)s] %(name)s:%(lineno)d - %(message)s",
-    handlers=[logging.FileHandler(_log_path, mode="a", encoding="utf-8")],
+    handlers=[_handler],
 )
 logger = logging.getLogger(__name__)
 
