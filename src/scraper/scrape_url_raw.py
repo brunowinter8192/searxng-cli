@@ -203,6 +203,7 @@ async def try_scrape_raw(browser_config, crawler_strategy, markdown_generator, u
         wait_until=wait_until,
         excluded_selector=COOKIE_CONSENT_SELECTOR,
         markdown_generator=markdown_generator,
+        verbose=False,
     )
     try:
         kwargs = {"config": browser_config}
