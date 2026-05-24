@@ -2,7 +2,7 @@
 
 ## Status Quo
 
-**Code:** `src/crawler/explore_site.py` (URL discovery, CLI entry point); `src/crawler/crawl_site.py` (BFS + sitemap functions called by explore_site)
+**Code:** `src/crawler/explore_site.py` (URL discovery, CLI entry point); `src/crawler/crawl_site.py` (BFS + sitemap functions called by explore_site); `src/crawler/filter_urls.py` (shared `match_any()` helper + `filter_urls_workflow` CLI tool)
 **Method:** Cascade discovery: sitemap → prefetch BFS fallback, with shallow-sitemap threshold and redirect resolution
 **Config:**
 
@@ -13,10 +13,16 @@ SITEMAP_MIN_THRESHOLD = 5      # in explore_site.py
 
 **Discovery-Kaskade (`explore_site_workflow`):**
 1. `resolve_redirect(url)` — HEAD request to resolve redirect chains before discovery. Returns `(final_url, final_domain)`. Fixes discovery for URLs that redirect to different domains (e.g. `docs.anthropic.com` → `platform.claude.com`).
-2. `discover_urls_sitemap(domain, include_patterns)` — Crawl4AI `AsyncUrlSeeder` mit `source="sitemap"`. Filtered via `filter_sitemap_by_seed_path()` to match seed URL's path prefix.
+2. `discover_urls_sitemap(domain, include_patterns)` — Crawl4AI `AsyncUrlSeeder` mit `source="sitemap"`. Filtered via `filter_sitemap_by_seed_path()` to match seed URL's path prefix. **If `exclude_patterns` is set, `match_any()` post-filter drops matching URLs immediately after** (both `strategy=sitemap` and `strategy=auto` sitemap sub-path, before the shallow-threshold check).
 3. **Shallow-sitemap threshold:** If sitemap returns `< SITEMAP_MIN_THRESHOLD` (5) URLs, also run `discover_urls()` prefetch BFS and take the larger result set.
 4. **No sitemap:** Fall through to `discover_urls()` prefetch BFS only.
 5. Output: text file with one URL per line + console summary.
+
+**Post-hoc filter (`filter_urls_workflow` in `filter_urls.py`):**
+- `searxng-cli filter_urls <file> --exclude-patterns "<pat>,..."` — in-place trim of a URL list file after inspection.
+- `--dry-run`: prints dropped URLs + kept count to stderr, file unchanged.
+- Atomic write: tmpfile + `os.replace`.
+- Shared helper: `match_any(url, patterns_str) -> bool` (fnmatch.fnmatchcase, comma-split, empty-token-safe). Imported by `explore_site.py` for the sitemap-path filter.
 
 **BFS-Konfiguration (`discover_urls` in `crawl_site.py`):**
 ```python
@@ -80,6 +86,7 @@ Cascade-Architektur (sitemap-first, BFS-fallback) wurde beibehalten, aber erweit
 ## Quellen
 
 - `src/crawler/explore_site.py` — vollständige Implementation
+- `src/crawler/filter_urls.py` — `filter_urls_workflow` + `match_any()` helper
 - `src/crawler/crawl_site.py` — BFS + Sitemap Discovery-Funktionen
 - Crawl4AI Docs (RAG Collection: Crawl4AIDocs) — BFSDeepCrawlStrategy, CrawlerRunConfig, prefetch, AsyncUrlSeeder
 - `src/crawler/DOCS.md` — Crawler-Übersicht
