@@ -243,6 +243,18 @@ Stop when:
 
 ### Phase 2 — Index (both modes)
 
+### CRITICAL: index-dir is incremental by default, NOT a full reindex
+
+`workflow.py index-dir --input <dir> --collection <coll>` uses hash-based skip-logic:
+
+- **skipped**: hash unchanged → no work
+- **adopted**: complete chunk set in DB but no hash entry → register hash, no re-embed
+- **to_index**: missing / partial / hash-changed → chunk + embed + insert
+
+Adding new files to an existing collection's directory + running index-dir = adds ONLY the new files. The existing chunks are NOT touched, NOT re-embedded, NOT deleted. Only `--force` bypasses the skip-logic (full reindex).
+
+This means: NEVER worry about "re-indexing the existing 800 chunks". The default IS additive.
+
 Identical for both modes. Run as background job with `PYTHONUNBUFFERED=1` so the worker stays responsive (foreground would block on the long-running embed phase) and the log fills line-by-line for post-mortem if needed.
 
 #### Skip-Logik (since 2026-05-08)
