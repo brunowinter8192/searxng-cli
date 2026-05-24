@@ -32,6 +32,7 @@ from src.search.cache import cache_key, cache_read, format_engine_pool
 from src.scraper.scrape_url import scrape_url_workflow
 from src.scraper.scrape_url_raw import scrape_url_raw_workflow
 from src.crawler.explore_site import explore_site_workflow
+from src.crawler.filter_urls import filter_urls_workflow
 from src.scraper.download_pdf import download_pdf_workflow
 from src.scraper.pdf_chain import should_download_as_pdf
 from mcp.types import TextContent
@@ -125,6 +126,14 @@ def main():
     p.add_argument("--exclude-patterns", dest="exclude_patterns", type=str, default=None)
     p.add_argument("--append", action="store_true")
 
+    # ── filter_urls ───────────────────────────────────────────────────────────
+    p = sub.add_parser("filter_urls", help="In-place URL list filter by glob patterns.")
+    p.add_argument("file", help="Path to URL list file (one URL per line)")
+    p.add_argument("--exclude-patterns", dest="exclude_patterns", required=True,
+                   help="Comma-separated glob patterns to drop (e.g. '*/genindex.html,*/_modules/*')")
+    p.add_argument("--dry-run", dest="dry_run", action="store_true",
+                   help="Print dropped URLs + kept count to stderr, do not modify file")
+
     # ── download_pdf ──────────────────────────────────────────────────────────
     p = sub.add_parser("download_pdf", help="Download PDF file from URL.")
     p.add_argument("url", help="URL of the PDF to download")
@@ -194,6 +203,10 @@ def main():
         logger.info("explore_site complete: strategy=%s domain=%s urls=%d output=%s",
                     strategy_used, domain, len(urls), output_path)
         result = [TextContent(type="text", text=f"Discovered {len(urls)} URLs → {output_path}")]
+
+    elif args.cmd == "filter_urls":
+        filter_urls_workflow(args.file, args.exclude_patterns, args.dry_run)
+        return
 
     elif args.cmd == "download_pdf":
         result = download_pdf_workflow(args.url, args.output_dir)

@@ -401,12 +401,31 @@ Web domain (e.g. `docs.crawl4ai.com`) OR a list of PDFs (paths or URLs).
 
 **2a. For Web Domains: Explore + Filter URLs**
 
+Two-stage filter — preemptive at discovery time, post-hoc after inspection.
+
+**Stage 1 — preemptive (discovery time):** strips known structural noise as the list is written.
+
 ```bash
-# Discovers URLs via sitemap → BFS cascade, writes list to /tmp/explore_<domain>_urls.txt, prints stdout summary
-searxng-cli explore_site https://docs.example.com --strategy sitemap --output /tmp/example_urls.txt
+# Strip obvious noise globs upfront (e.g. Sphinx index/module pages)
+searxng-cli explore_site https://docs.example.com --strategy sitemap --output /tmp/example_urls.txt \
+    --exclude-patterns "*/genindex.html,*/_modules/*,*/search.html"
 ```
 
-Review the URL list with the user. Kill noise: login pages, archive indexes, search-result pages, irrelevant subpaths. Save the filtered list as `/tmp/<collection>_urls.txt`.
+**Inspect:** `cat /tmp/example_urls.txt` or `head /tmp/example_urls.txt` — scan for patterns that only surface on seeing the full list.
+
+**Stage 2 — post-hoc (after inspection):** drops additional patterns or exact URLs in-place.
+
+```bash
+# Preview first (file unchanged)
+searxng-cli filter_urls /tmp/example_urls.txt --exclude-patterns "*/used-by.html" --dry-run
+
+# Apply (atomic rewrite)
+searxng-cli filter_urls /tmp/example_urls.txt --exclude-patterns "*/used-by.html"
+```
+
+Exact URLs (no wildcards) match literally. `--dry-run` prints dropped URLs + kept count to stderr without touching the file.
+
+Proceed with the cleanup + index phases of Mode 1 on the trimmed `/tmp/example_urls.txt`.
 
 **2b. For PDFs: Decide Which to Convert**
 
