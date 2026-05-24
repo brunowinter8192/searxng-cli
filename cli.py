@@ -18,6 +18,7 @@ logging.basicConfig(
     format="%(asctime)s [%(levelname)s] %(name)s:%(lineno)d - %(message)s",
     handlers=[logging.FileHandler(_log_path, mode="a", encoding="utf-8")],
 )
+logger = logging.getLogger(__name__)
 
 import argparse
 import asyncio
@@ -190,11 +191,9 @@ def main():
             args.depth, args.include_patterns, args.exclude_patterns, args.append
         ))
         domain = urlparse(args.url).netloc
-        sample_lines = "\n".join(f"  {u}" for u in urls[:5])
-        summary = f"✓ Discovered {len(urls)} URLs for {domain} (strategy: {strategy_used})\nFile: {output_path}"
-        if sample_lines:
-            summary += f"\nSample:\n{sample_lines}"
-        result = [TextContent(type="text", text=summary)]
+        logger.info("explore_site complete: strategy=%s domain=%s urls=%d output=%s",
+                    strategy_used, domain, len(urls), output_path)
+        result = [TextContent(type="text", text=f"Discovered {len(urls)} URLs → {output_path}")]
 
     elif args.cmd == "download_pdf":
         result = download_pdf_workflow(args.url, args.output_dir)
