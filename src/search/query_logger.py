@@ -4,6 +4,9 @@ import logging
 import os
 from pathlib import Path
 
+# From src/log_janitor.py: lazy 14-day prune on write
+from src.log_janitor import maybe_prune_jsonl
+
 logger = logging.getLogger(__name__)
 
 # Record schema — two record_type values written per production query, one per probe query:
@@ -56,5 +59,6 @@ def log_query(record: dict) -> None:
         log_path.parent.mkdir(parents=True, exist_ok=True)
         with open(log_path, "a", encoding="utf-8") as f:
             f.write(json.dumps(record, ensure_ascii=False) + "\n")
+        maybe_prune_jsonl(log_path)
     except Exception as e:
         logger.warning("query_log write failed: %s", e)
