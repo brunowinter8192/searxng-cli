@@ -47,19 +47,23 @@ def cleanup_workflow(input_dir: Path, output_dir: Path):
 
     output_dir.mkdir(parents=True, exist_ok=True)
     manifest = []
+    total_ws_strips = 0
+    total_para_inserts = 0
 
     for path in md_files:
-        entry = process_file(path, output_dir)
+        entry, ws_strips, para_inserts = process_file(path, output_dir)
         manifest.append(entry)
+        total_ws_strips += ws_strips
+        total_para_inserts += para_inserts
 
     write_manifest(manifest, output_dir)
-    print_summary(manifest, output_dir)
+    print_summary(manifest, output_dir, total_ws_strips, total_para_inserts)
 
 
 # FUNCTIONS
 
-# Parse, clean, and write one article file; return manifest entry dict
-def process_file(path: Path, output_dir: Path) -> dict:
+# Parse, clean, and write one article file; return (manifest_entry, ws_strips, para_inserts)
+def process_file(path: Path, output_dir: Path) -> tuple[dict, int, int]:
     raw = path.read_text(encoding="utf-8")
     original_chars = len(raw)
     hash_name = path.stem
@@ -72,16 +76,16 @@ def process_file(path: Path, output_dir: Path) -> dict:
         cleaned = "\n".join(body_lines).strip() + "\n"
         out_path = output_dir / path.name
         out_path.write_text(cleaned, encoding="utf-8")
-        return _manifest_entry(hash_name, fm_fields, original_chars, cleaned, "NO_H1")
+        return _manifest_entry(hash_name, fm_fields, original_chars, cleaned, "NO_H1"), 0, 0
 
     end_idx, anchor_name = find_end_anchor(body_lines, start_idx)
     extracted = body_lines[start_idx:end_idx]
-    cleaned_lines = clean_body(extracted)
+    cleaned_lines, ws_strips, para_inserts = clean_body(extracted)
     cleaned = "\n".join(cleaned_lines) + "\n"
 
     out_path = output_dir / path.name
     out_path.write_text(cleaned, encoding="utf-8")
-    return _manifest_entry(hash_name, fm_fields, original_chars, cleaned, anchor_name)
+    return _manifest_entry(hash_name, fm_fields, original_chars, cleaned, anchor_name), ws_strips, para_inserts
 
 
 # Build manifest entry dict merging frontmatter fields + run stats
@@ -141,37 +145,49 @@ def find_end_anchor(body_lines: list[str], start_idx: int) -> tuple[int, str]:
     return len(body_lines), "NONE"
 
 
-# Apply in-body cleanup rules to a list of lines; return cleaned list
-def clean_body(lines: list[str]) -> list[str]:
-    result = []
-    blank_run = 0
-
+# Apply in-body cleanup rules; return (cleaned_lines, ws_strip_count, para_insert_count).
+# Two passes: (1) line-level strip/substitution + trailing-ws; (2) paragraph normalization.
+def clean_body(lines: list[str]) -> tuple[list[str], int, int]:
+    # Pass 1 — strip/substitute each line, count trailing-ws hits
+    pass1: list[str] = []
+    ws_strips = 0
     for line in lines:
-        # Strip Google News badge line
         if _RE_GOOGLE_BADGE.search(line):
             continue
-        # Strip date/read-time byline (bare and Updated/Published prefix variants)
         if _RE_DATE_BYLINE.match(line):
             continue
-        # Strip author byline (By [...](...)...)
         if _RE_BYLINE.match(line):
             continue
-        # Strip standalone image lines and image-wrapped-in-link lines
         if _RE_IMAGE.match(line) or _RE_IMAGE_LINK.match(line):
             continue
-        # Strip empty links inline
         line = _RE_EMPTY_LINK.sub("", line)
-        # Strip inline links — keep link text, drop URL: [text](url) → text
         line = _RE_INLINE_LINK.sub(r'\1', line)
+        stripped = line.rstrip(" \t")
+        if stripped != line:
+            ws_strips += 1
+        pass1.append(stripped)
 
-        # Blank-line normalization (collapse 3+ consecutive blanks → 2)
+    # Pass 2 — paragraph normalization + blank-run collapse-to-1
+    result: list[str] = []
+    para_inserts = 0
+    blank_run = 0
+    prev_was_body_para = False
+    for line in pass1:
         if line.strip() == "":
             blank_run += 1
-            if blank_run <= 2:
+            if blank_run <= 1:
                 result.append("")
+            prev_was_body_para = False
         else:
             blank_run = 0
+            # Body paragraph: non-empty, not a header/bullet/indented-bullet
+            is_body_para = not line.lstrip().startswith(("#", "*", "-"))
+            if is_body_para and prev_was_body_para:
+                if not result or result[-1].strip():
+                    result.append("")
+                    para_inserts += 1
             result.append(line)
+            prev_was_body_para = is_body_para
 
     # Strip leading/trailing blank lines from body
     while result and result[0] == "":
@@ -179,7 +195,7 @@ def clean_body(lines: list[str]) -> list[str]:
     while result and result[-1] == "":
         result.pop()
 
-    return result
+    return result, ws_strips, para_inserts
 
 
 # Write manifest JSON to output_dir
@@ -188,8 +204,8 @@ def write_manifest(manifest: list[dict], output_dir: Path):
     path.write_text(json.dumps(manifest, indent=2, ensure_ascii=False), encoding="utf-8")
 
 
-# Print summary: total files, reduction stats, anchor distribution
-def print_summary(manifest: list[dict], output_dir: Path):
+# Print summary: total files, reduction stats, normalization counts, anchor distribution
+def print_summary(manifest: list[dict], output_dir: Path, ws_strips: int, para_inserts: int):
     reductions = [e["reduction_pct"] for e in manifest]
     anchor_dist: dict[str, int] = {}
     for e in manifest:
@@ -198,6 +214,8 @@ def print_summary(manifest: list[dict], output_dir: Path):
     print(f"Files processed : {len(manifest)}")
     if reductions:
         print(f"Reduction %     : mean={statistics.mean(reductions):.1f}%  median={statistics.median(reductions):.1f}%  min={min(reductions):.1f}%  max={max(reductions):.1f}%")
+    print(f"Trailing-ws strips  : {ws_strips} lines")
+    print(f"Para blank inserts  : {para_inserts} lines")
     print("End-anchor dist :")
     for anchor, count in sorted(anchor_dist.items(), key=lambda x: -x[1]):
         print(f"  {anchor}: {count}")
