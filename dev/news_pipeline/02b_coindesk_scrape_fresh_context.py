@@ -31,6 +31,12 @@ async def scrape_workflow(input_path: Path):
         markdown_generator=DefaultMarkdownGenerator(),
         verbose=False,
     )
+    run_config_fallback = CrawlerRunConfig(
+        cache_mode=CacheMode.BYPASS,
+        wait_until="domcontentloaded",
+        markdown_generator=DefaultMarkdownGenerator(),
+        verbose=False,
+    )
 
     manifest = []
     t_start = time.perf_counter()
@@ -47,20 +53,30 @@ async def scrape_workflow(input_path: Path):
         try:
             t0 = time.perf_counter()
             async with AsyncWebCrawler(config=browser_config) as crawler:
-                result = await crawler.arun(url=url, config=run_config)
+                content, wait_strategy = await fetch_with_fallback(
+                    crawler, url, run_config, run_config_fallback
+                )
             elapsed = time.perf_counter() - t0
-            content = result.markdown.raw_markdown if result.markdown else ""
+
             if content:
+                status = "ok_fallback" if wait_strategy == "domcontentloaded" else "ok"
                 file_path = write_article(entry, url_hash, content)
                 result_entry.update({
-                    "status": "ok",
+                    "status": status,
                     "char_count": len(content),
                     "file": str(file_path.relative_to(Path.cwd()) if file_path.is_absolute() else file_path),
                     "elapsed_s": round(elapsed, 2),
+                    "wait_strategy": wait_strategy,
                 })
-                print(f"  ok — {len(content):,} chars in {elapsed:.1f}s", file=sys.stderr)
+                label = "ok_fallback" if status == "ok_fallback" else "ok"
+                print(f"  {label} — {len(content):,} chars in {elapsed:.1f}s [{wait_strategy}]", file=sys.stderr)
             else:
-                result_entry.update({"status": "empty", "char_count": 0, "elapsed_s": round(elapsed, 2)})
+                result_entry.update({
+                    "status": "empty",
+                    "char_count": 0,
+                    "elapsed_s": round(elapsed, 2),
+                    "wait_strategy": wait_strategy,
+                })
                 print(f"  empty ({elapsed:.1f}s)", file=sys.stderr)
         except Exception as exc:
             result_entry.update({"status": "failed", "error": str(exc)})
@@ -74,6 +90,35 @@ async def scrape_workflow(input_path: Path):
 
 
 # FUNCTIONS
+
+# Try networkidle first; fall back to domcontentloaded on empty content or timeout exception.
+# Both attempts run inside the same crawler instance (shared browser context).
+# Returns (content_str, wait_strategy_used).
+async def fetch_with_fallback(crawler, url: str, run_config, run_config_fallback) -> tuple[str, str]:
+    content = ""
+    try:
+        result = await crawler.arun(url=url, config=run_config)
+        content = result.markdown.raw_markdown if result.markdown else ""
+    except Exception as exc:
+        if not _is_timeout(exc):
+            raise
+        print("  networkidle timeout — trying domcontentloaded", file=sys.stderr)
+
+    if content:
+        return content, "networkidle"
+
+    # Empty or timeout: retry with domcontentloaded
+    result = await crawler.arun(url=url, config=run_config_fallback)
+    content = result.markdown.raw_markdown if result.markdown else ""
+    return content, "domcontentloaded"
+
+
+# Return True if exception is a timeout (by type name or message)
+def _is_timeout(exc: Exception) -> bool:
+    name = type(exc).__name__.lower()
+    msg = str(exc).lower()
+    return "timeout" in name or "timeout" in msg
+
 
 # Load entries from discover JSON
 def load_entries(input_path: Path) -> list[dict]:
@@ -89,6 +134,7 @@ def scrape_one(entry: dict, url_hash: str) -> dict:
         "char_count": None,
         "status": None,
         "error": None,
+        "wait_strategy": None,
     }
 
 
@@ -120,13 +166,15 @@ def write_manifest(manifest: list[dict]):
 # Print run summary to stdout
 def print_summary(manifest: list[dict], total_s: float):
     ok = [e for e in manifest if e["status"] == "ok"]
+    ok_fb = [e for e in manifest if e["status"] == "ok_fallback"]
     failed = [e for e in manifest if e["status"] == "failed"]
     empty = [e for e in manifest if e["status"] == "empty"]
-    total_chars = sum(e["char_count"] or 0 for e in ok)
-    slowest = max(ok, key=lambda e: e.get("elapsed_s", 0), default=None)
+    all_ok = ok + ok_fb
+    total_chars = sum(e["char_count"] or 0 for e in all_ok)
+    slowest = max(all_ok, key=lambda e: e.get("elapsed_s", 0), default=None)
 
     print(f"\nDone in {total_s:.0f}s")
-    print(f"  ok      : {len(ok)}")
+    print(f"  ok      : {len(ok) + len(ok_fb)} ({len(ok_fb)} via fallback)")
     print(f"  empty   : {len(empty)}")
     print(f"  failed  : {len(failed)}")
     print(f"  total chars: {total_chars:,}")
