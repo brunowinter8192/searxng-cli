@@ -6,7 +6,7 @@ import json
 import re
 import sys
 import tempfile
-from datetime import datetime, timedelta, timezone
+from datetime import datetime, timezone
 from pathlib import Path
 
 from pydoll.browser import Chrome
@@ -24,20 +24,71 @@ REAL_UA = (
 MAX_CLICK_ROUNDS = 20
 POLL_INTERVAL = 0.5
 POLL_MAX = 40   # 20s max wait per click
+PRE_TODAY_THRESHOLD = 3  # stop when this many feed articles from before today
 
-# Extract all article URLs + nearest time label
+# Dump container selector counts + first 3 article-card ancestor chains
+_JS_INSPECT = """
+(function() {
+    var dateRe = /\\/\\d{4}\\/\\d{2}\\/\\d{2}\\//;
+    var scopes = [
+        {name: 'global', sel: 'a[href]'},
+        {name: 'main a', sel: 'main a[href]'},
+        {name: 'article a', sel: 'article a[href]'},
+        {name: 'aside a', sel: 'aside a[href]'},
+        {name: 'nav a', sel: 'nav a[href]'},
+        {name: 'footer a', sel: 'footer a[href]'},
+    ];
+    var counts = {};
+    scopes.forEach(function(s) {
+        counts[s.name] = Array.from(document.querySelectorAll(s.sel)).filter(function(a) {
+            return dateRe.test(a.href);
+        }).length;
+    });
+    var chains = [];
+    var seen = {};
+    var mains = document.querySelectorAll('main a[href]');
+    for (var i = 0; i < mains.length && chains.length < 3; i++) {
+        var href = mains[i].href;
+        if (!dateRe.test(href) || seen[href]) continue;
+        seen[href] = true;
+        var chain = [];
+        var node = mains[i];
+        for (var d = 0; d < 6; d++) {
+            node = node.parentElement;
+            if (!node || node === document.body) break;
+            var cls = node.className ? node.className.trim().split(/\\s+/).slice(0, 2).join('.') : '';
+            chain.push(node.tagName + (cls ? '.' + cls : ''));
+        }
+        chains.push({url: href.slice(22, 90), chain: chain});
+    }
+    return JSON.stringify({counts: counts, sample_chains: chains});
+})();
+"""
+
+# Extract feed article URLs + nearest time label — excludes aside/nav/footer/sidebar noise
 _JS_EXTRACT = """
 (function() {
+    var dateRe = /\\/\\d{4}\\/\\d{2}\\/\\d{2}\\//;
+    var skipTags = {ASIDE: 1, NAV: 1, FOOTER: 1, HEADER: 1};
+    var skipCls = /related|recommendation|popular|trending|sidebar/i;
     var links = document.querySelectorAll('a[href]');
     var results = [];
     var seen = {};
-    var dateRe = /\\/\\d{4}\\/\\d{2}\\/\\d{2}\\//;
     for (var i = 0; i < links.length; i++) {
-        var href = links[i].href;
+        var a = links[i];
+        var href = a.href;
         if (!dateRe.test(href) || seen[href]) continue;
+        var skip = false;
+        var node = a.parentElement;
+        while (node && node !== document.body) {
+            if (skipTags[node.tagName]) { skip = true; break; }
+            if (node.className && skipCls.test(node.className)) { skip = true; break; }
+            node = node.parentElement;
+        }
+        if (skip) continue;
         seen[href] = true;
         var timeLabel = '';
-        var node = links[i];
+        node = a;
         for (var d = 0; d < 10; d++) {
             node = node.parentElement;
             if (!node) break;
@@ -58,14 +109,24 @@ _JS_EXTRACT = """
 })();
 """
 
-# Count unique article URLs (fast poll)
+# Count feed-scoped article URLs (same exclusions as _JS_EXTRACT, fast poll)
 _JS_COUNT = """
 (function() {
+    var dateRe = /\\/\\d{4}\\/\\d{2}\\/\\d{2}\\//;
+    var skipTags = {ASIDE: 1, NAV: 1, FOOTER: 1, HEADER: 1};
+    var skipCls = /related|recommendation|popular|trending|sidebar/i;
     var seen = {};
     var count = 0;
-    var dateRe = /\\/\\d{4}\\/\\d{2}\\/\\d{2}\\//;
     document.querySelectorAll('a[href]').forEach(function(a) {
-        if (dateRe.test(a.href) && !seen[a.href]) { seen[a.href] = true; count++; }
+        if (!dateRe.test(a.href) || seen[a.href]) return;
+        var skip = false;
+        var node = a.parentElement;
+        while (node && node !== document.body) {
+            if (skipTags[node.tagName]) { skip = true; break; }
+            if (node.className && skipCls.test(node.className)) { skip = true; break; }
+            node = node.parentElement;
+        }
+        if (!skip) { seen[a.href] = true; count++; }
     });
     return count;
 })();
@@ -81,7 +142,8 @@ _JS_FIND_BTN = """
         if (/more\\s+stories|load\\s+more|show\\s+more/i.test(t)) {
             var r = el.getBoundingClientRect();
             var attrs = {};
-            Array.from(el.attributes).filter(a => a.name.startsWith('data-')).forEach(a => { attrs[a.name] = a.value; });
+            Array.from(el.attributes).filter(function(a) { return a.name.startsWith('data-'); })
+                .forEach(function(a) { attrs[a.name] = a.value; });
             return JSON.stringify({
                 found: true,
                 text: t.slice(0, 80),
@@ -121,11 +183,13 @@ async def probe_workflow(headless: bool):
     print(f"Browser session: {session_dir}", file=sys.stderr)
     Path(Path.home() / "tmp").mkdir(parents=True, exist_ok=True)
 
-    options = build_options(headless, session_dir)
+    today = datetime.now(timezone.utc).date()
     report = {
         "url": TARGET_URL,
         "probed_at": datetime.now(timezone.utc).isoformat(),
         "headless": headless,
+        "today_date": str(today),
+        "container_inspection": None,
         "button": None,
         "batches": [],
         "summary": {},
@@ -133,89 +197,98 @@ async def probe_workflow(headless: bool):
 
     # Explicit start/stop — async with __aexit__ tries to restore Preferences.backup
     # which doesn't exist in a fresh temp session dir (pydoll bug with ephemeral profiles).
-    browser = Chrome(options)
+    browser = Chrome(build_options(headless, session_dir))
     tab = await browser.start()
     try:
-            # Navigate + initial render wait
-            print(f"Navigating to {TARGET_URL} …", file=sys.stderr)
-            await tab.go_to(TARGET_URL, timeout=30)
-            await asyncio.sleep(3.0)
+        print(f"Navigating to {TARGET_URL} …", file=sys.stderr)
+        await tab.go_to(TARGET_URL, timeout=60)
+        await asyncio.sleep(3.0)
 
-            # Snapshot 0 — initial visible articles
-            initial = await extract_articles(tab)
-            all_urls = {a["url"]: a for a in initial}
-            report["batches"].append({"batch": 0, "new_urls": [a["url"] for a in initial], "labels": {a["url"]: a["timeLabel"] for a in initial}})
-            print(f"Snapshot 0: {len(initial)} initial articles", file=sys.stderr)
+        # DOM inspection — log container counts + article-card ancestor chains
+        inspection = await inspect_containers(tab)
+        report["container_inspection"] = inspection
+        print("Container counts:", {k: v for k, v in inspection["counts"].items()}, file=sys.stderr)
+        print("Sample ancestor chains:", file=sys.stderr)
+        for c in inspection.get("sample_chains", [])[:3]:
+            print(f"  {c['url'][:55]} → {' > '.join(c['chain'][:4])}", file=sys.stderr)
 
-            # Find + describe button, then screenshot
-            btn = await find_button(tab)
-            report["button"] = btn
-            if btn and btn.get("found"):
-                print(f"Button found: '{btn['text']}' | tag={btn['tagName']} | id='{btn['id']}' | class='{btn['className']}'", file=sys.stderr)
-                print(f"  rect={btn['rect']} scrollY={btn['scrollY']}", file=sys.stderr)
-                print(f"  dataAttrs={btn['dataAttrs']}", file=sys.stderr)
-                await asyncio.sleep(0.5)
-                await tab.take_screenshot(path=SCREENSHOT_PATH)
-                print(f"Screenshot saved: {SCREENSHOT_PATH}", file=sys.stderr)
-            else:
-                print("Button NOT found in initial render — will retry after scroll", file=sys.stderr)
+        # Snapshot 0 — initial feed articles (scoped, no sidebar)
+        initial = await extract_articles(tab)
+        all_urls = {a["url"]: a for a in initial}
+        dates_0 = _date_span(list(all_urls.keys()))
+        report["batches"].append({
+            "batch": 0, "new_urls": [a["url"] for a in initial],
+            "labels": {a["url"]: a["timeLabel"] for a in initial},
+            "total_after": len(all_urls), "date_span": dates_0,
+        })
+        print(f"Batch 0: {len(initial)} initial | span {dates_0} | pre-today={count_pre_today(list(all_urls.values()), today)}", file=sys.stderr)
 
-            # Click + wait cycle
+        # Find + describe button, then screenshot
+        btn = await find_button(tab)
+        report["button"] = btn
+        if btn and btn.get("found"):
+            print(f"Button: '{btn['text']}' | {btn['tagName']} | class='{btn['className']}'", file=sys.stderr)
+            await asyncio.sleep(0.5)
+            await tab.take_screenshot(path=SCREENSHOT_PATH)
+            print(f"Screenshot: {SCREENSHOT_PATH}", file=sys.stderr)
+        else:
+            print("Button NOT found on initial render", file=sys.stderr)
+
+        # Click + wait cycle — stop when ≥PRE_TODAY_THRESHOLD feed articles from before today
+        prev_count = len(all_urls)
+        for click_n in range(1, MAX_CLICK_ROUNDS + 1):
+            clicked = await click_button(tab)
+            if not clicked:
+                print(f"Batch {click_n}: button gone — end of feed", file=sys.stderr)
+                report["summary"]["button_disappeared_at_batch"] = click_n
+                break
+
+            await asyncio.sleep(2.0)
+            await wait_for_new_articles(tab, prev_count)
+            new_articles = await extract_articles(tab)
+            new_set = {a["url"]: a for a in new_articles}
+            added = {u: v for u, v in new_set.items() if u not in all_urls}
+            all_urls.update(new_set)
+
+            span = _date_span(list(added.keys()))
+            pre = count_pre_today(list(all_urls.values()), today)
+            print(f"Batch {click_n}: +{len(added)} | total={len(all_urls)} | span {span} | pre-today={pre}", file=sys.stderr)
+
+            report["batches"].append({
+                "batch": click_n,
+                "new_urls": list(added.keys()),
+                "labels": {u: v["timeLabel"] for u, v in added.items()},
+                "total_after": len(all_urls),
+                "date_span": span,
+                "pre_today_cumulative": pre,
+            })
             prev_count = len(all_urls)
-            for click_n in range(1, MAX_CLICK_ROUNDS + 1):
-                clicked = await click_button(tab)
-                if not clicked:
-                    print(f"Round {click_n}: button not clickable — end of feed or DOM change", file=sys.stderr)
-                    report["summary"]["button_disappeared_at_round"] = click_n
-                    break
 
-                new_count = await wait_for_new_articles(tab, prev_count)
-                new_articles = await extract_articles(tab)
-                new_set = {a["url"]: a for a in new_articles}
-                added = {u: v for u, v in new_set.items() if u not in all_urls}
-                all_urls.update(new_set)
-
-                # Re-find button after DOM update (it may scroll)
-                if not report["button"] or not report["button"].get("found"):
-                    btn = await find_button(tab)
-                    if btn and btn.get("found"):
-                        report["button"] = btn
-
-                oldest_h = oldest_age_hours(list(all_urls.values()))
-                print(f"Round {click_n}: +{len(added)} new URLs | total={len(all_urls)} | oldest≈{oldest_h:.1f}h ago", file=sys.stderr)
-
-                report["batches"].append({
-                    "batch": click_n,
-                    "new_urls": list(added.keys()),
-                    "labels": {u: v["timeLabel"] for u, v in added.items()},
-                    "total_after": len(all_urls),
-                    "oldest_hours_approx": round(oldest_h, 1) if oldest_h is not None else None,
-                })
-                prev_count = len(all_urls)
-
-                if oldest_h is not None and oldest_h >= 24.0:
-                    print(f"Reached 24h coverage after {click_n} click(s).", file=sys.stderr)
-                    report["summary"]["clicks_for_24h_coverage"] = click_n
-                    break
+            if pre >= PRE_TODAY_THRESHOLD:
+                print(f"24h coverage reached: {pre} pre-today articles after {click_n} click(s).", file=sys.stderr)
+                report["summary"]["clicks_for_24h_coverage"] = click_n
+                break
 
     finally:
         await tab.close()
-        await browser.stop()
+        try:
+            await browser.stop()
+        except Exception as e:
+            print(f"Browser stop (non-fatal): {e}", file=sys.stderr)
 
-    # Build final summary
-    all_article_list = list(all_urls.values())
-    oldest_h = oldest_age_hours(all_article_list)
-    sample_sorted = _sample_by_age(all_article_list)
+    # Final summary
+    all_list = list(all_urls.values())
+    by_date = _group_by_date(all_list)
     report["summary"].update({
         "total_unique_urls": len(all_urls),
-        "oldest_hours_approx": round(oldest_h, 1) if oldest_h is not None else None,
-        "sample_labels": sample_sorted,
+        "date_breakdown": {str(k): v for k, v in sorted(by_date.items(), reverse=True)},
+        "sample_labels": _sample_by_age(all_list),
         "screenshot": SCREENSHOT_PATH,
     })
 
     path = write_output(report)
     _print_summary(report)
-    print(f"\nJSON output: {path}", file=sys.stderr)
+    print(f"\nJSON output: {path}")
 
 
 # FUNCTIONS
@@ -241,7 +314,19 @@ def _extract_value(raw):
         return None
 
 
-# Run JS + decode JSON response into list of article dicts
+# Run DOM inspection JS, return parsed dict
+async def inspect_containers(tab) -> dict:
+    raw = await tab.execute_script(_JS_INSPECT)
+    val = _extract_value(raw)
+    if not val:
+        return {}
+    try:
+        return json.loads(val)
+    except (json.JSONDecodeError, TypeError):
+        return {}
+
+
+# Run extract JS + decode JSON response into list of article dicts
 async def extract_articles(tab) -> list[dict]:
     raw = await tab.execute_script(_JS_EXTRACT)
     val = _extract_value(raw)
@@ -253,7 +338,7 @@ async def extract_articles(tab) -> list[dict]:
         return []
 
 
-# Poll article count up to POLL_MAX × POLL_INTERVAL, return new count when it grows
+# Poll feed-scoped count up to POLL_MAX × POLL_INTERVAL; return when it grows
 async def wait_for_new_articles(tab, prev_count: int) -> int:
     for _ in range(POLL_MAX):
         await asyncio.sleep(POLL_INTERVAL)
@@ -293,35 +378,46 @@ def parse_url_date(url: str) -> datetime | None:
         return None
 
 
-# Compute hours since oldest article date (URL-based, conservative — midnight)
-def oldest_age_hours(articles: list[dict]) -> float | None:
-    dates = [parse_url_date(a["url"]) for a in articles]
+# Count articles whose URL date is before today
+def count_pre_today(articles: list[dict], today) -> int:
+    return sum(1 for a in articles if (d := parse_url_date(a["url"])) and d.date() < today)
+
+
+# Return date span string [earliest..latest] for a list of URLs
+def _date_span(urls: list[str]) -> str:
+    dates = [parse_url_date(u) for u in urls]
     dates = [d for d in dates if d is not None]
     if not dates:
-        return None
-    oldest = min(dates)
-    return (datetime.now(timezone.utc) - oldest).total_seconds() / 3600
+        return "(none)"
+    lo = min(dates).strftime("%m-%d")
+    hi = max(dates).strftime("%m-%d")
+    return f"[{lo}..{hi}]" if lo != hi else f"[{lo}]"
 
 
-# Return sample {url: label} for youngest, middle, oldest article
+# Group articles by URL date → {date: count}
+def _group_by_date(articles: list[dict]) -> dict:
+    groups: dict = {}
+    for a in articles:
+        d = parse_url_date(a["url"])
+        if d:
+            key = d.date()
+            groups[key] = groups.get(key, 0) + 1
+    return groups
+
+
+# Return sample list [{url, timeLabel}] for oldest, middle, newest
 def _sample_by_age(articles: list[dict]) -> list[dict]:
     with_date = [(parse_url_date(a["url"]), a) for a in articles]
     with_date = [(d, a) for d, a in with_date if d is not None]
     if not with_date:
         return []
     with_date.sort(key=lambda x: x[0])
-    indices = [0, len(with_date) // 2, len(with_date) - 1] if len(with_date) >= 3 else list(range(len(with_date)))
-    seen = set()
-    result = []
-    for i in indices:
-        if i not in seen:
-            seen.add(i)
-            _, a = with_date[i]
-            result.append({"url": a["url"], "timeLabel": a["timeLabel"]})
-    return result
+    n = len(with_date)
+    indices = sorted({0, n // 2, n - 1})
+    return [{"url": with_date[i][1]["url"], "timeLabel": with_date[i][1]["timeLabel"]} for i in indices]
 
 
-# Write probe JSON output
+# Write probe JSON output, return path
 def write_output(data: dict) -> Path:
     OUTPUT_DIR.mkdir(parents=True, exist_ok=True)
     ts = datetime.now(timezone.utc).strftime("%Y%m%dT%H%M%SZ")
@@ -335,20 +431,20 @@ def _print_summary(report: dict):
     s = report["summary"]
     btn = report["button"] or {}
     print("\n=== CoinDesk UI Probe Summary ===")
-    print(f"Total unique URLs  : {s.get('total_unique_urls', '?')}")
-    print(f"Oldest age (approx): {s.get('oldest_hours_approx', '?')}h")
-    print(f"Clicks for 24h     : {s.get('clicks_for_24h_coverage', 'not reached within rounds')}")
-    print(f"Button text        : {btn.get('text', 'NOT FOUND')}")
-    print(f"Button tag/class   : {btn.get('tagName', '?')} / {btn.get('className', '?')}")
-    print(f"Button data-attrs  : {btn.get('dataAttrs', {})}")
-    print(f"Screenshot         : {s.get('screenshot', '?')}")
-    print("Sample articles (oldest→newest):")
-    for item in reversed(s.get("sample_labels", [])):
-        print(f"  {item['timeLabel'] or '(no label)':<20}  {item['url']}")
+    print(f"Total unique feed URLs : {s.get('total_unique_urls', '?')}")
+    print(f"Clicks for 24h coverage: {s.get('clicks_for_24h_coverage', 'not reached')}")
+    print(f"Button                 : '{btn.get('text', 'NOT FOUND')}' | {btn.get('tagName', '?')} | class='{btn.get('className', '?')}'")
+    print(f"Screenshot             : {s.get('screenshot', '?')}")
+    print("Date breakdown:")
+    for date_str, count in s.get("date_breakdown", {}).items():
+        print(f"  {date_str}: {count} articles")
+    print("Sample labels (oldest→newest):")
+    for item in s.get("sample_labels", []):
+        print(f"  {(item['timeLabel'] or '(no label)'):<25}  {item['url'][22:90]}")
 
 
 def main():
-    parser = argparse.ArgumentParser(description="CoinDesk /latest-crypto-news UI probe via pydoll")
+    parser = argparse.ArgumentParser(description="CoinDesk /latest-crypto-news UI probe via pydoll (headed by default)")
     parser.add_argument("--headless", action="store_true", default=False, help="Run headless (default: headed)")
     args = parser.parse_args()
     asyncio.run(probe_workflow(args.headless))
