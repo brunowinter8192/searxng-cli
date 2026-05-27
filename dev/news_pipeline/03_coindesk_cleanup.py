@@ -4,7 +4,6 @@ import argparse
 import json
 import re
 import statistics
-from datetime import datetime, timezone
 from pathlib import Path
 
 INPUT_DIR = Path(__file__).parent / "02b_output"
@@ -15,8 +14,7 @@ _RE_MORE_FOR_YOU     = re.compile(r'^More For You\s*$')
 _RE_MORE_FOR_YOU_H2  = re.compile(r'^## More For You')
 _RE_PRIVACY          = re.compile(r'^## We Care About Your Privacy')
 # ≥2 concatenated [text](url) groups with no surrounding plain text.
-# Requires {2,} to avoid firing on single-link lines such as the Google News
-# badge [Make ](url) or nav section labels [Markets](url) that appear in body.
+# Requires {2,} to avoid firing on single-link lines (Google badge, nav labels).
 _RE_TAG_FOOTER       = re.compile(r'^(\[[^\]]+\]\([^)]+\)){2,}$')
 
 _END_ANCHORS = [
@@ -28,7 +26,11 @@ _END_ANCHORS = [
 
 # In-body strip patterns
 _RE_GOOGLE_BADGE = re.compile(r'\[Make\s*\]\(https://www\.google\.com/preferences/source')
-_RE_DATE_BYLINE  = re.compile(r'^[A-Z][a-z]+ \d{1,2}, \d{4},\s.*read$')
+# Updated/Published prefix variant covered by optional group
+_RE_DATE_BYLINE  = re.compile(r'^(?:Updated |Published )?[A-Z][a-z]+ \d{1,2}, \d{4},.*read$')
+_RE_BYLINE       = re.compile(r'^By \[.*?\]\(.*?\)(?:[,|].*)?\s*$')
+_RE_IMAGE        = re.compile(r'^!\[.*?\]\(.*?\)\s*$')
+_RE_IMAGE_LINK   = re.compile(r'^\[!\[.*?\]\(.*?\)\]\(.*?\)\s*$')
 _RE_EMPTY_LINK   = re.compile(r'\[\]\(.*?\)')
 
 
@@ -58,50 +60,61 @@ def process_file(path: Path, output_dir: Path) -> dict:
     original_chars = len(raw)
     hash_name = path.stem
 
-    frontmatter_str, body_lines = parse_frontmatter(raw)
+    fm_fields, body_lines = parse_frontmatter(raw)
 
     start_idx = find_start_anchor(body_lines)
     if start_idx is None:
-        # No H1 — output frontmatter + raw body unchanged, flag in manifest
-        cleaned = build_output(frontmatter_str, body_lines)
+        # No H1 — output raw body only (no frontmatter block), flag in manifest
+        cleaned = "\n".join(body_lines).strip() + "\n"
         out_path = output_dir / path.name
         out_path.write_text(cleaned, encoding="utf-8")
-        return {
-            "hash": hash_name,
-            "original_chars": original_chars,
-            "cleaned_chars": len(cleaned),
-            "reduction_pct": round((1 - len(cleaned) / original_chars) * 100, 1) if original_chars else 0.0,
-            "end_anchor_used": "NO_H1",
-        }
+        return _manifest_entry(hash_name, fm_fields, original_chars, cleaned, "NO_H1")
 
     end_idx, anchor_name = find_end_anchor(body_lines, start_idx)
     extracted = body_lines[start_idx:end_idx]
     cleaned_lines = clean_body(extracted)
-    cleaned = build_output(frontmatter_str, cleaned_lines)
+    cleaned = "\n".join(cleaned_lines) + "\n"
 
     out_path = output_dir / path.name
     out_path.write_text(cleaned, encoding="utf-8")
+    return _manifest_entry(hash_name, fm_fields, original_chars, cleaned, anchor_name)
+
+
+# Build manifest entry dict merging frontmatter fields + run stats
+def _manifest_entry(hash_name: str, fm: dict, original_chars: int, cleaned: str, anchor: str) -> dict:
+    cleaned_chars = len(cleaned)
+    reduction = round((1 - cleaned_chars / original_chars) * 100, 1) if original_chars else 0.0
     return {
         "hash": hash_name,
+        "url": fm.get("url", ""),
+        "lastmod": fm.get("lastmod", ""),
+        "publication_date": fm.get("publication_date", ""),
+        "title": fm.get("title", ""),
+        "section": fm.get("section", ""),
+        "scraped_at": fm.get("scraped_at", ""),
         "original_chars": original_chars,
-        "cleaned_chars": len(cleaned),
-        "reduction_pct": round((1 - len(cleaned) / original_chars) * 100, 1) if original_chars else 0.0,
-        "end_anchor_used": anchor_name,
+        "cleaned_chars": cleaned_chars,
+        "reduction_pct": reduction,
+        "end_anchor_used": anchor,
     }
 
 
-# Split raw file into frontmatter string and remaining body lines
-def parse_frontmatter(raw: str) -> tuple[str, list[str]]:
+# Split raw file into frontmatter field dict and body lines
+def parse_frontmatter(raw: str) -> tuple[dict, list[str]]:
     lines = raw.splitlines(keepends=True)
     if not lines or lines[0].strip() != "---":
-        return "", lines
+        return {}, [l.rstrip("\n") for l in lines]
     close = next((i for i in range(1, len(lines)) if lines[i].strip() == "---"), None)
     if close is None:
-        return "", lines
-    # frontmatter_str: content between the two --- markers (without trailing newline on last line)
-    frontmatter_str = "".join(lines[1:close]).rstrip("\n")
+        return {}, [l.rstrip("\n") for l in lines]
+    fm_fields: dict[str, str] = {}
+    for line in lines[1:close]:
+        stripped = line.rstrip("\n")
+        if ":" in stripped:
+            key, _, value = stripped.partition(":")
+            fm_fields[key.strip()] = value.strip()
     body_lines = [l.rstrip("\n") for l in lines[close + 1:]]
-    return frontmatter_str, body_lines
+    return fm_fields, body_lines
 
 
 # Return index of first H1 line in body_lines, or None
@@ -133,8 +146,14 @@ def clean_body(lines: list[str]) -> list[str]:
         # Strip Google News badge line
         if _RE_GOOGLE_BADGE.search(line):
             continue
-        # Strip date/read-time byline
+        # Strip date/read-time byline (bare and Updated/Published prefix variants)
         if _RE_DATE_BYLINE.match(line):
+            continue
+        # Strip author byline (By [...](...)...)
+        if _RE_BYLINE.match(line):
+            continue
+        # Strip standalone image lines and image-wrapped-in-link lines
+        if _RE_IMAGE.match(line) or _RE_IMAGE_LINK.match(line):
             continue
         # Strip empty links inline
         line = _RE_EMPTY_LINK.sub("", line)
@@ -157,14 +176,6 @@ def clean_body(lines: list[str]) -> list[str]:
     return result
 
 
-# Assemble final file content from frontmatter + body lines
-def build_output(frontmatter_str: str, body_lines: list[str]) -> str:
-    body = "\n".join(body_lines)
-    if frontmatter_str:
-        return f"---\n{frontmatter_str}\n---\n\n{body}\n"
-    return body + "\n"
-
-
 # Write manifest JSON to output_dir
 def write_manifest(manifest: list[dict], output_dir: Path):
     path = output_dir / "manifest.json"
@@ -180,7 +191,7 @@ def print_summary(manifest: list[dict], output_dir: Path):
 
     print(f"Files processed : {len(manifest)}")
     if reductions:
-        print(f"Reduction %      : mean={statistics.mean(reductions):.1f}%  median={statistics.median(reductions):.1f}%  min={min(reductions):.1f}%  max={max(reductions):.1f}%")
+        print(f"Reduction %     : mean={statistics.mean(reductions):.1f}%  median={statistics.median(reductions):.1f}%  min={min(reductions):.1f}%  max={max(reductions):.1f}%")
     print("End-anchor dist :")
     for anchor, count in sorted(anchor_dist.items(), key=lambda x: -x[1]):
         print(f"  {anchor}: {count}")
