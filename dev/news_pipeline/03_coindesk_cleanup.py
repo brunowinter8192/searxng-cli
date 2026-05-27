@@ -32,6 +32,10 @@ _RE_BYLINE       = re.compile(r'^By \[.*?\]\(.*?\)(?:[,|].*)?\s*$')
 _RE_IMAGE        = re.compile(r'^!\[.*?\]\(.*?\)\s*$')
 _RE_IMAGE_LINK   = re.compile(r'^\[!\[.*?\]\(.*?\)\]\(.*?\)\s*$')
 _RE_EMPTY_LINK   = re.compile(r'\[\]\(.*?\)')
+# Inline link strip: [text](url) → text. Applied after image-line removal so
+# standalone image lines are already gone before this substitution runs.
+# Does NOT match image markup (leading !) — those are handled by _RE_IMAGE/_RE_IMAGE_LINK.
+_RE_INLINE_LINK  = re.compile(r'\[([^\]]+)\]\([^)]+\)')
 
 
 # ORCHESTRATOR
@@ -157,6 +161,8 @@ def clean_body(lines: list[str]) -> list[str]:
             continue
         # Strip empty links inline
         line = _RE_EMPTY_LINK.sub("", line)
+        # Strip inline links — keep link text, drop URL: [text](url) → text
+        line = _RE_INLINE_LINK.sub(r'\1', line)
 
         # Blank-line normalization (collapse 3+ consecutive blanks → 2)
         if line.strip() == "":
