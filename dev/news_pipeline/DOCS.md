@@ -16,16 +16,17 @@ Per-domain news scraping probe for trading-bot data layer. CoinDesk first; raw-o
 
 ### 01_coindesk_discover.py
 
-**Purpose:** Fetch CoinDesk Google News Sitemap, filter to last 24h, write structured JSON for scrape input.
+**Purpose:** Discover CoinDesk articles via UI pagination on `/latest-crypto-news`. pydoll headed browser navigates the page, extracts feed-scoped article links via JS, clicks "More stories" until ≥3 pre-today articles are collected (24h coverage heuristic). Replaces sitemap-based approach (iter 4, 2026-05-27): removes 25-URL cap, picks up yesterday's articles that sitemap missed.
 
-**Input:** `https://www.coindesk.com/arc/outboundfeeds/news-sitemap-index` (live HTTP, Mozilla UA, stdlib urllib)
+**Approach:** `_JS_EXTRACT` (DOM traversal, skipTags/skipCls noise filter) + `_JS_CLICK_BTN` + `_JS_COUNT` poll loop. `lastmod` and `publication_date` derived from URL's `/YYYY/MM/DD/` path → UTC midnight ISO string. Title captured from `<a>` text. Terminates on `PRE_TODAY_THRESHOLD=3` or `MAX_CLICK_ROUNDS=8` safety cap (warns to stderr if cap fires).
 
-**Output:** `01_output/discover_<UTC-timestamp>.json` — list of `{url, lastmod, publication_date, title, section}` sorted by lastmod desc.
+**Output:** `01_output/discover_<UTC-timestamp>.json` — list of `{url, lastmod, publication_date, title, section}` sorted by lastmod desc. Schema identical to sitemap-based predecessor — Stage 2 requires zero changes.
 
-**Stdout:** total sitemap URLs, kept count, section distribution.
+**CLI:** `--headless` opt-in for cron; default headed for visual inspection.
 
 ```bash
 ./venv/bin/python dev/news_pipeline/01_coindesk_discover.py
+./venv/bin/python dev/news_pipeline/01_coindesk_discover.py --headless
 ```
 
 ### 02_coindesk_scrape.py
