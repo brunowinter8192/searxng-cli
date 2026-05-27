@@ -4,6 +4,14 @@ Per-domain news scraping probe for trading-bot data layer. CoinDesk first; raw-o
 
 **Status:** Probe stage — raw output for filter-design inspection. No src/ integration yet.
 
+## Convention
+
+**Probes laufen headed (headless=False)** für visuelle Mit-Inspektion durch den User. Gilt für alle `dev/news_pipeline/`-Probes mit Browser-Automation. `--headless` flag als explizites Opt-out vorhanden.
+
+## Documentation Tree
+
+- [exploration/DOCS.md](exploration/DOCS.md) — Manual UI exploration probes (pydoll browser, headed)
+
 ## Scripts
 
 ### 01_coindesk_discover.py
