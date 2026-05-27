@@ -47,3 +47,4 @@ dev/search_pipeline/01_reports/snippet_quality_*.md
 # News pipeline outputs (raw scrape data, gitignored)
 dev/news_pipeline/01_output/
 dev/news_pipeline/02_output/
+dev/news_pipeline/02b_output/

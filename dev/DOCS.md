@@ -9,3 +9,4 @@ Test suites and evaluation scripts for the search, scrape, explore, and agent pi
 - [explore_pipeline/DOCS.md](explore_pipeline/DOCS.md) — Site exploration evaluation
 - [cleanup/DOCS.md](cleanup/DOCS.md) — Web-MD cleanup scripts for crawled markdown files
 - [log_janitor/DOCS.md](log_janitor/DOCS.md) — Prune test for 14-day log retention janitor (JSONL + sidecar)
+- [news_pipeline/DOCS.md](news_pipeline/DOCS.md) — Per-domain news scraping probe (CoinDesk; trading-bot data layer)
