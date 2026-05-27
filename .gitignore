@@ -44,9 +44,7 @@ dev/search_pipeline/01_reports/engine_distribution_*.md
 dev/search_pipeline/01_reports/snippet_selection_*.md
 dev/search_pipeline/01_reports/snippet_quality_*.md
 
-# News pipeline outputs (raw scrape data, gitignored)
+# News pipeline outputs (discover JSONs accumulate — gitignored; cleaned content tracked)
 dev/news_pipeline/01_output/
 dev/news_pipeline/02_output/
-dev/news_pipeline/02b_output/
 dev/news_pipeline/exploration/01_output/
-dev/news_pipeline/03_output/
