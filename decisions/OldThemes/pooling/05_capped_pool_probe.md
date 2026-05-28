@@ -88,7 +88,7 @@ Cross-Encoder remains in scope as a future enhancement if a finer-grained-qualit
 
 ## Quellen
 
-- Production-architecture decisions (capped pool + Hard-Slot drop): `decisions/bee_fix.md`, `decisions/search07_ranking_format.md`
+- Production-architecture decisions (capped pool + Hard-Slot drop): `decisions/OldThemes/bee_cdp_starvation/fix_summary.md`, `decisions/search07_ranking_format.md`
 - Phase 7 BM25 evaluation: `01_bm25_evaluation_findings.md` (BM25 alone ties Hard-Slot 34/40 on uncapped pool)
 - Phase 8 Cross-Encoder verdict: `02_rerank_findings.md` (CE 35/40 with BM25 retrieve prefilter on uncapped pool — beats Hard-Slot)
 - Phase 9 bee-corrupted attempt: `03_rerank_validation_20queries.md`

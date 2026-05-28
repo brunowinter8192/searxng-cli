@@ -1,138 +1,80 @@
 # Search Pipeline Step 1: Engines
 
-> **⚠️ Superseded (2026-04-15 engine-cut + ongoing):** This file documents the historical SearXNG-aggregator architecture. The path src/searxng/settings.yml no longer exists — replaced by direct pydoll engines in `src/search/engines/` after the engine-cut. **For current state read [src/search/DOCS.md](../src/search/DOCS.md) (live engine list + per-engine description) and [search05_engine_expansion.md](search05_engine_expansion.md) (post-cut engine additions: HN, DDG, Mojeek, Lobsters, OpenAlex, Stack Exchange + drop history).** Current pool (2026-05-04): 8 engines uniform 4 req/min — Google, DuckDuckGo, Mojeek, Lobsters, Google Scholar (Browser); CrossRef, OpenAlex, Stack Exchange (HTTP). Bing, HN, Brave, Startpage, Semantic Scholar dropped.
+## Status Quo (IST)
 
-## Status Quo (Historical, pre-engine-cut)
+**Code:** `src/search/search_web.py` (`ENGINES` dict, `ENGINE_WATCHDOG_OVERRIDE`, `RATE_WAIT_TIMEOUT`); `src/search/filter_modes.py` (`_DEFAULT_ENGINES`, `apply_filter_mode()`); `src/search/engines/` (9 active engine files)
 
-**Code:** src/searxng/settings.yml (deleted 2026-04-15)
-**Method:** SearXNG aggregiert Ergebnisse aus mehreren Suchmaschinen pro Query
+**Active engines: 9** — 5 pydoll Chrome browser + 4 httpx HTTP API. Uniform 4 req/min token-bucket per engine.
 
-### Kategorie-System
+| Engine | Class¹ | Implementation | Watchdog | Max Results |
+|--------|--------|----------------|----------|-------------|
+| google | GENERAL | pydoll Chrome | 3.6s | 100 |
+| duckduckgo | GENERAL | pydoll Chrome | 3.6s | 10 |
+| mojeek | GENERAL | pydoll Chrome | 3.6s | 10 |
+| lobsters | QA | pydoll Chrome | 3.6s | 20 |
+| semantic_scholar | ACADEMIC | pydoll Chrome | 5.0s² | 10 |
+| crossref | ACADEMIC | httpx | 6.0s² | 200 |
+| openalex | ACADEMIC | httpx | 3.6s | 200 |
+| stack_exchange | QA | httpx | 3.6s | 100 |
+| open_library | GENERAL | httpx | 6.0s² | 100 |
 
-Zwei Custom-Kategorien statt SearXNG-Defaults:
+¹ Class labels are descriptive only — no runtime slot allocation exists. See `decisions/search07_ranking_format.md` for current pool architecture (per-engine dedup pools, no cross-engine ranking).
 
-- **general** — Scrapeable Engines (Web + Science). URLs können mit Crawl4AI geholt werden.
-- **plugin** — Discovery-Only. Content wird über dedizierte MCP Plugins geholt (ArXiv, GitHub, Reddit).
+² `ENGINE_WATCHDOG_OVERRIDE` entries in `search_web.py`: `semantic_scholar` 5.0s (CSR React hydration 0.5-2.5s), `crossref` 6.0s (API response 1-5s range), `open_library` 6.0s (server-dominated latency 1.4-5.8s). All others use `ENGINE_WATCHDOG_TIMEOUT = 3.6s`.
 
-### general Engines
+**Rate limiting:** `max_requests=4, window_seconds=60` configured in every engine file's INFRASTRUCTURE section (via `get_limiter()` call at import time). `RATE_WAIT_TIMEOUT = 60.0` in `search_web.py` — outer `asyncio.wait_for` guard on `acquire()` calls; dormant under normal 4 req/min load, guards against token-bucket saturation. See `decisions/rate_limiting.md`.
 
-| Engine | Weight | Tor | Index-Typ | Timeout |
-|--------|--------|-----|-----------|---------|
-| Google | 2 | nein (proxies: {}) | Eigener Index | default 5s |
-| Bing | 1 | nein (proxies: {}) | Eigener Index | default 5s |
-| Brave | 2 | ja (global proxy) | Eigener Index | default 5s |
-| Startpage | 1 | ja (global proxy) | Google-Proxy | default 5s |
-| DuckDuckGo | 1 | nein (proxies: {}) | Bing-basiert | default 5s |
-| Mojeek | 1 | nein (proxies: {}) | Eigener Crawler | default 5s |
-| Google Scholar | 2 | nein (kein Override) | Akademisch | 10s |
-| Semantic Scholar | 2 | nein | Akademisch (AI) | default 5s |
-| CrossRef | 1 | nein | DOI/Citations | default 5s |
+**Bucket-uniformity invariant:** All 9 engines fire on every query regardless of filter mode. `--books` / `--pdf` / `--docs` apply only per-engine query modifiers and post-merge URL filtering — never restrict which engines participate. `apply_filter_mode()` in `filter_modes.py` returns `excluded={}` in all code paths.
 
-### plugin Engines
+**Inert engine:** `src/search/engines/scholar.py` — file present but nothing imports it. Not in `ENGINES`, `_DEFAULT_ENGINES`, or `ENGINE_WATCHDOG_OVERRIDE`. Parked for g82 pooling-rework re-integration (Google-free pool design required; see Offene Fragen).
 
-| Engine | Weight | MCP Plugin | Zweck |
-|--------|--------|------------|-------|
-| ArXiv | 2 | arxiv | Paper-Discovery → Plugin holt Volltext |
-| GitHub | 1 | github-research | Repo/Code-Discovery → Plugin für Details |
-| Reddit | 1 | reddit | Thread-Discovery → Plugin für Comments |
-
-### disabled Engines
-
-| Engine | Grund |
-|--------|-------|
-| Qwant | HTTP 403 / Access Denied ohne Account |
-
-## Scoring-Algorithmus (Referenz)
-
-Aus `searxng/searxng` GitHub Source (`searx/results.py`):
-
-```
-weight = Π(engine_weights) × len(positions)
-score = Σ(weight / position_i)  # pro Engine-Position
-```
-
-- **Weights sind MULTIPLIKATIV** — alle Engine-Weights werden miteinander multipliziert
-- **Position inversely proportional** — Rank 1 = voller Score, Rank 10 = 1/10
-- **priority='high'** ignoriert Position (voller Weight), **'low'** skippt komplett
-- Ergebnisse von mehr Engines = höherer Score (positions-Liste wächst)
+**Plugin engines** (not in `ENGINES` dict, not in this pipeline): ArXiv, GitHub, Reddit — URL discovery via MCP plugins; content fetched by dedicated plugin.
 
 ## Evidenz
 
-### Kategorie-Trennung general/plugin
-Plugin-Domains (arxiv.org, github.com, reddit.com) können nicht effektiv gescrapt werden (API-Walls, Rate-Limits, dynamischer Content). Dedizierte MCP Plugins liefern strukturierte Daten. SearXNG-Engines für diese Domains dienen nur der URL-Discovery — der web-research Agent routet sie an die Plugins (→ plugin_routing.md).
+Per-engine implementation probes and smoke baselines — `decisions/OldThemes/engine_expansion_2026-05/`:
 
-### Bing — Neuer eigener Index
-Bing hat den zweitgrößten unabhängigen Web-Index weltweit. DDG basiert auf Bing, hat aber eigenes Ranking. Bing direkt aktivieren diversifiziert die Ergebnisse. Weight 1 zum Start (Qualität unbekannt, Tor-Kompatibilität unklar → proxies: {} als Bypass).
+| Engine | OldThemes file | Key finding |
+|--------|---------------|-------------|
+| google | _(pre-engine-cut baseline)_ | DOM selectors in `config.yml`; no browser changes post-cut |
+| duckduckgo | `duckduckgo.md` | URL cleaning required (uddg param); no consent banner |
+| mojeek | `mojeek.md` | 403 at >1.2 req/s burst; 4 req/min safe; arc=none param |
+| lobsters | `lobsters.md` | No body text on search page; snippet = domain label |
+| semantic_scholar | `semantic_scholar.md` | TLDR selector (DOM drift 2026-05-08); CSR watchdog 5.0s |
+| crossref | _(HTTP API, no probe needed)_ | 4 req/min; `rows=` param; watchdog 6.0s |
+| openalex | `openalex.md` | Abstract inverted index reconstruction; `mailto=` polite pool |
+| stack_exchange | `stack_exchange.md` | 300 req/day anon; `filter=withbody`; 15/30 smoke OK |
+| open_library | `open_library.md` | A/B: 9/10 book queries widened; 81.2 avg OL URLs; watchdog 6.0s |
+| bing | `bing_dropped.md` | Dropped 2026-05-04: DOM drift + no added value over DDG |
+| HN | `hn_dropped.md` | Dropped 2026-05-04: cascade-hostile empty-backoff mechanism |
+| Scholar | `scholar_reeval.md` | _JS_PARSE fix 2026-05-03; removed 2026-05-21 (see below) |
 
-### Mojeek — Unabhängiger Crawler
-Einziger komplett unabhängiger Crawler-Index neben Google, Bing und Brave. Kleinerer Index, aber diversifiziert Ergebnisse die sonst von den 3 großen dominiert werden. Weight 1 zum Start.
+**Scholar removal + uniformity invariant rationale:** `decisions/OldThemes/bee_cdp_starvation/fix_summary.md` — Phase 3 probe identified tokencap-path as primary cascade mechanism. RATE_WAIT_TIMEOUT=60 + Scholar removal + bucket-uniformity eliminated RATE_SKIP cascade. 20-query smoke post-fix: 0 RATE_SKIP events, 294s total wall (9 engines × 20 queries).
 
-### Semantic Scholar — AI-powered Academic
-Allen Institute for AI. Nutzt ML für Zitationsanalyse und Paper-Empfehlungen. Ergänzt Google Scholar mit anderem Ranking-Ansatz. Weight 2 weil akademische Qualität hoch.
+**No-backoff baseline (post-removal, 2026-05-22):** `dev/search_pipeline/01_reports/no_backoff_baseline_20260522_211439.md` — 30/30 queries with results, 0 RATE_SKIP events. See `decisions/rate_limiting.md` Evidenz.
 
-### CrossRef — DOI/Citation Nische
-Findet Papers über DOI und Zitationsnetzwerke. Nischenquelle, Weight 1.
+## Recommendation (SOLL)
 
-### Startpage — Weight 2 → 1
-Startpage ist ein Google-Proxy. Mit Weight 2 (wie Google) wurden Google-Ergebnisse massiv überrepräsentiert: eine URL die Google UND Startpage finden bekommt `weight = 2 × 2 × 2 = 8` statt `2 × 1 = 2`. Weight 1 reduziert den Google-Bias bei gleichzeitigem Erhalt als Tor-Fallback für Google-Ergebnisse.
+**Keep** — current 9-engine set stable post-bee_fix. 30/30 queries OK, 0 RATE_SKIP events (30-query baseline 2026-05-22).
 
-### Index-Diversität
-Vorher: 3 unabhängige Indizes (Google, Bing via DDG, Brave). Jetzt: 4 (+ Mojeek). Plus 2 akademische (Scholar, Semantic Scholar) und 1 Citation-Netzwerk (CrossRef).
+**Pending — Scholar re-integration:** requires g82 pooling-rework. `scholar.py` logic intact and ready; blocked on pool constant design in `filter_modes.py`.
 
-### Qwant — Access Denied
-Qwant liefert bei Direktanfragen ohne Account regelmäßig HTTP 403 / "Access Denied". Kein zuverlässiger Betrieb möglich → `disabled: true`.
-
-### Google Scholar — Erhöhter Timeout
-Google Scholar hat nachweislich höhere Latenz als Consumer-Suchmaschinen. `timeout: 10` verhindert vorzeitigen Abbruch.
-
-### Google, DDG, Bing, Mojeek — Kein Tor
-Diese Engines blockieren Tor-Exit-Nodes aggressiv (CAPTCHA, IP-Ban). Direktverbindung via `proxies: {}` als Bypass. Siehe auch search02_routing.md.
-
-## Entscheidung
-
-Engine-Set und Weights basieren auf Index-Diversifizierung und Kategorie-Trennung:
-
-- **general:** Maximale Index-Diversität (4 unabhängige Web-Indizes + 3 akademische Quellen). Weights: 2 für bewährte Quellen (Google, Brave, Scholar, Semantic Scholar), 1 für neue/redundante (Bing, DDG, Startpage, Mojeek, CrossRef).
-- **plugin:** Discovery-Only. Weights nach Relevanz für Tech/ML Use Case (ArXiv=2, GitHub/Reddit=1).
-- **Tor-Routing:** Engines die Tor blockieren bekommen `using_tor_proxy: false` + `proxies: {}`. Details → search02_routing.md.
+**Pending — Marginalia probe:** try-or-drop at hosted endpoint `search.marginalia.nu` when there is a concrete use-case gap in the current pool. See `decisions/OldThemes/engine_expansion_2026-05/00_research_context.md`.
 
 ## Offene Fragen
 
-- Weight-Kalibrierung: Precision@10 pro Engine fehlt. Aktuelle Weights sind Startpunkte, nicht kalibriert.
-- Google Scholar bei `time_range`: Scholar ignoriert time_range-Filter teilweise.
-- Bing/Mojeek Zuverlässigkeit: Noch nicht empirisch getestet. Können nach einigen Wochen Betrieb evaluiert werden.
+- **g82 pooling-rework:** which pool definition places Scholar in a Google-free set? What inter-session CAPTCHA behavior is expected at 4/min in a Scholar-only pool?
+- **SE API quota:** 300 req/day anonymous vs 10k/day with free registered key — sufficient for agentic-search volume?
+- **`open_library` sub-status labelling:** `ERROR_OTHER` returned for non-book queries (HTTP engine returning `[]`). `search_with_reason()` could provide finer sub-status; not blocking current operation.
 
 ## Quellen
 
-- src/searxng/settings.yml (deleted 2026-04-15) — Engine-Konfiguration
-- `searxng/searxng` GitHub Repo (`searx/results.py`) — Scoring-Algorithmus
-- `searxng/searxng` GitHub Repo (`searx/settings.yml`) — Default Engine-Konfigurationen
-- SearXNG Docs (RAG Collection: searxng) — Engine-Parameter, Weight-Semantik
-- Erfahrungswerte aus Betrieb (Qwant-Deaktivierung, DDG-Weight, Startpage-Redundanz)
-
-## Engine Status Update (2026-04-03)
-
-### SearXNG 2026.4.3 — Engine Fixes
-
-Update von 2026.3.10 → 2026.4.3 behebt Blocking für 3 Engines über neuen GSA iPhone User-Agent:
-- **Google** — wieder stabil ✓
-- **Brave** — wieder stabil ✓
-- **Google Scholar** — wieder stabil ✓
-
-### DDG Recovery Confirmed
-
-DuckDuckGo ist wieder funktional (vorher CAPTCHA-Blocking, upstream issue #4824). Aktuell noch `disabled: true` in `settings.yml` — Re-Enablement pending. DDG wird nicht re-enabled solange Bing direkt verfügbar ist (DDG basiert auf Bing, bietet keinen Mehrwert bei identischem Index).
-
-### Aktueller Engine-Status (alle 8 + DDG)
-
-| Engine | Status | Routing | Tor | Patch | Weight |
-|--------|--------|---------|-----|-------|--------|
-| Google | ✅ aktiv | direkt | nein | nein | 2 |
-| Bing | ✅ aktiv | direkt | nein | nein | 1 |
-| Brave | ✅ aktiv | Tor | ja | nein | 2 |
-| Startpage | ✅ aktiv | Tor | ja | nein | 1 |
-| Mojeek | ✅ aktiv | direkt | nein | arc=none | 1 |
-| Google Scholar | ✅ aktiv | direkt | nein | nein | 2 |
-| Semantic Scholar | ✅ aktiv | direkt | nein | session cookies | 2 |
-| CrossRef | ✅ aktiv | Tor | ja | nein | 1 |
-| DuckDuckGo | ⏸ disabled | direkt | nein | nein | 1 |
+| Source | Notes |
+|--------|-------|
+| `src/search/search_web.py` | ENGINES dict, ENGINE_WATCHDOG_OVERRIDE, RATE_WAIT_TIMEOUT — ground truth |
+| `src/search/filter_modes.py` | _DEFAULT_ENGINES, apply_filter_mode() — uniformity invariant |
+| `src/search/engines/*.py` | Per-engine max_requests=4/60s |
+| `decisions/OldThemes/engine_expansion_2026-05/` | Per-engine implementation history |
+| `decisions/OldThemes/bee_cdp_starvation/fix_summary.md` | Cascade fix rationale, Scholar removal, uniformity |
+| `decisions/search07_ranking_format.md` | Current pool/drilldown architecture; class labels removed |
+| `decisions/rate_limiting.md` | RATE_WAIT_TIMEOUT policy, fail-fast, no-backoff baseline |

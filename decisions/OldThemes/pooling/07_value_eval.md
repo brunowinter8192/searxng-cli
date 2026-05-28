@@ -137,7 +137,7 @@ PDF and books are dominated by oracle-saturation pathology (pool ≤ 10): all me
 
 ### Google CAPTCHA — Out on All 16 Pairs
 
-`/tmp/value_eval_probe_run.log` shows 4 Google CAPTCHA events (pairs 1, 2, 4, 7) with escalating backoffs: 34s, 65s, 123s, 244s. Once the first CAPTCHA triggered the rate_limiter's exponential backoff, subsequent pairs within the backoff window all hit `RATE_WAIT_TIMEOUT=60s` (from bee_fix) and got RATE_SKIP for Google. Total: google=0 across all 16 pairs.
+`/tmp/value_eval_probe_run.log` shows 4 Google CAPTCHA events (pairs 1, 2, 4, 7) with escalating backoffs: 34s, 65s, 123s, 244s. Once the first CAPTCHA triggered the rate_limiter's exponential backoff, subsequent pairs within the backoff window all hit `RATE_WAIT_TIMEOUT=60s` (see `decisions/rate_limiting.md`) and got RATE_SKIP for Google. Total: google=0 across all 16 pairs.
 
 **The eval ran as 8-engine, not 9-engine.** All 4 C-methods saw the same reduced pool, so the **method comparison is internally fair** — the winner is who-ranks-the-reduced-pool-best, and that's still C3. But Google's deep-tail (which Phase 10 showed contributes unique expert URLs not surfaced by other engines) is missing, so this eval cannot definitively claim C3 is the best in a 9-engine production scenario. A re-run with Google in the pool (after rate-limiter fail-fast cleanup + pacing strategy) would tighten the conclusion.
 
