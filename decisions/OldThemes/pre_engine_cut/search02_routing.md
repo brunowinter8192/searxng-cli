@@ -106,7 +106,7 @@ Split-Routing-Architektur: **Default Tor, Ausnahmen direkt.** Rationale:
 - src/searxng/settings.yml (deleted 2026-04-15) — Routing-Konfiguration
 - `searxng/searxng` GitHub Repo (`searx/network.py`) — Proxy-Inheritance-Logik
 - SearXNG Docs (RAG Collection: searxng) — outgoing, proxy, suspended_times Parameter
-- search01_engines.md — Engine-Auswahl und Kategorie-Zuordnung
+- search_pipeline.md — Engine-Auswahl und Kategorie-Zuordnung
 
 ## Implementiert (Session 2026-04-03)
 

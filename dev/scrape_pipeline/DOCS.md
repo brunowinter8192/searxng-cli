@@ -101,7 +101,7 @@ The file is gitignored — it accumulates across production MCP tool calls and i
 ./venv/bin/python dev/scrape_pipeline/03_cleanup/clean.py
 ```
 
-## 04_overview_sweep/ → decisions/scrape02_filtering
+## 04_overview_sweep/ → decisions/scrape_pipeline
 
 ### sweep.py + analyze.py + sweep_config.yml
 
@@ -139,7 +139,7 @@ The file is gitignored — it accumulates across production MCP tool calls and i
 
 12-URL test inventory extracted from `pipeline_smoke_20260506_003915.md`. Columns: Q-Nr, URL, Status (filled after test run).
 
-## 06_cloudflare_md_adoption/ → decisions/scrape04_cloudflare_fastpath
+## 06_cloudflare_md_adoption/ → decisions/scrape_pipeline
 
 ### 06_cloudflare_md_adoption.py
 
@@ -156,7 +156,7 @@ The file is gitignored — it accumulates across production MCP tool calls and i
 
 **Initial measurement (2026-05-07, 29 URLs):** 16/29 CF-fronted by cf-ray header, 7/29 actually serve markdown (5/5 Cloudflare-owned positive controls + 1 false-positive Anthropic stub of 12 bytes + Vercel via own edge). Mean byte-reduction 92.3%, median 97.0%. Adoption among non-Cloudflare-owned CF-customers: ≈0% in May 2026, 3 months after Beta launch.
 
-## browser_eval/ → decisions/scrape01_browser
+## browser_eval/ → decisions/scrape_pipeline
 
 ### 01_baseline.py
 
@@ -188,7 +188,7 @@ The file is gitignored — it accumulates across production MCP tool calls and i
 ./venv/bin/python dev/scrape_pipeline/browser_eval/03_browser.py https://docs.trychroma.com/docs/overview/telemetry
 ```
 
-## filter_eval/ → decisions/scrape02_filtering
+## filter_eval/ → decisions/scrape_pipeline
 
 ### 04_filtering.py
 
@@ -238,7 +238,7 @@ Configs tested:
 ./venv/bin/python dev/scrape_pipeline/filter_eval/06_content_source.py --url https://example.com
 ```
 
-## garbage_eval/ → decisions/scrape03_garbage
+## garbage_eval/ → decisions/scrape_pipeline
 
 ### 07_result_inspect.py
 

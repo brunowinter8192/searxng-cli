@@ -1,6 +1,6 @@
 ## Status
 
-**SUPERSEDED by `decisions/search07_ranking_format.md` (2026-05-04)** — this file documents the pre-engine-cut SearXNG-Docker pipeline (`src/searxng/`, `MAX_RESULTS=80`, hostname-priority via SearXNG-Plugin). That implementation no longer exists in the codebase as of the engine-cut refactor (2026-04-15). Kept for historical reference only.
+**SUPERSEDED by `decisions/search_pipeline.md` (2026-05-04)** — this file documents the pre-engine-cut SearXNG-Docker pipeline (`src/searxng/`, `MAX_RESULTS=80`, hostname-priority via SearXNG-Plugin). That implementation no longer exists in the codebase as of the engine-cut refactor (2026-04-15). Kept for historical reference only.
 
 # Search Pipeline Step 3: Ranking & Result Processing
 
@@ -39,7 +39,7 @@ remove:
 
 ### Ranking-Pipeline
 
-1. SearXNG berechnet internen Score: `weight = Π(engine_weights) × len(positions)`, `score = Σ(weight / position_i)` (→ search01_engines.md)
+1. SearXNG berechnet internen Score: `weight = Π(engine_weights) × len(positions)`, `score = Σ(weight / position_i)` (→ search_pipeline.md)
 2. Hostname-Regeln modifizieren Score: `high_priority` = priority='high' (voller Weight statt Weight/Position), `low_priority` = priority='low' (Score 0)
 3. `remove`-Einträge werden vollständig aus Ergebnissen entfernt (vor Ausgabe)
 4. `fetch_search_results()` nimmt die ersten `MAX_RESULTS=80` aus dem SearXNG-JSON

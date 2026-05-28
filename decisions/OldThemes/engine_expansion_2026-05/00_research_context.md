@@ -1,6 +1,6 @@
 # Engine Expansion 2026-05 — Research Context & Deferred Items
 
-Research pass and evaluation summary from the May 2026 engine expansion. Final IST (9-engine set) is in `decisions/search01_engines.md`. Per-engine implementation history is in the sibling files in this folder.
+Research pass and evaluation summary from the May 2026 engine expansion. Final IST (9-engine set) is in `decisions/search_pipeline.md`. Per-engine implementation history is in the sibling files in this folder.
 
 ## Research Pass (2026-05-01)
 
@@ -28,7 +28,7 @@ GitHub search for engines that extend the stack with technical bias, without new
 
 - SE API without key: 300 req/day — sufficient for agentic-search volume? Should a free registered key be added from the start?
 - Marginalia hosted API: public endpoint without key? Clarifies on first HTTP probe.
-- Engine dedup for discussion-aggregator results: HN/SE hits often lead to the same URLs as Google + additional discussion threads. Current `build_engine_pools()` dedup-by-position handles this correctly (see `decisions/search07_ranking_format.md`).
+- Engine dedup for discussion-aggregator results: HN/SE hits often lead to the same URLs as Google + additional discussion threads. Current `build_engine_pools()` dedup-by-position handles this correctly (see `decisions/search_pipeline.md`).
 
 ## Quellen
 
