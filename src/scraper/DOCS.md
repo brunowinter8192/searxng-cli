@@ -21,7 +21,7 @@ URL scraping and site exploration tools powered by Crawl4AI for SearXNG MCP serv
 
 Main orchestrator. Three-phase approach:
 
-1. **Phase 0: HTTP markdown fast-path** — `fetch_markdown_fastpath()` probes the URL with `Accept: text/markdown, text/html` via httpx. If the host serves text/markdown directly (Cloudflare-fronted zones with Markdown-for-Agents enabled, Vercel's own edge implementation, others), the markdown body is returned and Crawl4AI is skipped entirely. See `decisions/scrape04_cloudflare_fastpath.md`.
+1. **Phase 0: HTTP markdown fast-path** — `fetch_markdown_fastpath()` probes the URL with `Accept: text/markdown, text/html` via httpx. If the host serves text/markdown directly (Cloudflare-fronted zones with Markdown-for-Agents enabled, Vercel's own edge implementation, others), the markdown body is returned and Crawl4AI is skipped entirely. See `decisions/scrape_pipeline.md`.
 2. **Phase 1: Normal browser** — Standard Crawl4AI without stealth patches. Works for most sites (Wikipedia, docs, blogs). Tries `networkidle` first, falls back to `domcontentloaded`.
 3. **Phase 2: Stealth browser** — Only if Phase 1 returns empty. Uses `enable_stealth=True` + `UndetectedAdapter` + `AsyncPlaywrightCrawlerStrategy` (Level 3 anti-bot evasion). For sites with bot detection (e.g. TDS, some news sites).
 

@@ -5,7 +5,7 @@
 
 ## Sources
 
-- `decisions/scrape01_browser.md` — current 3-phase pipeline IST + per-phase configuration
+- `decisions/scrape_pipeline.md` — current 3-phase pipeline IST + per-phase configuration
 - `src/scraper/scrape_url.py:71-138` — phase escalation code (fastpath → browser_1a → browser_1b → browser_2_stealth)
 - `src/logs/scrape_log.jsonl` — per-scrape timing record schema (timings_ms.fastpath / browser_1a / browser_1b / browser_2_stealth / filter / total_wall)
 - Live observation: 2026-05-24 session, BfN.de scrape, 90s wall time

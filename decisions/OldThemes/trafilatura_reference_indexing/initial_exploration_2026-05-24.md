@@ -14,7 +14,7 @@ The indexing is **independent of any benchmarking concern** — clarified mid-se
 
 ## Why Trafilatura specifically
 
-- Tagged "Zum Indexieren" in `decisions/scrape02_filtering.md` Quellen for months as future-work
+- Tagged "Zum Indexieren" in `decisions/scrape_pipeline.md` Quellen for months as future-work
 - THE library we will benchmark `PruningContentFilter` against eventually (separate scope, not this work)
 - Test-bed for the consolidated `web-research` SKILL Mode 1 (Web-MD Capture) — first end-to-end run since the cleanup-and-index merger
 - Sphinx-generated docs trigger our empirically-validated 5-shape cleanup profile (Sphinx-Specific: header avg 10.7 LOC, footer 52.6 LOC, 37% noise) — high-confidence cleanup path
@@ -91,7 +91,7 @@ All design questions are resolved:
 
 ## Sources cited
 
-- `decisions/scrape02_filtering.md` — Quellen section names Trafilatura as future indexing target
+- `decisions/scrape_pipeline.md` — Quellen section names Trafilatura as future indexing target
 - `decisions/explore01_discovery.md` — sitemap → BFS cascade architecture
 - `skills/web-research/SKILL.md` — Mode 1 Web-MD pipeline (consolidated 2026-05-23 from former `cleanup-and-index` skill)
 - `decisions/logging.md` — central FileHandler-only config that ensures the upcoming worker run won't pollute stdout with crawl4ai or per-engine warnings (2026-05-24)
