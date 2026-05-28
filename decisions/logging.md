@@ -63,8 +63,6 @@ Options evaluated: see `decisions/OldThemes/logging_isolation/initial_audit_2026
 
 Keep (matches IST after migration).
 
-**Future consideration:** if an MCP-server entry-point is ever added (currently no `server.py`), it would need the same FileHandler-only config at its startup path. The `basicConfig` call in `cli.py` covers only the CLI path.
-
 ## Offene Fragen
 
 None currently. Rate-limited (HTTP 429) calls stay WARNING — distinct from "engine empty" (no results, normal operation). If 429s become frequent enough to be noise, revisit.

@@ -1,6 +1,6 @@
 # Plugin Routing
 
-## Status Quo
+## Status Quo (IST)
 
 **Code:** `skills/web-research/SKILL.md` (Plugin Routing section), `src/routing.py` (`check_plugin_routed()` — enforced at CLI level)
 
@@ -10,38 +10,28 @@
 |--------|--------|--------|
 | arxiv.org | Report: "USE RAG PLUGIN" | `mcp__rag__search_hybrid` or `/rag:pdf-convert` |
 | github.com | Report: "USE GITHUB PLUGIN" | `github__get_file_content` |
+| raw.githubusercontent.com | Report: "USE GITHUB PLUGIN" | `github__get_file_content` |
 | reddit.com | Report: "USE REDDIT PLUGIN" | `reddit__search_posts` |
 | youtube.com | SKIP entirely | — (video content not scrapable) |
+| youtu.be | SKIP entirely | — (video content not scrapable) |
 
 **Routing logic:** URL-domain matching only. No content-based routing. No subdomain handling documented.
 
 **Worker output:** When a `searxng-cli scrape_url <url>` call hits a routed domain, `check_plugin_routed()` returns a blocking TextContent with the routing message. The worker reports these in the "Plugin-Routed URLs" section of its output.
 
+**PDF routing:** PDF URLs (`.pdf` suffix or TIER1 academic domains) are routed to `download_pdf` via `should_download_as_pdf()`. See `decisions/scrape_pipeline.md` for the chain logic.
+
 ## Evidenz
 
-Plugin routing compliance across 3 eval agents:
+Routing logic is enforced at every CLI scrape call via `check_plugin_routed()`. The function returns a blocking TextContent (consumed by CLI) when the host matches a routed domain (host equality OR subdomain match via `host.endswith`).
 
-| Agent | Plugin-routed URLs |
-|-------|-------------------|
-| Agent 4 (test) | 22 |
-| Agent 5 (chunking) | 28 |
-| Agent 6 (embedding) | 40+ |
-
-No misrouted URLs observed (no arxiv/github/reddit URLs in scraped content). Routing appears reliable.
-
-High plugin-routed counts (40+) suggest the routing table is working — arxiv and github appear frequently in research-topic searches, and agents correctly separate them instead of attempting to scrape.
-
-## Entscheidung
+## Recommendation (SOLL)
 
 Plugin routing is the best-functioning part of the agent pipeline. No change needed.
 
 The routing table is correct: arxiv/github/reddit all have dedicated plugins that provide better access than scraping (structured metadata, full content, no auth issues). youtube skip is correct (no scraping value).
 
 One gap: no routing for `huggingface.co` (model cards, papers with code — frequently appears in ML research). Currently scraped like any other domain; scraper may hit rate limits or return incomplete model card content.
-
-### Implementiert (Session 2026-03-31)
-
-- **PDF URLs:** Agent instructions updated — PDF URLs (`.pdf`) are routed to `download_pdf(url)` instead of scrape attempt. Reported as `[PDF downloaded: /tmp/filename.pdf]` in agent output. `download_pdf` tool added to agent frontmatter and SKILL.md.
 
 ## Offene Fragen
 
@@ -54,9 +44,5 @@ One gap: no routing for `huggingface.co` (model cards, papers with code — freq
 
 - `skills/web-research/SKILL.md` — Plugin Routing section (canonical reference)
 - `src/routing.py` — `check_plugin_routed()` implementation
-- Eval session findings (2026-03-15): 22/28/40+ plugin-routed URLs, no misrouting observed
-
-### Zum Indexieren (für systematische Verbesserung)
-
 - HuggingFace API Docs — Model Card, Datasets API: https://huggingface.co/docs/hub/api
 - arxiv API Docs — Bulk metadata access: https://info.arxiv.org/help/api/index.html
