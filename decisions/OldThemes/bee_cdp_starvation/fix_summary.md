@@ -1,6 +1,6 @@
 # bee_fix — RATE_WAIT_TIMEOUT + Bucket-Uniformity + Scholar Removal (2026-05-21)
 
-Three production changes applied 2026-05-21 (commit on branch `engine-uniformity`). This file documents what was changed and why. The IST state resulting from these changes is in `decisions/search01_engines.md` (engine set) and `decisions/rate_limiting.md` (RATE_WAIT_TIMEOUT + bucket-uniformity policy).
+Three production changes applied 2026-05-21 (commit on branch `engine-uniformity`). This file documents what was changed and why. The IST state resulting from these changes is in `decisions/search_pipeline.md` (engine set) and `decisions/rate_limiting.md` (RATE_WAIT_TIMEOUT + bucket-uniformity policy).
 
 ## Production Changes Applied
 
