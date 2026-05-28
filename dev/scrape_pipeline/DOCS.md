@@ -109,7 +109,7 @@ The file is gitignored — it accumulates across production MCP tool calls and i
 
 `sweep.py` writes `sweep_outputs/<ts>/<config_name>/<slug>_<hash>.md` per URL + `_run_metadata.json` with timing/sizes. `analyze.py` diffs each candidate against the clean-raw baseline (latest `cleaned_outputs/`), computes line-set recall/precision/F1 per (config, URL), aggregates per config (median + per-shape), generates `_analysis.md` with cross-config ranking + per-shape breakdown + unified_diff drill-down for top-3 configs.
 
-**Caveat:** F1 is symmetric — chrome retention and content loss reduce it equally. For asymmetric preferences (e.g. "strip more chrome at cost of detail"), look at `precision` column separately and read the actual diffs in the drill-down section. See SESSION 2026-05-06 finding documented in `decisions/scrape02_filtering.md`.
+**Caveat:** F1 is symmetric — chrome retention and content loss reduce it equally. For asymmetric preferences (e.g. "strip more chrome at cost of detail"), look at `precision` column separately and read the actual diffs in the drill-down section. See SESSION 2026-05-06 finding documented in `decisions/scrape_pipeline.md`.
 
 ```bash
 ./venv/bin/python dev/scrape_pipeline/04_overview_sweep/sweep.py
