@@ -1,6 +1,6 @@
 # Explore Pipeline Step 1: Site Discovery
 
-## Status Quo
+## Status Quo (IST)
 
 **Code:** `src/crawler/explore_site.py` (URL discovery, CLI entry point); `src/crawler/crawl_site.py` (BFS + sitemap functions called by explore_site); `src/crawler/filter_urls.py` (shared `match_any()` helper + `filter_urls_workflow` CLI tool)
 **Method:** Cascade discovery: sitemap → prefetch BFS fallback, with shallow-sitemap threshold and redirect resolution
@@ -70,7 +70,7 @@ Schnellster sinnvoller Trigger — wartet auf DOM-Parse ohne JavaScript-Executio
 ### DEFAULT_MAX_PAGES = 200
 Balanciert Discovery-Vollständigkeit gegen Crawl-Zeit. 200 Seiten mit Prefetch sind in ~2-4 Minuten erreichbar. Kein Hard-Timeout im Workflow — Crawl läuft bis `max_pages` oder bis keine neuen URLs mehr gefunden werden.
 
-## Entscheidung
+## Recommendation (SOLL)
 
 Cascade-Architektur (sitemap-first, BFS-fallback) wurde beibehalten, aber erweitert:
 - Shallow-sitemap threshold: verhindert dass unvollständige Sitemaps die BFS-Discovery unterbinden
@@ -90,9 +90,6 @@ Cascade-Architektur (sitemap-first, BFS-fallback) wurde beibehalten, aber erweit
 - `src/crawler/crawl_site.py` — BFS + Sitemap Discovery-Funktionen
 - Crawl4AI Docs (RAG Collection: Crawl4AIDocs) — BFSDeepCrawlStrategy, CrawlerRunConfig, prefetch, AsyncUrlSeeder
 - `src/crawler/DOCS.md` — Crawler-Übersicht
-
-### Zum Indexieren (für systematische Verbesserung)
-
 - Crawl4AI Deep Crawl Docs — BFS Strategy, FilterChain, max_depth: https://docs.crawl4ai.com/core/deep-crawl
 - Crawl4AI GitHub Issues "sitemap" — AsyncUrlSeeder Bugs, dict-vs-string: https://github.com/unclecode/crawl4ai/issues?q=sitemap
 - Sitemap Protocol Spec — XML Sitemap Format, Sitemap Index: https://www.sitemaps.org/protocol.html

@@ -38,7 +38,7 @@ Phase 1a (`networkidle`) wartet, bis keine Netzwerkrequests mehr offen sind — 
 
 `networkidle` als primäre Strategie, weil JS-rendered Content ohne Wait nicht vollständig geladen ist. `domcontentloaded` als Fallback, weil manche Sites mit Polling-Requests `networkidle` blockieren. Stealth als letzte Phase, weil `UndetectedAdapter` stabiler mit einem frischen Browser ist und nicht alle Sites Bot-Detection haben.
 
-`CacheMode.BYPASS` immer aktiv, weil gecachte veraltete Inhalte in einem MCP-Kontext (Live-Recherche) mehr schaden als nützen.
+`CacheMode.BYPASS` immer aktiv, weil gecachte veraltete Inhalte für Live-Recherche mehr schaden als nützen.
 
 ### Offene Fragen
 
@@ -83,11 +83,11 @@ Phase 1a (`networkidle`) wartet, bis keine Netzwerkrequests mehr offen sind — 
 #### Crawl4AI Docs
 - `PruningContentFilter(threshold=0.48)`: Blöcke unterhalb des Scores werden entfernt. Höherer Threshold = aggressivere Filterung
 - Bekannte Limitation: PruningFilter kann Code-Blöcke zerstören, wenn sie als "low-density" eingestuft werden (wenig natürliche Sprache)
-- `DefaultMarkdownGenerator()` ohne Filter: vollständiger HTML→Markdown, kein Scoring — für Dev-Suites sinnvoller als für Live-MCP
+- `DefaultMarkdownGenerator()` ohne Filter: vollständiger HTML→Markdown, kein Scoring — für Dev-Suites sinnvoller als für Live-Recherche
 - `content_source`-Option in `CrawlerRunConfig`: alternative Quelle (z.B. `fit_html`, `cleaned_html`) statt Markdown-Pipeline
 
 #### Truncation-Logik
-- 15000 chars entspricht ~3750 Wörtern — ausreichend für die meisten Artikel, vermeidet Context-Window-Overflow im MCP
+- 15000 chars entspricht ~3750 Wörtern — ausreichend für die meisten Artikel, vermeidet Context-Window-Overflow
 - Absatzgrenze-Truncation (`\n\n` wenn > 80% der Grenze) verhindert mid-sentence cuts
 
 #### Empirical Sweep (2026-05)
@@ -172,7 +172,7 @@ Cookies vs cookies+sphinx selectors: no measurable difference on this URL set (�
 
 **Logging:** `logger.warning("Garbage detected [%s]: %s", garbage_type, url)` bei jeder Garbage-Erkennung in `try_scrape()`.
 
-**PDF-URLs:** MCP Tool `download_pdf(url, output_dir="/tmp")` als Lösung — PDFs werden heruntergeladen statt gescrapt. Agent-Instructions verweisen auf `download_pdf` statt "nicht scrapebar".
+**PDF-URLs:** `download_pdf` CLI command als Lösung — PDFs werden heruntergeladen statt gescrapt. Agent-Instructions verweisen auf `download_pdf` statt "nicht scrapebar".
 
 **`PLUGIN_HINTS`:** generischer Hint via `get_plugin_hint()`, wird an Fehlermeldung angehängt wenn alle Phasen fehlschlagen. Zwei fixe Domain-Mappings.
 
@@ -208,7 +208,7 @@ Recovery condition: stripped content must (a) differ from original and (b) pass 
 
 ### Recommendation (SOLL)
 
-6-Kategorien-Ansatz mit typisierten Returns für die häufigsten Failure-Cases im MCP-Kontext:
+6-Kategorien-Ansatz mit typisierten Returns für die häufigsten Failure-Cases:
 1. `crawl4ai_error`: direkte String-Matches zuverlässig, da Crawl4AI feste Error-Templates hat
 2. `http_error`: Kombination aus Länge und Keyword ist robuster als nur Keyword — kurze Error-Pages haben charakteristisches Profil
 3. `nav_dump`: Link-Density-Check fängt Seiten die nur Navigation ohne Content liefern
@@ -220,7 +220,7 @@ Typisierte Returns ermöglichen differenzierte Fehlermeldungen für den Caller u
 
 `PLUGIN_HINTS` als letzter Ausweg: liefert dem Nutzer einen konkreten Handlungshinweis statt blankem Fehler.
 
-PDF-URLs: Eigenes MCP Tool `download_pdf` statt Scraping-Versuch. Agent-Instructions aktualisiert.
+PDF-URLs: `download_pdf` CLI command statt Scraping-Versuch. Agent-Instructions aktualisiert.
 
 ### Offene Fragen
 
@@ -230,7 +230,7 @@ PDF-URLs: Eigenes MCP Tool `download_pdf` statt Scraping-Versuch. Agent-Instruct
 - `http_error`: False-Positive-Risiko bei kurzen legitimen Pages mit Zahlen wie "403" im Fließtext
 - `cookie_wall`: Threshold-Kalibrierung (15 cookie-signals) nicht durch Testdaten validiert
 - `login_wall`: False-Positive-Risiko bei kurzen Login-Tutorial-Seiten — 2000-char-Limit + generische Patterns
-- `PLUGIN_HINTS` ist hardcoded — eine konfigurierbare Map in `config.py` oder `server.py` wäre flexibler
+- `PLUGIN_HINTS` ist hardcoded — eine konfigurierbare Map in `config.py` wäre flexibler
 
 ---
 
