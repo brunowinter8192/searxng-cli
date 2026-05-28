@@ -1,5 +1,7 @@
 # Stealth
 
+> **Demoted to OldThemes 2026-05-28 (research-inventory artifact).** Active production-stealth code paths in the current codebase are: (a) src/search/browser.py — JS_FINGERPRINT_PATCHES (screen-dimensions, devicePixelRatio, getComputedStyle CSS Color-Patch), REAL_USER_AGENT override, Chrome anti-detection flags (--disable-blink-features=AutomationControlled, webrtc_leak_protection) — applied per tab via apply_fingerprint_patches(); documented in src/search/DOCS.md (Stealth Decisions section); (b) src/scraper/scrape_url.py Phase-2 fallback — BrowserConfig(enable_stealth=True) + UndetectedAdapter; documented in decisions/scrape_pipeline.md → Browser Strategy. The remainder of this file is cross-layer detection-knowledge inventory and historical engine-status snapshots (pre-engine-cut 2026-04 SearXNG stack, Brave drop-decision). Kept as research reference.
+
 Applies to: `src/search/` (pydoll-based custom engine) + `dev/search_pipeline/` (test suite)
 
 ## Detection Layers — Overview
