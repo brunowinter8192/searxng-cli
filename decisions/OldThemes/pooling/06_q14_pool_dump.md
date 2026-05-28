@@ -105,4 +105,4 @@ Next session: solve top-URL-identification automation first (Lobsters boost prot
 
 - Phase 9 predecessor: `05_capped_pool_probe.md`
 - Phase 10 probe artifacts: `dev/search_pipeline/single_query_pool_dump.py`, `dev/search_pipeline/01_reports/single_query_pool_postgresql_index_types_btree_g_20260521_231405.md`
-- Bee resolution (= pool integrity precondition): `decisions/bee_fix.md`
+- Bee resolution (= pool integrity precondition): `decisions/OldThemes/bee_cdp_starvation/fix_summary.md`

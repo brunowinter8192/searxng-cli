@@ -10,9 +10,11 @@
 
 **Fail-fast on CAPTCHA/429/Block:** engine detects failure → returns `([], S.EMPTY_BLOCK)` or analogous status immediately → `_engine_with_timing` in `search_web.py` records it in `engine_stats` → query log captures it. No retry, no session-scoped memory of the failure. Next query tries the engine again from scratch.
 
-**RATE_SKIP still active:** `asyncio.wait_for(get_limiter(engine.name).acquire(), timeout=RATE_WAIT_TIMEOUT=60s)` in `search_web.py` fires if token-bucket wait exceeds 60s. Under normal 4 req/min load this is dormant; it guards against genuine bucket saturation (unlikely) and asyncio event-loop starvation during Chrome CDP floods (bee_fix mechanism).
+**`RATE_WAIT_TIMEOUT = 60.0`** (defined in `search_web.py`): outer `asyncio.wait_for` guard on `acquire()` calls. Fires if the token-bucket wait exceeds 60s → engine returns `RATE_SKIP` for that query. Under normal 4 req/min load this is dormant; it guards against genuine bucket saturation and asyncio event-loop starvation. Raised from 5.0 → 60.0 on 2026-05-21 after Phase 3 probe identified tokencap-wait (not backoff) as the primary cascade mechanism (see `decisions/OldThemes/bee_cdp_starvation/fix_summary.md`).
 
-Removed from all 10 engine files: every `limiter.backoff()`, `limiter.reset_backoff()`, orphan `limiter = get_limiter(self.name)` assignments, and `get_limiter` imports where no longer used.
+**Bucket-uniformity invariant:** All 9 active engines fire on every query. `apply_filter_mode()` in `filter_modes.py` never restricts which engines participate — `excluded={}` in all code paths. Filter modes (`--books`, `--pdf`, `--docs`) apply per-engine query modifiers and post-merge URL filtering only.
+
+Removed from all 9 engine files: every `limiter.backoff()`, `limiter.reset_backoff()`, orphan `limiter = get_limiter(self.name)` assignments, and `get_limiter` imports where no longer used.
 
 ## Evidenz
 
@@ -81,5 +83,6 @@ Token-bucket pacing + fail-fast is the correct architecture. No further changes 
 
 - Diagnosed failure mode + formula derivation: `decisions/OldThemes/pooling/04_zero_query_diagnosis.md`
 - Reproduced in value-eval: `decisions/OldThemes/pooling/07_value_eval.md` (Caveats section, Google CAPTCHA)
+- Cascade probe phases (RATE_WAIT_TIMEOUT=60 rationale): `decisions/OldThemes/bee_cdp_starvation/fix_summary.md`
 - Probe-run evidence: `/tmp/value_eval_probe_run.log`
 - Project-wide principle: `decisions/OldThemes/no_backoff_retry.md`
