@@ -2,7 +2,7 @@
 
 pydoll-based parallel search pipeline. Exposes `search_web_workflow()` (single-query, fan-out across engines via asyncio.gather, returns engine-breakdown TextContent + writes per-engine pool cache) and `search_batch_workflow()` (N queries sequentially in one warm-Chrome session) — both consumed by `cli.py`. Plus `fetch_search_results()` sync wrapper consumed by dev scripts.
 
-**Active engines (9):** google, duckduckgo, mojeek, lobsters, semantic_scholar (pydoll); crossref, openalex, stack_exchange, open_library (HTTP). Scholar decoupled from default pool (see `decisions/OldThemes/scholar_decoupling/20260509.md`). See `decisions/stealth.md` for drop decisions on brave / startpage / bing.
+**Active engines (9):** google, duckduckgo, mojeek, lobsters, semantic_scholar (pydoll); crossref, openalex, stack_exchange, open_library (HTTP). Scholar decoupled from default pool (see `decisions/OldThemes/scholar_decoupling/20260509.md`). See `decisions/OldThemes/stealth_inventory/stealth.md` for drop decisions on brave / startpage / bing.
 
 **Two-call drilldown architecture (2026-05-23):** `search_web` returns an engine-breakdown table (counts only, no URLs). URLs per engine retrieved via `search_engine_drilldown` CLI subcommand, which reads the per-engine cache written by `search_web`. Dedup: URLs owned by the engine with the lowest position; random tie-break. No global ranking, no class/slot allocation.
 
@@ -87,4 +87,4 @@ Abstract `BaseEngine` parent — `search()` + default `search_with_reason()` tha
 
 ## Stealth Decisions
 
-Active stealth configuration lives in `src/search/browser.py` (hardcoded JS patches, UA, window size, Chrome options) and per-engine files (SOCS cookie for Google). Historical research documented in `decisions/stealth.md`.
+Active stealth configuration lives in `src/search/browser.py` (hardcoded JS patches, UA, window size, Chrome options) and per-engine files (SOCS cookie for Google). Historical research documented in `decisions/OldThemes/stealth_inventory/stealth.md`.

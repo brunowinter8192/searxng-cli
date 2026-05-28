@@ -1,5 +1,7 @@
 # Stealth
 
+> **Demoted to OldThemes 2026-05-28 (research-inventory artifact).** The only concrete production-stealth code path in the current codebase is the Phase-2 fallback (BrowserConfig(enable_stealth=True) + UndetectedAdapter in src/scraper/scrape_url.py — see decisions/scrape_pipeline.md → Browser Strategy). The remainder of this file is cross-layer detection-knowledge inventory and historical engine-status snapshots (pre-engine-cut 2026-04 SearXNG stack, Brave drop-decision). Kept as research reference.
+
 Applies to: `src/search/` (pydoll-based custom engine) + `dev/search_pipeline/` (test suite)
 
 ## Detection Layers — Overview
