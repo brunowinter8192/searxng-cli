@@ -120,9 +120,8 @@ def main():
     p.add_argument("output_dir", help="Directory to save the .md file (created if not exists)")
 
     # ── explore_site ──────────────────────────────────────────────────────────
-    p = sub.add_parser("explore_site", help="Discover URLs via sitemap + BFS, write to file + print summary.")
+    p = sub.add_parser("explore_site", help="Discover URLs via Playwright-per-page BFS, write to file + print summary.")
     p.add_argument("url", help="Root URL to explore")
-    p.add_argument("--strategy", choices=["auto", "sitemap", "prefetch"], default="auto")
     p.add_argument("--max-pages", dest="max_pages", type=int, default=200)
     p.add_argument("--output", type=str, default=None,
                    help="Output file path (default: /tmp/explore_<domain>_urls.txt)")
@@ -130,6 +129,14 @@ def main():
     p.add_argument("--include-patterns", dest="include_patterns", type=str, default=None)
     p.add_argument("--exclude-patterns", dest="exclude_patterns", type=str, default=None)
     p.add_argument("--append", action="store_true")
+    p.add_argument("--delay", type=float, default=3.0,
+                   help="Render delay in seconds after domcontentloaded (default: 3.0)")
+    p.add_argument("--page-timeout", dest="page_timeout", type=int, default=15000,
+                   help="Page load timeout in ms (default: 15000)")
+    p.add_argument("--concurrency", type=int, default=1,
+                   help="Concurrent discovery requests (default: 1; >1 risks Cloudflare WAF 429, max recommended: 10)")
+    p.add_argument("--stealth", action="store_true",
+                   help="Enable stealth mode (enable_stealth + UndetectedAdapter) to reduce 429s")
 
     # ── filter_urls ───────────────────────────────────────────────────────────
     p = sub.add_parser("filter_urls", help="In-place URL list filter by glob patterns.")
@@ -196,13 +203,14 @@ def main():
             result = asyncio.run(scrape_url_raw_workflow(args.url, args.output_dir))
 
     elif args.cmd == "explore_site":
-        urls, strategy_used, output_path = asyncio.run(explore_site_workflow(
-            args.url, args.strategy, args.max_pages, args.output,
-            args.depth, args.include_patterns, args.exclude_patterns, args.append
+        urls, stop_reason, output_path = asyncio.run(explore_site_workflow(
+            args.url, args.max_pages, args.output,
+            args.depth, args.include_patterns, args.exclude_patterns, args.append,
+            args.delay, args.page_timeout, args.concurrency, args.stealth,
         ))
         domain = urlparse(args.url).netloc
-        logger.info("explore_site complete: strategy=%s domain=%s urls=%d output=%s",
-                    strategy_used, domain, len(urls), output_path)
+        logger.info("explore_site complete: stop_reason=%s domain=%s urls=%d output=%s",
+                    stop_reason, domain, len(urls), output_path)
         result = [TextContent(type="text", text=f"Discovered {len(urls)} URLs → {output_path}")]
 
     elif args.cmd == "filter_urls":

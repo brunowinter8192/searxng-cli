@@ -6,78 +6,47 @@ import time
 from urllib.parse import urlparse
 
 import requests
-from src.crawler.crawl_site import discover_urls, discover_urls_sitemap
+from src.crawler.crawl_site import (discover_urls_playwright,
+                                    DEFAULT_DELAY_S, DEFAULT_PAGE_TIMEOUT_MS,
+                                    DEFAULT_DISCOVER_CONCURRENCY)
 from src.crawler.filter_urls import match_any
 
 logger = logging.getLogger(__name__)
 
 DEFAULT_MAX_PAGES = 200
-SITEMAP_MIN_THRESHOLD = 5
 
 
 # ORCHESTRATOR
-async def explore_site_workflow(url: str, strategy: str, max_pages: int, output: str,
+async def explore_site_workflow(url: str, max_pages: int, output: str,
                                 depth: int, include_patterns: str, exclude_patterns: str,
-                                append: bool = False):
+                                append: bool = False, delay_s: float = DEFAULT_DELAY_S,
+                                page_timeout_ms: int = DEFAULT_PAGE_TIMEOUT_MS,
+                                concurrency: int = DEFAULT_DISCOVER_CONCURRENCY,
+                                stealth: bool = False):
     domain = urlparse(url).netloc
-    effective_max = max_pages
 
     if output is None:
         output = f"/tmp/explore_{domain}_urls.txt"
 
     resolved_url, resolved_domain = resolve_redirect(url)
     if resolved_domain != domain:
-        logger.info("Redirect detected: %s -> %s (domain: %s -> %s)", url, resolved_url, domain, resolved_domain)
+        logger.info("Redirect detected: %s -> %s (domain: %s -> %s)",
+                    url, resolved_url, domain, resolved_domain)
         url = resolved_url
         domain = resolved_domain
 
-    logger.info("Exploring %s (strategy: %s)", url, strategy)
+    logger.info("Exploring %s (max_pages=%d, depth=%d, concurrency=%d)",
+                url, max_pages, depth, concurrency)
 
     start = time.time()
-    seed_path = urlparse(url).path
+    urls, stats = await discover_urls_playwright(
+        url, include_patterns, exclude_patterns, max_pages, depth,
+        delay_s, page_timeout_ms, concurrency, stealth,
+    )
+    duration = time.time() - start
 
-    if strategy == "sitemap":
-        urls = await discover_urls_sitemap(domain, include_patterns)
-        urls = filter_sitemap_by_seed_path(urls, seed_path)
-        if exclude_patterns:
-            before = len(urls)
-            urls = [u for u in urls if not match_any(u, exclude_patterns)]
-            logger.info("exclude_patterns: dropped %d URLs", before - len(urls))
-        strategy_used = "sitemap"
-        duration = time.time() - start
-        logger.info("Sitemap: %d URLs found in %.1fs", len(urls), duration)
-    elif strategy == "prefetch":
-        urls = await discover_urls(url, domain, depth, effective_max, exclude_patterns, include_patterns)
-        strategy_used = "prefetch"
-        duration = time.time() - start
-        logger.info("Prefetch: %d URLs found in %.1fs", len(urls), duration)
-    else:
-        sitemap_urls = await discover_urls_sitemap(domain, include_patterns)
-        sitemap_urls = filter_sitemap_by_seed_path(sitemap_urls, seed_path)
-        if exclude_patterns:
-            before = len(sitemap_urls)
-            sitemap_urls = [u for u in sitemap_urls if not match_any(u, exclude_patterns)]
-            logger.info("exclude_patterns: dropped %d URLs", before - len(sitemap_urls))
-
-        if len(sitemap_urls) >= SITEMAP_MIN_THRESHOLD:
-            urls = sitemap_urls
-            strategy_used = "sitemap"
-            duration = time.time() - start
-            logger.info("Sitemap: %d URLs found in %.1fs", len(urls), duration)
-        else:
-            if sitemap_urls:
-                logger.info("Sitemap too shallow (%d URLs). Trying prefetch BFS...", len(sitemap_urls))
-            else:
-                logger.info("No sitemap found. Trying prefetch BFS...")
-            prefetch_urls = await discover_urls(url, domain, depth, effective_max, exclude_patterns, include_patterns)
-            if len(prefetch_urls) > len(sitemap_urls):
-                urls = prefetch_urls
-                strategy_used = "prefetch"
-            else:
-                urls = sitemap_urls
-                strategy_used = "sitemap (shallow, prefetch found fewer)"
-            duration = time.time() - start
-            logger.info("%s: %d URLs found in %.1fs", strategy_used, len(urls), duration)
+    logger.info("Discovery: %d URLs in %.1fs — stop_reason=%s, 429s=%d",
+                len(urls), duration, stats["stop_reason"], stats["four_two_nine_count"])
 
     if append:
         existing = load_existing_urls(output)
@@ -89,11 +58,11 @@ async def explore_site_workflow(url: str, strategy: str, max_pages: int, output:
     save_url_list(urls, output, append=append)
     logger.info("Saved %d URLs to %s", len(urls), output)
 
-    if len(urls) >= effective_max:
+    if stats["stop_reason"] == "max_pages_reached":
         logger.info("Hit max_pages limit (%d). Run again with --max-pages %d --append to discover more.",
-                    effective_max, effective_max * 2)
+                    max_pages, max_pages * 2)
 
-    return urls, strategy_used, output
+    return urls, stats["stop_reason"], output
 
 
 # FUNCTIONS
@@ -108,13 +77,6 @@ def resolve_redirect(url: str) -> tuple[str, str]:
     except Exception as e:
         logger.warning("Redirect resolution failed for %s: %s", url, e)
         return url, urlparse(url).netloc
-
-
-# Filter sitemap URLs to match seed URL path prefix
-def filter_sitemap_by_seed_path(urls: list[str], seed_path: str) -> list[str]:
-    if not seed_path or seed_path == "/":
-        return urls
-    return [u for u in urls if seed_path in urlparse(u).path]
 
 
 # Print URL samples for noise pattern identification
@@ -155,25 +117,36 @@ def save_url_list(urls: list[str], output_path: str, append: bool = False) -> No
 
 
 if __name__ == "__main__":
-    parser = argparse.ArgumentParser(description="Discover all URLs of a website and save to a file")
+    parser = argparse.ArgumentParser(
+        description="Discover all URLs of a website via Playwright-per-page BFS and save to a file"
+    )
     parser.add_argument("--url", required=True, help="Seed URL to explore")
-    parser.add_argument("--strategy", choices=["auto", "sitemap", "prefetch"], default="auto",
-                        help="Discovery strategy: auto (sitemap->prefetch), sitemap, prefetch")
     parser.add_argument("--max-pages", type=int, default=DEFAULT_MAX_PAGES,
                         help=f"Max pages to discover (default: {DEFAULT_MAX_PAGES})")
-    parser.add_argument("--append", action="store_true",
-                        help="Append to output file instead of overwrite (for continuation runs)")
     parser.add_argument("--output", type=str, default=None,
                         help="Output file path (default: /tmp/explore_<domain>_urls.txt)")
     parser.add_argument("--depth", type=int, default=10,
-                        help="Max crawl depth for prefetch BFS")
+                        help="Max BFS depth (default: 10)")
     parser.add_argument("--include-patterns", type=str, default=None,
-                        help="Comma-separated URL patterns to include (e.g. '/docs/*,/api/*')")
+                        help="Comma-separated URL substrings to include (e.g. '/docs/,/api/')")
     parser.add_argument("--exclude-patterns", type=str, default=None,
-                        help="Comma-separated URL patterns to exclude (e.g. '/genindex*,/search*')")
+                        help="Comma-separated URL substrings to exclude (e.g. '/genindex,/search')")
+    parser.add_argument("--append", action="store_true",
+                        help="Append to output file instead of overwrite (for continuation runs)")
+    parser.add_argument("--delay", type=float, default=DEFAULT_DELAY_S,
+                        help=f"Render delay in seconds after domcontentloaded (default: {DEFAULT_DELAY_S})")
+    parser.add_argument("--page-timeout", type=int, default=DEFAULT_PAGE_TIMEOUT_MS,
+                        help=f"Page load timeout in ms (default: {DEFAULT_PAGE_TIMEOUT_MS})")
+    parser.add_argument("--concurrency", type=int, default=DEFAULT_DISCOVER_CONCURRENCY,
+                        help=f"Concurrent discovery requests (default: {DEFAULT_DISCOVER_CONCURRENCY}; "
+                             f">1 risks Cloudflare WAF 429, max recommended: 10)")
+    parser.add_argument("--stealth", action="store_true",
+                        help="Enable stealth mode (enable_stealth + UndetectedAdapter) to reduce 429s")
     args = parser.parse_args()
 
     logging.basicConfig(level=logging.INFO, format="%(message)s")
-    asyncio.run(explore_site_workflow(args.url, args.strategy, args.max_pages, args.output,
-                                     args.depth, args.include_patterns, args.exclude_patterns,
-                                     args.append))
+    asyncio.run(explore_site_workflow(
+        args.url, args.max_pages, args.output, args.depth,
+        args.include_patterns, args.exclude_patterns, args.append,
+        args.delay, args.page_timeout, args.concurrency, args.stealth,
+    ))
