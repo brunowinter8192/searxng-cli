@@ -68,7 +68,7 @@ Appends one JSONL failure record to `dev/scrape_pipeline/failures.jsonl`. Called
 
 ### get_plugin_hint()
 
-Returns plugin hint only for domains with dedicated MCP plugins (uses `PLUGIN_ROUTED_DOMAINS` from `routing.py`). Returns empty string for all other domains.
+Stub — always returns empty string. Previously queried `PLUGIN_ROUTED_DOMAINS` from `routing.py` (deleted); domain blocking removed.
 
 ### Constants
 

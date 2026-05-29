@@ -162,7 +162,7 @@ Results from lobsters for "rust async runtime"
 
 **Output:** Filtered markdown with `# Content from: <url>` header.
 
-**Plugin routing:** arxiv.org, github.com, reddit.com URLs are automatically rejected with a routing message — use the dedicated plugins instead.
+**Plugin routing:** none — all URLs are scraped without restriction. Use dedicated plugins (GitHub, Reddit, RAG) when they provide better access, but scrape_url will attempt any URL.
 
 ### scrape_url_raw
 
@@ -301,18 +301,21 @@ For multi-topic tasks: before moving to the next topic, verify ≥5 unique URLs 
 
 **PDF URLs:** If a result URL ends in `.pdf`, call `download_pdf` instead of `scrape_url`.
 
-## Plugin Routing (CRITICAL)
+## Plugin Routing
 
-**Do NOT scrape these domains — report them for plugin-based access:**
+No domain blocking — `scrape_url` and `scrape_url_raw` attempt to scrape any URL.
 
-| Domain | Action |
-|--------|--------|
-| arxiv.org | Report: "Use RAG plugin (mcp__rag__search_hybrid) or /rag:pdf-convert" |
-| github.com | Report: "Use GitHub Research plugin (github__get_file_content)" |
-| reddit.com | Report: "Use Reddit plugin (reddit__search_posts)" |
-| youtube.com | Skip entirely. Video content cannot be scraped. |
+Dedicated plugins often provide better access for specific domains; prefer them when the URL shape matches:
 
-`scrape_url` and `scrape_url_raw` enforce this routing at the CLI level — they will return a routing message and exit without scraping.
+| Domain | Preferred tool | Why |
+|--------|---------------|-----|
+| github.com (raw files, repo trees) | `github__get_file_content`, `get_repo_tree` | Structured access, no auth issues |
+| docs.github.com (rendered docs) | `scrape_url` | Plugin cannot serve rendered HTML; scrape directly |
+| reddit.com | `reddit__search_posts`, `search_subreddit` | Full thread content, structured |
+| arxiv.org (papers) | `mcp__rag__search_hybrid` or `/rag:pdf-convert` | Full PDF, metadata |
+| youtube.com | — | Video content; no useful scrapable text |
+
+These are recommendations, not CLI-enforced blocks. Use judgment based on what you need from the URL.
 
 ## Report Format
 

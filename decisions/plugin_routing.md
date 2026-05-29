@@ -2,47 +2,32 @@
 
 ## Status Quo (IST)
 
-**Code:** `skills/web-research/SKILL.md` (Plugin Routing section), `src/routing.py` (`check_plugin_routed()` — enforced at CLI level)
+**No domain blocking.** `scrape_url` and `scrape_url_raw` attempt to scrape any URL without restriction. `src/routing.py` and `check_plugin_routed()` have been deleted. The `elif blocked := check_plugin_routed(...)` guards in `cli.py` (scrape_url and scrape_url_raw handlers) have been removed. `get_plugin_hint()` in `src/scraper/scrape_url.py` returns `""` unconditionally.
 
-**Routing table** (applied to all search results before scraping):
+**PDF routing is unchanged:** `should_download_as_pdf()` still routes `.pdf`-suffix and TIER1 academic domain URLs to `download_pdf`. See `decisions/scrape_pipeline.md`.
 
-| Domain | Action | Plugin |
-|--------|--------|--------|
-| arxiv.org | Report: "USE RAG PLUGIN" | `mcp__rag__search_hybrid` or `/rag:pdf-convert` |
-| github.com | Report: "USE GITHUB PLUGIN" | `github__get_file_content` |
-| raw.githubusercontent.com | Report: "USE GITHUB PLUGIN" | `github__get_file_content` |
-| reddit.com | Report: "USE REDDIT PLUGIN" | `reddit__search_posts` |
-| youtube.com | SKIP entirely | — (video content not scrapable) |
-| youtu.be | SKIP entirely | — (video content not scrapable) |
-
-**Routing logic:** URL-domain matching only. No content-based routing. No subdomain handling documented.
-
-**Worker output:** When a `searxng-cli scrape_url <url>` call hits a routed domain, `check_plugin_routed()` returns a blocking TextContent with the routing message. The worker reports these in the "Plugin-Routed URLs" section of its output.
-
-**PDF routing:** PDF URLs (`.pdf` suffix or TIER1 academic domains) are routed to `download_pdf` via `should_download_as_pdf()`. See `decisions/scrape_pipeline.md` for the chain logic.
+**Previously blocked domains** (github.com, raw.githubusercontent.com, reddit.com, arxiv.org, youtube.com, youtu.be) are now scraped like any other domain.
 
 ## Evidenz
 
-Routing logic is enforced at every CLI scrape call via `check_plugin_routed()`. The function returns a blocking TextContent (consumed by CLI) when the host matches a routed domain (host equality OR subdomain match via `host.endswith`).
+**Root cause of removal:**
+
+1. **docs.github.com wrongly blocked.** The `host.endswith(".github.com")` subdomain branch caught rendered documentation pages on `docs.github.com`. The GitHub plugin (`get_file_content`) is for raw repo-file access only — it cannot serve rendered HTML docs. Blocking docs.github.com left no valid access path.
+
+2. **Plugin availability ≠ scrape incompatibility.** The existence of a plugin for github/reddit/arxiv does not mean scraping is broken. Workers should choose the best tool per URL shape; a hard CLI-level block prevents informed choice.
+
+3. **Product decision:** unrestricted scraping is the correct default. Plugin tools remain available and are often superior for their specific use cases (structured data, auth, large files), but the scraper must not preempt the choice.
 
 ## Recommendation (SOLL)
 
-Plugin routing is the best-functioning part of the agent pipeline. No change needed.
+Blocking removed, no change needed.
 
-The routing table is correct: arxiv/github/reddit all have dedicated plugins that provide better access than scraping (structured metadata, full content, no auth issues). youtube skip is correct (no scraping value).
-
-One gap: no routing for `huggingface.co` (model cards, papers with code — frequently appears in ML research). Currently scraped like any other domain; scraper may hit rate limits or return incomplete model card content.
+If a future need arises to guide tool selection for specific domains, the appropriate mechanism is SKILL.md guidance (prose recommendations, not CLI enforcement).
 
 ## Offene Fragen
 
-- Should `huggingface.co` be added to the routing table? HF has no dedicated plugin currently, so it would need to either: (a) be scraped as normal, (b) be skipped, or (c) be noted for future plugin development.
-- What about `paperswithcode.com`? Frequently surfaces in ML benchmarks. No dedicated plugin, but content is structured and scrapable.
-- Subdomain handling: does `gist.github.com` match the `github.com` routing rule? If not, gists get scraped instead of plugin-routed.
-- ~~Should the routing table be duplicated in `agents/web-research.md`?~~ → Resolved: `agents/web-research.md` removed. Canonical: `skills/web-research/SKILL.md`. `src/routing.py` enforces at runtime.
+None — prior questions about huggingface.co, gist.github.com, and paperswithcode.com routing are moot given unrestricted scraping.
 
 ## Quellen
 
-- `skills/web-research/SKILL.md` — Plugin Routing section (canonical reference)
-- `src/routing.py` — `check_plugin_routed()` implementation
-- HuggingFace API Docs — Model Card, Datasets API: https://huggingface.co/docs/hub/api
-- arxiv API Docs — Bulk metadata access: https://info.arxiv.org/help/api/index.html
+- `decisions/scrape_pipeline.md` — PDF routing chain (unchanged)
