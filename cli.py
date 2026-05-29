@@ -31,7 +31,6 @@ import asyncio
 import atexit
 from urllib.parse import urlparse
 
-from src.routing import check_plugin_routed
 from src.search.search_web import search_web_workflow, search_batch_workflow
 from src.search.browser import close_browser, kill_stale_chrome
 from src.search.cache import cache_key, cache_read, format_engine_pool
@@ -187,16 +186,12 @@ def main():
     elif args.cmd == "scrape_url":
         if should_download_as_pdf(args.url):
             result = download_pdf_workflow(args.url, str(Path.home() / "Downloads"))
-        elif blocked := check_plugin_routed(args.url):
-            result = blocked
         else:
             result = asyncio.run(scrape_url_workflow(args.url, args.max_content_length))
 
     elif args.cmd == "scrape_url_raw":
         if should_download_as_pdf(args.url):
             result = download_pdf_workflow(args.url, str(Path.home() / "Downloads"))
-        elif blocked := check_plugin_routed(args.url):
-            result = blocked
         else:
             result = asyncio.run(scrape_url_raw_workflow(args.url, args.output_dir))
 
