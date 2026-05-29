@@ -253,7 +253,7 @@ PDF-URLs: `download_pdf` CLI command statt Scraping-Versuch. Agent-Instructions 
 - info: hit (`Markdown fast-path hit: <url> (<N> chars)`)
 - debug: miss (sub-threshold / non-200 / wrong content-type) and network errors
 
-**Routing interaction:** `cli.py` calls `check_plugin_routed()` before either workflow function — fast-path therefore runs only on already-routed-clean URLs. No interaction.
+**Routing interaction:** No domain blocking in CLI — fast-path runs on all URLs that pass the PDF check. No interaction.
 
 **Caching interaction:** Both scraper modules use `CacheMode.BYPASS` for Crawl4AI; no application-level cache. Fast-path is the first decision point in the chain.
 

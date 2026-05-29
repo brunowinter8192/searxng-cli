@@ -15,7 +15,7 @@ URL scraping and site exploration tools powered by Crawl4AI for SearXNG MCP serv
 
 **Purpose:** URL scraping orchestrator. Uses Crawl4AI's AsyncWebCrawler with PruningContentFilter to extract clean page content as markdown. Two-phase browser strategy: normal browser first, stealth fallback for anti-bot sites.
 **Input:** URL string and optional maximum content length (default 15000).
-**Output:** Filtered markdown content wrapped in TextContent, or error message with plugin hint on failure. Side effect: writes one JSONL record to `scrape_log.jsonl` + one sidecar `.md` via `scrape_logger`.
+**Output:** Filtered markdown content wrapped in TextContent, or error message on failure. Side effect: writes one JSONL record to `scrape_log.jsonl` + one sidecar `.md` via `scrape_logger`.
 
 ### scrape_url_workflow()
 
@@ -27,7 +27,7 @@ Main orchestrator. Three-phase approach:
 
 Noise removal via `excluded_selector=COOKIE_CONSENT_SELECTOR` — CSS selectors matching common cookie consent frameworks. `remove_overlay_elements` is NOT used (destroys Wikipedia content by misclassifying DOM elements as overlays).
 
-On empty result, returns error message with plugin hint if URL matches a known domain with dedicated MCP plugin (Reddit, arxiv).
+On empty result, returns error message.
 
 ### fetch_markdown_fastpath()
 
@@ -68,7 +68,7 @@ Appends one JSONL failure record to `dev/scrape_pipeline/failures.jsonl`. Called
 
 ### get_plugin_hint()
 
-Stub — always returns empty string. Previously queried `PLUGIN_ROUTED_DOMAINS` from `routing.py` (deleted); domain blocking removed.
+Stub — always returns `""`. Domain blocking removed; no plugin-routing hint is applicable.
 
 ### Constants
 
