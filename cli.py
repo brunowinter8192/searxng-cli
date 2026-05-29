@@ -203,7 +203,7 @@ def main():
             result = asyncio.run(scrape_url_raw_workflow(args.url, args.output_dir))
 
     elif args.cmd == "explore_site":
-        urls, stop_reason, output_path = asyncio.run(explore_site_workflow(
+        urls, stop_reason, four_two_nine_count, output_path = asyncio.run(explore_site_workflow(
             args.url, args.max_pages, args.output,
             args.depth, args.include_patterns, args.exclude_patterns, args.append,
             args.delay, args.page_timeout, args.concurrency, args.stealth,
@@ -211,7 +211,8 @@ def main():
         domain = urlparse(args.url).netloc
         logger.info("explore_site complete: stop_reason=%s domain=%s urls=%d output=%s",
                     stop_reason, domain, len(urls), output_path)
-        result = [TextContent(type="text", text=f"Discovered {len(urls)} URLs → {output_path}")]
+        _suffix = f"stop_reason={stop_reason}" + (f", {four_two_nine_count}×429" if four_two_nine_count else "")
+        result = [TextContent(type="text", text=f"Discovered {len(urls)} URLs → {output_path} ({_suffix})")]
 
     elif args.cmd == "filter_urls":
         filter_urls_workflow(args.file, args.exclude_patterns, args.dry_run)

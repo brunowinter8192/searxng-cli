@@ -62,7 +62,7 @@ async def explore_site_workflow(url: str, max_pages: int, output: str,
         logger.info("Hit max_pages limit (%d). Run again with --max-pages %d --append to discover more.",
                     max_pages, max_pages * 2)
 
-    return urls, stats["stop_reason"], output
+    return urls, stats["stop_reason"], stats["four_two_nine_count"], output
 
 
 # FUNCTIONS

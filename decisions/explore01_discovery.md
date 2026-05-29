@@ -24,7 +24,7 @@ wait_until = "domcontentloaded"  # fixed, not configurable
    - `"max_pages_reached"` — capped; more pages likely exist → raise `--max-pages` + `--append`
    - `"429_persistent"` — WAF stopped the run; retry with `--stealth` or after cooldown
 
-**`explore_site_workflow`** wraps `discover_urls_playwright` with: `resolve_redirect()` (HEAD-based redirect resolution, kept), `--append` dedup, `print_url_samples`, `save_url_list`. Returns `(urls, stop_reason, output_path)`.
+**`explore_site_workflow`** wraps `discover_urls_playwright` with: `resolve_redirect()` (HEAD-based redirect resolution, kept), `--append` dedup, `print_url_samples`, `save_url_list`. Returns `(urls, stop_reason, four_two_nine_count, output_path)`. `cli.py` embeds both `stop_reason` and `four_two_nine_count` (when >0) in the visible `TextContent` summary printed to stdout — e.g. `Discovered 248 URLs → /tmp/... (stop_reason=frontier_exhausted)` or `(stop_reason=429_persistent, 3×429)`. Not logger-only.
 
 **Stealth toggle:** `--stealth` enables `BrowserConfig(enable_stealth=True)` + `UndetectedAdapter` + `AsyncPlaywrightCrawlerStrategy` — mirrors Phase-2 in `src/scraper/scrape_url.py`. Off by default.
 
