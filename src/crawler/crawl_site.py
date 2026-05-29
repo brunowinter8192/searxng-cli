@@ -3,12 +3,14 @@ import argparse
 import asyncio
 import logging
 import re
+import time
+from collections import deque
 from pathlib import Path
 from urllib.parse import urlparse
 
-from crawl4ai import AsyncWebCrawler, AsyncUrlSeeder, BrowserConfig, CrawlerRunConfig, CacheMode, SeedingConfig
-from crawl4ai.deep_crawling import BFSDeepCrawlStrategy
-from crawl4ai.deep_crawling.filters import FilterChain, DomainFilter, URLPatternFilter, ContentTypeFilter
+from crawl4ai import (AsyncWebCrawler, BrowserConfig, CrawlerRunConfig,
+                      CacheMode, UndetectedAdapter)
+from crawl4ai.async_crawler_strategy import AsyncPlaywrightCrawlerStrategy
 from crawl4ai.markdown_generation_strategy import DefaultMarkdownGenerator
 from crawl4ai.async_dispatcher import SemaphoreDispatcher
 
@@ -18,180 +20,185 @@ logger = logging.getLogger(__name__)
 
 PERMALINK_PATTERN = re.compile(r'\[¶\]\([^)]+\)')
 TRAILING_SLASH = re.compile(r'/$')
-DEFAULT_CONCURRENCY = 10
+DEFAULT_CONCURRENCY = 10          # parallel content crawl (crawl_urls)
+DEFAULT_DELAY_S = 3.0             # delay_before_return_html for discovery
+DEFAULT_PAGE_TIMEOUT_MS = 15000   # page_timeout per discovery page
+DEFAULT_DISCOVER_CONCURRENCY = 1  # discovery BFS concurrency (WAF-safe default)
 
 
 # ORCHESTRATOR
 async def crawl_site_workflow(url: str, output_dir: str, depth: int, max_pages: int,
                               exclude_patterns: str = None, include_patterns: str = None,
-                              no_prefetch: bool = False, strategy: str = "auto",
-                              url_file: str = None):
+                              url_file: str = None, delay_s: float = DEFAULT_DELAY_S,
+                              page_timeout_ms: int = DEFAULT_PAGE_TIMEOUT_MS,
+                              concurrency: int = DEFAULT_DISCOVER_CONCURRENCY,
+                              stealth: bool = False):
     target = Path(output_dir)
     target.mkdir(parents=True, exist_ok=True)
-
-    domain = urlparse(url).netloc
 
     if url_file:
         logger.info("Reading URLs from %s", url_file)
         urls = read_url_file(url_file)
         logger.info("Loaded %d URLs", len(urls))
-        results = await crawl_urls(urls)
-    elif strategy == "bfs":
-        logger.info("Strategy: BFS full rendering (depth=%d, max_pages=%d)", depth, max_pages)
-        results = await crawl_bfs(url, domain, depth, max_pages, exclude_patterns, include_patterns)
-    elif strategy == "sitemap":
-        logger.info("Strategy: Sitemap discovery")
-        urls = await discover_urls_sitemap(domain, include_patterns)
-        if not urls:
-            logger.info("No sitemap found. Aborting.")
-            return
-        logger.info("Sitemap: %d URLs", len(urls))
-        results = await crawl_urls(urls)
-    elif strategy == "prefetch":
-        logger.info("Strategy: Prefetch BFS (depth=%d, max_pages=%d)", depth, max_pages)
-        urls = await discover_urls(url, domain, depth, max_pages, exclude_patterns, include_patterns)
-        logger.info("Prefetch: %d URLs", len(urls))
-        results = await crawl_urls(urls)
-    elif strategy == "auto":
-        logger.debug("Auto-detection: trying sitemap...")
-        urls = await discover_urls_sitemap(domain, include_patterns)
-        if urls:
-            logger.info("Sitemap: %d URLs", len(urls))
-            results = await crawl_urls(urls)
-        else:
-            logger.debug("No sitemap. Trying prefetch BFS...")
-            urls = await discover_urls(url, domain, depth, max_pages, exclude_patterns, include_patterns)
-            if len(urls) > 1:
-                logger.info("Prefetch: %d URLs", len(urls))
-                results = await crawl_urls(urls)
-            else:
-                logger.info("SPA detected (prefetch found %d URLs). Falling back to BFS full rendering.", len(urls))
-                results = await crawl_bfs(url, domain, depth, max_pages, exclude_patterns, include_patterns)
     else:
-        logger.info("Crawling %s via BFS with full rendering (depth=%d, max_pages=%d)", url, depth, max_pages)
-        results = await crawl_bfs(url, domain, depth, max_pages, exclude_patterns, include_patterns)
+        logger.info("Discovering URLs: Playwright-per-page BFS (max_pages=%d, depth=%d, concurrency=%d)",
+                    max_pages, depth, concurrency)
+        urls, stats = await discover_urls_playwright(
+            url, include_patterns, exclude_patterns, max_pages, depth,
+            delay_s, page_timeout_ms, concurrency, stealth,
+        )
+        logger.info("Discovery: %d URLs, stop_reason=%s, 429s=%d, avg_latency=%dms",
+                    len(urls), stats["stop_reason"], stats["four_two_nine_count"],
+                    stats["avg_latency_ms"])
 
+    results = await crawl_urls(urls)
     logger.info("Crawled %d pages", len(results))
     unique = deduplicate(results)
     saved = save_markdown(unique, url, target)
-
     logger.info("Done: %d files saved to %s", saved, target)
 
 
 # FUNCTIONS
 
-# Discover URLs via sitemap (fastest strategy, no rendering needed)
-async def discover_urls_sitemap(domain: str, include_patterns: str = None) -> list[str]:
-    config = SeedingConfig(source="sitemap")
-    if include_patterns:
-        config.pattern = include_patterns.split(",")[0]
+# Strip query/fragment, @version path segments, trailing slash
+def normalize_url(url: str) -> str:
+    parsed = urlparse(url)
+    path = re.sub(r'/[^/]*@[^/]+', '', parsed.path)
+    path = path.rstrip('/')
+    return f"{parsed.scheme}://{parsed.netloc}{path}"
+
+
+# Fetch one page; return (status_code | None, internal_links, latency_ms)
+async def _fetch_page(crawler: AsyncWebCrawler, url: str,
+                      run_cfg: CrawlerRunConfig) -> tuple:
+    t0 = time.time()
     try:
-        async with AsyncUrlSeeder() as seeder:
-            results = await seeder.urls(f"https://{domain}", config=config)
-            return [r["url"] for r in results if "url" in r]
-    except Exception as e:
-        logger.warning("Sitemap discovery failed for %s: %s", domain, e)
-        return []
+        result = await crawler.arun(url=url, config=run_cfg)
+        latency_ms = int((time.time() - t0) * 1000)
+        status = result.status_code if hasattr(result, "status_code") else 200
+        links = result.links.get("internal", []) if isinstance(result.links, dict) else []
+        return status, links, latency_ms
+    except Exception as exc:
+        latency_ms = int((time.time() - t0) * 1000)
+        logger.warning("Fetch failed for %s: %s", url, exc)
+        return None, [], latency_ms
+
+
+# Playwright-per-page BFS: render each page, extract links.internal from post-JS DOM
+# Returns (found_urls, stats) where stats has stop_reason, four_two_nine_count, avg_latency_ms
+# stop_reason: "frontier_exhausted" | "max_pages_reached" | "429_persistent"
+async def discover_urls_playwright(seed: str, include_patterns: str | None,
+                                   exclude_patterns: str | None, max_pages: int,
+                                   max_depth: int, delay_s: float, page_timeout_ms: int,
+                                   concurrency: int, stealth: bool) -> tuple[list[str], dict]:
+    seed_norm = normalize_url(seed)
+    seed_netloc = urlparse(seed_norm).netloc
+
+    include_pats = [p.strip() for p in include_patterns.split(",") if p.strip()] if include_patterns else []
+    exclude_pats = [p.strip() for p in exclude_patterns.split(",") if p.strip()] if exclude_patterns else []
+
+    frontier: deque = deque()
+    visited: set[str] = {seed_norm}
+    found: list[str] = []
+    page_latencies: list[int] = []
+    four_two_nine_count = 0
+    consecutive_batches_429 = 0
+    stop_reason: str | None = None
+
+    frontier.append((seed_norm, 0))
+
+    run_cfg = CrawlerRunConfig(
+        cache_mode=CacheMode.BYPASS,
+        wait_until="domcontentloaded",
+        delay_before_return_html=delay_s,
+        page_timeout=page_timeout_ms,
+        verbose=False,
+    )
+    if stealth:
+        browser_cfg = BrowserConfig(headless=True, verbose=False, enable_stealth=True)
+        crawler_strategy = AsyncPlaywrightCrawlerStrategy(
+            browser_config=browser_cfg,
+            browser_adapter=UndetectedAdapter(),
+        )
+    else:
+        browser_cfg = BrowserConfig(headless=True, verbose=False)
+        crawler_strategy = None
+
+    kw: dict = {"config": browser_cfg}
+    if crawler_strategy:
+        kw["crawler_strategy"] = crawler_strategy
+
+    async with AsyncWebCrawler(**kw) as crawler:
+        while frontier and len(found) < max_pages and stop_reason is None:
+            batch: list[tuple[str, int]] = []
+            while frontier and len(batch) < concurrency:
+                url, depth = frontier.popleft()
+                if depth <= max_depth:
+                    batch.append((url, depth))
+            if not batch:
+                continue
+
+            tasks = [_fetch_page(crawler, url, run_cfg) for url, _ in batch]
+            results = await asyncio.gather(*tasks)
+
+            # 429 batch accounting — back off once, stop on second consecutive batch
+            batch_429 = sum(1 for status, _, _ in results if status == 429)
+            if batch_429 > 0:
+                four_two_nine_count += batch_429
+                consecutive_batches_429 += 1
+                urls_429 = [u for (u, _), (s, _, _) in zip(batch, results) if s == 429]
+                logger.warning("429 on: %s", urls_429)
+                if consecutive_batches_429 == 1:
+                    logger.warning("Backing off 5s (first 429 batch)...")
+                    await asyncio.sleep(5)
+                else:
+                    logger.warning("429 persists — stopping BFS.")
+                    stop_reason = "429_persistent"
+            else:
+                consecutive_batches_429 = 0
+
+            for (url, depth), (status, links, latency_ms) in zip(batch, results):
+                page_latencies.append(latency_ms)
+                if status == 429:
+                    continue
+                if status is not None and status >= 400:
+                    logger.debug("HTTP %d on %s", status, url)
+                    continue
+                found.append(url)
+                logger.debug("[%3d] %s (%dms)", len(found), url, latency_ms)
+                if depth >= max_depth:
+                    continue
+                for lk in links:
+                    href = lk.get("href", "") if isinstance(lk, dict) else str(lk)
+                    if not href.startswith("http"):
+                        continue
+                    norm = normalize_url(href)
+                    if urlparse(norm).netloc != seed_netloc:
+                        continue
+                    if include_pats and not any(p in norm for p in include_pats):
+                        continue
+                    if exclude_pats and any(p in norm for p in exclude_pats):
+                        continue
+                    if norm not in visited:
+                        visited.add(norm)
+                        frontier.append((norm, depth + 1))
+
+    if stop_reason is None:
+        stop_reason = "frontier_exhausted" if not frontier else "max_pages_reached"
+
+    stats = {
+        "pages_fetched": len(page_latencies),
+        "four_two_nine_count": four_two_nine_count,
+        "stop_reason": stop_reason,
+        "avg_latency_ms": int(sum(page_latencies) / len(page_latencies)) if page_latencies else 0,
+    }
+    return found, stats
 
 
 # Read URL list from text file (one URL per line)
 def read_url_file(path: str) -> list[str]:
     with open(path, "r", encoding="utf-8") as f:
         return [line.strip() for line in f if line.strip()]
-
-
-# Phase 1: Fast URL discovery via prefetch BFS
-async def discover_urls(url: str, domain: str, depth: int, max_pages: int,
-                        exclude_patterns: str = None, include_patterns: str = None) -> list[str]:
-    try:
-        import requests as _req
-        resp = _req.head(url, allow_redirects=True, timeout=10)
-        final_domain = urlparse(resp.url).netloc
-        if final_domain != domain:
-            domain = final_domain
-            url = resp.url
-    except Exception as e:
-        logger.warning("Redirect resolution failed for %s: %s", url, e)
-
-    filters = [
-        DomainFilter(allowed_domains=[domain]),
-        ContentTypeFilter(allowed_types=["text/html"]),
-    ]
-    if exclude_patterns:
-        filters.append(URLPatternFilter(patterns=exclude_patterns.split(","), reverse=True))
-    if include_patterns:
-        filters.append(URLPatternFilter(patterns=include_patterns.split(","), reverse=False))
-    filter_chain = FilterChain(filters)
-
-    strategy = BFSDeepCrawlStrategy(
-        max_depth=depth,
-        include_external=False,
-        filter_chain=filter_chain,
-        max_pages=max_pages
-    )
-
-    browser_config = BrowserConfig(headless=True, verbose=False)
-    run_config = CrawlerRunConfig(
-        deep_crawl_strategy=strategy,
-        cache_mode=CacheMode.BYPASS,
-        wait_until="domcontentloaded",
-        prefetch=True,
-        verbose=False,
-    )
-
-    async with AsyncWebCrawler(config=browser_config) as crawler:
-        results = await crawler.arun(url=url, config=run_config)
-
-    if not isinstance(results, list):
-        results = [results]
-
-    seen = set()
-    urls = []
-    for r in results:
-        normalized = TRAILING_SLASH.sub('', r.url) if hasattr(r, 'url') and r.url else None
-        if normalized and normalized not in seen:
-            seen.add(normalized)
-            urls.append(normalized)
-
-    return urls
-
-
-# BFS crawl with full rendering (for JS-heavy/SPA sites)
-async def crawl_bfs(url: str, domain: str, depth: int, max_pages: int,
-                    exclude_patterns: str = None, include_patterns: str = None) -> list:
-    filters = [
-        DomainFilter(allowed_domains=[domain]),
-        ContentTypeFilter(allowed_types=["text/html"]),
-    ]
-    if exclude_patterns:
-        filters.append(URLPatternFilter(patterns=exclude_patterns.split(","), reverse=True))
-    if include_patterns:
-        filters.append(URLPatternFilter(patterns=include_patterns.split(","), reverse=False))
-    filter_chain = FilterChain(filters)
-
-    strategy = BFSDeepCrawlStrategy(
-        max_depth=depth,
-        include_external=False,
-        filter_chain=filter_chain,
-        max_pages=max_pages
-    )
-
-    browser_config = BrowserConfig(headless=True, verbose=False)
-    run_config = CrawlerRunConfig(
-        deep_crawl_strategy=strategy,
-        cache_mode=CacheMode.BYPASS,
-        wait_until="networkidle",
-        markdown_generator=DefaultMarkdownGenerator(),
-        verbose=False,
-    )
-
-    async with AsyncWebCrawler(config=browser_config) as crawler:
-        results = await crawler.arun(url=url, config=run_config)
-
-    if not isinstance(results, list):
-        results = [results]
-
-    return results
 
 
 # Phase 2: Parallel crawl of discovered URLs
@@ -291,21 +298,28 @@ if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="Crawl a website and save as Markdown")
     parser.add_argument("--url", required=True, help="Seed URL to crawl")
     parser.add_argument("--output-dir", required=True, help="Directory to save markdown files")
-    parser.add_argument("--depth", type=int, default=3, help="Max crawl depth")
-    parser.add_argument("--max-pages", type=int, default=100, help="Max pages to crawl")
+    parser.add_argument("--depth", type=int, default=3, help="Max crawl depth (default: 3)")
+    parser.add_argument("--max-pages", type=int, default=100, help="Max pages to crawl (default: 100)")
     parser.add_argument("--exclude-patterns", type=str, default=None,
-                        help="Comma-separated URL patterns to exclude (e.g. '/genindex*,/search*')")
+                        help="Comma-separated URL substrings to exclude (e.g. '/genindex,/search')")
     parser.add_argument("--include-patterns", type=str, default=None,
-                        help="Comma-separated URL patterns to include (e.g. '/docs/*,/api/*')")
-    parser.add_argument("--no-prefetch", action="store_true",
-                        help="Use serial BFS with full rendering (for JS-heavy/SPA sites where prefetch finds no links)")
-    parser.add_argument("--strategy", choices=["auto", "sitemap", "prefetch", "bfs"], default="auto",
-                        help="Force discovery strategy: auto (cascade: sitemap->prefetch->bfs), sitemap, prefetch, bfs")
+                        help="Comma-separated URL substrings to include (e.g. '/docs/,/api/')")
     parser.add_argument("--url-file", type=str, default=None,
                         help="Path to text file with URLs (one per line) — skips discovery entirely")
+    parser.add_argument("--delay", type=float, default=DEFAULT_DELAY_S,
+                        help=f"Render delay in seconds after domcontentloaded (default: {DEFAULT_DELAY_S})")
+    parser.add_argument("--page-timeout", type=int, default=DEFAULT_PAGE_TIMEOUT_MS,
+                        help=f"Page load timeout in ms (default: {DEFAULT_PAGE_TIMEOUT_MS})")
+    parser.add_argument("--concurrency", type=int, default=DEFAULT_DISCOVER_CONCURRENCY,
+                        help=f"Concurrent discovery requests (default: {DEFAULT_DISCOVER_CONCURRENCY}; "
+                             f">1 risks Cloudflare WAF 429, max recommended: 10)")
+    parser.add_argument("--stealth", action="store_true",
+                        help="Enable stealth mode (enable_stealth + UndetectedAdapter) to reduce 429s")
     args = parser.parse_args()
 
     logging.basicConfig(level=logging.INFO, format="%(message)s")
-    asyncio.run(crawl_site_workflow(args.url, args.output_dir, args.depth, args.max_pages,
-                                    args.exclude_patterns, args.include_patterns, args.no_prefetch,
-                                    args.strategy, args.url_file))
+    asyncio.run(crawl_site_workflow(
+        args.url, args.output_dir, args.depth, args.max_pages,
+        args.exclude_patterns, args.include_patterns, args.url_file,
+        args.delay, args.page_timeout, args.concurrency, args.stealth,
+    ))
