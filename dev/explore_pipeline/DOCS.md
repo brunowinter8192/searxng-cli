@@ -43,6 +43,30 @@ python dev/explore_pipeline/03_strategies.py --depth 3
 
 Default test URL: docs.crawl4ai.com. Report includes results table, speedup calculation, and depth distribution per strategy.
 
+## 04_render_recall.py
+
+**Purpose:** Measures URL discovery recall on docs.github.com/de/rest against a 305-URL gold standard. Compares three BFS strategies (prefetch+dCL baseline, prefetch+NI, full-render NI) to isolate the effect of JS rendering on discovered URL count.
+**Output:** `04_reports/docs_github_rest_<YYYYMMDD>.md`
+**Gold standard:** `goldstandard/docs_github_rest.txt` (305 URLs from github/docs content/rest repo tree)
+
+```bash
+# Full run — all 3 strategies + regression (rate-limit warning: A/B prefetch=True blocked by GitHub WAF)
+./venv/bin/python dev/explore_pipeline/04_render_recall.py
+
+# Strategy C only (most resilient to rate limiting)
+./venv/bin/python dev/explore_pipeline/04_render_recall.py --strategies C_bfs_networkidle --no-regression
+
+# All strategies with delay between to avoid rate limiting
+./venv/bin/python dev/explore_pipeline/04_render_recall.py --delay 600
+
+# Custom gold / depth
+./venv/bin/python dev/explore_pipeline/04_render_recall.py --gold dev/explore_pipeline/goldstandard/docs_github_rest.txt --max-pages 600 --depth 10
+```
+
+CLI flags: `--gold PATH`, `--max-pages INT`, `--depth INT`, `--no-regression`, `--strategies COMMA_LIST`, `--delay INT`
+
+Key finding from Phase A run (2026-05-29): `BFSDeepCrawlStrategy` uses HTTP for link extraction regardless of `wait_until` — changing to `networkidle` has no effect on recall. Strategy C (prefetch=False) found 205/305 = 67.2% recall. See `decisions/OldThemes/crawler_js_render_discovery/A_recall_probe.md`.
+
 ## Report Formats
 
 **01_reports:** JSON with summary (total fetched, unique URLs, duplicates, content/empty counts, total chars) and URL list with per-URL content status and character counts. Reports are consumed by `dev/scrape_pipeline/filter_eval/06_content_source.py`.
