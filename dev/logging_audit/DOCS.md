@@ -20,7 +20,7 @@ Production code fix: `cli.py` logging config + call-site relevel. See `decisions
 - `src/search/engines/*.py`: all "Engine empty" calls used `logger.warning()` — misclassified. `query_log.jsonl` already holds per-engine `{status, drop_reason}` records via `query_logger.py`, making the text warning redundant.
 - `src/search/engines/stack_exchange.py`: `STACK_EXCHANGE_API_KEY not set` was WARNING — correctly reclassified to INFO (config state, not a problem).
 - `cli.py`: no `logging.basicConfig()` call → Python's `lastResort` handler at WARNING threshold → stderr emission.
-- `src/crawler/crawl_site.py:305`, `src/crawler/explore_site.py:167`: both have own `logging.basicConfig()` inside `if __name__ == "__main__"` guards — only fires in standalone mode, not via `cli.py`.
+- `src/crawler/crawl_site.py:305`: has own `logging.basicConfig()` inside `if __name__ == "__main__"` guard — only fires in standalone mode, not via `cli.py`.
 
 ### Scripts
 

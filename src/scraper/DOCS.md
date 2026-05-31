@@ -1,6 +1,6 @@
 # Scraper Module
 
-URL scraping and site exploration tools powered by Crawl4AI for SearXNG MCP server.
+URL scraping and PDF download tools powered by Crawl4AI for SearXNG MCP server.
 
 ## scrape_logger.py
 
@@ -8,7 +8,7 @@ URL scraping and site exploration tools powered by Crawl4AI for SearXNG MCP serv
 **Public interface:** `log_scrape(record: dict)`, `write_sidecar(url, ts, content, outcome, mode) -> str | None`.
 **Reads:** `SEARXNG_SCRAPE_LOG_PATH` env var (fallback `src/logs/scrape_log.jsonl`). Sidecar dir = `<log_dir>/scrape_content/`.
 **Writes:** `src/logs/scrape_log.jsonl` (one line per call), `<log_dir>/scrape_content/<ts>_<slug>.md` (per-call content sidecar). Both gitignored.
-**Called by:** `scrape_url.py` (end of `scrape_url_workflow`), `scrape_url_raw.py` (end of `scrape_url_raw_workflow`).
+**Called by:** `scrape_url.py` (end of `scrape_url_workflow`).
 **Calls out:** `src/log_janitor.py` (`maybe_prune_jsonl`, `maybe_prune_sidecars`).
 
 ## scrape_url.py
@@ -33,7 +33,7 @@ On empty result, returns error message.
 
 HTTP probe for server-side markdown availability (Phase 0). Sends `Accept: text/markdown, text/html` via `httpx.AsyncClient` with `follow_redirects=True` and `MD_FASTPATH_TIMEOUT` (5.0s). Returns `(content, status_code, content_type, miss_reason)` 4-tuple. On hit: `(body, 200, ct, None)`. On miss: `(None, status_code_or_None, ct_or_None, reason)` where reason ∈ `{"http_error", "wrong_content_type", "sub_threshold", "network_error"}`. Hit conditions: HTTP 200 + `text/markdown` content-type + body ≥ `MD_FASTPATH_MIN_BYTES` (200 bytes). Logs at info-level on hit; debug-level on miss/error. Imported by `scrape_url_raw.py` for reuse.
 
-The 200-byte threshold guards against redirect-stub responses (anomaly observed at docs.anthropic.com returning 12 bytes during the 2026-05-07 adoption probe). The 5s timeout is generous enough for cold-edge CDN routing while still being tighter than the typical Crawl4AI browser-launch path, so the probe never delays the fallback meaningfully.
+The 200-byte threshold guards against redirect-stub responses (anomaly observed at docs.anthropic.com returning 12 bytes during the 2026-05-07 adoption probe). The 5s timeout is generous enough for cold-edge CDN routing while still being tighter than the typical Crawl4AI browser-launch path, so the probe never delays the fallback meaningfully. Not imported by any other module — used only within `scrape_url_workflow`.
 
 ### try_scrape()
 
@@ -52,7 +52,7 @@ Returns `str | None` — garbage type identifier or None if content is valid. De
 
 `_GARBAGE_MESSAGES` dict maps each type to a human-readable error message for the caller. `try_scrape()` logs garbage type on every detection.
 
-Called by both `try_scrape()` and `try_scrape_raw()` after content extraction.
+Called by `try_scrape()` after content extraction, and by `src.crawler.crawl_site.save_markdown` for batch crawl garbage filtering.
 
 ### strip_consent_prefix()
 
@@ -80,12 +80,6 @@ Stub — always returns `""`. Domain blocking removed; no plugin-routing hint is
 - `CONSENT_WORDS` — keyword list for consent density scoring: cookie, consent, einwilligung, tracking, akzeptieren, datenschutz, zweck
 - `CONSENT_DENSITY_THRESHOLD` — 5. Sum of CONSENT_WORDS occurrences in first 3000 chars must exceed this to trigger stripping.
 - `CONSENT_SKIP_OFFSET` — 300 chars. Heading search starts at this offset to skip banner fragments before the actual content starts.
-
-## scrape_url_raw.py
-
-**Purpose:** Raw markdown scraping orchestrator for RAG indexing. Same two-phase browser strategy as `scrape_url.py` (normal → stealth fallback) but uses `DefaultMarkdownGenerator()` without PruningContentFilter and saves `raw_markdown` output to a .md file with `<!-- source: URL -->` header. Generates safe filename from URL (domain + path, max 120 chars).
-**Input:** URL string and output directory path.
-**Output:** TextContent with file path and char count on success, or error message on failure (Cloudflare-specific message when CF-protected). Side effect: writes one JSONL record to `scrape_log.jsonl` + one sidecar `.md` via `scrape_logger`. Sidecar content = same raw markdown saved to `output_dir`. Raw-mode fields `fallback_to_raw`, `truncated`, `consent_stripped` are null (not applicable).
 
 ## pdf_chain.py
 
@@ -118,7 +112,7 @@ Stub — always returns `""`. Domain blocking removed; no plugin-routing hint is
 
 ## download_pdf.py
 
-**Purpose:** PDF file download. Uses `requests.get()` with streaming. Chain-resolves the URL via `pdf_chain.py` before downloading: BLACKLIST check → GitHub blob check → TIER1 transform → DIRECT `.pdf` path → MULTI_STEP `citation_pdf_url` two-hop. Also called automatically by `cli.py` when `scrape_url` or `scrape_url_raw` detects a TIER1 domain or direct `.pdf` URL (`should_download_as_pdf()`).
+**Purpose:** PDF file download. Uses `requests.get()` with streaming. Chain-resolves the URL via `pdf_chain.py` before downloading: BLACKLIST check → GitHub blob check → TIER1 transform → DIRECT `.pdf` path → MULTI_STEP `citation_pdf_url` two-hop. Also called automatically by `cli.py` when `scrape_url` detects a TIER1 domain or direct `.pdf` URL (`should_download_as_pdf()`).
 **Input:** URL string and optional output directory (default `~/Downloads/`).
 **Output:** TextContent with file path and human-readable file size on success, or error message on failure (blocked domain, GitHub blob, no PDF path, HTTP error). Side effect: writes one JSONL record to `download_log.jsonl` via `download_logger` at every return path.
 
@@ -128,9 +122,8 @@ Content extraction is delegated entirely to Crawl4AI (v0.8.0):
 - **Browser strategy:** Normal browser first, Stealth (Level 3) as fallback. UndetectedAdapter breaks some sites (Wikipedia) by patching the browser too aggressively.
 - **Cookie removal:** CSS selector exclusion via `excluded_selector`. Specific selectors per framework (CookieYes, OneTrust, Cookiebot, GDPR etc.). `remove_overlay_elements` is NOT used — it removes legitimate content on some sites.
 - **Content filtering:** PruningContentFilter(0.48) + fit_markdown for relevance assessment. raw_markdown fallback when filtered content < 200 chars (table-heavy pages).
-- **Markdown generation:** Three modes:
-  - **scrape_url (MCP tool):** PruningContentFilter + fit_markdown — noise-filtered, for in-conversation reading
-  - **scrape_url_raw (MCP tool):** DefaultMarkdownGenerator + raw_markdown — full fidelity, saves to file for RAG indexing
-  - **crawl_site (export script):** DefaultMarkdownGenerator + raw_markdown — full fidelity, batch crawl, noise handled by downstream RAG cleanup agent
+- **Markdown generation:** Two modes:
+  - **scrape_url (CLI tool):** PruningContentFilter + fit_markdown — noise-filtered, for in-conversation reading
+  - **crawl_site (pipe script):** DefaultMarkdownGenerator + raw_markdown — full fidelity, batch crawl, noise handled by downstream RAG cleanup agent
 - **Known issue:** Crawl4AI captures stdout — always write debug output to files, not print()
 - **Cookie-Wall debugging:** Inject JS to enumerate `[class*='cky']` elements and check textLen per element. The largest container is usually the unmissed consent dialog. Add its class to COOKIE_CONSENT_SELECTOR.

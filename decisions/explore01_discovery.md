@@ -2,7 +2,7 @@
 
 ## Status Quo (IST)
 
-**Code:** `src/crawler/explore_site.py` (URL discovery, CLI entry point); `src/crawler/crawl_site.py` (BFS engine + content crawl functions called by explore_site); `src/crawler/filter_urls.py` (shared `match_any()` helper + `filter_urls_workflow` CLI tool)
+**Code:** `src/crawler/crawl_site.py` — `discover_urls_playwright()` (BFS engine) + `crawl_site_workflow()` (CLI entry point + content crawl). `explore_site.py` and `filter_urls.py` were removed; `discover_urls_playwright` is now an internal function of `crawl_site.py` only, not exposed as a CLI tool.
 
 **Method:** Single discovery method — `discover_urls_playwright()` in `crawl_site.py`. Manual BFS: `crawler.arun()` per frontier URL in a real Playwright browser; links extracted from `result.links.internal` (post-JS rendered DOM). No sitemap cascade, no prefetch BFS, no `BFSDeepCrawlStrategy`.
 
@@ -21,16 +21,12 @@ wait_until = "domcontentloaded"  # fixed, not configurable
 4. **429 policy:** if a batch returns 429 → back off 5s (once); if second consecutive batch also 429 → stop, set `stop_reason="429_persistent"`. No retry loops.
 5. **Stop reason** (D7 saturation signal) on exit:
    - `"frontier_exhausted"` — ran out of reachable links before hitting max_pages
-   - `"max_pages_reached"` — capped; more pages likely exist → raise `--max-pages` + `--append`
+   - `"max_pages_reached"` — capped; more pages likely exist → raise `--max-pages`
    - `"429_persistent"` — WAF stopped the run; retry with `--stealth` or after cooldown
-
-**`explore_site_workflow`** wraps `discover_urls_playwright` with: `resolve_redirect()` (HEAD-based redirect resolution, kept), `--append` dedup, `print_url_samples`, `save_url_list`. Returns `(urls, stop_reason, four_two_nine_count, output_path)`. `cli.py` embeds both `stop_reason` and `four_two_nine_count` (when >0) in the visible `TextContent` summary printed to stdout — e.g. `Discovered 248 URLs → /tmp/... (stop_reason=frontier_exhausted)` or `(stop_reason=429_persistent, 3×429)`. Not logger-only.
 
 **Stealth toggle:** `--stealth` enables `BrowserConfig(enable_stealth=True)` + `UndetectedAdapter` + `AsyncPlaywrightCrawlerStrategy` — mirrors Phase-2 in `src/scraper/scrape_url.py`. Off by default.
 
-**Post-hoc filter (`filter_urls_workflow` in `filter_urls.py`):** unchanged. `match_any(url, patterns_str)` (fnmatch) remains the shared glob-match helper for `filter_urls` CLI use.
-
-**Skill integration:** For permanent capture, URL discovery is governed by the `capture-and-index` skill Phase 0 (worker-side guideline: `__NEXT_DATA__`-first → sitemap if usable → Playwright BFS fallback; worker writes /tmp scripts situationally). `explore_site` / `discover_urls_playwright()` is used only for ad-hoc discovery via `searxng-cli explore_site` (legacy/ad-hoc).
+**Skill integration:** URL discovery is governed by the `capture-and-index` skill Phase 0 (worker-side guideline: `__NEXT_DATA__`-first → sitemap if usable → Playwright BFS fallback; worker writes /tmp scripts situationally). `discover_urls_playwright()` in `crawl_site.py` serves as the BFS implementation backing that fallback path.
 
 ## Evidenz
 
