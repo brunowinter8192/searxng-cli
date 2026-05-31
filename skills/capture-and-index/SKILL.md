@@ -1,35 +1,30 @@
 ---
 name: capture-and-index
-description: Worker-side skill — discover URLs agentic (no pinned script, worker writes /tmp probes), scrape raw/maximal, drop non-indexable pages, clean, and index into RAG. Modes: web-md (Discovery→Scrape→Drop→Cleanup→Index), pdf (Acquisition→Cleanup→Index).
+description: Worker-side skill — discover URLs agentic (worker writes /tmp scripts), select which to scrape, scrape raw/maximal, clean (incl. post-scrape noise drop), and index into RAG. Modes: web-md (Discovery→Select→Scrape→Cleanup→Index), pdf (Acquisition→Cleanup→Index).
 ---
 
 # Capture-and-Index — Skill
 
-Activated by a worker. Opus provides: SEED_URL (for web-md), or INPUT path (for pdf), plus COLLECTION and OUTPUT_DIR. The worker drives discovery and scraping; Opus only provides the seed and confirms the collection name.
-
-Target collection is named by the user at the start of the task. Default suggestion: `<current_project>_reference`, but may be another project's reference collection. Never pick the name autonomously.
-
 ---
 
-### Mode 1: Web-MD Capture (discovery → scrape → drop → clean → index)
+### Mode 1: Web-MD Capture (discovery → select → scrape → clean → index)
 
-Input: SEED_URL (root domain URL) + COLLECTION + OUTPUT_DIR.
-
-Pipeline: Discovery → Scrape (raw) → Drop Assessment → Cleanup → Index.
+Pipeline: Discovery → URL Selection (pre-scrape) → Scrape (raw) → Cleanup (incl. post-scrape drop) → Index.
 
 #### Phase 0 — Discovery
 
 Deliverable: `/tmp/<domain>_discovered_urls.txt` — one URL per line, maximum coverage of the target domain/section.
 
-The worker writes situational /tmp scripts for this phase — no pinned reference script. Choose the path based on structural signals from the seed page.
+Write your discovery scripts to `/tmp` — no pinned reference script. Choose the path below based on structural signals from the seed page. **Any errors during discovery (HTTP failures, 429s, blocked fetches) MUST be recorded for the Completion Report** — they distinguish complete coverage from coverage the site blocked.
 
 ##### Step 0 — Structural Signals (always, ~30s)
 
 Fetch the seed page HTML (plain HTTP, no browser). Check:
 
-- `robots.txt` — any relevant disallow rules?
 - `/sitemap.xml` and `/sitemaps/sitemap-0.xml` — does one exist?
 - `<script id="__NEXT_DATA__">` in the raw HTML — signals Next.js SSR (see Path A).
+
+`robots.txt` is NOT consulted — we capture every URL that matters to us regardless of disallow rules.
 
 ##### Path A — `__NEXT_DATA__` Extraction (Next.js SSR sites, preferred)
 
@@ -80,41 +75,37 @@ concurrency = 1                  # WAF-safe default
 
 Write discovered URLs to `/tmp/<domain>_discovered_urls.txt`.
 
-#### Phase 1 — Scrape
+#### Phase 1 — URL Selection (pre-scrape)
 
-Scrape every URL in the discovered set **raw and maximal** — no PruningContentFilter, no content truncation. Lost content is unrecoverable downstream; the drop and cleanup phases strip chrome after the fact.
+The cull happens on the URL LIST, before any scraping — not by reading scraped `.md` files. Inspect `/tmp/<domain>_discovered_urls.txt`, decide which URLs are obvious noise (e.g. changelog/archive/legal/asset paths, known-dead sections), and write a `/tmp` script that rewrites the list so only the URLs worth scraping remain.
+
+Record which patterns were dropped and why — this goes into the Completion Report (`URLs dropped (pre-scrape, pattern): K — patterns + why`).
+
+Do NOT read page content here; that is impossible pre-scrape. This step is purely list-level pattern selection.
+
+#### Phase 2 — Scrape
+
+Scrape every URL in the filtered list **raw and maximal** — no content filter, no truncation. Cleanup strips chrome after the fact, but content not captured here is gone for good.
 
 ```bash
 mkdir -p $OUTPUT_DIR
 ```
 
-**Note: the exact src/ pipe-scraper invocation is TBD (separate later task).** When that task lands, the concrete command replaces this placeholder. Invoke the scraper on the URL list with raw/maximal config — no filter arguments.
+Run the pipe-scraper on the filtered list (plugin-relative invocation — not a system path):
 
-Report: `N URLs scraped, M succeeded, K failed`. List failed URLs.
+```bash
+./venv/bin/python -m src.crawler.pipe_scraper \
+    --url-file /tmp/<domain>_discovered_urls.txt \
+    --output-dir $OUTPUT_DIR
+```
+
+> The exact pipe-scraper module/flags are finalized when the `src/` port lands (after the scraper eval). It renders in a browser, captures raw markdown (no PruningContentFilter), enforces a hard per-URL timeout with WAF-safe pacing, and tracks total scrape duration.
+
+The scraper's own output is short: a console line with **success count, error count, and total duration**, plus a full per-URL report written to `/tmp/<domain>_scrape_report.md` (per-URL status + outcome). It does NOT dump a per-URL list to the console — failures live in the report md and can be inspected there if needed.
+
+Take from that console line for the Completion Report: scraped N, errors K, **duration T**. The error breakdown (429 / timeout / http_error) is already itemized in the scrape report md.
 
 If `>50%` failed → STOP, report to Opus, do not proceed.
-
-#### Phase 2 — Drop Assessment
-
-After scraping, read each `.md` file and decide per-URL whether to keep or drop. Drop criteria are content-based — not pattern-based.
-
-Drop a file when it is:
-- Empty or near-empty (< 5 meaningful lines of prose)
-- Redirect-only (page body is just "redirecting to X")
-- Pure navigation page (only link lists, no prose)
-- Duplicate of another already-kept file (identical or near-identical body)
-
-Keep everything else — including thin pages, deprecated pages, and pages with only partial content.
-
-Report:
-```
-Drop Assessment: N kept, K dropped
-  empty/redirect: X
-  nav-only:       Y
-  duplicate:      Z
-```
-
-Proceed with cleanup on the kept set only.
 
 #### Phase 3 — Cleanup
 
@@ -123,6 +114,14 @@ Diagnose first. Don't write cleanup regex before classifying shape.
 ##### Diagnose Pass
 
 Build a small script that scans ALL `.md` files in OUTPUT_DIR, extracts per-file fingerprints (h1 count, h2 count, prose density, table presence, source domain from `<!-- source: URL -->` comment, total LOC). Cluster by fingerprint similarity to identify 4-5 shape groups. ~50 LOC, ~5s runtime.
+
+##### Post-Scrape Drop — thin successful pages (part of the diagnose pass)
+
+Scrape gaps (429 / timeout / http_error) are already reported by the scraper — they never produced a usable `.md`. The only thing to analyse here are the **successful but very small** `.md` files (HTTP 200, tiny byte size): pages that scraped fine but genuinely carry little or no real content (stub, redirect landing, pure nav).
+
+Delete those — they are thin/noise. Record the count for the Completion Report. There is no per-file content re-read of every page; only the small successful ones get this look.
+
+The two numbers stay separate in the report: scrape errors come from the scraper, thin/noise comes from this check. Together they tell us whether a dropped URL was a scraper problem or just an empty page.
 
 ##### The Five Shapes
 
@@ -174,6 +173,7 @@ For each detected shape, write ONE small script in `/tmp/clean_<shape>_<COLLECTI
 - Use `Path(__file__).parent` — NEVER hardcode absolute paths like `/Users/...`
 - Preserve `<!-- source: URL -->` comments in every file (they are crawl metadata)
 - Overwrite originals in-place
+- After cleaning, spot-check 2-3 files — strip% can lie; eyeballing catches over-strip
 
 ##### Edge Cases
 
@@ -322,168 +322,47 @@ Stop when:
 
 ### Index — Final Phase (both modes)
 
-#### CRITICAL: index-dir is incremental by default, NOT a full reindex
-
-`workflow.py index-dir --input <dir> --collection <coll>` uses hash-based skip-logic:
-
-- **skipped**: hash unchanged → no work
-- **adopted**: complete chunk set in DB but no hash entry → register hash, no re-embed
-- **to_index**: missing / partial / hash-changed → chunk + embed + insert
-
-Adding new files to an existing collection's directory + running index-dir = adds ONLY the new files. The existing chunks are NOT touched, NOT re-embedded, NOT deleted. Only `--force` bypasses the skip-logic (full reindex).
-
-This means: NEVER worry about "re-indexing the existing 800 chunks". The default IS additive.
-
-Identical for both modes. Run as background job with `PYTHONUNBUFFERED=1` so the worker stays responsive (foreground would block on the long-running embed phase) and the log fills line-by-line for post-mortem if needed.
-
-#### Skip-Logik (since 2026-05-08)
-
-`workflow.py index-dir` is **skip-by-default**. Per file the SHA256 of the content is compared against the `indexed_files` tracking table:
-
-- **skipped** — hash matches an existing entry → no work, no GPU touch
-- **adopted** — file not in `indexed_files`, but a complete chunk set exists in `documents` (COUNT == MAX(total_chunks)) → register hash without re-embed (one-time bootstrap for collections that pre-date hash tracking)
-- **indexed** — missing, partial, or hash-changed → chunk + embed + insert + register hash
-
-Concretely: re-running `index-dir` on a directory where 14 of 168 files are new now indexes the 14, registers hashes for the 154 unchanged ones, and exits in seconds — not the previous full re-embed of all 168.
-
-GPU servers are only started when there is real work to embed.
-
-#### Pre-run: detect partial chunks from prior killed runs
-
-A killed run can still leave partial chunks (e.g. abort happened mid-document insert). The skip-logic does NOT catch this case — partial documents are detected via the `total_chunks` mismatch, but the hash entry was never written for the killed file, so on re-run it lands in the **indexed** bucket and gets cleanly re-done. So the only scenario that needs manual intervention is a partial document whose hash was somehow already registered.
-
-Check first:
-
-```bash
-rag-cli progress "$COLLECTION"
-```
-
-Any document showing `done < total` was interrupted mid-write. If you see one AND its hash is in `indexed_files`, delete the partial chunks so the re-run treats it as missing:
-
-```bash
-rag-cli delete --collection "$COLLECTION" --document "<doc>.md"
-```
-
-Don't pass `--remove-source` — the `.md` is fine, only the partial DB rows need to go. The next `index-dir` will treat the file as missing and re-index from scratch.
-
-#### Run indexing
-
-For multiple files (typical case — directory with N new + M existing):
+One script call. `index-dir` is incremental (hash-based skip) — re-running only embeds new/changed files; existing chunks are never touched or re-embedded.
 
 ```bash
 cd ~/Documents/ai/Meta/ClaudeCode/MCP/RAG && \
 PYTHONUNBUFFERED=1 ./venv/bin/python workflow.py index-dir \
     --input "$OUTPUT_DIR" --collection "$COLLECTION" \
     > /tmp/${COLLECTION}_index.log 2>&1 &
-```
-
-Skip-logic handles "only re-index new/changed files" automatically.
-
-For an explicit single-file workflow (e.g. recovery of one specific document, or scripted per-file loops):
-
-```bash
-./venv/bin/python workflow.py index-file \
-    --input "$OUTPUT_DIR/specific_paper.md" --collection "$COLLECTION"
-```
-
-`--force` is available on both subcommands and bypasses the skip — use only when the embedding model or chunker config changed and the entire collection genuinely needs re-embedding. Routine indexing should never need `--force`.
-
-#### Wait for indexing to finish — match timer duration to expected wallclock
-
-**Lock awareness**: The indexer holds a global RAG lock for its full duration (written to `~/.rag-locks/rag.lock`). Any `rag-cli` command other than `status` will fail with "rag busy" while the lock is held. **Do NOT call `rag-cli progress` while the indexer is running** — it would hit a DB query blocked by indexer DDL/write locks and hang (this was the root cause of the zombie-process bug). Use `rag-cli status` instead to check mid-run progress — it reads the lockfile directly, no DB query.
-
-Indexing takes 30–90 minutes for typical book-sized collections. The default polling pattern `sleep 60 && rag-cli progress` is the single most expensive anti-pattern in worker orchestration: each `Bash(run_in_background=true)` completion arriving while an API stream is open fires a new REQ, cancels the in-flight stream client-side, and gets billed input + cache-read. A 60-minute index with 60s polls = ~60 cascade events. **Never** set a short timer for a long-running job.
-
-Two correct patterns, depending on whether anything follows the indexer:
-
-**A) Indexing is the last work step before the completion checklist** — wait passively. ONE backgrounded bash fires ONE completion when the indexer is gone:
-
-```bash
-# Run as Bash(run_in_background=true)
 ( while pgrep -f 'workflow.py index-dir' > /dev/null 2>&1; do sleep 30; done; echo INDEXING_DONE ) &
 wait
 ```
 
-The `sleep 30` *inside* the loop is normal blocking sleep — it does NOT trigger CC tool-completion events. CC sees ONE backgrounded call, ONE completion at the very end. Zero cascade.
-
-**B) More steps follow after the indexer** — set ONE timer that approximates the expected remaining wallclock. **The timer duration must match the work, not a default like 60–120s.** For a 29-minute remaining run, set the timer to ~25 minutes. ONE completion fires, then check `rag-cli status` (lock free = done; still held = still running + shows progress). If more time needed, set another sized-to-remaining timer. Never fire 14 short timers for a single long run.
-
-If the user asks "how far?" at any moment, do ONE manual `rag-cli status` in foreground — shows document progress from the lockfile with no DB query. The anti-pattern is *automated repeated short polling*, not a single user-triggered status read.
-
-After indexing completes (lock released, `rag-cli status` shows FREE), run the post-checks:
-
-```bash
-rag-cli progress "$COLLECTION"          # all docs must show done == total (safe: lock is free)
-tail -30 /tmp/${COLLECTION}_index.log    # confirm "Done: N files indexed (X chunks), Y skipped, Z adopted"
-```
-
-**Output shape of `rag-cli progress`:**
+The script prints per file `Indexed <doc> -> N chunks` and a final summary line:
 
 ```
-Indexing Progress: <COLLECTION>
-
-  Document                  Done / Total       %  Status
-  doc_a.md                   579 / 579    100.0%  done
-  doc_b.md                  1248 / 1390    89.8%  in-progress
-  doc_c.md                     0 / 0        0.0%  ...   (not yet started — won't appear)
+Done: N files indexed (X chunks), Y skipped, Z adopted
 ```
 
-A document is currently being indexed when its row shows `done < total`. Documents not yet started don't appear in the table at all. Documents with `done == total` are committed.
+Report `N` (files indexed) and `X` (chunks) from that line — `N` is the **final md** count for the Completion Report.
 
-#### Failure check (after indexing done)
-
-```bash
-tail -20 /tmp/${COLLECTION}_index.log
-```
-
-Confirm the summary line `Done: N files indexed (X chunks), Y skipped, Z adopted` — N+Y+Z must equal the total number of `.md` files found. Cross-check with `rag-cli progress` — every document should show `done == total` (call only after lock is free). NULL-embedding skips are logged at WARNING level in `src/rag/logs/indexer.log` (search for `NULL embedding skipped`); investigate via the indexer log before treating the collection as complete if any are present.
-
-#### Verify
-
-```bash
-cd ~/Documents/ai/Meta/ClaudeCode/MCP/RAG && \
-./venv/bin/python workflow.py search \
-    --query "<topic from collection content>" \
-    --top-k 3
-```
-
-Top result should be a chunk from the just-indexed collection.
+No separate verify step inside the pipe: the real verification is the research done on the indexed data back in the main session, not a query here.
 
 ---
 
 ### Completion Report
 
-Output back to Opus when done:
+Output back to Opus when done.
+
+**web-md — the funnel:**
 
 ```
-CAPTURE-AND-INDEX REPORT
-=========================
-Mode:             [web-md | pdf]
-Collection:       <COLLECTION>
-Seed / Input:     <SEED_URL or INPUT path>
-Phase 0 (Discovery):  [N URLs found, path: A/__NEXT_DATA__ | B/sitemap | C/Playwright-BFS]  (web-md only)
-Phase 1 (Scrape):     [M ok, K failed]                                                       (web-md only)
-Phase 2 (Drop):       [N kept, K dropped — empty: X, nav-only: Y, duplicate: Z]             (web-md only)
-Phase 0 (Acquire):    [convert: M ok, K failed]                                              (pdf only)
-Cleanup shapes:   [shape: file_count, ...]  (web-md only)
-Cleanup issues:   [issue: count, ...]       (pdf only)
-Char reduction:   X% total                  (web-md)
-Word stability:   ±Y%                       (pdf)
-Indexed:          N chunks across M documents
-Verification:     query "<q>" → top result snippet (~50 chars)
-Status:           [Success | Issues — describe]
+URLs discovered:                    N
+URLs dropped (pre-scrape, pattern): K    — which patterns + why
+URLs scraped:                       N − K
+Scrape:                             M ok, E errors   ·   duration: T   (errors itemized in /tmp scrape report md)
+md dropped (post-scrape, thin):     D
+Final md indexed:                   M − D
+Collection:                         <COLLECTION>
 ```
+
+Keep the two drop reasons separate: scrape errors **E** come from the scraper (a scraper/WAF gap), thin/noise **D** comes from the cleanup check (pages that scraped fine but carry no content). Together they tell us whether the scraper has gaps or the URLs were just empty.
+
+**pdf:** `convert: M ok, K failed` · `cleanup issues: [...]` · `indexed: N chunks across M documents`.
 
 End with this report. STOP. No commit needed (output is data files, not code).
-
----
-
-### Anti-Patterns (both modes)
-
-- Pre-crawl URL pattern filters (`--exclude-patterns`) instead of post-crawl content-based drop
-- One mega-script with N regex patterns instead of per-shape/per-issue small scripts
-- Treating `strip%` (web-md) or `% removed` (pdf) as a quality metric — bytes-out vs bytes-in says nothing about indexability
-- Hardcoded absolute paths in cleanup scripts
-- Infinite loops — every `while` MUST increment in all paths
-- Skipping the backup step (pdf mode) — restore is impossible without it
-- Skipping spot-check after cleanup — strip% can lie, eyeballing 2-3 files catches over-strip
