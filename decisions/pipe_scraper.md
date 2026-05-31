@@ -1,23 +1,33 @@
 # decisions/pipe_scraper.md — Pipe-Scraper Configuration
 
-Covers `crawl_urls()` in `src/crawler/crawl_site.py` — the production content-crawl function.  
+Covers `src/crawler/pipe_scraper.py` — the production capture-pipeline scrape step.  
 Separate from `decisions/scrape_pipeline.md` (filter/garbage/browser config for the ad-hoc CLI scraper).
+
+**Note:** `crawl_urls()` in `src/crawler/crawl_site.py` is out of scope here — it serves the BFS-discovery workflow (`crawl_site_workflow`) and is unchanged.
 
 ## Status Quo (IST)
 
-`crawl_urls()` in `src/crawler/crawl_site.py`, `DEFAULT_CONCURRENCY = 10`:
+`scrape_urls_workflow()` in `src/crawler/pipe_scraper.py`:
 
-| Parameter | Current value |
+| Parameter | Value |
 |---|---|
-| `wait_until` | `"networkidle"` |
-| `delay_before_return_html` | absent (none) |
-| `page_timeout` | absent (crawl4ai default — no hard cap) |
-| `concurrency` | 10 (`DEFAULT_CONCURRENCY` via `SemaphoreDispatcher(max_session_permit=10)`) |
+| `wait_until` | `"domcontentloaded"` |
+| `delay_before_return_html` | `0.5s` (`DELAY_S`) |
+| `page_timeout` | `15000ms` (`PAGE_TIMEOUT_MS`) |
+| `concurrency` | `5` (`CONCURRENCY`) |
 | markdown | `DefaultMarkdownGenerator()` raw (no `PruningContentFilter`) |
-| garbage-drop | `is_garbage_content()` called in `save_markdown()` — skips garbage at save time |
-| pacing | none — all URLs dispatched simultaneously into the semaphore |
+| garbage-drop | none — saves every page (content completeness is scraper's job) |
+| `batch_size` | `30` (`BATCH_SIZE`) |
+| `inter_batch_sleep_s` | `30.0s` (`INTER_BATCH_SLEEP_S`) |
 
-`crawl_urls()` returns raw `CrawlResult` list; caller (`crawl_and_save_workflow`) passes to `save_markdown()`.
+Output contract:
+- Per-URL raw markdown → `--output-dir`, each file with `<!-- source: URL -->` header
+- Short console line: `Scraped N/M ok, K errors in Xs`
+- Full per-URL report → `/tmp/<domain>_scrape_report.md` (outcome / status / bytes / wall_ms per URL)
+- Runnable as `python -m src.crawler.pipe_scraper --url-file <list> --output-dir <dir>`
+- CLI flags `--batch-size` / `--inter-batch-sleep` allow WAF-rate tuning without code changes
+
+`scrape_urls_workflow()` also importable — capture-and-index skill Phase 2 calls it directly.
 
 ## Evidenz
 
@@ -88,44 +98,11 @@ Dataset: all 316 URLs, `concurrency=5`, `delay_s=0.5`, `batch_size=30`, `inter_b
 
 ## Recommendation (SOLL)
 
-Two tiers — generalized core (site-agnostic) and site-sensitive pacing (GH-tuned conservative default).
+**Keep** — IST = SOLL. `src/crawler/pipe_scraper.py` implements both tiers as validated.
 
-### Tier 1: Generalized Scraper Core
-
-Applies to any site. Replaces current IST:
-
-| Parameter | SOLL | IST |
-|---|---|---|
-| `wait_until` | `"domcontentloaded"` | `"networkidle"` |
-| `delay_before_return_html` | `0.5s` | absent |
-| `page_timeout` | `15000ms` | absent |
-| `concurrency` | `5` | `10` |
-| markdown | `DefaultMarkdownGenerator()` raw | unchanged |
-| garbage-drop | **remove** from scraper | `is_garbage_content()` in `save_markdown()` |
-
-Rationale: `domcontentloaded` is the correct trigger for SSR sites and avoids networkidle hangs on SPAs; hard timeout prevents uncapped waits; c=5 avoids WAF burst on any moderately rate-limited host; raw markdown preserves full content for downstream filtering; garbage-drop removed from scraper — content completeness is the scraper's job, filtering is a downstream concern.
-
-### Tier 2: Site-Sensitive Pacing (WAF Mitigation)
-
-For sustained runs (>30 URLs). Tuned to GH's rate/burst budget; validated at 316-URL scale:
-
-| Parameter | Value | Character |
-|---|---|---|
-| `batch_size` | `30` | Conservative safe default |
-| `inter_batch_sleep` | `30s` | Conservative safe default |
-
-This is a **conservative safe default, not a universal constant.** It guarantees WAF safety at the cost of throughput (~1 req/s sustained vs. 3.75 req/s burst ceiling):
-- WAF-free hosts: pacing is unnecessary (only costs time) — can be disabled
-- Stricter WAFs: may need smaller batch or longer sleep
-- Fits the priority ordering: completeness + determinism > speed
-
-### Migration
-
-`crawl_urls()` in `src/crawler/crawl_site.py` needs:
-- `wait_until`, `delay_s`, `page_timeout_ms` params replacing hardcoded `networkidle` / no-delay / no-timeout
-- `concurrency=5` replacing `DEFAULT_CONCURRENCY=10`
-- `batch_size` / `inter_batch_sleep` params (or caller wraps with batching logic)
-- `garbage-drop` removed or made optional in `save_markdown()`
+- Tier 1 (generalized core): `domcontentloaded`, `delay=0.5s`, `timeout=15000ms`, `c=5`, raw markdown, no garbage-drop — all in production.
+- Tier 2 (pacing): `batch_size=30`, `inter_batch_sleep=30s` as module constants + overridable CLI flags — in production.
+- `crawl_urls()` in `crawl_site.py` is out of scope (serves BFS workflow, not the capture pipe).
 
 **src/ port is a separate later task.** Do NOT modify src/ from this decision record.
 
