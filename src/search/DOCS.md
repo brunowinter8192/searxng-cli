@@ -40,9 +40,10 @@ pydoll-based parallel search pipeline. Exposes `search_web_workflow()` (single-q
 
 ## browser.py
 
-**Purpose:** pydoll Chrome lifecycle. Starts a single shared Chrome instance on first call, creates a new tab per engine for isolation. Applies fingerprint patches (WebGL, canvas, permissions) at launch. Two cleanup paths:
+**Purpose:** pydoll Chrome lifecycle. Starts a single shared Chrome instance on first call, creates a new tab per engine for isolation. Applies fingerprint patches (WebGL, canvas, permissions) at launch. Three cleanup paths:
+- `kill_tab(tab)` — async, per-engine tab cleanup in engine `finally` blocks. Uses browser-level `Target.closeTarget` CDP command (via `_browser._execute_command`, NOT the hung tab connection). 5s `asyncio.wait_for` cap. Cleans `_browser._tabs_opened`. Replaces the former `tab.close()` path which caused 65s hangs on TIMEOUT_NONCOOP cases (`Page.close` via tab connection → hung renderer → 60s pydoll fallback).
 - `close_browser()` — async, for in-loop shutdown (used by dev scripts). Issues CDP `Browser.close` and waits for response.
-- `kill_stale_chrome()` — sync `pkill -f "user-data-dir=<SESSION_DIR>"`, registered as `atexit` handler in `cli.py`.
+- `kill_stale_chrome()` — sync `pkill -f "user-data-dir=<SESSION_DIR>"`, nuclear OS-level fallback.
 
 **Input:** None (singleton on first access).
 **Output:** pydoll Chrome instance and new tab contexts.
@@ -79,7 +80,7 @@ See prior DOCS.md entries — these modules are unchanged. `is_book_url`, `is_pd
 
 ## engines/
 
-Per-engine parser modules. Each exports an `Engine` class with `search(query, language, max_results)` returning `list[SearchResult]`. Rate-limiter integration, entity decoding, sub-status interface, and per-engine details unchanged — see individual engine entries in prior DOCS.md. Engine parsers are NOT modified by the drilldown migration.
+Per-engine parser modules. Each exports an `Engine` class with `search(query, language, max_results)` returning `list[SearchResult]`. Rate-limiter integration, entity decoding, sub-status interface unchanged — see individual engine entries in prior DOCS.md. Engine parsers were NOT modified by the drilldown migration. Post-migration changes: all 5 pydoll engines switched `finally: await tab.close()` → `finally: await kill_tab(tab)` (bead 7u5); title-keyword CAPTCHA check removed from `_diagnose_empty` in google/duckduckgo/semantic_scholar (bead 18v).
 
 ### engines/base.py (18 LOC)
 Abstract `BaseEngine` parent — `search()` + default `search_with_reason()` that delegates to `search()`.

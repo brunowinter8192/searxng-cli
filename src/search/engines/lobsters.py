@@ -4,7 +4,7 @@ import json
 import logging
 from urllib.parse import quote_plus
 
-from src.search.browser import new_tab
+from src.search.browser import new_tab, kill_tab
 from src.search.engines.base import BaseEngine
 from src.search.rate_limiter import RateLimiter, _limiters
 from src.search.result import SearchResult
@@ -55,7 +55,7 @@ class LobstersEngine(BaseEngine):
             results = await _parse_results(tab, max_results)
             return results, (None if results else S.EMPTY_NO_RESULTS)
         finally:
-            await tab.close()
+            await kill_tab(tab)
 
     # Legacy thin wrapper — delegates to search_with_reason; swallows exceptions for dev-script compat
     async def search(self, query: str, language: str = "en", max_results: int = 10) -> list[SearchResult]:

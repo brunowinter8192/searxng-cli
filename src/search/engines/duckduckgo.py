@@ -4,7 +4,7 @@ import json
 import logging
 from urllib.parse import quote_plus, urlparse, parse_qs
 
-from src.search.browser import new_tab
+from src.search.browser import new_tab, kill_tab
 from src.search.engines.base import BaseEngine
 from src.search.rate_limiter import RateLimiter, _limiters
 from src.search.result import SearchResult
@@ -61,7 +61,7 @@ class DuckDuckGoEngine(BaseEngine):
             results = await _parse_results(tab, max_results)
             return results, (None if results else S.EMPTY_NO_RESULTS)
         finally:
-            await tab.close()
+            await kill_tab(tab)
 
     # Legacy thin wrapper — delegates to search_with_reason; swallows exceptions for dev-script compat
     async def search(self, query: str, language: str = "en", max_results: int = 10) -> list[SearchResult]:
@@ -148,9 +148,6 @@ async def _parse_results(tab, max_results: int) -> list[SearchResult]:
 async def _diagnose_empty(tab) -> str:
     captcha_raw = await tab.execute_script(_JS_CAPTCHA)
     if _extract_value(captcha_raw) and int(_extract_value(captcha_raw) or 0) > 0:
-        return S.EMPTY_BLOCK
-    title = _extract_value(await tab.execute_script("return document.title.toLowerCase()")) or ""
-    if any(x in title for x in ("captcha", "unusual traffic", "are you a bot", "robot")):
         return S.EMPTY_BLOCK
     state = _extract_value(await tab.execute_script("return document.readyState")) or ""
     if state != "complete":

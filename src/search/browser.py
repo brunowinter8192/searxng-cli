@@ -7,7 +7,7 @@ from pathlib import Path
 
 from pydoll.browser import Chrome
 from pydoll.browser.options import ChromiumOptions
-from pydoll.commands import PageCommands
+from pydoll.commands import PageCommands, TargetCommands
 
 logger = logging.getLogger(__name__)
 
@@ -135,6 +135,26 @@ async def new_tab():
     tab = await _browser.new_tab()
     await apply_fingerprint_patches(tab)
     return tab
+
+
+# Kill tab via browser-level Target.closeTarget — works even when the tab's own connection is hung
+# 5s cap on close_target guards against wedged browser channel (Chrome process unresponsive);
+# kill_stale_chrome() remains the nuclear OS-level fallback for that extreme case
+async def kill_tab(tab) -> None:
+    global _browser
+    target_id = getattr(tab, '_target_id', None)
+    if _browser is None or target_id is None:
+        return
+    try:
+        await asyncio.wait_for(
+            _browser._execute_command(TargetCommands.close_target(target_id)),
+            timeout=5.0,
+        )
+    except Exception as e:
+        logger.warning("kill_tab close_target failed (target_id=%s): %s", target_id, e)
+    finally:
+        if _browser is not None:
+            _browser._tabs_opened.pop(target_id, None)
 
 
 # Cleanup browser on shutdown

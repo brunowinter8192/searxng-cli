@@ -7,7 +7,7 @@ from urllib.parse import quote_plus, urlparse, parse_qs
 from pydoll.commands.network_commands import NetworkCommands
 from pydoll.protocol.network.types import CookieSameSite
 
-from src.search.browser import new_tab
+from src.search.browser import new_tab, kill_tab
 from src.search.engines.base import BaseEngine
 from src.search.rate_limiter import RateLimiter, _limiters
 from src.search.result import SearchResult
@@ -94,7 +94,7 @@ class GoogleEngine(BaseEngine):
             results = await _parse_results(tab, max_results)
             return results, (None if results else S.EMPTY_NO_RESULTS)
         finally:
-            await tab.close()
+            await kill_tab(tab)
 
     # Legacy thin wrapper — delegates to search_with_reason; swallows exceptions for dev-script compat
     async def search(self, query: str, language: str = "en", max_results: int = 10) -> list[SearchResult]:
@@ -197,9 +197,8 @@ async def _parse_results(tab, max_results: int) -> list[SearchResult]:
 # Diagnose why Google returned empty after _wait_for_results failed; tab is still open
 # Priority: BLOCK → CONSENT → CONCURRENT_RACE → NO_CONTAINER
 async def _diagnose_empty(tab) -> str:
-    title = _extract_value(await tab.execute_script("return document.title.toLowerCase()")) or ""
     url = _extract_value(await tab.execute_script("return window.location.href")) or ""
-    if any(x in title for x in ("captcha", "unusual traffic", "are you a bot", "robot")) or "/sorry/" in url:
+    if "/sorry/" in url:
         return S.EMPTY_BLOCK
     if CONSENT_DOMAIN in url:
         return S.EMPTY_CONSENT
