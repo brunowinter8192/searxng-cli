@@ -1,6 +1,6 @@
 # search/
 
-pydoll-based parallel search pipeline. Exposes `search_web_workflow()` (single-query, fan-out across engines via asyncio.gather, returns engine-breakdown TextContent + writes per-engine pool cache) and `search_batch_workflow()` (N queries sequentially in one warm-Chrome session) — both consumed by `cli.py`. Plus `fetch_search_results()` sync wrapper consumed by dev scripts.
+pydoll-based parallel search pipeline. Exposes `search_web_workflow()` (single-query, fan-out across engines via asyncio.gather, returns engine-breakdown TextContent + writes per-engine pool cache) consumed by `cli.py`. Plus `fetch_search_results()` sync wrapper consumed by dev scripts.
 
 **Active engines (9):** google, duckduckgo, mojeek, lobsters, semantic_scholar (pydoll); crossref, openalex, stack_exchange, open_library (HTTP). Scholar decoupled from default pool (see `decisions/OldThemes/scholar_decoupling/20260509.md`). See `decisions/OldThemes/stealth_inventory/stealth.md` for drop decisions on brave / startpage / bing.
 
@@ -10,13 +10,12 @@ pydoll-based parallel search pipeline. Exposes `search_web_workflow()` (single-q
 
 ## search_web.py
 
-**Purpose:** Search orchestrator. Three entry points:
-- `search_web_workflow(query, ..., engine_timeout=None, _with_timings=False, query_modifier_map=None)` — single query, fan-out across all active engines via `asyncio.gather` of `_engine_with_timing` tasks. After fanout: `filter_urls_by_mode(raw_results, mode)` → `build_engine_pools(filtered)` → **post-dedup pool cap** → `_format_breakdown` → `cache_write(capped_pools)`. **Post-dedup pool cap:** after `build_engine_pools`, K = `len(pools['google'])` if > 0 else 10. Each engine's pool trimmed to `pool[:K]` — engines with fewer than K URLs unaffected. Prevents 200-URL drilldown floods from CrossRef/OpenAlex/Stack Exchange/Open Library. If Google was CAPTCHA'd or not in the engine set, K falls back to 10. **Three-tier timeout architecture:** (1) `ENGINE_WATCHDOG_TIMEOUT=3.6s` global default. (2) `ENGINE_WATCHDOG_OVERRIDE: dict[str, float]` per-engine override — `{"open_library": 6.0, "semantic_scholar": 5.0, "crossref": 6.0}`. (3) `RATE_WAIT_TIMEOUT=60.0s` cap on token-bucket acquire → `RATE_SKIP`. Status sub-classification: `_engine_with_timing` returns 5-tuple `(results, rate_wait_ms, search_ms, status, drop_reason)`. TIMEOUT into 3 sub-statuses (`TIMEOUT_WATCHDOG / TIMEOUT_NONCOOP / TIMEOUT_HTTPX`), ERROR into 4 (`ERROR_BROWSER / ERROR_HTTP / ERROR_PARSE / ERROR_OTHER`). **Two-record logging:** `_query_engines_concurrent` writes `engine_run` record immediately after fanout; `search_web_workflow` writes `workflow_summary` record after pool-build. `_select_engines(engines)` returns `(selected_dict, excluded_dict)`; default 9-engine set via `_DEFAULT_ENGINES`. Per-engine result caps in `ENGINE_MAX_RESULTS` dict. Returns `list[TextContent]` (one element: breakdown table); with `_with_timings=True` returns `(list, dict)` where `dict` has `engine_fanout_ms, pool_build_ms, cache_write_ms, total_ms, engine_details`.
-- `search_batch_workflow(queries, ...)` — N queries sequentially through `search_web_workflow` in the SAME process (Chrome stays warm), `close_browser()` in finally.
+**Purpose:** Search orchestrator. Two entry points:
+- `search_web_workflow(query, language="en", time_range=None, engines=None, ..., engine_timeout=None, _with_timings=False, query_modifier_map=None)` — single query, fan-out across all active engines via `asyncio.gather` of `_engine_with_timing` tasks. After fanout: `filter_urls_by_mode(raw_results, mode)` → `build_engine_pools(filtered)` → **post-dedup pool cap** → `_format_breakdown` → `cache_write(capped_pools)`. **Post-dedup pool cap:** after `build_engine_pools`, K = `len(pools['google'])` if > 0 else 10. Each engine's pool trimmed to `pool[:K]` — engines with fewer than K URLs unaffected. Prevents 200-URL drilldown floods from CrossRef/OpenAlex/Stack Exchange/Open Library. If Google was CAPTCHA'd or not in the engine set, K falls back to 10. **Three-tier timeout architecture:** (1) `ENGINE_WATCHDOG_TIMEOUT=3.6s` global default. (2) `ENGINE_WATCHDOG_OVERRIDE: dict[str, float]` per-engine override — `{"open_library": 6.0, "semantic_scholar": 5.0, "crossref": 6.0}`. (3) `RATE_WAIT_TIMEOUT=60.0s` cap on token-bucket acquire → `RATE_SKIP`. Status sub-classification: `_engine_with_timing` returns 5-tuple `(results, rate_wait_ms, search_ms, status, drop_reason)`. TIMEOUT into 3 sub-statuses (`TIMEOUT_WATCHDOG / TIMEOUT_NONCOOP / TIMEOUT_HTTPX`), ERROR into 4 (`ERROR_BROWSER / ERROR_HTTP / ERROR_PARSE / ERROR_OTHER`). **Two-record logging:** `_query_engines_concurrent` writes `engine_run` record immediately after fanout; `search_web_workflow` writes `workflow_summary` record after pool-build. `_select_engines(engines)` returns `(selected_dict, excluded_dict)`; default 9-engine set via `_DEFAULT_ENGINES`. Per-engine result caps in `ENGINE_MAX_RESULTS` dict. Returns `list[TextContent]` (one element: breakdown table); with `_with_timings=True` returns `(list, dict)` where `dict` has `engine_fanout_ms, pool_build_ms, cache_write_ms, total_ms, engine_details`. **CLI dispatch:** hardcodes `language="en"`, `time_range=None`, `engines=None` — full signature retained for dev-script callers.
 - `fetch_search_results()` — sync wrapper for dev scripts; returns raw result list, no pool-building.
 
-**Input:** Query string (or list), language, time range, engine filter, filter-mode flags.
-**Output:** `list[TextContent]` (single workflow), `list[list[TextContent]]` (batch). Side effect: writes disk cache `~/.cache/searxng/<key>.json`.
+**Input:** Query string, language, time range, engine filter, filter-mode flags.
+**Output:** `list[TextContent]`. Side effect: writes disk cache `~/.cache/searxng/<key>.json`.
 
 ## merge.py
 
@@ -42,7 +41,7 @@ pydoll-based parallel search pipeline. Exposes `search_web_workflow()` (single-q
 ## browser.py
 
 **Purpose:** pydoll Chrome lifecycle. Starts a single shared Chrome instance on first call, creates a new tab per engine for isolation. Applies fingerprint patches (WebGL, canvas, permissions) at launch. Two cleanup paths:
-- `close_browser()` — async, used inside an active event loop (e.g. by `search_batch_workflow` in finally). Issues CDP `Browser.close` and waits for response.
+- `close_browser()` — async, for in-loop shutdown (used by dev scripts). Issues CDP `Browser.close` and waits for response.
 - `kill_stale_chrome()` — sync `pkill -f "user-data-dir=<SESSION_DIR>"`, registered as `atexit` handler in `cli.py`.
 
 **Input:** None (singleton on first access).

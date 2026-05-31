@@ -11,7 +11,6 @@ import pydoll.exceptions as _pydoll_exc
 import websockets.exceptions as _ws_exc
 from mcp.types import TextContent
 
-from src.search.browser import close_browser
 from src.search.cache import cache_key, cache_write
 from src.search.engines.google import GoogleEngine
 from src.search.engines.crossref import CrossRefEngine
@@ -127,32 +126,6 @@ async def search_web_workflow(
         "total_ms": total_ms,
     }
     return result, timings
-
-
-# Run N queries sequentially in shared Chrome, close browser in finally
-async def search_batch_workflow(
-    queries: list[str],
-    language: str = "en",
-    time_range: str | None = None,
-    engines: str | None = None,
-    query_modifier_map: dict[str, Callable[[str], str]] | None = None,
-    books: bool = False,
-    pdf: bool = False,
-    docs: bool = False,
-) -> list[list[TextContent]]:
-    results: list = []
-    try:
-        for q in queries:
-            results.append(await search_web_workflow(
-                q, language, time_range, engines,
-                query_modifier_map=query_modifier_map,
-                books=books,
-                pdf=pdf,
-                docs=docs,
-            ))
-    finally:
-        await close_browser()
-    return results
 
 
 # Synchronous wrapper for dev scripts — runs event loop internally

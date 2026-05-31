@@ -53,18 +53,15 @@ Phase 1a (`networkidle`) wartet, bis keine Netzwerkrequests mehr offen sind — 
 
 ### Status Quo (IST)
 
-**Code:** `src/scraper/scrape_url.py` — `scrape_url_workflow`, `scrape_url_raw_workflow`, `truncate_content`
+**Code:** `src/scraper/scrape_url.py` — `scrape_url_workflow`, `truncate_content`
 
 **Method:** PruningContentFilter mit fit_markdown-Fallback auf raw_markdown
 
 **Config:**
 - `scrape_url_workflow`: `PruningContentFilter(threshold=0.48)` + `fit_markdown`
   - Fallback auf `raw_markdown` wenn `fit_markdown < MIN_CONTENT_THRESHOLD` (200 chars)
-  - `DEFAULT_MAX_CONTENT_LENGTH = 15000` chars
+  - `DEFAULT_MAX_CONTENT_LENGTH = 15000` chars (fixed, no CLI param)
   - Truncation an Absatzgrenze (`\n\n`) wenn `last_newline > max_length * 0.8`
-- `scrape_url_raw_workflow`: `DefaultMarkdownGenerator()` ohne Filter + `raw_markdown`
-  - Speichert mit `<!-- source: URL -->` Header in Datei
-  - Kein Truncation (für Dev/Suite-Verwendung)
 - `COOKIE_CONSENT_SELECTOR`: CSS-Selektor-Liste für DOM-Elemente vor dem Crawl entfernen
   - CookieYes: `cky-consent`, `cky-banner`, `cky-modal`
   - OneTrust: `onetrust-*`
@@ -125,13 +122,13 @@ Cookies vs cookies+sphinx selectors: no measurable difference on this URL set (�
 
 `COOKIE_CONSENT_SELECTOR` als DOM-Intervention vor dem Crawl: entfernt Cookie-Walls auf DOM-Ebene, bevor Crawl4AI den Content verarbeitet — zuverlässiger als Post-Processing.
 
-`scrape_url_raw` bewusst ohne Filter: Dev-Suites und Vergleiche brauchen den Roh-Output, keine Filterung.
+Raw markdown for pipe-scraping (offline doc indexing): handled by `crawl_site_workflow` in `src/crawler/crawl_site.py` — uses `DefaultMarkdownGenerator()` without filter, saves to files. Not exposed as a CLI command.
 
 ### Offene Fragen
 
 - ~~Threshold 0.48 nicht durch systematische Tests belegt~~ → DONE 2026-05: Sweep bestätigt empirisch optimal für asymmetrische Noise-Removal-Präferenz
 - ~~`content_source="fit_html"` als Alternative~~ → RULED OUT 2026-05: always-pre-filtered Anomalie, nicht als tuning-knob nutzbar
-- Code-Seiten (GitHub, Docs): PruningFilter destruktiv für Code-Blöcke — `scrape_url_raw` (Mode 1) als Alternative für Code-heavy Sites bestätigt; Mode 1 + cleanup-Skill ist der Indexing-Pfad
+- Code-Seiten (GitHub, Docs): PruningFilter destruktiv für Code-Blöcke — raw mode (DefaultMarkdownGenerator via crawl_site) als Indexing-Pfad; für ad-hoc CLI-Scraping gibt es kein raw-mode equivalent (scrape_url_raw entfernt)
 - Cookie-Consent via `excluded_selector` entfernt den DOM-Node, aber manchmal bleibt ein Overlay-Backdrop — JS-basierte Dismissal wäre robuster
 - `MIN_CONTENT_THRESHOLD` (200 chars) ggf. zu niedrig — 200 chars kann auch ein valider Error-Text sein
 - **15K cap removal pending (2026-05-06 user direction)** — `DEFAULT_MAX_CONTENT_LENGTH = 15000` strippt 95% von long-form articles (seirdy.one 226K → 14K), verzerrt empirische Vergleiche. Removal via Prod-Migration-Bead nach pfk (Paper Mode) sequenziert.
@@ -238,7 +235,7 @@ PDF-URLs: `download_pdf` CLI command statt Scraping-Versuch. Agent-Instructions 
 
 ### Status Quo (IST)
 
-`src/scraper/scrape_url.py` and `src/scraper/scrape_url_raw.py` execute an HTTP-only fast-path BEFORE invoking Crawl4AI's browser stack. Implementation: `fetch_markdown_fastpath()` in `scrape_url.py` (FUNCTIONS section), imported into `scrape_url_raw.py` via the existing cross-module import. Inserted in both workflows immediately after the entry-point `logger.info("Scraping…")` line and BEFORE Crawl4AI's `DefaultMarkdownGenerator` setup.
+`src/scraper/scrape_url.py` executes an HTTP-only fast-path BEFORE invoking Crawl4AI's browser stack. Implementation: `fetch_markdown_fastpath()` in `scrape_url.py` (FUNCTIONS section), called from `scrape_url_workflow` immediately after the entry-point `logger.info("Scraping…")` line and BEFORE Crawl4AI setup.
 
 **Mechanism:**
 - `httpx.AsyncClient(follow_redirects=True, timeout=MD_FASTPATH_TIMEOUT)` GET with header `Accept: text/markdown, text/html`
