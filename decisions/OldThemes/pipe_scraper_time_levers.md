@@ -1,60 +1,112 @@
 # Pipe-Scraper Time Levers — Pacing Overhead & WAF-Rate Tuning
 
-**Topic:** the validated pipe-scraper config (`decisions/pipe_scraper.md` SOLL) is deliberately conservative on speed. ~70% of the runtime is WAF-budget pacing, not scraping. This file documents the time breakdown, the speed levers, their WAF risks, and the eval needed to tune them.
+**Topic:** pacing overhead, WAF budget, and the evolution from ad-hoc batch/sleep to Scrapy-style per-domain gate.
 
-**Status:** SOLL shipped as conservative default (Phase 3: 316/316, 0×429, 438s). Time-tuning is a follow-up — NOT yet evaluated.
+---
 
-## Current config (time knobs)
+## Phase 1 — Batch/Sleep Config (superseded)
+
+**Status:** shipped as conservative default. Superseded by Scrapy-style gate.
+
+### Config (batch/sleep — superseded values)
 
 | Knob | Value | Meaning |
 |---|---|---|
-| concurrency | 5 | pages in parallel — WAF burst ceiling (c=10 → 20×429, proven Phase 1) |
-| delay_before_return_html | 0.5s | per-page render wait after `domcontentloaded` |
-| page_timeout | 15000ms | hard per-page cap (max observed 6.2s — never fired) |
-| batch_size | 30 | URLs per batch before a pause |
-| inter_batch_sleep | 30s | pause between batches (WAF budget recovery) |
+| `CONCURRENCY` | 5 | global semaphore — WAF burst ceiling (c=10 → 20×429, proven Phase 1) |
+| `delay_before_return_html` | 0.5s | per-page render wait after `domcontentloaded` |
+| `page_timeout` | 15000ms | hard per-page cap (max observed 6.2s — never fired) |
+| `BATCH_SIZE` | 30 | URLs per batch before a pause |
+| `INTER_BATCH_SLEEP_S` | 30.0s | pause between batches (WAF budget recovery) |
 
-## Time breakdown (316 URLs → 438s wallclock)
+### Time breakdown (316 URLs → 438s wallclock)
 
 - 316 / 30 = 11 batches.
 - One batch of 30 @ c=5 ≈ 10s scrape (Phase 1: c=5 on 30 URLs = 10s).
 - 10 inter-batch pauses × 30s = 300s.
 - **Total ≈ 110s scrape + 300s pauses + overhead = 438s. Pauses = ~68% of runtime.**
 
-The scraping itself is fast; the pacing dominates.
+The scraping itself is fast; the pacing dominates. Effective sustained rate ≈ 0.75 req/s.
 
-## Levers + WAF risks
+### WAF characterization (Phases 1+2 sweep results)
 
-| Lever | Effect | Risk | Status |
+WAF = rate/burst budget over time, NOT a pure concurrency cap:
+- One 30-URL burst at c=5 in ~8s (3.75 req/s) exhausts the budget
+- Budget recovery requires minutes, not seconds (8s intra-sweep gap: insufficient)
+- c=10 → 20×429, c=5 = WAF-safe ceiling
+- ~1 req/s sustained = fully safe
+
+### Levers + WAF risks (batch/sleep model)
+
+| Lever | Effect | Risk | Finding |
 |---|---|---|---|
-| ↓ inter_batch_sleep (30s → less) | biggest win (~300s) | WAF needs minutes to recover budget; Phase 2 proved an 8s gap → ban. Below threshold = 429 mid-run → incomplete capture | unknown minimum — needs eval |
-| ↑ batch_size (30 → more) | fewer pauses | batch = the burst; ~30 URLs in 8s already exhausts the budget. Bigger → 429 mid-batch | unknown max burst — needs eval |
-| ↑ concurrency (5 → more) | faster bursts | c=10 proven 20×429 | OFF THE TABLE — capped at 5 |
-| ↓ delay (0.5 → 0) | ~32s (316×0.5/5) | SSR: content in initial HTML → likely safe; CSR/lazy-loaded: miss content → incomplete | small + site-dependent |
+| ↓ inter_batch_sleep | biggest win (~300s) | 8s gap proved a ban; below threshold = 429 mid-run | unknown minimum |
+| ↑ batch_size | fewer pauses | batch = burst; 30 URLs in 8s already exhausts budget | unknown max |
+| ↑ concurrency (5→more) | faster bursts | c=10 → 20×429 | OFF THE TABLE |
+| ↓ delay (0.5→0) | ~32s | SSR: likely safe; CSR: may miss content | small + site-dependent |
 
-## WAF characterization (from `decisions/pipe_scraper.md` Evidenz)
+### Why batch/sleep is an ad-hoc approximation
 
-WAF = rate/burst budget over time, NOT a concurrency cap. ~30 URLs in 8s (3.75 req/s) exhausts the burst budget; recovery takes minutes, not seconds. Current config ≈ 0.75 req/s sustained (30 URLs / ~40s) — safe with margin. Unknowns: the actual minimum-safe-pause and max-safe-burst.
+The batch-stop-and-go achieves ~1 req/s sustained, but via burst+pause rather than evenly spaced starts. The 30s inter-batch pause is a guessed recovery time, not derived from a rate model. The Scrapy gate replaces this with a principled reference that achieves the same effective rate with no dead pauses.
 
-## Needed eval (to tune)
+---
 
-WAF-rate sweep on the 316 GH URLs (or a fresh discovery set):
+## Phase 2 — Scrapy-Style Gate (current production)
 
-- `inter_batch_sleep` ∈ {30, 20, 15, 10}s at batch=30 → where do 429s appear?
-- `batch_size` ∈ {30, 45, 60} at sleep=30s → where does the burst break?
-- Optional: a bounded-retry strategy (retry 429'd URLs after cooldown) to recover completeness if pushed past the safe edge.
-- `delay` ∈ {0, 0.5} byte-completeness comparison on a clean (non-WAF-contaminated) sample — Phase 2's delay sweep was contaminated, so the delay→completeness relationship is still unmeasured.
+**Status:** shipped, validated on 316 URLs.
 
-Output: a less-conservative config that keeps completeness while cutting pacing overhead, OR confirmation that 30 / 30s is near-optimal. The production `pipe_scraper.py` exposes `--batch-size` and `--inter-batch-sleep` flags specifically so this sweep needs no code change.
+### Approach choice
 
-## Trade-off framing
+Two candidates were evaluated:
 
-Speed vs WAF-safety/completeness. Project priority: completeness + determinism > speed → the conservative default ships now. The tuning eval narrows the pacing only as far as the WAF tolerates, holding 0×429.
+**(A) Own per-domain logic** — `lastseen` dict + per-domain `asyncio.Lock` + per-domain `asyncio.Semaphore(8)`. Exact Scrapy semantics, fully deterministic.
+
+**(B) crawl4ai `RateLimiter` + `MemoryAdaptiveDispatcher`** — less code, but `RateLimiter` applies ×0.75 delay reduction on each success. Adaptive path → violates the "no adaptive delay reduction, determinism over everything" constraint. Rejected.
+
+**Chosen: A.** Determinism constraint is hard — no adaptive reduce anywhere.
+
+### Gate mechanics
+
+Per domain (key = `urlparse(url).netloc`), state = `{lastseen: float, lock: asyncio.Lock, sem: asyncio.Semaphore(8)}`.
+
+`_gate_domain(state, download_delay)`:
+1. Acquire domain `lock`
+2. Compute `jitter = random.uniform(0.5 × download_delay, 1.5 × download_delay)`
+3. `gap = now - lastseen`; if `gap < jitter`: sleep remainder
+4. Stamp `lastseen = time.time()` (at request START, not completion — exact Scrapy semantics)
+5. Release lock
+
+Sleep-inside-lock is intentional: it serializes starts per domain. Event loop handles other domains freely during the sleep.
+
+`_scrape_one` flow: `sem.acquire` → `_gate_domain` → `crawler.arun()` (outside lock, inside sem slot).
+
+### Config (current production)
+
+| Knob | Value | Meaning |
+|---|---|---|
+| `DOWNLOAD_DELAY` | 1.0s | Scrapy base; actual jitter = uniform(0.5×, 1.5×) → 0.5–1.5s |
+| `CONCURRENCY_PER_DOMAIN` | 8 | in-flight cap per domain (dormant: at ~1s gate + 1.8s p50, ~2 in flight) |
+| retry / backoff / autothrottle | OFF | determinism constraint |
+
+Effective start rate: ~1 req/s per domain — same as old batch config, but evenly spaced.
+
+### Validation result
+
+316 `docs.github.com/de/rest` URLs, `--download-delay 1.0 --concurrency-per-domain 8`:
+
+| Metric | Batch/Sleep | Scrapy Gate | Delta |
+|---|---|---|---|
+| ok | 316/316 | 316/316 | — |
+| WAF 429 | 0 | 0 | — |
+| Wallclock | 438s | 319s | −119s (−27%) |
+
+No dead 30s pauses → 27% faster at identical WAF safety.
+
+---
 
 ## Quellen
 
-- `decisions/pipe_scraper.md` — IST/Evidenz/SOLL (validated config + WAF characterization)
-- `dev/scrape_pipeline/p1_pipe_scraper.py` — scraper probe (the knobs)
-- `dev/scrape_pipeline/A_pipe_scrape_eval.py` — batching/pacing harness (phase3) — sweep-ready
+- `decisions/pipe_scraper.md` — current IST/Evidenz/SOLL
+- `dev/scrape_pipeline/p1_pipe_scraper.py` — probe (batch/sleep knobs)
+- `dev/scrape_pipeline/A_pipe_scrape_eval.py` — Phase 1/2/3 sweep harness
 - `dev/scrape_pipeline/A_pipe_scrape_eval_reports/` — Phase 1/2/3 reports (concurrency_sweep, delay_sweep, full_run)
-- `src/crawler/pipe_scraper.py` — production module (exposes batch/pacing as CLI flags for the sweep)
+- Scrapy source: `scrapy/core/downloader/__init__.py` — per-domain slot, delay gate, `RANDOMIZE_DOWNLOAD_DELAY`, `CONCURRENT_REQUESTS_PER_DOMAIN`

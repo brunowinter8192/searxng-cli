@@ -38,6 +38,7 @@
 | GitHub Issue #5922 | github.com | Issue | search02_routing | Referenced |
 | GitHub PR #5644 | github.com | PR | search01_engines | Referenced |
 
+| github.com/scrapy/scrapy (scrapy/core/downloader/__init__.py) | Repo | pipe_scraper | Referenced |
 | daijro/camoufox | Repo | stealth01 | Referenced |
 | saifyxpro/HeadlessX | Repo | stealth01 | Referenced |
 | nichochar/stealth-browser-mcp | Repo | stealth01 | Referenced |
