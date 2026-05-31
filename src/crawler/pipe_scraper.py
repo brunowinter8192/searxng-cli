@@ -1,6 +1,7 @@
 # INFRASTRUCTURE
 import argparse
 import asyncio
+import random
 import re
 import time
 from pathlib import Path
@@ -9,37 +10,28 @@ from urllib.parse import urlparse
 from crawl4ai import AsyncWebCrawler, BrowserConfig, CrawlerRunConfig, CacheMode
 from crawl4ai.markdown_generation_strategy import DefaultMarkdownGenerator
 
-DELAY_S = 0.5
+DOWNLOAD_DELAY = 1.0          # Scrapy per-domain base delay (s); jitter = uniform(0.5×, 1.5×)
+CONCURRENCY_PER_DOMAIN = 8    # Scrapy per-domain in-flight cap
 PAGE_TIMEOUT_MS = 15000
-CONCURRENCY = 5
-BATCH_SIZE = 30
-INTER_BATCH_SLEEP_S = 30.0
+DELAY_BEFORE_RETURN_HTML = 0.5
 EMPTY_THRESHOLD_BYTES = 100
 
 # ORCHESTRATOR
 
-# Scrape URL list in batches, write per-URL md files + /tmp report. Prints short summary.
+# Scrape URL list with Scrapy-style per-domain pacing, write per-URL md files + /tmp report.
 async def scrape_urls_workflow(
     urls: list[str],
     output_dir: Path,
-    batch_size: int = BATCH_SIZE,
-    inter_batch_sleep_s: float = INTER_BATCH_SLEEP_S,
+    download_delay: float = DOWNLOAD_DELAY,
+    concurrency_per_domain: int = CONCURRENCY_PER_DOMAIN,
 ) -> list[dict]:
     output_dir.mkdir(parents=True, exist_ok=True)
-    batches = [urls[i:i + batch_size] for i in range(0, len(urls), batch_size)]
-
     t0 = time.time()
-    all_results: list[dict] = []
-    for idx, batch in enumerate(batches):
-        results = await _scrape_batch(batch, output_dir)
-        all_results.extend(results)
-        if idx < len(batches) - 1:
-            await asyncio.sleep(inter_batch_sleep_s)
-
+    results = await _scrape_all(urls, output_dir, download_delay, concurrency_per_domain)
     wall_s = time.time() - t0
-    _print_summary(all_results, wall_s)
-    _write_tmp_report(_domain_from_urls(urls), all_results)
-    return all_results
+    _print_summary(results, wall_s)
+    _write_tmp_report(_domain_from_urls(urls), results)
+    return results
 
 
 # FUNCTIONS
@@ -50,15 +42,40 @@ def _url_to_filename(url: str) -> str:
     slug = re.sub(r'_+', '_', slug).strip('_')[:100]
     return f"{slug}.md"
 
-# Scrape one URL inside an open crawler, return metrics dict
+# Return or create per-domain state entry (lastseen, lock, sem) — asyncio-safe (no await, no race)
+def _ensure_domain_state(domain_states: dict, domain: str, concurrency_per_domain: int) -> dict:
+    if domain not in domain_states:
+        domain_states[domain] = {
+            'lastseen': 0.0,
+            'lock': asyncio.Lock(),
+            'sem': asyncio.Semaphore(concurrency_per_domain),
+        }
+    return domain_states[domain]
+
+# Scrapy gate: under domain lock, wait until delay elapsed since lastseen, then stamp lastseen=now.
+async def _gate_domain(state: dict, download_delay: float) -> None:
+    async with state['lock']:
+        jitter = random.uniform(0.5 * download_delay, 1.5 * download_delay)
+        now = time.time()
+        gap = now - state['lastseen']
+        if gap < jitter:
+            await asyncio.sleep(jitter - gap)
+        state['lastseen'] = time.time()
+
+# Scrape one URL: acquire domain semaphore cap, gate on per-domain delay, then run crawler.
 async def _scrape_one(
     crawler: AsyncWebCrawler,
     url: str,
     run_cfg: CrawlerRunConfig,
-    sem: asyncio.Semaphore,
+    domain_states: dict,
+    download_delay: float,
+    concurrency_per_domain: int,
     output_dir: Path,
 ) -> dict:
-    async with sem:
+    domain = urlparse(url).netloc
+    state = _ensure_domain_state(domain_states, domain, concurrency_per_domain)
+    async with state['sem']:
+        await _gate_domain(state, download_delay)
         t0 = time.time()
         try:
             result = await crawler.arun(url=url, config=run_cfg)
@@ -87,21 +104,28 @@ async def _scrape_one(
     return {'url': url, 'wall_ms': wall_ms, 'bytes': byte_count,
             'status_code': status, 'outcome': outcome}
 
-# Scrape one batch of URLs at configured concurrency
-async def _scrape_batch(urls: list[str], output_dir: Path) -> list[dict]:
+# Scrape all URLs under a single crawler with per-domain Scrapy-style pacing.
+async def _scrape_all(
+    urls: list[str],
+    output_dir: Path,
+    download_delay: float,
+    concurrency_per_domain: int,
+) -> list[dict]:
     browser_cfg = BrowserConfig(headless=True, verbose=False)
     run_cfg = CrawlerRunConfig(
         cache_mode=CacheMode.BYPASS,
         wait_until="domcontentloaded",
-        delay_before_return_html=DELAY_S,
+        delay_before_return_html=DELAY_BEFORE_RETURN_HTML,
         page_timeout=PAGE_TIMEOUT_MS,
         markdown_generator=DefaultMarkdownGenerator(),
         verbose=False,
     )
-    sem = asyncio.Semaphore(CONCURRENCY)
+    domain_states: dict = {}
     async with AsyncWebCrawler(config=browser_cfg) as crawler:
         raw = await asyncio.gather(
-            *[_scrape_one(crawler, url, run_cfg, sem, output_dir) for url in urls],
+            *[_scrape_one(crawler, url, run_cfg, domain_states,
+                          download_delay, concurrency_per_domain, output_dir)
+              for url in urls],
             return_exceptions=True,
         )
     return [
@@ -143,17 +167,17 @@ def _print_summary(results: list[dict], wall_s: float) -> None:
 
 
 if __name__ == '__main__':
-    parser = argparse.ArgumentParser(description='Pipe scraper — batch-crawl URL list to markdown')
+    parser = argparse.ArgumentParser(description='Pipe scraper — crawl URL list to markdown with Scrapy-style per-domain pacing')
     parser.add_argument('--url-file', required=True, help='Text file with URLs (one per line)')
     parser.add_argument('--output-dir', required=True, help='Directory to write per-URL markdown files')
-    parser.add_argument('--batch-size', type=int, default=BATCH_SIZE,
-                        help=f'URLs per batch (default: {BATCH_SIZE})')
-    parser.add_argument('--inter-batch-sleep', type=float, default=INTER_BATCH_SLEEP_S,
-                        help=f'Seconds to pause between batches (default: {INTER_BATCH_SLEEP_S})')
+    parser.add_argument('--download-delay', type=float, default=DOWNLOAD_DELAY,
+                        help=f'Scrapy per-domain base delay in seconds (default: {DOWNLOAD_DELAY}); actual jitter = uniform(0.5×, 1.5×)')
+    parser.add_argument('--concurrency-per-domain', type=int, default=CONCURRENCY_PER_DOMAIN,
+                        help=f'Per-domain in-flight request cap (default: {CONCURRENCY_PER_DOMAIN})')
     args = parser.parse_args()
 
     urls = [ln.strip() for ln in Path(args.url_file).read_text(encoding='utf-8').splitlines()
             if ln.strip()]
     asyncio.run(scrape_urls_workflow(
-        urls, Path(args.output_dir), args.batch_size, args.inter_batch_sleep,
+        urls, Path(args.output_dir), args.download_delay, args.concurrency_per_domain,
     ))

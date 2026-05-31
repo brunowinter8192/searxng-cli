@@ -2,15 +2,15 @@
 
 Full-site BFS discovery + capture-pipeline scrape step. Used by the capture-and-index workflow for offline documentation indexing.
 
-## pipe_scraper.py (159 LOC)
+## pipe_scraper.py (183 LOC)
 
-**Purpose:** Validated capture-pipeline scrape step. Batch-crawls a URL list to raw markdown files with WAF-safe pacing. Standalone module — NOT a CLI subcommand of `cli.py`.
+**Purpose:** Validated capture-pipeline scrape step. Crawls a URL list to raw markdown files with Scrapy-style per-domain pacing (delay-gate + jitter + concurrency cap). Standalone module — NOT a CLI subcommand of `cli.py`.
 **Reads:** URL list (from `--url-file` flag or caller-supplied list).
 **Writes:** Per-URL `.md` files to `--output-dir` (each with `<!-- source: URL -->` header); `/tmp/<domain>_scrape_report.md` (per-URL outcome table); short summary line to stdout.
 **Called by:** capture-and-index skill Phase 2 (`python -m src.crawler.pipe_scraper --url-file <list> --output-dir <dir>`); importable as `scrape_urls_workflow()` for direct programmatic use.
 **Calls out:** `crawl4ai` (AsyncWebCrawler, BrowserConfig, CrawlerRunConfig, DefaultMarkdownGenerator)
 
-Config (validated, 316-URL GH Docs eval): `wait_until=domcontentloaded`, `delay=0.5s`, `timeout=15000ms`, `c=5`, `batch_size=30`, `inter_batch_sleep=30s`. No garbage-drop.
+Pacing: Scrapy per-domain gate — `lastseen` dict + `asyncio.Lock` (serializes starts) + `asyncio.Semaphore(8)` cap (per domain). `DOWNLOAD_DELAY=1.0s`, jitter=`uniform(0.5×,1.5×)` → ~1 req/s start rate per domain. No batch loop, no inter-batch sleep, no retry/backoff. Validated: 316/316 ok, 0×429, 319s.
 
 ### CLI
 
@@ -18,12 +18,12 @@ Config (validated, 316-URL GH Docs eval): `wait_until=domcontentloaded`, `delay=
 |---|---|---|
 | `--url-file` | required | Text file with URLs (one per line) |
 | `--output-dir` | required | Directory to write per-URL markdown files |
-| `--batch-size` | 30 | URLs per batch (WAF-rate tuning) |
-| `--inter-batch-sleep` | 30.0 | Seconds between batches (WAF-rate tuning) |
+| `--download-delay` | 1.0 | Scrapy per-domain base delay in seconds; jitter = uniform(0.5×, 1.5×) |
+| `--concurrency-per-domain` | 8 | Per-domain in-flight request cap |
 
 ```bash
 ./venv/bin/python -m src.crawler.pipe_scraper --url-file urls.txt --output-dir ./output
-./venv/bin/python -m src.crawler.pipe_scraper --url-file urls.txt --output-dir ./output --batch-size 10 --inter-batch-sleep 60
+./venv/bin/python -m src.crawler.pipe_scraper --url-file urls.txt --output-dir ./output --download-delay 1.5 --concurrency-per-domain 4
 ```
 
 ---
