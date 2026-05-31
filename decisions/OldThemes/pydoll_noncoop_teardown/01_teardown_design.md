@@ -114,6 +114,17 @@ remains the nuclear OS-level fallback.
 
 ## Verification
 
-`dev/search_pipeline/24_pydoll_teardown_verify.py` — uses `chrome://hang` URL to
-freeze a renderer, wraps in `asyncio.wait_for(5.0)` with `kill_tab` in finally, measures
-wall time and checks renderer count via `pgrep`.
+`dev/search_pipeline/24_pydoll_teardown_verify.py` — three tests, all PASS
+(`teardown_verify_20260531_201523.md`):
+
+**Hang simulation:** `about:blank` + `execute_script("return new Promise(function() {})",
+await_promise=True)`. Renderer waits for a never-resolving Promise; browser process stays
+fully responsive → `close_target` over browser connection completes in <100ms after cancel.
+`chrome://hang` was rejected: it stalls Chrome IPC to the hung tab, which also slows
+`close_target` on the browser connection — not the production scenario.
+
+**T1 — single hung tab:** wall=5002ms (vs old ~65000ms), registry clean → PASS
+**T2 — normal tab:** wall=43ms, registry clean → PASS
+**T3 — parallel batch (5× hung via `asyncio.gather`):** mirrors production 5-engine fanout.
+Measured via `_browser.get_targets()` (CDP `Target.getTargets`, type=page).
+wall=5002ms (vs old 5×65s=325s), CDP targets Δ=+0 (no orphans), registry clean → PASS
