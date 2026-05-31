@@ -30,6 +30,8 @@ wait_until = "domcontentloaded"  # fixed, not configurable
 
 **Post-hoc filter (`filter_urls_workflow` in `filter_urls.py`):** unchanged. `match_any(url, patterns_str)` (fnmatch) remains the shared glob-match helper for `filter_urls` CLI use.
 
+**Skill integration:** For permanent capture, URL discovery is governed by the `capture-and-index` skill Phase 0 (worker-side guideline: `__NEXT_DATA__`-first → sitemap if usable → Playwright BFS fallback; worker writes /tmp scripts situationally). `explore_site` / `discover_urls_playwright()` is used only for ad-hoc discovery via `searxng-cli explore_site` (legacy/ad-hoc).
+
 ## Evidenz
 
 ### Playwright-per-page BFS vs HTTP BFS — Phase B recall probe
@@ -91,15 +93,14 @@ HEAD-request before BFS. Fixes domain-mismatch for redirect chains (e.g. `docs.a
 
 Evidenz: `__NEXT_DATA__` union achieves 100% recall in 1.6s vs 81.3% BFS in ~18 min on docs.github.com/de/rest. The BFS gap is structural (version-scoped nav), not fixable by tuning. The `__NEXT_DATA__` approach is deterministic, requires no browser, and generalizes to any Next.js SSR site.
 
-**Migration pending:** Skill-/Baukasten-Struktur-Entscheidung (nächste Session). No `src/` change until structure is decided. See `decisions/OldThemes/agentic_discovery/02_pipe_flow_and_roadmap.md`.
+**Skill structure resolved:** `capture-and-index` skill encodes the discovery cascade as Phase 0. No `src/` change needed for the discovery guideline itself — it lives in the skill. Remaining work: (1) src/ pipe-scraper implementation for Phase 1 Scrape (separate later task); (2) end-to-end capture run of the 305 docs.github.com/de/rest URLs to validate the full pipe. See `decisions/OldThemes/agentic_discovery/03_skill_structure_resolved.md`.
 
-**Playwright BFS retained as fallback** for non-Next.js sites and sites without embedded nav data.
+**Playwright BFS retained as fallback** (Path C in the skill) for non-Next.js sites and sites without embedded nav data.
 
 ## Offene Fragen
 
 - Concurrency >1 WAF behavior: does `--concurrency 3` on docs.github.com trigger 429 without stealth?
 - `__NEXT_DATA__` key-path portability: `props.pageProps.mainContext.sidebarTree` is GitHub-Docs-specific — what's the discovery heuristic for the nav-tree key on an unknown Next.js site?
-- Skill-/Baukasten-Struktur: where does the new discovery path live in the production skill graph? (Blocked on structure decision — see OldThemes/agentic_discovery/02_pipe_flow_and_roadmap.md)
 
 ## Quellen
 

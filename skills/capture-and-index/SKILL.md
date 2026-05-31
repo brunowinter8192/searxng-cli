@@ -1,43 +1,122 @@
 ---
-name: cleanup-and-index
-description: Worker-side skill — clean raw markdown from web crawls or PDF conversions, then index into RAG. Two modes (web-md, pdf), three phases (Acquisition, Cleanup, Index).
+name: capture-and-index
+description: Worker-side skill — discover URLs agentic (no pinned script, worker writes /tmp probes), scrape raw/maximal, drop non-indexable pages, clean, and index into RAG. Modes: web-md (Discovery→Scrape→Drop→Cleanup→Index), pdf (Acquisition→Cleanup→Index).
 ---
 
-# Cleanup-and-Index — Skill
+# Capture-and-Index — Skill
 
-Activated by a worker after Opus's web-research setup has produced four inputs: MODE (web-md or pdf), INPUT (URL list `.txt` or PDF path), COLLECTION (RAG collection name), and OUTPUT_DIR. Workflow: pick MODE, run Phase 0 → Phase 1 → Phase 2 in order.
+Activated by a worker. Opus provides: SEED_URL (for web-md), or INPUT path (for pdf), plus COLLECTION and OUTPUT_DIR. The worker drives discovery and scraping; Opus only provides the seed and confirms the collection name.
 
-Inputs are produced by Opus before spawning — see web-research SKILL § Permanent Capture Workflow → Setup for how INPUT, COLLECTION, and OUTPUT_DIR are determined.
+Target collection is named by the user at the start of the task. Default suggestion: `<current_project>_reference`, but may be another project's reference collection. Never pick the name autonomously.
 
 ---
 
-### Mode 1: Web-MD Capture (search → crawl → clean → index)
+### Mode 1: Web-MD Capture (discovery → scrape → drop → clean → index)
 
-Input: absolute path to a URL list `.txt` (one URL per line) OR a directory of pre-crawled `*.md` files.
+Input: SEED_URL (root domain URL) + COLLECTION + OUTPUT_DIR.
 
-- If URL list: Phase 0 crawls all URLs via Crawl4AI.
-- If pre-crawled directory: skip Phase 0.
+Pipeline: Discovery → Scrape (raw) → Drop Assessment → Cleanup → Index.
 
-Pipeline: [optional crawl] → block-level chrome cleanup (5-shape + Sphinx-specifics) → index.
+#### Phase 0 — Discovery
 
-#### Phase 0 — Acquisition
+Deliverable: `/tmp/<domain>_discovered_urls.txt` — one URL per line, maximum coverage of the target domain/section.
+
+The worker writes situational /tmp scripts for this phase — no pinned reference script. Choose the path based on structural signals from the seed page.
+
+##### Step 0 — Structural Signals (always, ~30s)
+
+Fetch the seed page HTML (plain HTTP, no browser). Check:
+
+- `robots.txt` — any relevant disallow rules?
+- `/sitemap.xml` and `/sitemaps/sitemap-0.xml` — does one exist?
+- `<script id="__NEXT_DATA__">` in the raw HTML — signals Next.js SSR (see Path A).
+
+##### Path A — `__NEXT_DATA__` Extraction (Next.js SSR sites, preferred)
+
+Applicable when: `<script id="__NEXT_DATA__">` found in seed HTML.
+
+No browser needed — the full nav tree is in the initial SSR HTML.
+
+**Procedure:**
+
+1. Parse the `__NEXT_DATA__` JSON blob from the seed page.
+2. Walk any field containing `childPages`, `items`, or `navigation` keys paired with `href` or `url` strings — that is the nav tree. Key path is site-specific — discover by inspection (grep the blob for fields containing `childPages`/`href` pairs; do NOT assume `props.pageProps.mainContext.sidebarTree`).
+3. Collect all URL strings matching the target section/domain from the primary nav (latest / free-pro-team / main version).
+4. Check for an `allVersions`, `versions`, or equivalent version-list field in the blob. For EACH version:
+   - Construct the version-scoped root URL.
+   - Fetch it via plain HTTP.
+   - Extract its nav tree (same walk logic).
+   - Normalize version-prefixed URLs to canonical form (strip the version segment: `/de/enterprise-cloud@latest/rest/X` → `/de/rest/X`).
+   - Union into the main set.
+5. **Always check the OLDEST version.** Deprecated pages are removed from newer versions' sidebars but persist in the oldest, and their pages still return HTTP 200. Missing the oldest version means missing deprecated content — this pattern recurs on any versioned doc site.
+6. Write the normalized union to `/tmp/<domain>_discovered_urls.txt`.
+
+**Expected outcome:** 100% of pages appearing in ANY version's sidebar, in ~1–5s (O(versions) HTTP fetches, no browser).
+
+**Sitemap-coverage trap:** if the site also exposes a sitemap, verify it covers the target section (spot-check ≥5 known pages against the sitemap) before trusting it as an alternative. Sitemaps are often root-only or homepage-only even on sites where `__NEXT_DATA__` yields full coverage.
+
+##### Path B — Sitemap (non-Next.js, sitemap exists and is verified)
+
+Applicable when: sitemap found AND spot-check confirms it covers the target section adequately.
+
+Fetch and parse the sitemap; filter to target section URLs; write to `/tmp/<domain>_discovered_urls.txt`.
+
+##### Path C — Playwright BFS (fallback — no `__NEXT_DATA__`, no usable sitemap)
+
+Applicable when: neither Path A nor Path B applies.
+
+Write a /tmp BFS script using `crawler.arun()` per frontier URL; extract `result.links.internal` from the fully rendered DOM. Config:
+
+```python
+wait_until = "domcontentloaded"
+delay_before_return_html = 3.0   # the one genuine time↔completeness dial
+page_timeout = 15000             # load ceiling; does NOT add to delay
+concurrency = 1                  # WAF-safe default
+```
+
+429 policy: back off 5s once; stop if second consecutive batch also 429 — report `stop_reason="429_persistent"`. No retry loops.
+
+**Known ceiling:** sites with section-scoped navigation (sidebar shows only the current section's nav, not a global tree) produce a structural recall ceiling regardless of rendering quality. `stop_reason="frontier_exhausted"` means all link-reachable pages found; orphan pages (never linked from anywhere) are an inherent BFS blind spot.
+
+Write discovered URLs to `/tmp/<domain>_discovered_urls.txt`.
+
+#### Phase 1 — Scrape
+
+Scrape every URL in the discovered set **raw and maximal** — no PruningContentFilter, no content truncation. Lost content is unrecoverable downstream; the drop and cleanup phases strip chrome after the fact.
 
 ```bash
 mkdir -p $OUTPUT_DIR
-cd /Users/brunowinter2000/Documents/ai/Meta/ClaudeCode/MCP/searxng && \
-./venv/bin/python -m src.crawler.crawl_site \
-    --url-file $INPUT \
-    --output-dir $OUTPUT_DIR \
-    --concurrency 10
 ```
 
-Report: `N URLs crawled, M succeeded, K failed`. List failed URLs.
+**Note: the exact src/ pipe-scraper invocation is TBD (separate later task).** When that task lands, the concrete command replaces this placeholder. Invoke the scraper on the URL list with raw/maximal config — no filter arguments.
+
+Report: `N URLs scraped, M succeeded, K failed`. List failed URLs.
 
 If `>50%` failed → STOP, report to Opus, do not proceed.
 
-If INPUT is a directory of `.md` files: skip Phase 0, set `OUTPUT_DIR=INPUT`.
+#### Phase 2 — Drop Assessment
 
-#### Phase 1 — Cleanup
+After scraping, read each `.md` file and decide per-URL whether to keep or drop. Drop criteria are content-based — not pattern-based.
+
+Drop a file when it is:
+- Empty or near-empty (< 5 meaningful lines of prose)
+- Redirect-only (page body is just "redirecting to X")
+- Pure navigation page (only link lists, no prose)
+- Duplicate of another already-kept file (identical or near-identical body)
+
+Keep everything else — including thin pages, deprecated pages, and pages with only partial content.
+
+Report:
+```
+Drop Assessment: N kept, K dropped
+  empty/redirect: X
+  nav-only:       Y
+  duplicate:      Z
+```
+
+Proceed with cleanup on the kept set only.
+
+#### Phase 3 — Cleanup
 
 Diagnose first. Don't write cleanup regex before classifying shape.
 
@@ -104,11 +183,11 @@ For each detected shape, write ONE small script in `/tmp/clean_<shape>_<COLLECTI
 
 ---
 
-### Mode 2: PDF Capture (search → download → convert → clean → index)
+### Mode 2: PDF Capture (download → convert → clean → index)
 
 Input: absolute path to a single PDF file OR a directory of `*.pdf` files.
 
-Pipeline: MinerU convert → OCR/LaTeX cleanup → index.
+Pipeline: Acquisition → Cleanup → Index.
 
 #### Phase 0 — Acquisition
 
@@ -169,7 +248,7 @@ Use this pattern whenever **any** of the following is true:
 wait
 ```
 
-The `sleep 15` *inside* the loop is normal blocking sleep — it does NOT trigger CC tool-completion events. CC sees ONE backgrounded call, ONE completion when MinerU is truly gone. Zero cascade. Mirror of the Phase 2 indexing pattern.
+The `sleep 15` *inside* the loop is normal blocking sleep — it does NOT trigger CC tool-completion events. CC sees ONE backgrounded call, ONE completion when MinerU is truly gone. Zero cascade.
 
 ##### Post-Convert Verify
 
@@ -241,9 +320,9 @@ Stop when:
 
 ---
 
-### Phase 2 — Index (both modes)
+### Index — Final Phase (both modes)
 
-### CRITICAL: index-dir is incremental by default, NOT a full reindex
+#### CRITICAL: index-dir is incremental by default, NOT a full reindex
 
 `workflow.py index-dir --input <dir> --collection <coll>` uses hash-based skip-logic:
 
@@ -309,8 +388,6 @@ For an explicit single-file workflow (e.g. recovery of one specific document, or
 
 `--force` is available on both subcommands and bypasses the skip — use only when the embedding model or chunker config changed and the entire collection genuinely needs re-embedding. Routine indexing should never need `--force`.
 
-This handles: server health check → start if needed → classify (skip/adopt/index) → chunk + embed only the indexed bucket → summary.
-
 #### Wait for indexing to finish — match timer duration to expected wallclock
 
 **Lock awareness**: The indexer holds a global RAG lock for its full duration (written to `~/.rag-locks/rag.lock`). Any `rag-cli` command other than `status` will fail with "rag busy" while the lock is held. **Do NOT call `rag-cli progress` while the indexer is running** — it would hit a DB query blocked by indexer DDL/write locks and hang (this was the root cause of the zombie-process bug). Use `rag-cli status` instead to check mid-run progress — it reads the lockfile directly, no DB query.
@@ -329,7 +406,7 @@ wait
 
 The `sleep 30` *inside* the loop is normal blocking sleep — it does NOT trigger CC tool-completion events. CC sees ONE backgrounded call, ONE completion at the very end. Zero cascade.
 
-**B) More steps follow after the indexer (e.g. sample-query verification, cleanup pass on an output dir)** — set ONE timer that approximates the expected remaining wallclock. **The timer duration must match the work, not a default like 60–120s.** For a 29-minute remaining run, set the timer to ~25 minutes. ONE completion fires, then check `rag-cli status` (lock free = done; still held = still running + shows progress). If more time needed, set another sized-to-remaining timer. Never fire 14 short timers for a single long run.
+**B) More steps follow after the indexer** — set ONE timer that approximates the expected remaining wallclock. **The timer duration must match the work, not a default like 60–120s.** For a 29-minute remaining run, set the timer to ~25 minutes. ONE completion fires, then check `rag-cli status` (lock free = done; still held = still running + shows progress). If more time needed, set another sized-to-remaining timer. Never fire 14 short timers for a single long run.
 
 If the user asks "how far?" at any moment, do ONE manual `rag-cli status` in foreground — shows document progress from the lockfile with no DB query. The anti-pattern is *automated repeated short polling*, not a single user-triggered status read.
 
@@ -379,12 +456,15 @@ Top result should be a chunk from the just-indexed collection.
 Output back to Opus when done:
 
 ```
-CLEANUP-AND-INDEX REPORT
+CAPTURE-AND-INDEX REPORT
 =========================
 Mode:             [web-md | pdf]
 Collection:       <COLLECTION>
-Input:            <INPUT path> (N items)
-Phase 0:          [crawl: M ok, K failed | convert: M ok, K failed]
+Seed / Input:     <SEED_URL or INPUT path>
+Phase 0 (Discovery):  [N URLs found, path: A/__NEXT_DATA__ | B/sitemap | C/Playwright-BFS]  (web-md only)
+Phase 1 (Scrape):     [M ok, K failed]                                                       (web-md only)
+Phase 2 (Drop):       [N kept, K dropped — empty: X, nav-only: Y, duplicate: Z]             (web-md only)
+Phase 0 (Acquire):    [convert: M ok, K failed]                                              (pdf only)
 Cleanup shapes:   [shape: file_count, ...]  (web-md only)
 Cleanup issues:   [issue: count, ...]       (pdf only)
 Char reduction:   X% total                  (web-md)
@@ -400,6 +480,7 @@ End with this report. STOP. No commit needed (output is data files, not code).
 
 ### Anti-Patterns (both modes)
 
+- Pre-crawl URL pattern filters (`--exclude-patterns`) instead of post-crawl content-based drop
 - One mega-script with N regex patterns instead of per-shape/per-issue small scripts
 - Treating `strip%` (web-md) or `% removed` (pdf) as a quality metric — bytes-out vs bytes-in says nothing about indexability
 - Hardcoded absolute paths in cleanup scripts
