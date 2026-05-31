@@ -67,6 +67,36 @@ CLI flags: `--gold PATH`, `--max-pages INT`, `--depth INT`, `--no-regression`, `
 
 Key finding from Phase A run (2026-05-29): `BFSDeepCrawlStrategy` uses HTTP for link extraction regardless of `wait_until` — changing to `networkidle` has no effect on recall. Strategy C (prefetch=False) found 205/305 = 67.2% recall. See `decisions/OldThemes/crawler_js_render_discovery/A_recall_probe.md`.
 
+## 05_playwright_bfs.py (328 LOC)
+
+**Purpose:** Manual Playwright-per-page BFS: renders each page via `AsyncWebCrawler.arun()` (real browser, post-JS DOM), extracts `result.links.internal`, follows matching `--include-pattern` URLs. Measures recall vs goldstandard. Contrasts with `04_render_recall.py` (HTTP BFS).
+**Output:** `05_reports/docs_github_rest_<YYYYMMDD>.md`
+
+```bash
+./venv/bin/python dev/explore_pipeline/05_playwright_bfs.py
+./venv/bin/python dev/explore_pipeline/05_playwright_bfs.py --max-pages 400 --concurrency 1
+./venv/bin/python dev/explore_pipeline/05_playwright_bfs.py --stealth
+```
+
+CLI flags: `--gold PATH`, `--seed URL`, `--include-pattern STR`, `--max-pages INT`, `--max-depth INT`, `--delay N.N`, `--page-timeout INT`, `--concurrency {1,2,3}`, `--stealth`
+
+Key finding (2026-05-29): Playwright BFS from `docs.github.com/de/rest` reaches 248/305 = 81.3%. Ceiling is structural — GHEC/deprecated pages are not linked from any FPT sidebar page.
+
+## 06_nextdata_probe.py (339 LOC)
+
+**Purpose:** Agentic discovery via `__NEXT_DATA__` nav-tree extraction. Fetches seed HTML via plain HTTP (no browser), parses `sidebarTree` from the Next.js SSR blob, detects all versions via `allVersions`, fetches each version's REST root page, unions all sidebar trees normalized to canonical `/de/rest/…` form. Scores recall vs goldstandard.
+**Output:** `06_reports/gh_live_discovery_<date>_<time>.md` · discovered URL set → `06_discovered_urls.txt`
+
+```bash
+./venv/bin/python dev/explore_pipeline/06_nextdata_probe.py
+./venv/bin/python dev/explore_pipeline/06_nextdata_probe.py --no-ghes
+./venv/bin/python dev/explore_pipeline/06_nextdata_probe.py --gold dev/explore_pipeline/goldstandard/docs_github_rest.txt
+```
+
+CLI flags: `--gold PATH`, `--no-ghec`, `--no-ghes`
+
+Key finding (2026-05-31): 305/305 = 100% recall in 1.6s. FPT sidebar (256) + GHEC normalized (36 net new) + GHES all-versions normalized (24 net new, incl. deprecated `projects-classic` in GHES 3.16). Generic to any Next.js SSR doc site. Method narrative: `decisions/OldThemes/agentic_discovery/01_gh_live_experiment.md`.
+
 ## Report Formats
 
 **01_reports:** JSON with summary (total fetched, unique URLs, duplicates, content/empty counts, total chars) and URL list with per-URL content status and character counts. Reports are consumed by `dev/scrape_pipeline/filter_eval/06_content_source.py`.
@@ -74,3 +104,7 @@ Key finding from Phase A run (2026-05-29): `BFSDeepCrawlStrategy` uses HTTP for 
 **02_reports:** Markdown with summary table, removed URLs list, and full baseline URL list with [REMOVED] markers.
 
 **03_reports:** Markdown with strategy comparison table (pages, time, per-page ms, duplicates), speedup vs baseline, and depth distribution per strategy.
+
+**05_reports:** Markdown with recall table (found/matched/missing/noise/latency), baseline comparison, and sample missing URLs.
+
+**06_reports:** Markdown with recall table (found per version/net additions/matched/noise), baseline comparison, per-step discovery log. Discovered URL set saved separately as `06_discovered_urls.txt`.
