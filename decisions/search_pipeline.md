@@ -32,6 +32,10 @@
 
 **Plugin engines** (not in `ENGINES` dict, not in this pipeline): ArXiv, GitHub, Reddit — URL discovery via MCP plugins; content fetched by dedicated plugin.
 
+**Tab teardown:** `kill_tab()` in `src/search/browser.py` — calls `_browser._execute_command(TargetCommands.close_target(target_id))` over the browser-level WebSocket (separate from the tab connection). Called in `finally` of all 5 pydoll engine `search_with_reason()` methods. Replaced `tab.close()` (`Page.close` via tab connection → hung renderer → pydoll 60s fallback → 65s total on NONCOOP). 5s `asyncio.wait_for` cap on `close_target` guards against wedged browser channel. Rationale: `decisions/OldThemes/pydoll_noncoop_teardown/01_teardown_design.md`.
+
+**`_diagnose_empty` title-keyword check:** Removed from `google.py`, `duckduckgo.py`, `semantic_scholar.py` (dead code for modern reCAPTCHA Enterprise; prior robust block-detection runs before `_diagnose_empty` in all three). Retained in `mojeek.py`, `lobsters.py` (sole `EMPTY_BLOCK` detection path).
+
 ### Evidenz
 
 Per-engine implementation probes and smoke baselines — `decisions/OldThemes/engine_expansion_2026-05/`:

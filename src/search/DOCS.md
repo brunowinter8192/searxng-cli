@@ -40,9 +40,10 @@ pydoll-based parallel search pipeline. Exposes `search_web_workflow()` (single-q
 
 ## browser.py
 
-**Purpose:** pydoll Chrome lifecycle. Starts a single shared Chrome instance on first call, creates a new tab per engine for isolation. Applies fingerprint patches (WebGL, canvas, permissions) at launch. Two cleanup paths:
+**Purpose:** pydoll Chrome lifecycle. Starts a single shared Chrome instance on first call, creates a new tab per engine for isolation. Applies fingerprint patches (WebGL, canvas, permissions) at launch. Three cleanup paths:
+- `kill_tab(tab)` — async, per-engine tab cleanup in engine `finally` blocks. Uses browser-level `Target.closeTarget` CDP command (via `_browser._execute_command`, NOT the hung tab connection). 5s `asyncio.wait_for` cap. Cleans `_browser._tabs_opened`. Replaces the former `tab.close()` path which caused 65s hangs on TIMEOUT_NONCOOP cases (`Page.close` via tab connection → hung renderer → 60s pydoll fallback).
 - `close_browser()` — async, for in-loop shutdown (used by dev scripts). Issues CDP `Browser.close` and waits for response.
-- `kill_stale_chrome()` — sync `pkill -f "user-data-dir=<SESSION_DIR>"`, registered as `atexit` handler in `cli.py`.
+- `kill_stale_chrome()` — sync `pkill -f "user-data-dir=<SESSION_DIR>"`, nuclear OS-level fallback.
 
 **Input:** None (singleton on first access).
 **Output:** pydoll Chrome instance and new tab contexts.
