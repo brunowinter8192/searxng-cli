@@ -62,7 +62,7 @@ On error (import failure, missing dependency, engine timeout): the CLI prints to
 | search_engine_drilldown | Fetch URL list for a specific engine from cached search results (or re-runs search on cache miss) |
 | scrape_url | Fetch page content as filtered markdown (PruningContentFilter). For in-conversation reading |
 | scrape_url_raw | Fetch page content as raw markdown and save as .md file. For RAG indexing |
-| explore_site | Discover URLs via sitemap + BFS prefetch. Returns structured URL list |
+| explore_site | Discover URLs via Playwright-per-page BFS (post-JS DOM links). Returns structured URL list. **Legacy/ad-hoc only** — not the capture-pipeline discovery path. |
 | download_pdf | Download PDF file from URL to local disk |
 
 ## Parameter Reference
@@ -181,7 +181,9 @@ Results from lobsters for "rust async runtime"
 | --max-pages | int | 200 | Max pages to discover |
 | --url-pattern | str | None | Regex filter for discovered URLs |
 
-**Output:** Structured URL list discovered via sitemap → BFS cascade.
+**Output:** Structured URL list discovered via Playwright-per-page BFS (post-JS DOM links).
+
+**Note:** legacy/ad-hoc only — not used in the permanent-capture workflow. Discovery for capture is handled by the `capture-and-index` worker (Phase 0).
 
 ### download_pdf
 
@@ -402,33 +404,9 @@ For when ad-hoc lookup isn't enough — the user wants to permanently capture a 
 
 Web domain (e.g. `docs.crawl4ai.com`) OR a list of PDFs (paths or URLs).
 
-**2a. For Web Domains: Explore + Filter URLs**
+**2a. For Web Domains**
 
-Two-stage filter — preemptive at discovery time, post-hoc after inspection.
-
-**Stage 1 — preemptive (discovery time):** strips known structural noise as the list is written.
-
-```bash
-# Strip obvious noise globs upfront (e.g. Sphinx index/module pages)
-searxng-cli explore_site https://docs.example.com --strategy sitemap --output /tmp/example_urls.txt \
-    --exclude-patterns "*/genindex.html,*/_modules/*,*/search.html"
-```
-
-**Inspect:** `cat /tmp/example_urls.txt` or `head /tmp/example_urls.txt` — scan for patterns that only surface on seeing the full list.
-
-**Stage 2 — post-hoc (after inspection):** drops additional patterns or exact URLs in-place.
-
-```bash
-# Preview first (file unchanged)
-searxng-cli filter_urls /tmp/example_urls.txt --exclude-patterns "*/used-by.html" --dry-run
-
-# Apply (atomic rewrite)
-searxng-cli filter_urls /tmp/example_urls.txt --exclude-patterns "*/used-by.html"
-```
-
-Exact URLs (no wildcards) match literally. `--dry-run` prints dropped URLs + kept count to stderr without touching the file.
-
-Proceed with the cleanup + index phases of Mode 1 on the trimmed `/tmp/example_urls.txt`.
+Identify the seed domain URL (e.g. `https://docs.example.com`). The worker handles discovery — no pre-crawl filtering by Opus.
 
 **2b. For PDFs: Decide Which to Convert**
 
@@ -436,12 +414,12 @@ Review PDF candidates with the user. Skip paywalls, redundant copies, off-topic 
 
 **3. Confirm Collection Target with User (MANDATORY ASK)**
 
-Convention: one RAG collection per project, named `<current_project>_reference` (lowercase, underscore). All reference material for the project lives in this single collection — never create per-source collections.
+Target collection is named by the user. Default suggestion: `<current_project>_reference` (lowercase, underscore), but may be another project's reference collection.
 
 Before writing the worker spawn prompt, ASK the user explicitly:
 > "Target collection: `<project>_reference`. OUTPUT_DIR: `~/Documents/ai/Meta/ClaudeCode/MCP/RAG/data/documents/<project>_reference/`. Confirm or override?"
 
-NEVER pick a collection name on your own. The default-per-convention is a suggestion to the user, not a decision Opus makes alone.
+NEVER pick a collection name on your own.
 
 #### Common Inputs
 
@@ -450,11 +428,16 @@ Every worker spawn provides:
 | Var | Meaning | Example |
 |---|---|---|
 | `MODE` | `web-md` or `pdf` | `web-md` |
-| `INPUT` | Source path | `/tmp/searxng_urls.txt` or `/path/to/paper.pdf` |
-| `COLLECTION` | RAG collection name — `<project>_reference` (lowercase, underscore). One reference collection per project, all indexed material lands here. | `searxng_reference` |
-| `OUTPUT_DIR` | Where cleaned `.md` files land — folder name MUST match `COLLECTION` exactly | `~/Documents/ai/Meta/ClaudeCode/MCP/RAG/data/documents/searxng_reference/` |
+| `SEED_URL` | Root domain URL (web-md only — worker discovers all URLs) | `https://docs.example.com` |
+| `INPUT` | PDF file or directory path (pdf mode only) | `/path/to/paper.pdf` |
+| `COLLECTION` | RAG collection name — user-named; default `<project>_reference` | `searxng_reference` |
+| `OUTPUT_DIR` | Where scraped/converted `.md` files land — folder name MUST match `COLLECTION` exactly | `~/Documents/ai/Meta/ClaudeCode/MCP/RAG/data/documents/searxng_reference/` |
 
 #### Spawn Worker
+
+Worker pipe (web-md): Discovery → Scrape (raw, maximal) → Drop Assessment → Cleanup → Index  
+Worker pipe (pdf): Acquisition → Cleanup → Index  
+Opus provides SEED_URL / INPUT, COLLECTION, OUTPUT_DIR. Worker drives all phases.
 
 Write to `/tmp/spawn-<worker_name>.md`:
 
@@ -463,20 +446,23 @@ Write to `/tmp/spawn-<worker_name>.md`:
 
 You are a WORKER.
 
-FIRST: activate the cleanup-and-index skill via Skill(skill="cleanup-and-index").
+FIRST: activate the capture-and-index skill via Skill(skill="capture-and-index").
 
 Then follow its workflow for Mode <web-md | pdf>, with these inputs:
 
-- MODE: <web-md | pdf>
-- INPUT: <absolute path to URL list .txt OR PDF file/dir>
+- MODE: web-md
+- SEED_URL: <root domain URL>          (web-md — worker discovers all URLs)
 - COLLECTION: <COLLECTION_NAME>
 - OUTPUT_DIR: ~/Documents/ai/Meta/ClaudeCode/MCP/RAG/data/documents/<COLLECTION_NAME>/
+
+For pdf mode, replace SEED_URL with:
+- INPUT: <absolute path to PDF file or directory>
 
 Report when done. No commit needed (output is data files, not code).
 ```
 
 ```bash
-worker-cli spawn cleanup-<collection_lower> /tmp/spawn-<worker_name>.md \
+worker-cli spawn capture-<collection_lower> /tmp/spawn-<worker_name>.md \
     <current_project_root> sonnet
 ```
 

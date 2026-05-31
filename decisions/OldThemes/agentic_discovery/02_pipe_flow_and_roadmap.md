@@ -63,22 +63,17 @@ und einen Drop empfehlen, ohne dass Opus vorher ein Pattern kannte.
 
 ## Offene Entscheidung (nächste Session): Skill-/Baukasten-Struktur
 
-Zwei bestehende Pipeline-Skills:
+**RESOLVED → `decisions/OldThemes/agentic_discovery/03_skill_structure_resolved.md`**
+
+Zwei bestehende Pipeline-Skills (historischer Kontext, Entscheidung unten aufgelöst):
 - **web-research** (Opus-seitig): Discovery + evtl. Filterung, gibt gecrawlte URLs weiter
 - **cleanup-and-index** (Worker-seitig): Indexierung, Post-processing
 
-Offene Fragen:
-1. **Umbenennung `cleanup-and-index`?** — der Name passt nicht mehr wenn der Worker auch Discovery +
-   Crawl + Drop-Assessment macht. Kandidaten: `crawl-and-index`, `index-worker`, `doc-pipeline-worker`.
-2. **Baukasten vs. monolithischer Skill:** Sollen Discovery, Crawl, Drop-Assessment, Index als
-   einzelne wiederverwendbare Bausteine existieren (jeder aufrufbar), oder bleibt ein Worker-Skill
-   der die ganze Pipeline macht?
-3. **Vorgefertigte Scripts vs. Worker schreibt Scripts selbst:** Der Worker könnte (a) feste
-   Scripts aufrufen (`06_nextdata_probe.py`, `crawl_site.py`, ...) oder (b) nach einem generischen
-   Workflow selbst situationsabhängige Probe-Scripts schreiben. Option (b) ist flexibler aber
-   schwerer zu testen und zu reproduzieren.
-4. **`web-research` Scope:** Bleibt Opus für Discovery zuständig, oder übergibt Opus nur den Seed
-   und der Worker macht Discovery + Crawl + Index komplett?
+Offene Fragen (alle resolved):
+1. **Umbenennung:** → `capture-and-index` (deckt den kompletten Worker-Flow: Discovery + Scrape + Drop + Cleanup + Index)
+2. **Baukasten vs. monolithisch:** → Monolithischer Worker-Skill. Discovery-Guideline im Skill als Prozedur (Phase 0), kein separater Baukasten.
+3. **Scripts vs. Worker schreibt selbst:** → Worker schreibt /tmp-Scripts situationsabhängig. Kein pinned reference script.
+4. **`web-research` Scope:** → Opus gibt Seed URL + Collection. Worker macht Discovery + Scrape + Drop + Cleanup + Index komplett. Opus-Rolle: identify domain → confirm collection → spawn worker → verify.
 
 ---
 
