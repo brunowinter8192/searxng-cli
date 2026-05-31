@@ -51,7 +51,31 @@ Single-page check: `https://docs.github.com/de/rest/agent-tasks` rendered with `
 
 ### Navigation topology ceiling (81.3%)
 
-Post-run diagnostic on seed page `/de/rest`: only 35 `/de/rest/*` links in rendered DOM. `agent-tasks`, `enterprise-admin`, `announcement-banners` not present. Sidebar is section-scoped: categories only appear in navigation when the user is within that section. The 18.7% gap is a navigation topology constraint, not a rendering failure. Knowingly accepted; tracked as open point (see SOLL).
+Post-run diagnostic on seed page `/de/rest`: only 35 `/de/rest/*` links in rendered DOM. `agent-tasks`, `enterprise-admin`, `announcement-banners` not present. Sidebar is section-scoped: categories only appear in navigation when the user is within that section. The 18.7% gap is a navigation topology constraint, not a rendering failure. Knowingly accepted; superseded by __NEXT_DATA__ approach below.
+
+### __NEXT_DATA__ nav-tree extraction — agentic discovery experiment
+
+Script: `dev/explore_pipeline/06_nextdata_probe.py`  
+Report: `dev/explore_pipeline/06_reports/gh_live_discovery_20260531_0256.md`  
+Method narrative: `decisions/OldThemes/agentic_discovery/01_gh_live_experiment.md`  
+Dataset: `dev/explore_pipeline/goldstandard/docs_github_rest.txt` (305 URLs)
+
+| Strategy | Recall % | Matched | Time | Mechanism |
+|----------|----------|---------|------|-----------|
+| Playwright BFS (Phase B, above) | 81.3% | 248/305 | ~18 min | Playwright, 3s/page |
+| __NEXT_DATA__ union — FPT only | 83.3% | 254/305 | 0.3s | 1 HTTP fetch |
+| __NEXT_DATA__ union — FPT + GHEC | 98.0% | 299/305 | 0.5s | 2 HTTP fetches |
+| __NEXT_DATA__ union — FPT + GHEC + GHES all (6 versions) | **100.0%** | **305/305** | **1.6s** | **8 HTTP fetches** |
+
+**Method:** GitHub Docs is Next.js SSR. Every page embeds a `<script id="__NEXT_DATA__">` block
+in the initial HTML containing the full nav tree (`props.pageProps.mainContext.sidebarTree`).
+No browser needed. `allVersions` field lists all content variants; fetching each version's
+REST root page and unioning their normalized sidebars gives complete coverage.
+
+**Key finding:** The 18.7% BFS gap is entirely explained by version-scoped nav:
+- GHEC (`enterprise-cloud@latest`): adds `enterprise-admin`, `announcement-banners`, `scim` + extra pages in 8 shared categories (36 net new)
+- GHES 3.16 (oldest version): holds deprecated `projects-classic/*` + `repos/tags` not in any newer sidebar (6 net new)
+- Noise: 11 URLs (version root pages + scim — all return HTTP 200, outside goldstandard scope)
 
 ### HTTP BFS is always HTTP-speed regardless of wait_until
 
@@ -63,21 +87,27 @@ HEAD-request before BFS. Fixes domain-mismatch for redirect chains (e.g. `docs.a
 
 ## Recommendation (SOLL)
 
-Keep — shipped. Current config is the validated production state.
+**Change: `discover_urls_playwright()` (Playwright BFS) → `__NEXT_DATA__` nav-tree extraction as primary discovery path for Next.js SSR doc-sites; Playwright BFS as fallback.**
 
-**Two tracked open points (do NOT fix here):**
-1. **Coverage gap (18.7%):** section-scoped navigation topology on docs.github.com means some categories are unreachable from a single seed. Mitigation options: additive sitemap union (if sitemap exists), multi-seed BFS, or repo-tree API. Evaluated when needed per site.
-2. **Runtime:** ~4s/page × N pages (sequential). Concurrency knob available (`--concurrency`, max 10) for speed-vs-WAF tuning. Concurrent WAF behavior (D5 from OldThemes) not yet measured — treat concurrency >1 as experimental.
+Evidenz: `__NEXT_DATA__` union achieves 100% recall in 1.6s vs 81.3% BFS in ~18 min on docs.github.com/de/rest. The BFS gap is structural (version-scoped nav), not fixable by tuning. The `__NEXT_DATA__` approach is deterministic, requires no browser, and generalizes to any Next.js SSR site.
+
+**Migration pending:** Skill-/Baukasten-Struktur-Entscheidung (nächste Session). No `src/` change until structure is decided. See `decisions/OldThemes/agentic_discovery/02_pipe_flow_and_roadmap.md`.
+
+**Playwright BFS retained as fallback** for non-Next.js sites and sites without embedded nav data.
 
 ## Offene Fragen
 
-- Concurrency >1 WAF behavior: does `--concurrency 3` or `--concurrency 10` on docs.github.com trigger 429? Stealth needed?
-- Does docs.github.com have a usable sitemap for the missing 18.7%? (`/sitemap.xml` returns 404 on `de/rest` sub-path — not tested globally.)
+- Concurrency >1 WAF behavior: does `--concurrency 3` on docs.github.com trigger 429 without stealth?
+- `__NEXT_DATA__` key-path portability: `props.pageProps.mainContext.sidebarTree` is GitHub-Docs-specific — what's the discovery heuristic for the nav-tree key on an unknown Next.js site?
+- Skill-/Baukasten-Struktur: where does the new discovery path live in the production skill graph? (Blocked on structure decision — see OldThemes/agentic_discovery/02_pipe_flow_and_roadmap.md)
 
 ## Quellen
 
 - `dev/explore_pipeline/05_playwright_bfs.py` — Phase B probe implementation
 - `dev/explore_pipeline/05_reports/docs_github_rest_20260529.md` — Phase B run report
 - `dev/explore_pipeline/04_render_recall.py` — Phase A HTTP BFS baseline
+- `dev/explore_pipeline/06_nextdata_probe.py` — __NEXT_DATA__ discovery implementation
+- `dev/explore_pipeline/06_reports/gh_live_discovery_20260531_0256.md` — __NEXT_DATA__ run report (305/305)
+- `decisions/OldThemes/agentic_discovery/01_gh_live_experiment.md` — full method narrative
 - `decisions/OldThemes/crawler_js_render_discovery/` — full investigation arc (A_recall_probe.md, B_playwright_bfs_probe.md, 00_design_decisions_and_levers.md)
 - Crawl4AI issue #1665 — BFSDeepCrawlStrategy captures page before JavaScript loads
