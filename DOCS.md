@@ -14,7 +14,7 @@ CLI-driven web research toolkit for Claude Code. Runs a parallel 9-engine search
 |---|---|---|---|
 | `src/search/` | parallel search pipeline (fan-out, dedup, pool cache) | 2595 | 14 |
 | `src/scraper/` | scrape + download (fastpath, browser, stealth, logging) | 859 | 6 |
-| `src/crawler/` | BFS discovery + content crawl | 325 | 1 |
+| `src/crawler/` | BFS discovery + capture-pipe scrape step | 484 | 2 |
 
 ## Root-Level Files
 
