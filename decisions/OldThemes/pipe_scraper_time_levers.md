@@ -109,4 +109,4 @@ No dead 30s pauses → 27% faster at identical WAF safety.
 - `dev/scrape_pipeline/p1_pipe_scraper.py` — probe (batch/sleep knobs)
 - `dev/scrape_pipeline/A_pipe_scrape_eval.py` — Phase 1/2/3 sweep harness
 - `dev/scrape_pipeline/A_pipe_scrape_eval_reports/` — Phase 1/2/3 reports (concurrency_sweep, delay_sweep, full_run)
-- Scrapy source: `scrapy/core/downloader/__init__.py` — per-domain slot, delay gate, `RANDOMIZE_DOWNLOAD_DELAY`, `CONCURRENT_REQUESTS_PER_DOMAIN`
+- Scrapy source: `scrapy/core/downloader/__init__.py` — per-domain slot, delay gate, RANDOMIZE_DOWNLOAD_DELAY, CONCURRENT_REQUESTS_PER_DOMAIN (Scrapy config keys)

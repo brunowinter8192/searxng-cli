@@ -9,7 +9,7 @@ Separate from `decisions/scrape_pipeline.md` (filter/garbage/browser config for 
 
 `scrape_urls_workflow()` in `src/crawler/pipe_scraper.py`:
 
-Pacing model based on Scrapy (`scrapy/core/downloader`: per-domain delay-gate + `RANDOMIZE_DOWNLOAD_DELAY` jitter + `CONCURRENT_REQUESTS_PER_DOMAIN` cap), retry/backoff disabled for determinism. `DOWNLOAD_DELAY=1.0s` → ~1 req/s start rate per domain = proven-safe (old batch config averaged ~1 req/s, 0×429).
+Pacing model based on Scrapy (`scrapy/core/downloader`: per-domain delay-gate + RANDOMIZE_DOWNLOAD_DELAY jitter + CONCURRENT_REQUESTS_PER_DOMAIN cap — Scrapy config keys, not local symbols), retry/backoff disabled for determinism. `DOWNLOAD_DELAY=1.0s` → ~1 req/s start rate per domain = proven-safe (old batch config averaged ~1 req/s, 0×429).
 
 | Parameter | Value |
 |---|---|
