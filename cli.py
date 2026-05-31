@@ -29,18 +29,13 @@ logger = logging.getLogger(__name__)
 import argparse
 import asyncio
 import atexit
-from urllib.parse import urlparse
 
-from src.search.search_web import search_web_workflow, search_batch_workflow
-from src.search.browser import close_browser, kill_stale_chrome
+from src.search.search_web import search_web_workflow
+from src.search.browser import kill_stale_chrome
 from src.search.cache import cache_key, cache_read, format_engine_pool
 from src.scraper.scrape_url import scrape_url_workflow
-from src.scraper.scrape_url_raw import scrape_url_raw_workflow
-from src.crawler.explore_site import explore_site_workflow
-from src.crawler.filter_urls import filter_urls_workflow
 from src.scraper.download_pdf import download_pdf_workflow
 from src.scraper.pdf_chain import should_download_as_pdf
-from mcp.types import TextContent
 
 atexit.register(kill_stale_chrome)
 
@@ -48,7 +43,7 @@ atexit.register(kill_stale_chrome)
 def main():
     parser = argparse.ArgumentParser(
         prog="cli.py",
-        description="SearXNG Web Research CLI — search, scrape, explore, download PDF."
+        description="SearXNG Web Research CLI — search_web, search_engine_drilldown, scrape_url, download_pdf."
     )
     sub = parser.add_subparsers(dest="cmd", required=True)
 
@@ -58,34 +53,12 @@ def main():
         help="Search across 9 engines. Returns engine breakdown table — use search_engine_drilldown to see URLs per engine."
     )
     p.add_argument("query", help="Search query (2-5 keywords)")
-    p.add_argument("--language", default="en", help="ISO language code (e.g. 'de')")
-    p.add_argument("--time-range", dest="time_range", choices=["day", "month", "year"], default=None)
-    p.add_argument("--engines", default=None,
-                   help="Comma-separated engine list (e.g. 'google,duckduckgo,openalex')")
     mode_sw = p.add_mutually_exclusive_group()
     mode_sw.add_argument("--books", action="store_true",
                    help="Restrict to book-domain whitelist (+book modifier). Mutually exclusive with --pdf / --docs")
     mode_sw.add_argument("--pdf", action="store_true",
                    help="Restrict to PDF-domain whitelist (+pdf modifier). Mutually exclusive with --books / --docs")
     mode_sw.add_argument("--docs", action="store_true",
-                   help="Noise-blacklist filter (+documentation modifier). Mutually exclusive with --books / --pdf")
-
-    # ── search_batch ──────────────────────────────────────────────────────────
-    p = sub.add_parser(
-        "search_batch",
-        help="Search multiple queries in one warm-Chrome session. Returns engine breakdown per query."
-    )
-    p.add_argument("queries", nargs="+", help="One or more search queries")
-    p.add_argument("--language", default="en", help="ISO language code (e.g. 'de')")
-    p.add_argument("--time-range", dest="time_range", choices=["day", "month", "year"], default=None)
-    p.add_argument("--engines", default=None,
-                   help="Comma-separated engine list (e.g. 'google,duckduckgo')")
-    mode_sb = p.add_mutually_exclusive_group()
-    mode_sb.add_argument("--books", action="store_true",
-                   help="Restrict to book-domain whitelist (+book modifier). Mutually exclusive with --pdf / --docs")
-    mode_sb.add_argument("--pdf", action="store_true",
-                   help="Restrict to PDF-domain whitelist (+pdf modifier). Mutually exclusive with --books / --docs")
-    mode_sb.add_argument("--docs", action="store_true",
                    help="Noise-blacklist filter (+documentation modifier). Mutually exclusive with --books / --pdf")
 
     # ── search_engine_drilldown ───────────────────────────────────────────────
@@ -97,10 +70,6 @@ def main():
     p.add_argument("--engine", required=True,
                    help="Engine name: google, duckduckgo, mojeek, lobsters, semantic_scholar, "
                         "openalex, crossref, stack_exchange, open_library")
-    p.add_argument("--language", default="en")
-    p.add_argument("--engines", default=None,
-                   help="Must match original search_web call (part of cache key)")
-    p.add_argument("--time-range", dest="time_range", choices=["day", "month", "year"], default=None)
     mode_edd = p.add_mutually_exclusive_group()
     mode_edd.add_argument("--books", action="store_true",
                    help="Must match original search_web call (part of cache key)")
@@ -110,41 +79,8 @@ def main():
                    help="Must match original search_web call (part of cache key)")
 
     # ── scrape_url ────────────────────────────────────────────────────────────
-    p = sub.add_parser("scrape_url", help="Scrape URL to filtered markdown (PruningContentFilter).")
+    p = sub.add_parser("scrape_url", help="Scrape URL to filtered markdown (PruningContentFilter, 15000 char limit).")
     p.add_argument("url", help="URL to scrape")
-    p.add_argument("--max-content-length", dest="max_content_length", type=int, default=15000)
-
-    # ── scrape_url_raw ────────────────────────────────────────────────────────
-    p = sub.add_parser("scrape_url_raw", help="Scrape URL to raw markdown file (for RAG indexing).")
-    p.add_argument("url", help="URL to scrape")
-    p.add_argument("output_dir", help="Directory to save the .md file (created if not exists)")
-
-    # ── explore_site ──────────────────────────────────────────────────────────
-    p = sub.add_parser("explore_site", help="Discover URLs via Playwright-per-page BFS, write to file + print summary.")
-    p.add_argument("url", help="Root URL to explore")
-    p.add_argument("--max-pages", dest="max_pages", type=int, default=200)
-    p.add_argument("--output", type=str, default=None,
-                   help="Output file path (default: /tmp/explore_<domain>_urls.txt)")
-    p.add_argument("--depth", type=int, default=10)
-    p.add_argument("--include-patterns", dest="include_patterns", type=str, default=None)
-    p.add_argument("--exclude-patterns", dest="exclude_patterns", type=str, default=None)
-    p.add_argument("--append", action="store_true")
-    p.add_argument("--delay", type=float, default=3.0,
-                   help="Render delay in seconds after domcontentloaded (default: 3.0)")
-    p.add_argument("--page-timeout", dest="page_timeout", type=int, default=15000,
-                   help="Page load timeout in ms (default: 15000)")
-    p.add_argument("--concurrency", type=int, default=1,
-                   help="Concurrent discovery requests (default: 1; >1 risks Cloudflare WAF 429, max recommended: 10)")
-    p.add_argument("--stealth", action="store_true",
-                   help="Enable stealth mode (enable_stealth + UndetectedAdapter) to reduce 429s")
-
-    # ── filter_urls ───────────────────────────────────────────────────────────
-    p = sub.add_parser("filter_urls", help="In-place URL list filter by glob patterns.")
-    p.add_argument("file", help="Path to URL list file (one URL per line)")
-    p.add_argument("--exclude-patterns", dest="exclude_patterns", required=True,
-                   help="Comma-separated glob patterns to drop (e.g. '*/genindex.html,*/_modules/*')")
-    p.add_argument("--dry-run", dest="dry_run", action="store_true",
-                   help="Print dropped URLs + kept count to stderr, do not modify file")
 
     # ── download_pdf ──────────────────────────────────────────────────────────
     p = sub.add_parser("download_pdf", help="Download PDF file from URL.")
@@ -157,25 +93,17 @@ def main():
 
     if args.cmd == "search_web":
         result = asyncio.run(search_web_workflow(
-            args.query, args.language, args.time_range, args.engines,
+            args.query, "en", None, None,
             books=args.books, pdf=args.pdf, docs=args.docs,
         ))
-
-    elif args.cmd == "search_batch":
-        results = asyncio.run(search_batch_workflow(
-            args.queries, args.language, args.time_range, args.engines,
-            books=args.books, pdf=args.pdf, docs=args.docs,
-        ))
-        print("\n---\n".join(r[0].text for r in results))
-        return
 
     elif args.cmd == "search_engine_drilldown":
         mode = "books" if args.books else ("pdf" if args.pdf else ("docs" if args.docs else None))
-        key = cache_key(args.query, args.language, args.engines, args.time_range, modifier_id=mode)
+        key = cache_key(args.query, "en", None, None, modifier_id=mode)
         hit = cache_read(key)
         if hit is None:
             asyncio.run(search_web_workflow(
-                args.query, args.language, args.time_range, args.engines,
+                args.query, "en", None, None,
                 books=args.books, pdf=args.pdf, docs=args.docs,
             ))
             hit = cache_read(key)
@@ -194,35 +122,10 @@ def main():
         if should_download_as_pdf(args.url):
             result = download_pdf_workflow(args.url, str(Path.home() / "Downloads"))
         else:
-            result = asyncio.run(scrape_url_workflow(args.url, args.max_content_length))
-
-    elif args.cmd == "scrape_url_raw":
-        if should_download_as_pdf(args.url):
-            result = download_pdf_workflow(args.url, str(Path.home() / "Downloads"))
-        else:
-            result = asyncio.run(scrape_url_raw_workflow(args.url, args.output_dir))
-
-    elif args.cmd == "explore_site":
-        urls, stop_reason, four_two_nine_count, output_path = asyncio.run(explore_site_workflow(
-            args.url, args.max_pages, args.output,
-            args.depth, args.include_patterns, args.exclude_patterns, args.append,
-            args.delay, args.page_timeout, args.concurrency, args.stealth,
-        ))
-        domain = urlparse(args.url).netloc
-        logger.info("explore_site complete: stop_reason=%s domain=%s urls=%d output=%s",
-                    stop_reason, domain, len(urls), output_path)
-        _suffix = f"stop_reason={stop_reason}" + (f", {four_two_nine_count}×429" if four_two_nine_count else "")
-        result = [TextContent(type="text", text=f"Discovered {len(urls)} URLs → {output_path} ({_suffix})")]
-
-    elif args.cmd == "filter_urls":
-        filter_urls_workflow(args.file, args.exclude_patterns, args.dry_run)
-        return
+            result = asyncio.run(scrape_url_workflow(args.url))
 
     elif args.cmd == "download_pdf":
         result = download_pdf_workflow(args.url, args.output_dir)
-
-    else:
-        parser.error(f"Unknown command: {args.cmd}")
 
     print(result[0].text)
 
