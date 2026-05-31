@@ -80,7 +80,7 @@ See prior DOCS.md entries — these modules are unchanged. `is_book_url`, `is_pd
 
 ## engines/
 
-Per-engine parser modules. Each exports an `Engine` class with `search(query, language, max_results)` returning `list[SearchResult]`. Rate-limiter integration, entity decoding, sub-status interface, and per-engine details unchanged — see individual engine entries in prior DOCS.md. Engine parsers are NOT modified by the drilldown migration.
+Per-engine parser modules. Each exports an `Engine` class with `search(query, language, max_results)` returning `list[SearchResult]`. Rate-limiter integration, entity decoding, sub-status interface unchanged — see individual engine entries in prior DOCS.md. Engine parsers were NOT modified by the drilldown migration. Post-migration changes: all 5 pydoll engines switched `finally: await tab.close()` → `finally: await kill_tab(tab)` (bead 7u5); title-keyword CAPTCHA check removed from `_diagnose_empty` in google/duckduckgo/semantic_scholar (bead 18v).
 
 ### engines/base.py (18 LOC)
 Abstract `BaseEngine` parent — `search()` + default `search_with_reason()` that delegates to `search()`.
