@@ -2,6 +2,41 @@
 
 Quality monitoring and configuration testing for the URL scraper module.
 
+## Pipe-Scraper Eval Suite (`p1_` + `A_`, scrape_pipeline/ root)
+
+Empirical eval of the GH REST API docs scrape pipeline — WAF boundary, content completeness, full-corpus capture. Results feed `decisions/pipe_scraper.md`.
+
+### p1_pipe_scraper.py (97 LOC)
+
+**Purpose:** Core scraper probe — `scrape_urls(urls, delay_s, page_timeout_ms, concurrency, output_dir)` → per-URL metrics dicts. Config locked to: browser, `wait_until="domcontentloaded"`, `delay_before_return_html`, hard `page_timeout`, `DefaultMarkdownGenerator()` raw, no `PruningContentFilter`, no garbage-drop. Saves `<!-- source: url -->\n\nraw_md` per URL when `output_dir` set.
+**Calls out:** `crawl4ai` (AsyncWebCrawler, BrowserConfig, CrawlerRunConfig, DefaultMarkdownGenerator)
+**Called by:** `A_pipe_scrape_eval.py`
+
+### A_pipe_scrape_eval.py (481 LOC)
+
+**Purpose:** Eval harness — three phases via argparse: `phase1` (concurrency/WAF sweep), `phase2` (delay sweep, completeness proxy), `phase3` (full 316-URL run: WAF probe + batched pacing + position-tracked 429s + retry pass). Writes timestamped MD reports to `A_pipe_scrape_eval_reports/`; phase3 also saves raw markdown corpus.
+**Calls out:** `p1_pipe_scraper.scrape_urls`
+**Called by:** CLI only
+
+```bash
+# WAF/concurrency sweep (30 stratified URLs, delay=1.0s fixed)
+./venv/bin/python dev/scrape_pipeline/A_pipe_scrape_eval.py phase1
+
+# Delay sweep (30 stratified URLs, c=5 fixed)
+./venv/bin/python dev/scrape_pipeline/A_pipe_scrape_eval.py phase2
+
+# Full run (316 URLs, WAF probe → batched c=5 + 30s pauses → retry on 429s)
+./venv/bin/python dev/scrape_pipeline/A_pipe_scrape_eval.py phase3 --delay 0.5
+```
+
+**Reports:**
+- `A_pipe_scrape_eval_reports/concurrency_sweep_<ts>.md` — phase1
+- `A_pipe_scrape_eval_reports/delay_sweep_<ts>.md` — phase2 (includes WAF-contamination note)
+- `A_pipe_scrape_eval_reports/full_run_<ts>.md` — phase3 summary
+- `A_pipe_scrape_eval_reports/full_run_<ts>/` — phase3 raw markdown corpus (one .md per URL)
+
+---
+
 ## Top-Level Scripts
 
 ### 01_dual_mode_smoke.py
