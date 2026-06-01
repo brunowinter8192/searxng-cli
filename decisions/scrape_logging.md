@@ -12,8 +12,8 @@
 
 **Sidecar policy by outcome:**
 - `outcome == "ok"` → sidecar written (final content)
-- `outcome == "garbage"` → sidecar written (`garbage_content` field from `try_scrape` — content that triggered garbage classification, for inspection)
-- `outcome == "empty"` | `"timeout"` | `"error"` → `content_path: null`, no sidecar written
+- `outcome == garbage type string` → sidecar written (`garbage_content` field from `try_scrape` meta — content that triggered garbage classification, for inspection)
+- `outcome == "empty"` → `content_path: null`, no sidecar written
 
 **Log path:** `SEARXNG_SCRAPE_LOG_PATH` env var → fallback `src/logs/scrape_log.jsonl`. Sidecar dir: `<log_dir>/scrape_content/`. Fail-soft: write errors are logged as WARNING, scrape result still reaches caller.
 
@@ -22,32 +22,21 @@
 **JSONL record schema:**
 ```json
 {
-  "ts": "2026-05-23T22:30:01.234Z",
+  "ts": "2026-06-01T14:22:01.123Z",
   "url": "https://example.com/article",
   "domain": "example.com",
   "mode": "filtered",
   "outcome": "ok",
-  "phase_used": "browser_1a",
-  "phases_attempted": ["fastpath", "browser_1a"],
-  "timings_ms": {
-    "fastpath": 412,
-    "browser_1a": 3187,
-    "browser_1b": null,
-    "browser_2_stealth": null,
-    "filter": null,
-    "total_wall": 3622
-  },
+  "timings_ms": {"total_wall": 7241},
   "http_status": 200,
   "content_type": "text/html; charset=utf-8",
-  "bytes_returned": 5104,
-  "bytes_raw_markdown": 14823,
+  "bytes_returned": 4802,
+  "bytes_raw_markdown": 11340,
   "fallback_to_raw": false,
   "truncated": false,
   "consent_stripped": false,
   "garbage_type": null,
-  "fastpath_hit": false,
-  "fastpath_miss_reason": "wrong_content_type",
-  "content_path": "scrape_content/2026-05-23T22-30-01.234Z_example-com-article.md"
+  "content_path": "scrape_content/2026-06-01T14-22-01.123Z_example-com-article.md"
 }
 ```
 
@@ -55,21 +44,17 @@
 
 | Field | Values / Notes |
 |-------|---------------|
-| `mode` | `"filtered"` (scrape_url) |
-| `outcome` | `"ok"` \| `"garbage"` \| `"empty"` \| `"timeout"` \| `"error"` |
-| `phase_used` | `"fastpath"` \| `"browser_1a"` \| `"browser_1b"` \| `"browser_2_stealth"` \| null on failure |
-| `phases_attempted` | ordered list of phases that ran |
-| `timings_ms.filter` | always null — PruningContentFilter runs inside Crawl4AI `arun`, not separable |
-| `http_status` | from phase that produced final content; null on failure |
-| `content_type` | Content-Type header from winning phase; null if N/A |
+| `mode` | `"filtered"` — only mode (raw mode removed) |
+| `outcome` | `"ok"` \| garbage type string (e.g. `"cookie_wall"`, `"cloudflare"`) \| `"empty"` |
+| `timings_ms.total_wall` | wall time of full `scrape_url_workflow` call in ms |
+| `http_status` | HTTP status from crawl result; null on network failure |
+| `content_type` | Content-Type header from crawl result; null if N/A |
 | `bytes_returned` | byte length of final content (after truncation); null on failure |
-| `bytes_raw_markdown` | raw_markdown length before filter/fallback; for raw mode = `bytes_returned`; for fastpath = `bytes_returned` |
-| `fallback_to_raw` | true iff `fit_markdown < 200` triggered fallback to `raw_markdown` |
+| `bytes_raw_markdown` | raw_markdown length before PruningContentFilter; null on failure |
+| `fallback_to_raw` | true iff `fit_markdown < MIN_CONTENT_THRESHOLD` triggered fallback to `raw_markdown` |
 | `truncated` | true iff 15K cap applied |
 | `consent_stripped` | true iff `strip_consent_prefix()` changed content |
-| `garbage_type` | 7 values from `is_garbage_content()` or null |
-| `fastpath_hit` | true iff fastpath returned content |
-| `fastpath_miss_reason` | `"http_error"` \| `"wrong_content_type"` \| `"sub_threshold"` \| `"network_error"` \| null (on hit) |
+| `garbage_type` | 7 values from `is_garbage_content()` or null; set on failure, null on success |
 | `content_path` | relative path under log dir, e.g. `"scrape_content/<file>.md"`; null when no content |
 
 **Sidecar file format:**

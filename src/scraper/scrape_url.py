@@ -1,14 +1,10 @@
 # INFRASTRUCTURE
-import json
 import logging
-import os
 import re
 import time
 from datetime import datetime, timezone
-from pathlib import Path
 from urllib.parse import urlparse
 
-import httpx
 from crawl4ai import AsyncWebCrawler, BrowserConfig, CrawlerRunConfig, CacheMode, UndetectedAdapter
 from crawl4ai.async_crawler_strategy import AsyncPlaywrightCrawlerStrategy
 from crawl4ai.content_filter_strategy import PruningContentFilter
@@ -24,8 +20,6 @@ _LINK_LINE_RE = re.compile(r'^\[.+\]\(.+\)$')
 
 DEFAULT_MAX_CONTENT_LENGTH = 15000
 MIN_CONTENT_THRESHOLD = 200
-MD_FASTPATH_MIN_BYTES = 200
-MD_FASTPATH_TIMEOUT = 5.0
 
 CONSENT_WORDS = ["cookie", "consent", "einwilligung", "tracking", "akzeptieren", "datenschutz", "zweck"]
 CONSENT_DENSITY_THRESHOLD = 5
@@ -61,107 +55,23 @@ async def scrape_url_workflow(url: str, max_content_length: int = DEFAULT_MAX_CO
     domain = (urlparse(url).hostname or "").removeprefix("www.")
     logger.info("Scraping: %s", url)
 
-    phases_attempted: list[str] = []
-    timings_ms: dict = {"fastpath": None, "browser_1a": None, "browser_1b": None, "browser_2_stealth": None, "filter": None}
-    phase_used: str | None = None
-    winning_meta: dict = {}
-    last_garbage: str | None = None
-    last_garbage_content: str | None = None
-
-    t0 = time.perf_counter()
-    md, fp_status, fp_ct, fp_miss = await fetch_markdown_fastpath(url)
-    timings_ms["fastpath"] = round((time.perf_counter() - t0) * 1000)
-    phases_attempted.append("fastpath")
-
-    if md:
-        logger.debug("Markdown fast-path hit: %s (%d chars)", url, len(md))
-        phase_used = "fastpath"
-        final = truncate_content(md, max_content_length)
-        content_path = write_sidecar(url, ts, final, "ok", "filtered")
-        log_scrape({
-            "ts": ts, "url": url, "domain": domain, "mode": "filtered", "outcome": "ok",
-            "phase_used": "fastpath", "phases_attempted": phases_attempted,
-            "timings_ms": {**timings_ms, "total_wall": round((time.perf_counter() - t_total) * 1000)},
-            "http_status": fp_status, "content_type": fp_ct,
-            "bytes_returned": len(final.encode("utf-8")), "bytes_raw_markdown": len(md.encode("utf-8")),
-            "fallback_to_raw": False, "truncated": len(md) > max_content_length,
-            "consent_stripped": False, "garbage_type": None,
-            "fastpath_hit": True, "fastpath_miss_reason": None, "content_path": content_path,
-        })
-        return [TextContent(type="text", text=f"# Content from: {url}\n\n{final}")]
-
-    markdown_generator = DefaultMarkdownGenerator(
-        content_filter=PruningContentFilter(threshold=0.48)
-    )
-    normal_config = BrowserConfig(headless=True, verbose=False)
-
-    t0 = time.perf_counter()
-    phases_attempted.append("browser_1a")
-    content, m1a = await try_scrape(normal_config, None, markdown_generator, url, "networkidle")
-    timings_ms["browser_1a"] = round((time.perf_counter() - t0) * 1000)
-    if content:
-        phase_used = "browser_1a"
-        winning_meta = m1a
-    else:
-        if m1a.get("garbage_type"):
-            last_garbage = m1a["garbage_type"]
-        if m1a.get("garbage_content"):
-            last_garbage_content = m1a["garbage_content"]
-
-    if not content:
-        t0 = time.perf_counter()
-        phases_attempted.append("browser_1b")
-        c2, m1b = await try_scrape(normal_config, None, markdown_generator, url, "domcontentloaded")
-        timings_ms["browser_1b"] = round((time.perf_counter() - t0) * 1000)
-        if c2:
-            content = c2
-            phase_used = "browser_1b"
-            winning_meta = m1b
-        else:
-            if m1b.get("garbage_type"):
-                last_garbage = m1b["garbage_type"]
-            if m1b.get("garbage_content"):
-                last_garbage_content = m1b["garbage_content"]
-
-    if not content:
-        stealth_config = BrowserConfig(headless=True, verbose=False, enable_stealth=True)
-        adapter = UndetectedAdapter()
-        stealth_strategy = AsyncPlaywrightCrawlerStrategy(
-            browser_config=stealth_config,
-            browser_adapter=adapter
-        )
-        t0 = time.perf_counter()
-        phases_attempted.append("browser_2_stealth")
-        c3, m2 = await try_scrape(stealth_config, stealth_strategy, markdown_generator, url, "networkidle")
-        timings_ms["browser_2_stealth"] = round((time.perf_counter() - t0) * 1000)
-        if c3:
-            content = c3
-            phase_used = "browser_2_stealth"
-            winning_meta = m2
-        else:
-            if m2.get("garbage_type"):
-                last_garbage = m2["garbage_type"]
-            if m2.get("garbage_content"):
-                last_garbage_content = m2["garbage_content"]
-
+    content, meta = await try_scrape(url)
     total_wall = round((time.perf_counter() - t_total) * 1000)
 
     if not content:
-        log_scrape_failure(url, last_garbage, winning_meta.get("status_code"))
-        outcome = last_garbage if last_garbage else "empty"
-        content_path = write_sidecar(url, ts, last_garbage_content, outcome, "filtered")
+        outcome = meta.get("garbage_type") or "empty"
+        content_path = write_sidecar(url, ts, meta.get("garbage_content"), outcome, "filtered")
         log_scrape({
             "ts": ts, "url": url, "domain": domain, "mode": "filtered", "outcome": outcome,
-            "phase_used": None, "phases_attempted": phases_attempted,
-            "timings_ms": {**timings_ms, "total_wall": total_wall},
-            "http_status": None, "content_type": None,
+            "timings_ms": {"total_wall": total_wall},
+            "http_status": meta.get("status_code"), "content_type": meta.get("content_type"),
             "bytes_returned": None, "bytes_raw_markdown": None,
             "fallback_to_raw": False, "truncated": False,
-            "consent_stripped": False, "garbage_type": last_garbage,
-            "fastpath_hit": False, "fastpath_miss_reason": fp_miss, "content_path": content_path,
+            "consent_stripped": False, "garbage_type": meta.get("garbage_type"),
+            "content_path": content_path,
         })
         hint = get_plugin_hint(url)
-        reason = _GARBAGE_MESSAGES[last_garbage] if last_garbage else "No content extracted"
+        reason = _GARBAGE_MESSAGES.get(outcome, "No content extracted")
         msg = f"Error scraping {url}: {reason}"
         if hint:
             msg += f"\n\nHint: {hint}"
@@ -172,57 +82,40 @@ async def scrape_url_workflow(url: str, max_content_length: int = DEFAULT_MAX_CO
     content_path = write_sidecar(url, ts, final, "ok", "filtered")
     log_scrape({
         "ts": ts, "url": url, "domain": domain, "mode": "filtered", "outcome": "ok",
-        "phase_used": phase_used, "phases_attempted": phases_attempted,
-        "timings_ms": {**timings_ms, "total_wall": total_wall},
-        "http_status": winning_meta.get("status_code"), "content_type": winning_meta.get("content_type"),
+        "timings_ms": {"total_wall": total_wall},
+        "http_status": meta.get("status_code"), "content_type": meta.get("content_type"),
         "bytes_returned": len(final.encode("utf-8")),
-        "bytes_raw_markdown": winning_meta.get("raw_markdown_bytes", len(content.encode("utf-8"))),
-        "fallback_to_raw": winning_meta.get("fallback_to_raw", False),
+        "bytes_raw_markdown": meta.get("raw_markdown_bytes", len(content.encode("utf-8"))),
+        "fallback_to_raw": meta.get("fallback_to_raw", False),
         "truncated": len(content) > max_content_length,
-        "consent_stripped": winning_meta.get("consent_stripped", False),
+        "consent_stripped": meta.get("consent_stripped", False),
         "garbage_type": None,
-        "fastpath_hit": False, "fastpath_miss_reason": fp_miss, "content_path": content_path,
+        "content_path": content_path,
     })
     return [TextContent(type="text", text=f"# Content from: {url}\n\n{final}")]
 
 
 # FUNCTIONS
 
-# Try Accept: text/markdown fast-path; return (content, status_code, content_type, miss_reason)
-# On hit: (body, 200, ct, None). On miss: (None, status_code_or_None, ct_or_None, reason_str).
-# miss_reason values: "http_error" | "wrong_content_type" | "sub_threshold" | "network_error"
-async def fetch_markdown_fastpath(url: str) -> tuple[str | None, int | None, str | None, str | None]:
-    try:
-        async with httpx.AsyncClient(follow_redirects=True, timeout=MD_FASTPATH_TIMEOUT) as client:
-            resp = await client.get(url, headers={"Accept": "text/markdown, text/html"})
-        ct = resp.headers.get("content-type", "") or ""
-        if resp.status_code != 200:
-            logger.debug("Markdown fast-path miss (HTTP %d): %s", resp.status_code, url)
-            return None, resp.status_code, None, "http_error"
-        if "text/markdown" not in ct:
-            logger.debug("Markdown fast-path miss (ct=%s): %s", ct.split(";")[0].strip(), url)
-            return None, resp.status_code, ct, "wrong_content_type"
-        body = resp.text
-        if len(body) < MD_FASTPATH_MIN_BYTES:
-            logger.debug("Markdown fast-path sub-threshold (%d bytes): %s", len(body), url)
-            return None, resp.status_code, ct, "sub_threshold"
-        return body, resp.status_code, ct, None
-    except Exception as exc:
-        logger.debug("Markdown fast-path error for %s: %s", url, exc)
-        return None, None, None, "network_error"
-
-
-# Attempt scrape with given wait strategy; return (content, meta) where meta is a dict with:
-# garbage_type, status_code, content_type, fallback_to_raw, consent_stripped,
-# garbage_content (content that triggered garbage detection, for sidecar logging),
-# raw_markdown_bytes (raw_markdown length before filter/fallback, for bytes_raw_markdown field)
-async def try_scrape(browser_config, crawler_strategy, markdown_generator, url: str, wait_until: str) -> tuple[str, dict]:
-    logger.debug("Trying %s wait strategy", wait_until)
+# Single-call crawl4ai scrape with native anti-bot baseline; return (content, meta)
+# meta keys: garbage_type, status_code, content_type, fallback_to_raw, consent_stripped,
+#            garbage_content (content that triggered garbage detection, for sidecar logging),
+#            raw_markdown_bytes (raw_markdown length before filter/fallback)
+async def try_scrape(url: str) -> tuple[str, dict]:
+    browser_config = BrowserConfig(headless=True, verbose=False, enable_stealth=True)
+    adapter = UndetectedAdapter()
+    crawler_strategy = AsyncPlaywrightCrawlerStrategy(
+        browser_config=browser_config,
+        browser_adapter=adapter
+    )
     run_config = CrawlerRunConfig(
+        magic=True,
+        wait_until="load",
+        page_timeout=60000,
+        max_retries=0,
         cache_mode=CacheMode.BYPASS,
-        wait_until=wait_until,
+        markdown_generator=DefaultMarkdownGenerator(content_filter=PruningContentFilter(threshold=0.48)),
         excluded_selector=COOKIE_CONSENT_SELECTOR,
-        markdown_generator=markdown_generator,
         verbose=False,
     )
     _empty_meta: dict = {
@@ -231,10 +124,7 @@ async def try_scrape(browser_config, crawler_strategy, markdown_generator, url: 
         "garbage_content": None, "raw_markdown_bytes": 0,
     }
     try:
-        kwargs = {"config": browser_config}
-        if crawler_strategy:
-            kwargs["crawler_strategy"] = crawler_strategy
-        async with AsyncWebCrawler(**kwargs) as crawler:
+        async with AsyncWebCrawler(config=browser_config, crawler_strategy=crawler_strategy) as crawler:
             result = await crawler.arun(url=url, config=run_config)
         status_code = result.status_code if hasattr(result, "status_code") else None
         ct = None
@@ -267,25 +157,6 @@ async def try_scrape(browser_config, crawler_strategy, markdown_generator, url: 
     except Exception as e:
         logger.warning("Failed to scrape %s: %s", url, e)
         return "", dict(_empty_meta)
-
-
-# Append one JSONL failure record to dev/scrape_pipeline/failures.jsonl
-def log_scrape_failure(url: str, garbage_type: str | None, status_code: int | None) -> None:
-    project_root = os.environ.get("SEARXNG_PROJECT_ROOT")
-    if not project_root:
-        return
-    try:
-        log_path = Path(project_root) / "dev" / "scrape_pipeline" / "failures.jsonl"
-        record = {
-            "ts": datetime.now(timezone.utc).isoformat(),
-            "url": url,
-            "garbage_type": garbage_type,
-            "status_code": status_code,
-        }
-        with log_path.open("a", encoding="utf-8") as f:
-            f.write(json.dumps(record) + "\n")
-    except Exception as e:
-        logger.warning("Failed to log scrape failure: %s", e)
 
 
 # Detect garbage content: error pages, cookie walls, login walls, navigation dumps
