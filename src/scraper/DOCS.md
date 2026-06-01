@@ -23,13 +23,13 @@ Main orchestrator. Single-call approach: invokes `try_scrape(url)`, then logs re
 
 On empty/garbage result, returns error message with `garbage_type` from `_GARBAGE_MESSAGES`. No retry across phases.
 
-### try_scrape()
+### try_scrape(url)
 
-Single-call crawl4ai scrape with native anti-bot baseline. Builds config internally:
+Signature: `try_scrape(url: str) -> tuple[str, dict]`. Builds all config internally. Config:
 - `BrowserConfig(headless=True, verbose=False, enable_stealth=True)` + `UndetectedAdapter()` via `AsyncPlaywrightCrawlerStrategy`
 - `CrawlerRunConfig(magic=True, wait_until="load", page_timeout=60000, max_retries=0, cache_mode=CacheMode.BYPASS, markdown_generator=DefaultMarkdownGenerator(PruningContentFilter(0.48)), excluded_selector=COOKIE_CONSENT_SELECTOR)`
 
-Attempts a single scrape with given browser config, optional crawler strategy, and wait strategy. Returns `(content, meta)` where `meta` is a dict with keys: `garbage_type`, `status_code`, `content_type`, `fallback_to_raw`, `consent_stripped`, `garbage_content` (content that triggered garbage detection — written to sidecar on garbage outcome), `raw_markdown_bytes` (raw_markdown length before filter/fallback — used for `bytes_raw_markdown` log field). Checks `result.status_code` first — if >= 400, returns `("", meta_with_garbage_type="http_error")`. Content selection: `fit_markdown` if >= 200 chars (MIN_CONTENT_THRESHOLD), otherwise falls back to `raw_markdown` (`fallback_to_raw=True`). Checks content via `is_garbage_content()` — if `cookie_wall` is detected, attempts `strip_consent_prefix()` first: if stripping yields different content that passes garbage detection, returns stripped content with `consent_stripped=True`. All other garbage types (and cookie_wall when stripping fails) return empty string with `garbage_content` populated for sidecar logging. `is_garbage_content()` on this path is classification-only — no retry phases.
+Returns `(content, meta)` where `meta` is a dict with keys: `garbage_type`, `status_code`, `content_type`, `fallback_to_raw`, `consent_stripped`, `garbage_content` (content that triggered garbage detection — written to sidecar on garbage outcome), `raw_markdown_bytes` (raw_markdown length before filter/fallback — used for `bytes_raw_markdown` log field). Checks `result.status_code` first — if >= 400, returns `("", meta_with_garbage_type="http_error")`. Content selection: `fit_markdown` if >= 200 chars (MIN_CONTENT_THRESHOLD), otherwise falls back to `raw_markdown` (`fallback_to_raw=True`). Checks content via `is_garbage_content()` — if `cookie_wall` is detected, attempts `strip_consent_prefix()` first: if stripping yields different content that passes garbage detection, returns stripped content with `consent_stripped=True`. All other garbage types (and cookie_wall when stripping fails) return empty string with `garbage_content` populated for sidecar logging. `is_garbage_content()` on this path is classification-only — no retry phases.
 
 ### is_garbage_content()
 
