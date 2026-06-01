@@ -87,3 +87,12 @@ Ship-and-Observe. Kein formales Eval vor dem Merge — der User hat explizit ent
 - `src/logs/scrape_log.jsonl`: `outcome`-Feld (garbage_type, empty vs ok Rate)
 - Anekdotische Qualitäts-Checks im Alltag (Agent-Recherche, 2-3 URLs pro Session)
 - Kein Rollback-Plan documented — bei systematischen Regressions: neues OldThemes-Phase.
+
+## Erste Live-Verifikation (2026-06-01)
+
+Post-Merge live-getestet über die Prod-CLI (`searxng-cli scrape_url`) an zwei gezielten Fällen aus einer DDG-Suche ("rag chunking strategies"):
+
+- **Medium** (`medium.com/@.../15-advanced-chunking-techniques-...`) — der harte Bot/Cookie/Login-Wall-Fall. Ergebnis: `outcome=ok`, voller Artikel (alle 15 Techniken im Sidecar), `total_wall` 4510ms, `garbage_type=null`, Pruning 13307→7037 Bytes (~47% Boilerplate). **Empirische Bestätigung der #1959-Schlussfolgerung:** die Stealth-Kombi (UndetectedAdapter/Patchright + `enable_stealth` GPU-Flags) hat Mediums Bot-Detection passiert — keine Login-Wall, echter Content. Restchrome oben (`Sign up`/`Get app`) + eine Cookie-Zeile unten = bekannter prune_048-Tradeoff, kein Content-Verlust.
+- **Microsoft Learn** (`learn.microsoft.com/.../rag-chunking-phase`) — JS-lastige Docs-SPA, `wait_until="load"`-Test. Ergebnis: voller gerenderter Artikel, am Ende `[Content truncated...]` durch den bestehenden 15K-`DEFAULT_MAX_CONTENT_LENGTH`-Cap (intendiert, kein Fehler). Ein generisches „requires authorization"-Banner erschien, blockierte den Content aber NICHT.
+
+Beide bestätigen Determinismus (weit unter 60s-page_timeout), Vollständigkeit (`wait_until=load`) und No-Blocking (Stealth) am echten Traffic. Weiterer E2E-Testlauf folgt user-seitig.
