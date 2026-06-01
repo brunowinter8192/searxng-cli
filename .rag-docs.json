@@ -9,7 +9,6 @@
     "dev/*/*/DOCS.md",
     "decisions/*.md",
     "decisions/OldThemes/*.md",
-    "decisions/OldThemes/**/*.md",
-    "sources/sources.md"
+    "decisions/OldThemes/**/*.md"
   ]
 }

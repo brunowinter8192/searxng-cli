@@ -80,4 +80,4 @@ The WAF is NOT a pure concurrency cap. It is a rate/burst budget over time with 
 ## Quellen
 
 - `decisions/OldThemes/pipe_scraper_time_levers.md` — Phase 1/2/3 sweep history + old batch config
-- Scrapy source reference: `scrapy/core/downloader/__init__.py` (per-domain slot, delay gate, RANDOMIZE_DOWNLOAD_DELAY, CONCURRENT_REQUESTS_PER_DOMAIN) — see `sources/sources.md`
+- Scrapy source reference: `scrapy/core/downloader/__init__.py` (per-domain slot, delay gate, RANDOMIZE_DOWNLOAD_DELAY, CONCURRENT_REQUESTS_PER_DOMAIN)
