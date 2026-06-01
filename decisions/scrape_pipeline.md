@@ -6,46 +6,38 @@
 
 **Code:** `src/scraper/scrape_url.py` — `scrape_url_workflow`, `try_scrape`
 
-**Method:** 3-stufige Fallback-Kette mit zwei Browser-Phasen
+**Method:** Einzelner crawl4ai-Browser-Call mit nativer Anti-Bot-Baseline
 
-**Config:**
-- Phase 1a: `BrowserConfig(headless=True, verbose=False)` + `wait_until="networkidle"`
-- Phase 1b: `BrowserConfig(headless=True, verbose=False)` + `wait_until="domcontentloaded"` (Fallback)
-- Phase 2: `BrowserConfig(headless=True, verbose=False, enable_stealth=True)` + `UndetectedAdapter` + `AsyncPlaywrightCrawlerStrategy` + `wait_until="networkidle"`
-- `cache_mode=CacheMode.BYPASS` in allen Phasen
-- Jede Phase erstellt eine neue `AsyncWebCrawler`-Instanz (kein Session-Reuse)
+**Config (`try_scrape`):**
+- `BrowserConfig(headless=True, verbose=False, enable_stealth=True)`
+- `UndetectedAdapter()` verdrahtet via `AsyncPlaywrightCrawlerStrategy(browser_config=..., browser_adapter=...)`
+- `CrawlerRunConfig(magic=True, wait_until="load", page_timeout=60000, max_retries=0, cache_mode=CacheMode.BYPASS, markdown_generator=DefaultMarkdownGenerator(content_filter=PruningContentFilter(threshold=0.48)), excluded_selector=COOKIE_CONSENT_SELECTOR)`
 
-Phase 1a (`networkidle`) wartet, bis keine Netzwerkrequests mehr offen sind — robuster für SPA/JS-heavy Sites, aber langsamer. Phase 1b (`domcontentloaded`) feuert früher und rettet Sites, bei denen `networkidle` einen Timeout auslöst (z.B. endlose Polling-Requests). Phase 2 (Stealth) greift bei Anti-Bot-Schutz.
+**Parameter-Herleitung:**
+- `enable_stealth=True` + `magic=True` — No-Blocking: `enable_stealth` hält WebGL aktiv (kein `--disable-gpu`), `magic` übernimmt automatisches Overlay/Popup-Handling
+- `wait_until="load"` — Vollständigkeit: vollständiger Page-Load, weniger hängeanfällig als `networkidle` (kein 500ms-Idle-Wait), früher als `networkidle` auf tracker-heavy Sites
+- `page_timeout=60000` — Determinismus: harte Navigationsgrenze, Worst Case ~64s/URL
+- `UndetectedAdapter` — Patchright als primäre Anti-Bot-Evasion (ersetzt den schwächeren playwright-stealth-Pfad)
+- `max_retries=0` — kein internes Retry (No-Op, entspricht Default), Determinismus
+- `cache_mode=CacheMode.BYPASS` — kein Cache, jeder Request geht ans Netz
 
 ### Evidenz
 
-#### Session-Findings (2026-03)
-- `domcontentloaded`-Fallback hat Sites gerettet, bei denen `networkidle` hängt (Polling-Requests blockieren den Wait)
-- Stealth-Phase war notwendig für Sites mit aktivem Bot-Detection (z.B. Cloudflare-geschützte Domains)
-- `UndetectedAdapter` hat bekannte Fingerprinting-Vektoren (WebDriver-Flag, Chrome-Devtools-Protokoll-Signaturen)
+Prozess-Narrative, Iteration-History und Alternativ-Bewertung (networkidle-Timeout-Kosten, Hamster-Wheel-Risiko, enable_stealth/#1959-Analyse): `decisions/OldThemes/scrape_phase_escalation/`
 
-#### Crawl4AI Docs
-- `networkidle`: wartet bis 500ms keine Netzwerk-Aktivität — geeignet für JS-rendered Content
-- `domcontentloaded`: feuert sobald HTML geparst — kein Warten auf dynamischen Content
-- `enable_stealth=True`: aktiviert Playwright-Stealth-Patches (navigator.webdriver=false, etc.)
-- `CacheMode.BYPASS`: ignoriert Cache vollständig, jeder Request geht ans Netz
-
-#### Bekannte Einschränkungen
-- Kein Session-Reuse: jede Phase startet einen neuen Browser-Prozess — hoher Overhead bei mehreren Versuchen
-- `UndetectedAdapter` kann mit bestimmten Sites inkompatibel sein (daher Phase 2 als letzter Ausweg)
+Crawl4AI 0.8.6 API-Verifikation:
+- Alle `CrawlerRunConfig`-Parameter (`magic`, `wait_until`, `page_timeout`, `max_retries`) in `async_configs.py:1399–1519` vorhanden
+- `page_timeout` als Navigations-Timeout bestätigt: `async_crawler_strategy.py:762–763` — `page.goto(url, wait_until=config.wait_until, timeout=config.page_timeout)`
+- `UndetectedAdapter` + `AsyncPlaywrightCrawlerStrategy(browser_adapter=...)` API: `async_crawler_strategy.py:76`
 
 ### Recommendation (SOLL)
 
-`networkidle` als primäre Strategie, weil JS-rendered Content ohne Wait nicht vollständig geladen ist. `domcontentloaded` als Fallback, weil manche Sites mit Polling-Requests `networkidle` blockieren. Stealth als letzte Phase, weil `UndetectedAdapter` stabiler mit einem frischen Browser ist und nicht alle Sites Bot-Detection haben.
-
-`CacheMode.BYPASS` immer aktiv, weil gecachte veraltete Inhalte für Live-Recherche mehr schaden als nützen.
+Keep — architecture is the IST.
 
 ### Offene Fragen
 
 - Session-Reuse: Könnte ein persistenter Browser über mehrere Scrapes hinweg den Overhead reduzieren — Risiko: State-Pollution zwischen unabhängigen Requests
-- `domcontentloaded` + kurzer `js_code`-Wait als Alternative zu `networkidle`
-- Phase 2 könnte auch `domcontentloaded`-Fallback bekommen (aktuell nur `networkidle`)
-- Timeout-Konfiguration: kein expliziter Timeout gesetzt — Crawl4AI-Default gilt
+- `wait_until="load"` vs. kurzer `js_code`-Wait für Sites, die Content nach `load` nachladen (echte JS-SPAs)
 
 ---
 
@@ -165,15 +157,15 @@ Raw markdown for pipe-scraping (offline doc indexing): handled by `crawl_site_wo
   - Trigger: `len(content) < 500` UND `"checking your browser"` oder `"enable javascript and cookies"`
   - ODER: `"just a moment"` UND `"cloudflare"` (ohne Längenlimit)
 
-**Error Messages:** `_GARBAGE_MESSAGES` dict maps jede Kategorie auf eine menschenlesbare Fehlermeldung. `scrape_url_workflow()` trackt `last_garbage` über alle 3 Scrape-Versuche und gibt differenzierte Meldung zurück.
+**Error Messages:** `_GARBAGE_MESSAGES` dict maps jede Kategorie auf eine menschenlesbare Fehlermeldung. `scrape_url_workflow()` gibt differenzierte Meldung auf Basis des `garbage_type` aus `try_scrape` meta zurück.
+
+**Role:** `is_garbage_content()` dient ausschließlich der Klassifikation für Logging (`garbage_type` im JSONL-Record) und Fehlermeldung an den Caller. Bei erkanntem Garbage ohne Recovery (cookie_wall-Stripping fehlgeschlagen oder anderer Typ) scheitert der Scrape und wird als `garbage_type` geloggt. Kein Retry über weitere Phasen — ein einziger Call.
 
 **Logging:** `logger.warning("Garbage detected [%s]: %s", garbage_type, url)` bei jeder Garbage-Erkennung in `try_scrape()`.
 
 **PDF-URLs:** `download_pdf` CLI command als Lösung — PDFs werden heruntergeladen statt gescrapt. Agent-Instructions verweisen auf `download_pdf` statt "nicht scrapebar".
 
-**`PLUGIN_HINTS`:** generischer Hint via `get_plugin_hint()`, wird an Fehlermeldung angehängt wenn alle Phasen fehlschlagen. Zwei fixe Domain-Mappings.
-
-**Persistent Failure Logging (added 2026-03):** Every final scrape failure — all 3 attempts exhausted — appended as JSONL record to `dev/scrape_pipeline/failures.jsonl`. Implementation: `log_scrape_failure(url, garbage_type, status_code)` in `src/scraper/scrape_url.py`, called from `scrape_url_workflow()` at the final `if not content:` exit. Fields per record: `ts` (ISO 8601 UTC), `url`, `garbage_type` (str | null), `status_code` (int | null). `try_scrape()` return type extended from `tuple[str, str | None]` to `tuple[str, str | None, int | None]` to propagate `result.status_code`. `scrape_url_workflow()` tracks `last_status_code` alongside `last_garbage` across all 3 attempts. Silent fail: `log_scrape_failure()` wraps all I/O in try/except. File path gitignored; see `dev/scrape_pipeline/DOCS.md` for jq usage examples.
+**`PLUGIN_HINTS`:** generischer Hint via `get_plugin_hint()` (Stub — gibt immer `""` zurück), wird an Fehlermeldung angehängt wenn Scrape scheitert.
 
 **Consent-Prefix Stripping (added 2026-04):** `strip_consent_prefix()` in `src/scraper/scrape_url.py` — recovery for `cookie_wall` pages. When `is_garbage_content()` returns `cookie_wall`, `try_scrape()` attempts to strip the leading consent block and recover actual page content instead of immediately discarding. Only triggers on `cookie_wall`; all other garbage types still discarded immediately.
 
@@ -231,92 +223,22 @@ PDF-URLs: `download_pdf` CLI command statt Scraping-Versuch. Agent-Instructions 
 
 ---
 
-## Cloudflare / Vercel Fast-Path
-
-### Status Quo (IST)
-
-`src/scraper/scrape_url.py` executes an HTTP-only fast-path BEFORE invoking Crawl4AI's browser stack. Implementation: `fetch_markdown_fastpath()` in `scrape_url.py` (FUNCTIONS section), called from `scrape_url_workflow` immediately after the entry-point `logger.info("Scraping…")` line and BEFORE Crawl4AI setup.
-
-**Mechanism:**
-- `httpx.AsyncClient(follow_redirects=True, timeout=MD_FASTPATH_TIMEOUT)` GET with header `Accept: text/markdown, text/html`
-- ALL of: HTTP 200 + `Content-Type` contains `text/markdown` + body length ≥ `MD_FASTPATH_MIN_BYTES` → return body
-- Otherwise (any miss, any exception) → return `None` → workflow falls through to existing Crawl4AI two-phase scrape unchanged
-
-**Constants:**
-- `MD_FASTPATH_MIN_BYTES = 200` — body-length threshold; rejects redirect-stub responses
-- `MD_FASTPATH_TIMEOUT = 5.0` — generous for cold-edge CDN routing, tight enough to not delay Crawl4AI fallback
-
-**Logging:**
-- info: hit (`Markdown fast-path hit: <url> (<N> chars)`)
-- debug: miss (sub-threshold / non-200 / wrong content-type) and network errors
-
-**Routing interaction:** No domain blocking in CLI — fast-path runs on all URLs that pass the PDF check. No interaction.
-
-**Caching interaction:** Both scraper modules use `CacheMode.BYPASS` for Crawl4AI; no application-level cache. Fast-path is the first decision point in the chain.
-
-### Evidenz
-
-**Cloudflare announcement** — blog.cloudflare.com/markdown-for-agents/ (2026-02-12). Cloudflare CDN edge supports `Accept: text/markdown` content-negotiation for opted-in zones. Response includes `Content-Type: text/markdown; charset=utf-8`, an `x-markdown-tokens` integer header with the token count, and a `Content-Signal: ai-train=yes, search=yes, ai-input=yes` header. Beta for Pro/Business/Enterprise/SSL-for-SaaS plans; rollout began Feb 2026. Cited 80% token reduction on a sample blog post. Article notes Claude Code and OpenCode already send the header in production.
-
-**Adoption probe** — `dev/scrape_pipeline/06_cloudflare_md_adoption.py`, run 2026-05-07 against 29-URL curated set across three categories:
-
-| Category | URLs | MD-served | Notes |
-|---|---|---|---|
-| Cloudflare-owned (positive control) | 5 | 5/5 | 100% — expected |
-| Likely CF-fronted (typical scrape targets: dev.to, npm, Discord, Shopify, HuggingFace, Vercel, Tailwind, Supabase, Fly.io, Linear, Hashnode, Deno, Astro, Pydantic, PostHog, Render, Medium, Anthropic) | 19 | 2/19 | docs.anthropic.com (12-byte stub anomaly) + vercel.com/docs (Vercel's own edge implementation, no cf-ray) |
-| Non-CF negative controls (Wikipedia, Python.org, MDN, arXiv, GitHub-raw) | 5 | 0/5 | as expected |
-
-Mean byte-reduction on positives: 92.3%, median 97.0%, range 71.2%–98.5%. Aggregate adoption rate among non-Cloudflare-owned CF-customers in May 2026 (3 months after Beta launch): ≈0%.
-
-**Vercel finding (independent multi-vendor pattern):** vercel.com/docs returns `Content-Type: text/markdown` WITHOUT the `cf-ray` header — Vercel implements the same `Accept: text/markdown` convention on their own edge infrastructure independently of Cloudflare. The fast-path is therefore not Cloudflare-specific; it reflects an emerging multi-vendor convention.
-
-**Live verification (post-merge, 2026-05-07):** `searxng-cli scrape_url https://blog.cloudflare.com/markdown-for-agents/` returned in 1.06s with clean markdown frontmatter and body. Typical Crawl4AI baseline path: ~5–15s. Fast-path verified working in production.
-
-### Recommendation (SOLL)
-
-Keep current implementation (no change needed). The probe-on-every-scrape strategy is correct given:
-- Failure-mode is graceful (HTML fallback to existing path) and adds at most ~5s before falling back
-- Adoption is currently low (~24% of probe set, but mostly Cloudflare-owned) but growing — the fast-path catches new opt-ins automatically without code changes
-- The win-when-it-works is large: 97% median byte reduction, ~5x faster than browser path
-- Multi-vendor extension (Vercel) confirms the pattern isn't going away
-
-### Offene Fragen
-
-- Does `x-markdown-tokens` count match what our downstream cleanup + index pipeline chunking would compute? Could be used to influence chunk size dynamically when present.
-- Adoption tracking: re-run the probe quarterly. Track whether the May 2026 baseline (~24% of probe set) grows. The probe script is the persistent measurement artifact.
-- Other multi-vendor edges that might already implement this pattern (Fastly, AWS CloudFront)? Out of scope for now — let the probe surface them when they appear.
-
----
-
 ## Quellen
 
 **Code:**
 - `src/scraper/scrape_url.py` (Code-Inspektion — Browser Strategy, Content Filtering, Garbage Detection)
-
-**Crawl4AI Docs** (RAG Collection: Crawl4AIDocs):
-- BrowserConfig, CrawlerRunConfig, wait_until-Optionen (Browser Strategy)
-- PruningContentFilter, DefaultMarkdownGenerator, content_source (Content Filtering)
-- Error-Format, result.markdown-Struktur (Garbage Detection)
+- `venv/lib/python3.14/site-packages/crawl4ai/async_configs.py:1399–1519` (CrawlerRunConfig 0.8.6 Konstruktor-Signatur)
+- `venv/lib/python3.14/site-packages/crawl4ai/async_crawler_strategy.py:76,117,762–763` (UndetectedAdapter-Wiring, page_timeout-Wirkung)
+- `venv/lib/python3.14/site-packages/crawl4ai/browser_manager.py:95,763` (enable_stealth GPU-Flags + StealthAdapter-Bedingung)
 
 **Session-Findings:**
-- CookieYes cky-modal Fix, TDS Cookie-Wall, LanceDB 404, Truncation-Logik, domcontentloaded-Fallback (2026-03)
-
-**Cloudflare / Vercel Fast-Path:**
-- blog.cloudflare.com/markdown-for-agents/ (Cloudflare announcement, 2026-02-12)
-- developers.cloudflare.com/fundamentals/reference/markdown-for-agents/ (config docs)
-- vercel.com/docs (independent multi-vendor implementation, observed via probe; not formally documented by Vercel as of 2026-05-07)
-- dev/scrape_pipeline/06_cloudflare_md_adoption.py (adoption probe)
-- dev/scrape_pipeline/06_reports/cf_md_adoption_20260507_*.md (run snapshots)
+- CookieYes cky-modal Fix, TDS Cookie-Wall, LanceDB 404, Truncation-Logik (2026-03)
+- Phasen-Eskalations-Analyse, networkidle-Timeout-Kosten, Ship-and-Observe-Entscheidung (2026-05/06): `decisions/OldThemes/scrape_phase_escalation/`
 
 **Zum Indexieren (für systematische Verbesserung):**
 - Crawl4AI GitHub Issues "stealth" — UndetectedAdapter Bugs, Browser-Detection: https://github.com/unclecode/crawl4ai/issues?q=stealth+undetected
 - Crawl4AI Page Interaction Docs — js_code, wait_for, session_id: https://docs.crawl4ai.com/core/page-interaction
-- Playwright Docs — Browser Contexts, Network Interception: https://playwright.dev/python/docs/browser-contexts
 - Crawl4AI GitHub Issues "PruningContentFilter" — Threshold-Tuning, Code-Block-Destruction: https://github.com/unclecode/crawl4ai/issues?q=pruning+filter
-- Crawl4AI Content Filter Source — PruningContentFilter Algorithmus: https://github.com/unclecode/crawl4ai/blob/main/crawl4ai/content_filter_strategy.py
-- Trafilatura Docs — Alternative Content-Extraction (Benchmark-Vergleich): https://trafilatura.readthedocs.io/
-- Mozilla Readability — Reference Content-Extraction-Algorithmus: https://github.com/mozilla/readability
 - CookieYes Developer Docs — DOM-Struktur, Klassen-Konventionen: https://www.cookieyes.com/documentation/
-- Crawl4AI GitHub Issues "empty content" — Error-as-Content Pattern, Browser-Failures: https://github.com/unclecode/crawl4ai/issues?q=empty+content
 - OneTrust Developer Docs — Cookie-Banner DOM-Struktur: https://developer.onetrust.com/
 - Cookiebot Developer Docs — Dialog-Klassen: https://www.cookiebot.com/en/developer/

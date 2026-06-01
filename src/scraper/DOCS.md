@@ -2,42 +2,34 @@
 
 URL scraping and PDF download tools powered by Crawl4AI for SearXNG MCP server.
 
-## scrape_logger.py
+## scrape_logger.py (88 LOC)
 
-**Purpose:** Per-URL structured logging for scrape_url and scrape_url_raw. Two outputs per scrape call: (1) one JSONL record appended to `src/logs/scrape_log.jsonl`, (2) one sidecar `.md` file under the `scrape_content/` subdir of the log dir (gitignored) containing the exact content the caller received. No sidecar on error/timeout/empty outcomes; sidecar IS written on garbage outcome (content that triggered classification is preserved for inspection).
+**Purpose:** Per-URL structured logging for `scrape_url`. Two outputs per call: (1) one JSONL record appended to `src/logs/scrape_log.jsonl`, (2) one sidecar `.md` file under `scrape_content/` subdir containing the exact content the caller received. No sidecar on empty outcome; sidecar IS written on garbage outcome (content that triggered classification is preserved for inspection).
 **Public interface:** `log_scrape(record: dict)`, `write_sidecar(url, ts, content, outcome, mode) -> str | None`.
 **Reads:** `SEARXNG_SCRAPE_LOG_PATH` env var (fallback `src/logs/scrape_log.jsonl`). Sidecar dir = `<log_dir>/scrape_content/`.
 **Writes:** `src/logs/scrape_log.jsonl` (one line per call), `<log_dir>/scrape_content/<ts>_<slug>.md` (per-call content sidecar). Both gitignored.
 **Called by:** `scrape_url.py` (end of `scrape_url_workflow`).
 **Calls out:** `src/log_janitor.py` (`maybe_prune_jsonl`, `maybe_prune_sidecars`).
 
-## scrape_url.py
+## scrape_url.py (235 LOC)
 
-**Purpose:** URL scraping orchestrator. Uses Crawl4AI's AsyncWebCrawler with PruningContentFilter to extract clean page content as markdown. Two-phase browser strategy: normal browser first, stealth fallback for anti-bot sites.
+**Purpose:** URL scraping orchestrator. Single crawl4ai-Browser-Call with native anti-bot baseline (`enable_stealth=True` + `UndetectedAdapter` + `magic=True` + `wait_until="load"`). Extracts clean page content as markdown via PruningContentFilter.
 **Input:** URL string and optional maximum content length (default 15000).
 **Output:** Filtered markdown content wrapped in TextContent, or error message on failure. Side effect: writes one JSONL record to `scrape_log.jsonl` + one sidecar `.md` via `scrape_logger`.
 
 ### scrape_url_workflow()
 
-Main orchestrator. Three-phase approach:
+Main orchestrator. Single-call approach: invokes `try_scrape(url)`, then logs result and returns content or error message. Noise removal via `excluded_selector=COOKIE_CONSENT_SELECTOR` (inside `try_scrape` via `CrawlerRunConfig`). `remove_overlay_elements` is NOT used (destroys Wikipedia content by misclassifying DOM elements as overlays).
 
-1. **Phase 0: HTTP markdown fast-path** — `fetch_markdown_fastpath()` probes the URL with `Accept: text/markdown, text/html` via httpx. If the host serves text/markdown directly (Cloudflare-fronted zones with Markdown-for-Agents enabled, Vercel's own edge implementation, others), the markdown body is returned and Crawl4AI is skipped entirely. See `decisions/scrape_pipeline.md`.
-2. **Phase 1: Normal browser** — Standard Crawl4AI without stealth patches. Works for most sites (Wikipedia, docs, blogs). Tries `networkidle` first, falls back to `domcontentloaded`.
-3. **Phase 2: Stealth browser** — Only if Phase 1 returns empty. Uses `enable_stealth=True` + `UndetectedAdapter` + `AsyncPlaywrightCrawlerStrategy` (Level 3 anti-bot evasion). For sites with bot detection (e.g. TDS, some news sites).
+On empty/garbage result, returns error message with `garbage_type` from `_GARBAGE_MESSAGES`. No retry across phases.
 
-Noise removal via `excluded_selector=COOKIE_CONSENT_SELECTOR` — CSS selectors matching common cookie consent frameworks. `remove_overlay_elements` is NOT used (destroys Wikipedia content by misclassifying DOM elements as overlays).
+### try_scrape(url)
 
-On empty result, returns error message.
+Signature: `try_scrape(url: str) -> tuple[str, dict]`. Builds all config internally. Config:
+- `BrowserConfig(headless=True, verbose=False, enable_stealth=True)` + `UndetectedAdapter()` via `AsyncPlaywrightCrawlerStrategy`
+- `CrawlerRunConfig(magic=True, wait_until="load", page_timeout=60000, max_retries=0, cache_mode=CacheMode.BYPASS, markdown_generator=DefaultMarkdownGenerator(PruningContentFilter(0.48)), excluded_selector=COOKIE_CONSENT_SELECTOR)`
 
-### fetch_markdown_fastpath()
-
-HTTP probe for server-side markdown availability (Phase 0). Sends `Accept: text/markdown, text/html` via `httpx.AsyncClient` with `follow_redirects=True` and `MD_FASTPATH_TIMEOUT` (5.0s). Returns `(content, status_code, content_type, miss_reason)` 4-tuple. On hit: `(body, 200, ct, None)`. On miss: `(None, status_code_or_None, ct_or_None, reason)` where reason ∈ `{"http_error", "wrong_content_type", "sub_threshold", "network_error"}`. Hit conditions: HTTP 200 + `text/markdown` content-type + body ≥ `MD_FASTPATH_MIN_BYTES` (200 bytes). Logs at info-level on hit; debug-level on miss/error. Imported by `scrape_url_raw.py` for reuse.
-
-The 200-byte threshold guards against redirect-stub responses (anomaly observed at docs.anthropic.com returning 12 bytes during the 2026-05-07 adoption probe). The 5s timeout is generous enough for cold-edge CDN routing while still being tighter than the typical Crawl4AI browser-launch path, so the probe never delays the fallback meaningfully. Not imported by any other module — used only within `scrape_url_workflow`.
-
-### try_scrape()
-
-Attempts a single scrape with given browser config, optional crawler strategy, and wait strategy. Returns `(content, meta)` where `meta` is a dict with keys: `garbage_type`, `status_code`, `content_type`, `fallback_to_raw`, `consent_stripped`, `garbage_content` (content that triggered garbage detection — written to sidecar on garbage outcome), `raw_markdown_bytes` (raw_markdown length before filter/fallback — used for `bytes_raw_markdown` log field). Checks `result.status_code` first — if >= 400, returns `("", meta_with_garbage_type="http_error")`. Content selection: `fit_markdown` if >= 200 chars (MIN_CONTENT_THRESHOLD), otherwise falls back to `raw_markdown` (`fallback_to_raw=True`). Checks content via `is_garbage_content()` — if `cookie_wall` is detected, attempts `strip_consent_prefix()` first: if stripping yields different content that passes garbage detection, returns stripped content with `consent_stripped=True`. All other garbage types (and cookie_wall when stripping fails) return empty string with `garbage_content` populated for sidecar logging.
+Returns `(content, meta)` where `meta` is a dict with keys: `garbage_type`, `status_code`, `content_type`, `fallback_to_raw`, `consent_stripped`, `garbage_content` (content that triggered garbage detection — written to sidecar on garbage outcome), `raw_markdown_bytes` (raw_markdown length before filter/fallback — used for `bytes_raw_markdown` log field). Checks `result.status_code` first — if >= 400, returns `("", meta_with_garbage_type="http_error")`. Content selection: `fit_markdown` if >= 200 chars (MIN_CONTENT_THRESHOLD), otherwise falls back to `raw_markdown` (`fallback_to_raw=True`). Checks content via `is_garbage_content()` — if `cookie_wall` is detected, attempts `strip_consent_prefix()` first: if stripping yields different content that passes garbage detection, returns stripped content with `consent_stripped=True`. All other garbage types (and cookie_wall when stripping fails) return empty string with `garbage_content` populated for sidecar logging. `is_garbage_content()` on this path is classification-only — no retry phases.
 
 ### is_garbage_content()
 
@@ -62,10 +54,6 @@ Attempts to recover content from a cookie-wall page by stripping the leading con
 
 Truncates content if exceeding maximum length. Attempts to break at paragraph boundary for clean truncation. Appends truncation notice when content is cut.
 
-### log_scrape_failure()
-
-Appends one JSONL failure record to `dev/scrape_pipeline/failures.jsonl`. Called at the final failure exit in `scrape_url_workflow()` when all 3 attempts are exhausted. Fields: `ts` (ISO 8601 UTC), `url`, `garbage_type`, `status_code`. Requires `SEARXNG_PROJECT_ROOT` env variable — silently skips if not set. Silent fail on any I/O error.
-
 ### get_plugin_hint()
 
 Stub — always returns `""`. Domain blocking removed; no plugin-routing hint is applicable.
@@ -75,8 +63,6 @@ Stub — always returns `""`. Domain blocking removed; no plugin-routing hint is
 - `COOKIE_CONSENT_SELECTOR` — CSS selector string matching common cookie consent frameworks: CookieYes (cky-consent, cky-banner, cky-modal), OneTrust, Cookiebot, cc-banner, GDPR, cookie-banner, cookie-consent, cookie-notice, cookie-law. Note: `cky-modal` is critical — CookieYes stores the full Consent Preferences dialog (12K+ chars of cookie descriptions) in this container. Without it, only the small banner (236 chars) is removed.
 - `DEFAULT_MAX_CONTENT_LENGTH` — 15000 chars
 - `MIN_CONTENT_THRESHOLD` — 200 chars. fit_markdown below this triggers raw_markdown fallback.
-- `MD_FASTPATH_MIN_BYTES` — 200 bytes. Phase 0 markdown response below this is treated as stub/redirect noise and rejected (fall through to Crawl4AI).
-- `MD_FASTPATH_TIMEOUT` — 5.0s. Phase 0 httpx timeout — generous for cold-edge routing, tight against fallback delay.
 - `CONSENT_WORDS` — keyword list for consent density scoring: cookie, consent, einwilligung, tracking, akzeptieren, datenschutz, zweck
 - `CONSENT_DENSITY_THRESHOLD` — 5. Sum of CONSENT_WORDS occurrences in first 3000 chars must exceed this to trigger stripping.
 - `CONSENT_SKIP_OFFSET` — 300 chars. Heading search starts at this offset to skip banner fragments before the actual content starts.
@@ -118,9 +104,9 @@ Stub — always returns `""`. Domain blocking removed; no plugin-routing hint is
 
 ## Architecture
 
-Content extraction is delegated entirely to Crawl4AI (v0.8.0):
-- **Browser strategy:** Normal browser first, Stealth (Level 3) as fallback. UndetectedAdapter breaks some sites (Wikipedia) by patching the browser too aggressively.
-- **Cookie removal:** CSS selector exclusion via `excluded_selector`. Specific selectors per framework (CookieYes, OneTrust, Cookiebot, GDPR etc.). `remove_overlay_elements` is NOT used — it removes legitimate content on some sites.
+Content extraction is delegated entirely to Crawl4AI (v0.8.6):
+- **Browser strategy:** Single call — `enable_stealth=True` + `UndetectedAdapter` (Patchright) + `magic=True` + `wait_until="load"` + `page_timeout=60000`. No phase escalation. See `decisions/scrape_pipeline.md`.
+- **Cookie removal:** CSS selector exclusion via `excluded_selector=COOKIE_CONSENT_SELECTOR`. Specific selectors per framework (CookieYes, OneTrust, Cookiebot, GDPR etc.). `remove_overlay_elements` is NOT used — it removes legitimate content on some sites.
 - **Content filtering:** PruningContentFilter(0.48) + fit_markdown for relevance assessment. raw_markdown fallback when filtered content < 200 chars (table-heavy pages).
 - **Markdown generation:** Two modes:
   - **scrape_url (CLI tool):** PruningContentFilter + fit_markdown — noise-filtered, for in-conversation reading

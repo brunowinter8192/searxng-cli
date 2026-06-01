@@ -12,29 +12,22 @@ logger = logging.getLogger(__name__)
 
 DEFAULT_LOG_PATH = Path(__file__).parent.parent.parent / "src" / "logs" / "scrape_log.jsonl"
 
-# Record schema (one record per scrape_url / scrape_url_raw call):
+# Record schema (one record per scrape_url call):
 # {
 #   "ts": str (ISO-8601 UTC, millisecond precision),
 #   "url": str,
 #   "domain": str,
-#   "mode": "filtered" | "raw",
+#   "mode": "filtered",
 #   "outcome": "ok" | "garbage" | "empty" | "timeout" | "error",
-#   "phase_used": "fastpath" | "browser_1a" | "browser_1b" | "browser_2_stealth" | null,
-#   "phases_attempted": [str],
-#   "timings_ms": {
-#     "fastpath": int | null, "browser_1a": int | null, "browser_1b": int | null,
-#     "browser_2_stealth": int | null, "filter": null, "total_wall": int
-#   },
+#   "timings_ms": {"total_wall": int},
 #   "http_status": int | null,
 #   "content_type": str | null,
 #   "bytes_returned": int | null,
 #   "bytes_raw_markdown": int | null,
-#   "fallback_to_raw": bool | null,      # null for raw mode
-#   "truncated": bool | null,             # null for raw mode
-#   "consent_stripped": bool | null,      # null for raw mode
+#   "fallback_to_raw": bool,
+#   "truncated": bool,
+#   "consent_stripped": bool,
 #   "garbage_type": str | null,
-#   "fastpath_hit": bool,
-#   "fastpath_miss_reason": "wrong_content_type" | "sub_threshold" | "http_error" | "network_error" | null,
 #   "content_path": str | null            # relative path under log dir, e.g. "scrape_content/<file>.md"
 # }
 #
