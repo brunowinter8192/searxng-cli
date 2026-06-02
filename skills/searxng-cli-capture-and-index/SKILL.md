@@ -106,7 +106,7 @@ mkdir -p $OUTPUT_DIR
 Run the pipe-scraper on the filtered list. It lives in the searxng SOURCE — the plugin **cache has NO venv**, so a plugin-relative `./venv/bin/python` resolves into the worktree and fails. Invoke via the absolute source path (so both the venv and the `src.crawler` module resolve) as a background-wait (scrapes of N>50 URLs exceed CC's auto-background threshold):
 
 ```bash
-SEARXNG=/Users/brunowinter2000/Documents/ai/Meta/ClaudeCode/MCP/searxng
+SEARXNG=/Users/brunowinter2000/Documents/ai/Meta/ClaudeCode/cli/searxng-cli
 cd "$SEARXNG" && ./venv/bin/python -m src.crawler.pipe_scraper \
     --url-file /tmp/<domain>_discovered_urls.txt \
     --output-dir $OUTPUT_DIR > /tmp/<domain>_scrape.log 2>&1 &
@@ -352,7 +352,7 @@ Stop when:
 One script call. `index-dir` is incremental (hash-based skip) — re-running only embeds new/changed files; existing chunks are never touched or re-embedded.
 
 ```bash
-cd ~/Documents/ai/Meta/ClaudeCode/MCP/RAG && \
+cd ~/Documents/ai/Meta/ClaudeCode/cli/rag-cli && \
 PYTHONUNBUFFERED=1 ./venv/bin/python workflow.py index-dir \
     --input "$OUTPUT_DIR" --collection "$COLLECTION" \
     > /tmp/${COLLECTION}_index.log 2>&1 &
