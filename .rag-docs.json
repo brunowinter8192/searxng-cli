@@ -1,5 +1,5 @@
 {
-  "collection": "searxng-docs",
+  "collection": "searxng-cli-docs",
   "include": [
     "DOCS.md",
     "src/DOCS.md",
