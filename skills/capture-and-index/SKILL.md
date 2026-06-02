@@ -83,6 +83,18 @@ Record which patterns were dropped and why — this goes into the Completion Rep
 
 Do NOT read page content here; that is impossible pre-scrape. This step is purely list-level pattern selection.
 
+#### Phase 1b — Opus Cull Review (MANDATORY STOP)
+
+After the pattern-noise cull, the list still contains pages that are valid content but may be **irrelevant to what the user actually needs**. You (worker) cannot judge user-relevance — you lack the session context, and the cull is domain-specific. So you do NOT edit the list for relevance; you present, **Opus edits the `/tmp` file directly** (it is shared between sessions).
+
+STOP here. Report to Opus:
+- the URL-list path (`/tmp/<domain>_discovered_urls.txt`) and total count
+- a **per-section breakdown**: group URLs by their first path segment under the target root, with counts — e.g. `rest/actions: 41 · rest/repos: 28 · rest/enterprise-admin: 35 · …`
+
+Then WAIT. Opus strips the unwanted URLs from `/tmp/<domain>_discovered_urls.txt` itself (its own bash — the cull patterns are domain-specific). When Opus says go, re-read the now-shorter file and proceed to Phase 2 — do NOT modify the list yourself.
+
+Do NOT scrape before Opus says go. Scraping the full list wastes scrape + index time, blocks RAG globally during indexing, and dilutes retrieval with irrelevant pages. This STOP is the single highest-leverage step for retrieval quality.
+
 #### Phase 2 — Scrape
 
 Scrape every URL in the filtered list **raw and maximal** — no content filter, no truncation. Cleanup strips chrome after the fact, but content not captured here is gone for good.
@@ -91,15 +103,18 @@ Scrape every URL in the filtered list **raw and maximal** — no content filter,
 mkdir -p $OUTPUT_DIR
 ```
 
-Run the pipe-scraper on the filtered list (plugin-relative invocation — not a system path):
+Run the pipe-scraper on the filtered list. It lives in the searxng SOURCE — the plugin **cache has NO venv**, so a plugin-relative `./venv/bin/python` resolves into the worktree and fails. Invoke via the absolute source path (so both the venv and the `src.crawler` module resolve) as a background-wait (scrapes of N>50 URLs exceed CC's auto-background threshold):
 
 ```bash
-./venv/bin/python -m src.crawler.pipe_scraper \
+SEARXNG=/Users/brunowinter2000/Documents/ai/Meta/ClaudeCode/MCP/searxng
+cd "$SEARXNG" && ./venv/bin/python -m src.crawler.pipe_scraper \
     --url-file /tmp/<domain>_discovered_urls.txt \
-    --output-dir $OUTPUT_DIR
+    --output-dir $OUTPUT_DIR > /tmp/<domain>_scrape.log 2>&1 &
+( while pgrep -f 'pipe_scraper' > /dev/null 2>&1; do sleep 15; done; echo SCRAPE_DONE ) &
+wait
 ```
 
-> The exact pipe-scraper module/flags are finalized when the `src/` port lands (after the scraper eval). It renders in a browser, captures raw markdown (no PruningContentFilter), enforces a hard per-URL timeout with WAF-safe pacing, and tracks total scrape duration.
+> `src/crawler/pipe_scraper.py` is the validated production scraper (crawl4ai browser, raw markdown, Scrapy-style per-domain pacing — see `decisions/pipe_scraper.md`). When `wait` returns the scrape is DONE — read `/tmp/<domain>_scrape.log` ONCE for the summary line. Do NOT add manual `sleep`/`tail`/`ps`/poll calls between launch and the `wait` return — the environment's polling-loop hook blocks them and wastes turns.
 
 The scraper's own output is short: a console line with **success count, error count, and total duration**, plus a full per-URL report written to `/tmp/<domain>_scrape_report.md` (per-URL status + outcome). It does NOT dump a per-URL list to the console — failures live in the report md and can be inspected there if needed.
 
@@ -114,6 +129,18 @@ Diagnose first. Don't write cleanup regex before classifying shape.
 ##### Diagnose Pass
 
 Build a small script that scans ALL `.md` files in OUTPUT_DIR, extracts per-file fingerprints (h1 count, h2 count, prose density, table presence, source domain from `<!-- source: URL -->` comment, total LOC). Cluster by fingerprint similarity to identify 4-5 shape groups. ~50 LOC, ~5s runtime.
+
+**Fold in — Block Detection (cookie / paywall / JS-wall / captcha).** The diagnose script already holds every file's content in memory — so ALSO match each file against a BROAD, high-recall block-signature list (it deliberately over-catches; block text is too fuzzy across domains for a precise list to generalize — over-catch + verify is the model). Case-insensitive substring set, extend freely:
+
+```
+cookie/consent : "accept cookies", "we use cookies", "cookie policy", "consent", "gdpr", "manage preferences"
+paywall/sub    : "subscribe to", "sign in to continue", "members only", "create a free account", "register to read"
+js/bot wall    : "enable javascript", "javascript is required", "verify you are human", "captcha", "checking your browser", "access denied"
+```
+
+A file is a CANDIDATE when it matches a signature AND is small (byte-size in the thin-page range — large matches are legit content merely mentioning the term). For every candidate, the diagnose script PRINTS its `<!-- source -->` URL + first ~15 lines into its own output — so you confirm real-block vs false-positive from the already-returned output, no extra call. If the candidate set is large (dozens+), that signals a systemic crawl block → STOP and report to Opus.
+
+A confirmed block page is garbage → **DELETE it** (same as a thin page) — no content-stripping. REPORT the confirmed-block count + example URLs in the Completion Report.
 
 ##### Post-Scrape Drop — thin successful pages (part of the diagnose pass)
 
@@ -341,6 +368,8 @@ Done: N files indexed (X chunks), Y skipped, Z adopted
 
 Report `N` (files indexed) and `X` (chunks) from that line — `N` is the **final md** count for the Completion Report.
 
+When `wait` returns, indexing is DONE — read `/tmp/${COLLECTION}_index.log` ONCE for the summary line. Do NOT manually poll the log or process between launch and the `wait` return (no `sleep`/`tail`/`ps`/`until pgrep` loops) — the environment's polling-loop hook blocks them and wastes turns. Indexing blocks RAG globally for ALL projects while it runs — one more reason not to busy-wait around it.
+
 No separate verify step inside the pipe: the real verification is the research done on the indexed data back in the main session, not a query here.
 
 ---
@@ -357,6 +386,7 @@ URLs dropped (pre-scrape, pattern): K    — which patterns + why
 URLs scraped:                       N − K
 Scrape:                             M ok, E errors   ·   duration: T   (errors itemized in /tmp scrape report md)
 md dropped (post-scrape, thin):     D
+blocks detected (cookie/paywall):   B    — confirmed real-block MDs + example URLs (NOT auto-stripped)
 Final md indexed:                   M − D
 Collection:                         <COLLECTION>
 ```

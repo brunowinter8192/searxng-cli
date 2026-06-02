@@ -118,7 +118,7 @@ When the user wants to permanently capture a whole domain (or a set of PDFs) int
 
 Default is `<current_project>_reference`, but it may be another project's reference collection.
 
-**3.** Spawn the worker. It activates the `capture-and-index` skill and runs the whole pipe (web-md: Discovery → URL Selection → Scrape → Cleanup → Index; pdf: Acquisition → Cleanup → Index). Opus provides only the seed/input, collection, and output dir.
+**3.** Spawn the worker. It activates the `capture-and-index` skill and runs the pipe — but for web-md it **STOPS at the URL list (Phase 1b) for your cull review** before scraping (step 4). web-md: Discovery → URL Selection → **STOP (Opus cull)** → Scrape → Cleanup → Index; pdf: Acquisition → Cleanup → Index (no cull stop). Opus provides the seed/input, collection, and output dir.
 
 Worker prompt (`/tmp/spawn-<name>.md`):
 
@@ -130,9 +130,13 @@ Inputs:
 - SEED_URL: <root domain URL>   (web-md)   OR   INPUT: <PDF file/dir>   (pdf)
 - COLLECTION: <name>
 - OUTPUT_DIR: ~/Documents/ai/Meta/ClaudeCode/MCP/RAG/data/documents/<name>/
-Report the funnel when done. No commit needed (output is data files).
+web-md: STOP at Phase 1b — report the URL-list path + per-section breakdown and WAIT for my cull decision before scraping. Then report the funnel when done (incl. blocks-detected). No commit needed (output is data files).
 ```
 
 ```bash
 worker-cli spawn capture-<collection_lower> /tmp/spawn-<name>.md <project_root> sonnet
 ```
+
+**4.** Cull review (web-md only — the highest-leverage step). When the worker stops at Phase 1b it reports the URL-list path + a per-section breakdown. Review it against **what the user actually needs this session** — drop sections that are valid content but off-topic (e.g. a GitHub REST capture aimed at search/contents/git-trees does not need `actions`/`enterprise-admin`/`scim`). Send the worker the sections/patterns to drop. The worker applies the cull and proceeds. This is YOUR call, not the worker's — only you hold the user-need context.
+
+**5.** When the worker reports the funnel, check `blocks detected` — non-zero means it found cookie/paywall MDs (not auto-stripped). Decide from the reported patterns whether a `src/` strip-script is warranted.
