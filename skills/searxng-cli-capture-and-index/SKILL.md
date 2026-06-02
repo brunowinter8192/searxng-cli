@@ -103,18 +103,18 @@ Scrape every URL in the filtered list **raw and maximal** — no content filter,
 mkdir -p $OUTPUT_DIR
 ```
 
-Run the pipe-scraper on the filtered list. It lives in the searxng SOURCE — the plugin **cache has NO venv**, so a plugin-relative `./venv/bin/python` resolves into the worktree and fails. Invoke via the absolute source path (so both the venv and the `src.crawler` module resolve) as a background-wait (scrapes of N>50 URLs exceed CC's auto-background threshold):
+Launch the pipe-scraper as a **background Bash call** (`run_in_background=true`), then go idle. It lives in the searxng SOURCE — the plugin **cache has NO venv**, so a plugin-relative `./venv/bin/python` resolves into the worktree and fails. Invoke via the absolute source path (so both the venv and the `src.crawler` module resolve):
 
 ```bash
 SEARXNG=/Users/brunowinter2000/Documents/ai/Meta/ClaudeCode/cli/searxng-cli
 cd "$SEARXNG" && ./venv/bin/python -m src.crawler.pipe_scraper \
     --url-file /tmp/<domain>_discovered_urls.txt \
     --output-dir $OUTPUT_DIR > /tmp/<domain>_scrape.log 2>&1 &
-( while pgrep -f 'pipe_scraper' > /dev/null 2>&1; do sleep 15; done; echo SCRAPE_DONE ) &
-wait
 ```
 
-> `src/crawler/pipe_scraper.py` is the validated production scraper (crawl4ai browser, raw markdown, Scrapy-style per-domain pacing — see `decisions/pipe_scraper.md`). When `wait` returns the scrape is DONE — read `/tmp/<domain>_scrape.log` ONCE for the summary line. Do NOT add manual `sleep`/`tail`/`ps`/poll calls between launch and the `wait` return — the environment's polling-loop hook blocks them and wastes turns.
+> `src/crawler/pipe_scraper.py` is the validated production scraper (crawl4ai browser, raw markdown, Scrapy-style per-domain pacing — see `decisions/pipe_scraper.md`). Launch it as a background Bash call (`run_in_background=true`) and go idle — CC wakes you when the background process completes. Do NOT `pgrep`/name-poll/`wait`-loop. On the completion notification, read `/tmp/<domain>_scrape.log` ONCE for the `Scraped N/N ok` summary, then continue **on your own** to Cleanup → Index → final report.
+>
+> **Opus is hands-off from the cull-go until your final report.** You own the entire Scrape → Cleanup → Index pipeline end-to-end. NEVER hand back to Opus mid-pipeline (no "resume me", no intermediate status request) — Opus does nothing until you present the funnel. The only thing that wakes you between phases is CC's own background-completion notification for the task you launched.
 
 The scraper's own output is short: a console line with **success count, error count, and total duration**, plus a full per-URL report written to `/tmp/<domain>_scrape_report.md` (per-URL status + outcome). It does NOT dump a per-URL list to the console — failures live in the report md and can be inspected there if needed.
 
@@ -262,20 +262,9 @@ Do NOT carry a bash assoc-array pattern into a zsh worker session expecting it t
 
 If MinerU fails for any PDF: log + skip + continue. Report failed PDFs at end.
 
-##### Background-Polling for Phase 0 Convert
+##### Background Convert — launch + go idle
 
-Use this pattern whenever **any** of the following is true:
-- Input PDF is >50 MB
-- Batch over all PDFs in a directory (loop template above)
-- Single PDF and wallclock is expected to exceed 60 s (rule of thumb: any academic paper >10 MB, any book PDF)
-
-```bash
-# Run as Bash(run_in_background=true)
-( while pgrep -f 'workflow.py convert' > /dev/null 2>&1; do sleep 15; done; echo CONVERT_DONE ) &
-wait
-```
-
-The `sleep 15` *inside* the loop is normal blocking sleep — it does NOT trigger CC tool-completion events. CC sees ONE backgrounded call, ONE completion when MinerU is truly gone. Zero cascade.
+For any non-trivial convert (PDF >50 MB, a batch over a directory, or a single PDF expected to exceed ~60 s — any academic paper >10 MB, any book PDF): launch `workflow.py convert` as a background Bash call (`run_in_background=true`) and go idle. CC wakes you on background completion; then run the post-convert verify and continue. Do NOT `pgrep`/name-poll/`wait`-loop — you own the pipeline end-to-end, Opus stays hands-off until the final report.
 
 ##### Post-Convert Verify
 
@@ -290,20 +279,11 @@ Threshold: **≥ 100 words** = meaningful conversion. Below threshold:
 - Retry: add `--timeout 300` (or higher) to the `workflow.py convert` call
 - If retry also fails: skip file, add to failed list, continue batch
 
-##### Why Background-Polling for Convert
+##### Why launch-and-idle, not a foreground call
 
-Claude Code auto-backgrounds any Bash call whose wallclock exceeds ~60 s AND whose output stream has been idle for >30 s. MinerU convert on large PDFs routinely meets both conditions — it's CPU-bound and silent during the OCR/LaTeX extraction phase.
+MinerU convert on large PDFs is CPU-bound and silent for long stretches. A naive foreground `Bash(workflow.py convert ...)` gets auto-backgrounded by CC after ~60 s of quiet output, and the tool-result returns exit 0 (CC's backgrounding exit, NOT MinerU's) — so the worker wrongly concludes "convert done" and moves on while MinerU is still running, leaving an empty/partial `.md`.
 
-**What happens without the polling pattern:**
-
-1. Worker fires `Bash(workflow.py convert --input paper.pdf --output out.md)` with output redirected to a log file.
-2. CC sees process running, output stream quiet → auto-backgrounds the call.
-3. Bash tool-result returns immediately with exit code 0 (CC's backgrounding exit, NOT MinerU's exit).
-4. Worker reads exit=0 → assumes convert succeeded, moves to Phase 1 cleanup.
-5. MinerU is still running in the background (or was killed by CC). The `.md` output file is empty or partially written.
-6. GUARD 2 in the batch loop (`[ -s "$OUTPUT_DIR/$STEM.md" ]`) fires — but only if the worker revisits the file. If the worker already reported "Phase 0 done" and moved on, the empty file silently enters Phase 1.
-
-**What the polling pattern does:** CC sees ONE backgrounded Bash call. `wait` blocks until `pgrep -f 'workflow.py convert'` finds no process. Only then does `echo CONVERT_DONE` fire. Worker receives ONE completion notification after MinerU is truly gone, then runs the post-convert verify.
+Launching explicitly with `run_in_background=true` removes the ambiguity: the worker goes idle and is woken by CC's genuine background-completion notification (MinerU truly gone), THEN runs the post-convert verify. Never infer completion from a returned Bash exit on a long convert.
 
 #### Phase 1 — Cleanup
 
@@ -356,8 +336,6 @@ cd ~/Documents/ai/Meta/ClaudeCode/cli/rag-cli && \
 PYTHONUNBUFFERED=1 ./venv/bin/python workflow.py index-dir \
     --input "$OUTPUT_DIR" --collection "$COLLECTION" \
     > /tmp/${COLLECTION}_index.log 2>&1 &
-( while pgrep -f 'workflow.py index-dir' > /dev/null 2>&1; do sleep 30; done; echo INDEXING_DONE ) &
-wait
 ```
 
 The script prints per file `Indexed <doc> -> N chunks` and a final summary line:
@@ -368,7 +346,7 @@ Done: N files indexed (X chunks), Y skipped, Z adopted
 
 Report `N` (files indexed) and `X` (chunks) from that line — `N` is the **final md** count for the Completion Report.
 
-When `wait` returns, indexing is DONE — read `/tmp/${COLLECTION}_index.log` ONCE for the summary line. Do NOT manually poll the log or process between launch and the `wait` return (no `sleep`/`tail`/`ps`/`until pgrep` loops) — the environment's polling-loop hook blocks them and wastes turns. Indexing blocks RAG globally for ALL projects while it runs — one more reason not to busy-wait around it.
+Launch index-dir as a background Bash call (`run_in_background=true`) and go idle — CC wakes you on background completion. Do NOT `pgrep`/name-poll/`wait`-loop. On the completion notification, read `/tmp/${COLLECTION}_index.log` ONCE for the summary line, then output the Completion Report. Indexing blocks RAG globally for ALL projects while it runs — going idle (not busy-waiting) is doubly right here. Opus stays hands-off until your final report.
 
 No separate verify step inside the pipe: the real verification is the research done on the indexed data back in the main session, not a query here.
 
