@@ -1,5 +1,5 @@
 ---
-name: capture-and-index
+name: searxng-cli-capture-and-index
 description: Worker-side skill — discover URLs agentic (worker writes /tmp scripts), select which to scrape, scrape raw/maximal, clean (incl. post-scrape noise drop), and index into RAG. Modes: web-md (Discovery→Select→Scrape→Cleanup→Index), pdf (Acquisition→Cleanup→Index).
 ---
 

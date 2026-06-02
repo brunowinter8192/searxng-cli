@@ -1,11 +1,10 @@
 {
-  "name": "searxng",
+  "name": "searxng-cli",
   "version": "1.0.0",
   "description": "SearXNG MCP server - web search and URL scraping with markdown conversion",
   "author": {
     "name": "Bruno Winter"
   },
   "keywords": ["searxng", "search", "scraper", "cli", "web"],
-  "skills": ["./skills/web-research/", "./skills/cleanup-and-index/"],
-  "commands": []
+  "skills": ["./skills/searxng-cli-web-research/", "./skills/searxng-cli-capture-and-index/"]
 }

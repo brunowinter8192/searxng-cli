@@ -1,5 +1,5 @@
 ---
-name: web-research
+name: searxng-cli-web-research
 description: SearXNG web research — CLI tool reference (search_web, search_engine_drilldown, scrape_url, download_pdf) + permanent-capture worker setup
 ---
 
