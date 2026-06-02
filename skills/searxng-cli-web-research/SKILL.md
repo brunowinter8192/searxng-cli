@@ -114,7 +114,7 @@ When the user wants to permanently capture a whole domain (or a set of PDFs) int
 **1.** Identify the source: a seed domain URL (web-md), or PDF paths/URLs (pdf — download first via `download_pdf` if they are URLs).
 
 **2.** Confirm the target collection with the user (MANDATORY ASK — never pick it yourself):
-> "Target collection: `<project>_reference`. OUTPUT_DIR: `~/Documents/ai/Meta/ClaudeCode/MCP/RAG/data/documents/<project>_reference/`. Confirm or override?"
+> "Target collection: `<project>_reference`. OUTPUT_DIR: `~/Documents/ai/Meta/ClaudeCode/cli/rag-cli/data/documents/<project>_reference/`. Confirm or override?"
 
 Default is `<current_project>_reference`, but it may be another project's reference collection.
 
@@ -129,7 +129,7 @@ Inputs:
 - MODE: <web-md | pdf>
 - SEED_URL: <root domain URL>   (web-md)   OR   INPUT: <PDF file/dir>   (pdf)
 - COLLECTION: <name>
-- OUTPUT_DIR: ~/Documents/ai/Meta/ClaudeCode/MCP/RAG/data/documents/<name>/
+- OUTPUT_DIR: ~/Documents/ai/Meta/ClaudeCode/cli/rag-cli/data/documents/<name>/
 web-md: STOP at Phase 1b — report the URL-list path + per-section breakdown and WAIT for my cull decision before scraping. Then report the funnel when done (incl. blocks-detected). No commit needed (output is data files).
 ```
 
