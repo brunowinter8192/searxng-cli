@@ -118,13 +118,13 @@ When the user wants to permanently capture a whole domain (or a set of PDFs) int
 
 Default is `<current_project>_reference`, but it may be another project's reference collection.
 
-**3.** Spawn the worker. It activates the `capture-and-index` skill and runs the pipe — but for web-md it **STOPS at the URL list (Phase 1b) for your cull review** before scraping (step 4). web-md: Discovery → URL Selection → **STOP (Opus cull)** → Scrape → Cleanup → Index; pdf: Acquisition → Cleanup → Index (no cull stop). Opus provides the seed/input, collection, and output dir.
+**3.** Spawn the worker. It activates the `searxng-cli-capture-and-index` skill and runs the pipe — but for web-md it **STOPS at the URL list (Phase 1b) for your cull review** before scraping (step 4). web-md: Discovery → URL Selection → **STOP (Opus cull)** → Scrape → Cleanup → Index; pdf: Acquisition → Cleanup → Index (no cull stop). Opus provides the seed/input, collection, and output dir.
 
 Worker prompt (`/tmp/spawn-<name>.md`):
 
 ```markdown
 You are a WORKER.
-FIRST: activate the capture-and-index skill via Skill(skill="capture-and-index").
+FIRST: activate the searxng-cli-capture-and-index skill via Skill(skill="searxng-cli-capture-and-index").
 Inputs:
 - MODE: <web-md | pdf>
 - SEED_URL: <root domain URL>   (web-md)   OR   INPUT: <PDF file/dir>   (pdf)
