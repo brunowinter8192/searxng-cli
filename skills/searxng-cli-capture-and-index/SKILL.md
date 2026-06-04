@@ -329,12 +329,22 @@ Stop when:
 
 ### Index — Final Phase (both modes)
 
-One script call. `index-dir` is incremental (hash-based skip) — re-running only embeds new/changed files; existing chunks are never touched or re-embedded.
+One script call. `rag-cli index` is incremental (hash-based skip) — re-running only embeds new/changed files; existing chunks are never touched or re-embedded.
+
+**Important — OUTPUT_DIR must be the collection dir.** Set `OUTPUT_DIR` to the rag-cli collection directory so cleaned MDs land exactly where `rag-cli index` expects them:
 
 ```bash
-cd ~/Documents/ai/Meta/ClaudeCode/cli/rag-cli && \
-PYTHONUNBUFFERED=1 ./venv/bin/python workflow.py index-dir \
-    --input "$OUTPUT_DIR" --collection "$COLLECTION" \
+RAG_ROOT=~/Documents/ai/Meta/ClaudeCode/cli/rag-cli
+OUTPUT_DIR="$RAG_ROOT/data/documents/$COLLECTION"
+mkdir -p "$OUTPUT_DIR"
+```
+
+Set this BEFORE the Scrape phase (Phase 2) so the scraper writes directly into the collection dir.
+
+Then launch index as a background Bash call:
+
+```bash
+PYTHONUNBUFFERED=1 rag-cli index --collection "$COLLECTION" \
     > /tmp/${COLLECTION}_index.log 2>&1 &
 ```
 
@@ -346,7 +356,7 @@ Done: N files indexed (X chunks), Y skipped, Z adopted
 
 Report `N` (files indexed) and `X` (chunks) from that line — `N` is the **final md** count for the Completion Report.
 
-Launch index-dir as a background Bash call (`run_in_background=true`) and go idle — CC wakes you on background completion. Do NOT `pgrep`/name-poll/`wait`-loop. On the completion notification, read `/tmp/${COLLECTION}_index.log` ONCE for the summary line, then output the Completion Report. Indexing blocks RAG globally for ALL projects while it runs — going idle (not busy-waiting) is doubly right here. Opus stays hands-off until your final report.
+Launch index as a background Bash call (`run_in_background=true`) and go idle — CC wakes you on background completion. Do NOT `pgrep`/name-poll/`wait`-loop. On the completion notification, read `/tmp/${COLLECTION}_index.log` ONCE for the summary line, then output the Completion Report. Indexing blocks RAG globally for ALL projects while it runs — going idle (not busy-waiting) is doubly right here. Opus stays hands-off until your final report.
 
 No separate verify step inside the pipe: the real verification is the research done on the indexed data back in the main session, not a query here.
 
