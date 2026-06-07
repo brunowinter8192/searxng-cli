@@ -53,9 +53,10 @@ Per-domain news scraping pipeline for trading-bot data layer. CoinDesk → RAG c
 
 ### 02b_coindesk_scrape_fresh_context.py
 
-**Purpose:** Scrape each URL with fresh `AsyncWebCrawler` per URL — new Chromium process + clean cookie jar each fetch. Runs CONCURRENTLY via `asyncio.gather` + `Semaphore(8)` with `0.5–1.0s` jitter. `domcontentloaded` + `delay_before_return_html=0.5`, `page_timeout=15000`, no networkidle, no custom UA. Loud regwall guard: per-page WARN + per-run ERROR + exit non-zero if ≥20% regwalled. **Use this for production-quality scrapes.**
+**Purpose:** Scrape each URL with fresh `AsyncWebCrawler` per URL — new Chromium process + clean cookie jar each fetch. Runs CONCURRENTLY via `asyncio.gather` + prod's deterministic per-domain Scrapy gate (ported from `src/crawler/pipe_scraper.py`: `_ensure_domain_state` + `_gate_domain`, `DOWNLOAD_DELAY=1.0`, `CONCURRENCY_PER_DOMAIN=8`, jitter=uniform(0.5×,1.5×)). `domcontentloaded` + `delay_before_return_html=0.5`, `page_timeout=15000`, no networkidle, no custom UA. Loud regwall guard: per-page WARN + per-run ERROR + exit non-zero if ≥20% regwalled. **Use this for production-quality scrapes.**
 
-Validated: 0/32 regwall, 32/32 ok, ~31s on 32 CoinDesk URLs. Mechanism confirmed in `scrape_isolation_smoke.py` (B2 path). Real-B1 (shared crawler + timezone cache-bust) empirically failed (25/32 timeout) — see `decisions/OldThemes/news_pipeline_layers/12_scrape_prod_rebuild.md`.
+Only deviation from `pipe_scraper.py`: fresh crawler per URL (isolation). Pacing is identical.
+Validated: 0/32 regwall, 32/32 ok, ~32s on 32 CoinDesk URLs. See `decisions/OldThemes/news_pipeline_layers/12_scrape_prod_rebuild.md` for full investigation trail (real-B1 timezone dead-end, B2 validation, gate restoration).
 
 **Input:** `--input <path>` or auto-picks newest `01_output/discover_*.json`. Pipeline passes the 04_dedup output explicitly via `--input`.
 

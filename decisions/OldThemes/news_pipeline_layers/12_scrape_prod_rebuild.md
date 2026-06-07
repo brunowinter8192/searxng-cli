@@ -91,3 +91,22 @@ Spot-checked `meta-is-paying` (3c7a9e542b5b.md, 22KB) and `michael-saylor-s-rall
 - Stdout: `ok : N`, `failed : N`, `empty : N`, `regwall : N`, `total chars`, `slowest` —
   orchestrator regexes `ok\s*:\s*(\d+)` and `failed\s*:\s*(\d+)` unaffected.
 - Exit code: 0 normally; non-zero only when regwall fraction >= 0.20.
+
+## Pacing Restored to Prod Gate
+
+**Problem with initial B2 ship:** bare `asyncio.Semaphore(8)` + `random.uniform(0.5, 1.0)` jitter.
+This dropped prod's deliberately-chosen DETERMINISTIC per-domain rate model. Prod's `_gate_domain`
+enforces evenly-spaced ~1 req/s start times with no adaptive delay reduction — validated WAF-safe
+(0×429 over 316 URLs). Bare semaphore + random jitter is non-deterministic and loses the rate floor.
+
+**Fix:** ported `_ensure_domain_state` and `_gate_domain` verbatim from
+`src/crawler/pipe_scraper.py` into `02b`. Constants match prod exactly:
+`DOWNLOAD_DELAY = 1.0`, `CONCURRENCY_PER_DOMAIN = 8`. `_fetch_one` flow:
+`domain = urlparse(url).netloc` → `state = _ensure_domain_state(domain_states, domain, CONCURRENCY_PER_DOMAIN)`
+→ `async with state["sem"]` → `await _gate_domain(state, DOWNLOAD_DELAY)` → fresh crawler → `arun`.
+
+**Result:** 32/32 ok, 0/32 regwall, 0 empty, **32s** wallclock.
+Gate floors single-domain 32-URL run at ~32s (~1 req/s), matching the spec prediction.
+
+**Current deviation from prod (`pipe_scraper.py`):** fresh `AsyncWebCrawler` per URL only.
+Pacing, concurrency cap, jitter formula, and constants are now identical.
