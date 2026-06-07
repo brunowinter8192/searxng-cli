@@ -52,5 +52,8 @@ dev/news_pipeline/03_output/
 dev/news_pipeline/04_output/
 dev/news_pipeline/exploration/01_output/
 
+# src/news prod pipeline working dirs (ephemeral, cleared per run)
+data/news/
+
 # eval full-run corpus dirs (summary reports stay, raw markdown does not)
 dev/scrape_pipeline/A_pipe_scrape_eval_reports/full_run_*/
