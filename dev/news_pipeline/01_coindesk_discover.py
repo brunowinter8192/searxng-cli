@@ -10,6 +10,7 @@ import sys
 import tempfile
 import time
 import urllib.request
+from urllib.parse import urlparse
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
 
@@ -181,7 +182,7 @@ async def discover_workflow():
     # pipeline with URL-dedup — skip deliberately.
     entries, n_filtered = filter_live_blogs(entries)
     if n_filtered:
-        print(f"Filtered {n_filtered} live-markets URLs (skipped)")
+        print(f"Filtered {n_filtered} live-blog URLs (skipped)")
     path = write_output(entries)
     print_summary(entries, path)
 
@@ -328,9 +329,16 @@ def build_entries(all_urls: dict) -> list[dict]:
     return entries
 
 
-# Remove live-blog URLs (/live-markets- substring); return (filtered_list, count_removed)
+# Return True if URL is a CoinDesk live-blog: slug (last path segment) starts with "live-".
+# Catches live-markets-, live-updates-, and any future live-X- variant.
+def _is_live_blog(url: str) -> bool:
+    slug = urlparse(url).path.rstrip("/").split("/")[-1]
+    return slug.startswith("live-")
+
+
+# Remove CoinDesk live-blog URLs (slug starts with "live-"); return (filtered_list, count_removed).
 def filter_live_blogs(entries: list[dict]) -> tuple[list[dict], int]:
-    kept = [e for e in entries if "/live-markets-" not in e["url"]]
+    kept = [e for e in entries if not _is_live_blog(e["url"])]
     return kept, len(entries) - len(kept)
 
 
