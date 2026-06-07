@@ -9,19 +9,22 @@ import sys
 import time
 from datetime import datetime, timezone
 from pathlib import Path
+from urllib.parse import urlparse
 
 from crawl4ai import AsyncWebCrawler, BrowserConfig, CrawlerRunConfig, CacheMode
 from crawl4ai.markdown_generation_strategy import DefaultMarkdownGenerator
 
-# Isolation mechanism: fresh AsyncWebCrawler per URL = fresh Chromium process + clean cookie jar.
-# Runs CONCURRENTLY via asyncio.gather + Semaphore(CONCURRENCY) — validated in
-# scrape_isolation_smoke.py (B2 path): 0/32 regwall, 32/32 ok, 24s on 32 CoinDesk URLs.
-# domcontentloaded + delay_before_return_html=0.5 only — no networkidle, no fallback.
+# Isolation: fresh AsyncWebCrawler per URL = fresh Chromium process + clean cookie jar per fetch.
+# Pacing: prod's deterministic per-domain Scrapy gate (ported from src/crawler/pipe_scraper.py) —
+# ~1 req/s start rate, jitter = uniform(0.5x, 1.5x) DOWNLOAD_DELAY, no adaptive reduction.
+# Validated WAF-safe (0×429 over 316 URLs in prod). Only deviation from prod: fresh-crawler-per-URL.
+# Concurrency: asyncio.gather + per-domain Semaphore(CONCURRENCY_PER_DOMAIN) + asyncio.Lock gate.
 
 # Exit non-zero if regwall_count/total >= this fraction (isolation likely broken).
 REGWALL_FAIL_THRESHOLD = 0.20
 
-CONCURRENCY = 8
+DOWNLOAD_DELAY = 1.0           # Scrapy per-domain base delay (s); jitter = uniform(0.5x, 1.5x)
+CONCURRENCY_PER_DOMAIN = 8     # Scrapy per-domain in-flight cap
 PAGE_TIMEOUT_MS = 15000
 DELAY_BEFORE_RETURN_HTML = 0.5
 
@@ -48,18 +51,18 @@ _RUN_CFG = CrawlerRunConfig(
 
 # ORCHESTRATOR
 
-# Scrape all entries concurrently: fresh crawler per URL, semaphore-gated, loud regwall guard.
+# Scrape all entries concurrently: fresh crawler per URL, prod gate pacing, loud regwall guard.
 async def scrape_workflow(input_path: Path) -> None:
     entries = load_entries(input_path)
     OUTPUT_DIR.mkdir(parents=True, exist_ok=True)
     print(f"Input : {input_path} ({len(entries)} URLs)", file=sys.stderr)
     print(f"Output: {OUTPUT_DIR}", file=sys.stderr)
 
-    sem = asyncio.Semaphore(CONCURRENCY)
+    domain_states: dict = {}
     t_start = time.perf_counter()
 
     raw_results = await asyncio.gather(
-        *[_fetch_one(sem, entries[i], i, len(entries)) for i in range(len(entries))],
+        *[_fetch_one(domain_states, entries[i], i, len(entries)) for i in range(len(entries))],
         return_exceptions=True,
     )
 
@@ -81,9 +84,33 @@ def _is_regwall(markdown: str) -> bool:
     return any(sig in markdown for sig in REGWALL_SIGNALS)
 
 
-# Fetch one URL: acquire semaphore → jitter → fresh crawler → regwall check → write or skip.
+# Return or create per-domain state entry (lastseen, lock, sem) — asyncio-safe (no await, no race).
+# Ported from src/crawler/pipe_scraper.py:_ensure_domain_state.
+def _ensure_domain_state(domain_states: dict, domain: str, concurrency_per_domain: int) -> dict:
+    if domain not in domain_states:
+        domain_states[domain] = {
+            "lastseen": 0.0,
+            "lock": asyncio.Lock(),
+            "sem": asyncio.Semaphore(concurrency_per_domain),
+        }
+    return domain_states[domain]
+
+
+# Scrapy gate: under domain lock, wait until delay elapsed since lastseen, then stamp lastseen=now.
+# Ported from src/crawler/pipe_scraper.py:_gate_domain.
+async def _gate_domain(state: dict, download_delay: float) -> None:
+    async with state["lock"]:
+        jitter = random.uniform(0.5 * download_delay, 1.5 * download_delay)
+        now = time.time()
+        gap = now - state["lastseen"]
+        if gap < jitter:
+            await asyncio.sleep(jitter - gap)
+        state["lastseen"] = time.time()
+
+
+# Fetch one URL: domain sem → gate → fresh crawler → arun → regwall check → write or skip.
 async def _fetch_one(
-    sem: asyncio.Semaphore,
+    domain_states: dict,
     entry: dict,
     idx: int,
     total: int,
@@ -94,8 +121,10 @@ async def _fetch_one(
         "url": url, "hash": url_hash, "file": None,
         "char_count": None, "status": None, "error": None, "wait_strategy": None,
     }
-    async with sem:
-        await asyncio.sleep(random.uniform(0.5, 1.0))
+    domain = urlparse(url).netloc
+    state = _ensure_domain_state(domain_states, domain, CONCURRENCY_PER_DOMAIN)
+    async with state["sem"]:
+        await _gate_domain(state, DOWNLOAD_DELAY)
         print(f"[{idx + 1}/{total}] {url}", file=sys.stderr)
         t0 = time.perf_counter()
         try:
@@ -221,8 +250,8 @@ def pick_latest_input() -> Path:
 def main():
     parser = argparse.ArgumentParser(
         description=(
-            "CoinDesk raw scrape — fresh AsyncWebCrawler per URL, concurrent via "
-            "asyncio.gather + Semaphore(8), domcontentloaded + fixed delay, loud regwall guard."
+            "CoinDesk raw scrape — fresh AsyncWebCrawler per URL, concurrent via asyncio.gather, "
+            "prod Scrapy gate (~1 req/s per domain, deterministic), loud regwall guard."
         )
     )
     parser.add_argument(
