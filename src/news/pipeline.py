@@ -88,7 +88,8 @@ async def run_pipeline(platform: Platform, skip_index: bool = False) -> None:
 
     # Stage 4 — cleanup (in-process)
     log.info("STAGE cleanup …")
-    clean_manifest = _run_cleanup(manifest, scrape_dir, clean_dir, platform, log)
+    discover_by_url = {e["url"]: e for e in new_entries}
+    clean_manifest = _run_cleanup(manifest, scrape_dir, clean_dir, platform, log, discover_by_url)
     log.info(f"cleanup → {len(clean_manifest)} files cleaned")
 
     # Stage 5 — publish
@@ -164,13 +165,15 @@ def _write_discover_snapshot(entries: list[dict], discover_dir: Path) -> Path:
 
 
 # In-process cleanup: read body from scrape_dir, apply platform.cleanup, write pure content to clean_dir.
-# CORRECTION 2: writes PURE CONTENT — no frontmatter prepended.
+# publication_date is sourced from discover_by_url (discover entries carry it; scrape manifest does not).
+# pub_date_str() in publish.py provides a URL-path fallback as a secondary net.
 def _run_cleanup(
     manifest: list[dict],
     scrape_dir: Path,
     clean_dir: Path,
     platform: Platform,
     log: logging.Logger,
+    discover_by_url: dict[str, dict],
 ) -> list[dict]:
     clean_manifest = []
     for entry in manifest:
@@ -185,10 +188,11 @@ def _run_cleanup(
         cleaned = platform.cleanup(raw_body, entry)
         dest = clean_dir / f"{h}.md"
         dest.write_text(cleaned, encoding="utf-8")
+        discover_entry = discover_by_url.get(entry["url"], {})
         clean_manifest.append({
             "url": entry["url"],
             "hash": h,
-            "publication_date": entry.get("publication_date", ""),
+            "publication_date": discover_entry.get("publication_date", ""),
         })
     return clean_manifest
 
