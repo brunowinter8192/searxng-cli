@@ -28,7 +28,7 @@ Per-domain news scraping pipeline for trading-bot data layer. CoinDesk → RAG c
 
 **Purpose:** Discover CoinDesk articles via UI pagination on `/latest-crypto-news`. Background Chrome launched via `open -gna "Google Chrome" --args --remote-debugging-port=<PORT> ...` (no focus steal); pydoll connects via `Chrome().connect(ws_url)`. Clicks "More stories" until ≥3 articles older than 48h are found (`PRE_48H_THRESHOLD=3`, `CUTOFF_DAYS=2`). Chrome killed via `pkill -f remote-debugging-port=<PORT>` on cleanup.
 
-**Approach:** `_JS_EXTRACT` (DOM traversal, skipTags/skipCls noise filter) + `_JS_CLICK_BTN` + `_JS_COUNT` poll loop. `lastmod` and `publication_date` derived from URL's `/YYYY/MM/DD/` path → UTC midnight ISO string. Title captured from `<a>` text. `MAX_CLICK_ROUNDS=8` safety cap. **Live-blog URLs (`/live-markets-*`) filtered post-discovery.**
+**Approach:** `_JS_EXTRACT` (DOM traversal, skipTags/skipCls noise filter) + `_JS_CLICK_BTN` + `_JS_COUNT` poll loop. `lastmod` and `publication_date` derived from URL's `/YYYY/MM/DD/` path → UTC midnight ISO string. Title captured from `<a>` text. `MAX_CLICK_ROUNDS=8` safety cap. **Live-blog URLs filtered post-discovery via `_is_live_blog`: slug (last path segment) starts with `live-` — catches `live-markets-`, `live-updates-`, any future `live-X-` variant.**
 
 **Output:** `01_output/discover_<UTC-timestamp>.json` — list of `{url, lastmod, publication_date, title, section}` sorted by lastmod desc.
 

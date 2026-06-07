@@ -110,3 +110,16 @@ Gate floors single-domain 32-URL run at ~32s (~1 req/s), matching the spec predi
 
 **Current deviation from prod (`pipe_scraper.py`):** fresh `AsyncWebCrawler` per URL only.
 Pacing, concurrency cap, jitter formula, and constants are now identical.
+
+## Live-Blog Filter Broadened
+
+**Root cause found in post-run noise check:** live-blogs lack the `More For You` end-anchor that
+03_cleanup relies on, so the full chrome-heavy page leaks into the output. The old substring filter
+`"/live-markets-" not in url` missed `/live-updates-` variants.
+
+**Fix:** replaced with precise slug-prefix check — `_is_live_blog(url)` extracts the last path
+segment via `urlparse(url).path` and checks `slug.startswith("live-")`. Catches `live-markets-`,
+`live-updates-`, and any future `live-X-` without false-firing on mid-slug or suffix "live".
+
+**Regression verify:** applied to `discover_filtered_20260607T195044Z.json` (32 entries) — exactly
+1 dropped (`live-updates-bitcoin-below-usd62-000-...`), 31 kept, 0 live-blog leaks in kept.
