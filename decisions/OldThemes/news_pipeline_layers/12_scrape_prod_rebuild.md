@@ -123,3 +123,45 @@ segment via `urlparse(url).path` and checks `slug.startswith("live-")`. Catches 
 
 **Regression verify:** applied to `discover_filtered_20260607T195044Z.json` (32 entries) — exactly
 1 dropped (`live-updates-bitcoin-below-usd62-000-...`), 31 kept, 0 live-blog leaks in kept.
+
+## Migration to src/news/
+
+**Branch:** `news-migrate`  
+**Commits:** 3 chunked commits on branch `news-migrate`.
+
+### Structure created
+
+```
+src/news/
+  __init__.py              # empty
+  __main__.py              # python -m src.news --source coindesk [--skip-index]
+  pipeline.py              # async orchestrator (in-process, replaces run_pipeline.py subprocesses)
+  registry.py              # name -> Platform; register() / get()
+  platform.py              # ScrapeConfig dataclass + Platform Protocol
+  engine/
+    scrape.py              # B2 engine ported from 02b; RegwallGuardError not sys.exit
+    dedup.py               # filter_new_entries(); source-prefixed filename key
+    publish.py             # publish_articles(); manifest in-memory
+  platforms/coindesk/
+    config.py              # REGWALL_SIGNALS, SCRAPE_CONFIG, discovery constants
+    discover.py            # pydoll UI pagination; returns entry list (no file I/O)
+    cleanup.py             # cleanup(raw_markdown, entry) -> pure body str
+    __init__.py            # CoinDeskPlatform; auto-registers on import
+```
+
+### Corrections applied
+
+1. **RegwallGuardError** (not `sys.exit(1)`): `engine/scrape.py` defines `class RegwallGuardError(Exception)`;
+   `_check_regwall_guard` raises it when `regwall_count/total >= 0.20`. `pipeline.py` catches it,
+   logs ERROR, writes marker, returns.
+2. **Pure content, no frontmatter**: `engine/scrape.py:_write_body` writes raw markdown only.
+   `pipeline.py:_run_cleanup` writes `platform.cleanup(body, entry)` result only. Published files
+   are pure content — metadata is in the filename (`{source}__{pubdate}__{hash}.md`).
+3. **--skip-index threaded**: `__main__.py` → `run_pipeline(platform, skip_index=...)` →
+   `publish_articles(..., skip_index=skip_index)`.
+
+### Self-contained constraint
+
+`src/news/` does NOT import from `src/crawler/` or `src/scraper/`. The Scrapy gate
+(`_ensure_domain_state`, `_gate_domain`) is ported verbatim from `src/crawler/pipe_scraper.py`
+into `engine/scrape.py`.
