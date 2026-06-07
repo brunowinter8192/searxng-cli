@@ -4,6 +4,7 @@ import argparse
 import asyncio
 import hashlib
 import json
+import random
 import sys
 import time
 from datetime import datetime, timezone
@@ -12,133 +13,140 @@ from pathlib import Path
 from crawl4ai import AsyncWebCrawler, BrowserConfig, CrawlerRunConfig, CacheMode
 from crawl4ai.markdown_generation_strategy import DefaultMarkdownGenerator
 
-USER_AGENT = "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36"
+# Isolation mechanism: fresh AsyncWebCrawler per URL = fresh Chromium process + clean cookie jar.
+# Runs CONCURRENTLY via asyncio.gather + Semaphore(CONCURRENCY) — validated in
+# scrape_isolation_smoke.py (B2 path): 0/32 regwall, 32/32 ok, 24s on 32 CoinDesk URLs.
+# domcontentloaded + delay_before_return_html=0.5 only — no networkidle, no fallback.
+
+# Exit non-zero if regwall_count/total >= this fraction (isolation likely broken).
+REGWALL_FAIL_THRESHOLD = 0.20
+
+CONCURRENCY = 8
+PAGE_TIMEOUT_MS = 15000
+DELAY_BEFORE_RETURN_HTML = 0.5
+
+# Precise regwall signals — do NOT use loose markers (subscribe/register fire on article footers).
+REGWALL_SIGNALS = [
+    "from_regwall",
+    "Create a FREE account to continue reading",
+    "You've reached your monthly limit",
+]
+
 INPUT_DIR = Path(__file__).parent / "01_output"
 OUTPUT_DIR = Path(__file__).parent / "02b_output"
 
+# Shared fetch config — no browser state carried between URLs (each gets a fresh crawler).
+_RUN_CFG = CrawlerRunConfig(
+    cache_mode=CacheMode.BYPASS,
+    wait_until="domcontentloaded",
+    delay_before_return_html=DELAY_BEFORE_RETURN_HTML,
+    page_timeout=PAGE_TIMEOUT_MS,
+    markdown_generator=DefaultMarkdownGenerator(),
+    verbose=False,
+)
+
 
 # ORCHESTRATOR
-async def scrape_workflow(input_path: Path):
+
+# Scrape all entries concurrently: fresh crawler per URL, semaphore-gated, loud regwall guard.
+async def scrape_workflow(input_path: Path) -> None:
     entries = load_entries(input_path)
     OUTPUT_DIR.mkdir(parents=True, exist_ok=True)
     print(f"Input : {input_path} ({len(entries)} URLs)", file=sys.stderr)
     print(f"Output: {OUTPUT_DIR}", file=sys.stderr)
 
-    browser_config = BrowserConfig(headless=True, verbose=False, user_agent=USER_AGENT)
-    run_config = CrawlerRunConfig(
-        cache_mode=CacheMode.BYPASS,
-        wait_until="networkidle",
-        markdown_generator=DefaultMarkdownGenerator(),
-        verbose=False,
-    )
-    run_config_fallback = CrawlerRunConfig(
-        cache_mode=CacheMode.BYPASS,
-        wait_until="domcontentloaded",
-        markdown_generator=DefaultMarkdownGenerator(),
-        verbose=False,
-    )
-
-    manifest = []
+    sem = asyncio.Semaphore(CONCURRENCY)
     t_start = time.perf_counter()
 
-    # Fresh AsyncWebCrawler per URL — new Chrome process + clean BrowserContext per fetch.
-    # Prevents crawl4ai's contexts_by_config cache from reusing the same Playwright context
-    # (and its cookies) across URLs. See browser_manager.py:1662-1675.
-    for i, entry in enumerate(entries, 1):
-        url = entry["url"]
-        url_hash = hashlib.sha256(url.encode()).hexdigest()[:12]
-        print(f"[{i}/{len(entries)}] {url}", file=sys.stderr)
+    raw_results = await asyncio.gather(
+        *[_fetch_one(sem, entries[i], i, len(entries)) for i in range(len(entries))],
+        return_exceptions=True,
+    )
 
-        result_entry = scrape_one(entry, url_hash)
-        try:
-            t0 = time.perf_counter()
-            async with AsyncWebCrawler(config=browser_config) as crawler:
-                content, wait_strategy = await fetch_with_fallback(
-                    crawler, url, run_config, run_config_fallback
-                )
-            elapsed = time.perf_counter() - t0
-
-            if content:
-                status = "ok_fallback" if wait_strategy == "domcontentloaded" else "ok"
-                file_path = write_article(entry, url_hash, content)
-                result_entry.update({
-                    "status": status,
-                    "char_count": len(content),
-                    "file": str(file_path.relative_to(Path.cwd()) if file_path.is_absolute() else file_path),
-                    "elapsed_s": round(elapsed, 2),
-                    "wait_strategy": wait_strategy,
-                })
-                label = "ok_fallback" if status == "ok_fallback" else "ok"
-                print(f"  {label} — {len(content):,} chars in {elapsed:.1f}s [{wait_strategy}]", file=sys.stderr)
-            else:
-                result_entry.update({
-                    "status": "empty",
-                    "char_count": 0,
-                    "elapsed_s": round(elapsed, 2),
-                    "wait_strategy": wait_strategy,
-                })
-                print(f"  empty ({elapsed:.1f}s)", file=sys.stderr)
-        except Exception as exc:
-            result_entry.update({"status": "failed", "error": str(exc)})
-            print(f"  FAILED: {exc}", file=sys.stderr)
-
-        manifest.append(result_entry)
-        await asyncio.sleep(1.0)
-
+    manifest = _collect_manifest(entries, raw_results)
+    _check_regwall_guard(manifest)
     write_manifest(manifest)
     print_summary(manifest, time.perf_counter() - t_start)
 
 
 # FUNCTIONS
 
-# Try networkidle first; fall back to domcontentloaded on empty content or timeout exception.
-# Both attempts run inside the same crawler instance (shared browser context).
-# Returns (content_str, wait_strategy_used).
-async def fetch_with_fallback(crawler, url: str, run_config, run_config_fallback) -> tuple[str, str]:
-    content = ""
-    try:
-        result = await crawler.arun(url=url, config=run_config)
-        content = result.markdown.raw_markdown if result.markdown else ""
-    except Exception as exc:
-        if not _is_timeout(exc):
-            raise
-        print("  networkidle timeout — trying domcontentloaded", file=sys.stderr)
-
-    if content:
-        return content, "networkidle"
-
-    # Empty or timeout: retry with domcontentloaded
-    result = await crawler.arun(url=url, config=run_config_fallback)
-    content = result.markdown.raw_markdown if result.markdown else ""
-    return content, "domcontentloaded"
-
-
-# Return True if exception is a timeout (by type name or message)
-def _is_timeout(exc: Exception) -> bool:
-    name = type(exc).__name__.lower()
-    msg = str(exc).lower()
-    return "timeout" in name or "timeout" in msg
-
-
-# Load entries from discover JSON
+# Load entries from discover JSON.
 def load_entries(input_path: Path) -> list[dict]:
     return json.loads(input_path.read_text(encoding="utf-8"))
 
 
-# Build a base manifest entry for a URL
-def scrape_one(entry: dict, url_hash: str) -> dict:
-    return {
-        "url": entry["url"],
-        "hash": url_hash,
-        "file": None,
-        "char_count": None,
-        "status": None,
-        "error": None,
-        "wait_strategy": None,
+# Return True if markdown contains a known regwall signal.
+def _is_regwall(markdown: str) -> bool:
+    return any(sig in markdown for sig in REGWALL_SIGNALS)
+
+
+# Fetch one URL: acquire semaphore → jitter → fresh crawler → regwall check → write or skip.
+async def _fetch_one(
+    sem: asyncio.Semaphore,
+    entry: dict,
+    idx: int,
+    total: int,
+) -> dict:
+    url = entry["url"]
+    url_hash = hashlib.sha256(url.encode()).hexdigest()[:12]
+    result_entry: dict = {
+        "url": url, "hash": url_hash, "file": None,
+        "char_count": None, "status": None, "error": None, "wait_strategy": None,
     }
+    async with sem:
+        await asyncio.sleep(random.uniform(0.5, 1.0))
+        print(f"[{idx + 1}/{total}] {url}", file=sys.stderr)
+        t0 = time.perf_counter()
+        try:
+            async with AsyncWebCrawler(config=BrowserConfig(headless=True, verbose=False)) as crawler:
+                result = await crawler.arun(url=url, config=_RUN_CFG)
+            elapsed = time.perf_counter() - t0
+            raw_md = (result.markdown.raw_markdown if result.markdown else "") or ""
+
+            if _is_regwall(raw_md):
+                result_entry.update({
+                    "status": "regwall", "char_count": len(raw_md),
+                    "elapsed_s": round(elapsed, 2), "wait_strategy": "domcontentloaded",
+                })
+                print(f"  WARN regwall detected — skipping write: {url}", file=sys.stderr)
+            elif not raw_md:
+                result_entry.update({
+                    "status": "empty", "char_count": 0,
+                    "elapsed_s": round(elapsed, 2), "wait_strategy": "domcontentloaded",
+                })
+                print(f"  empty ({elapsed:.1f}s)", file=sys.stderr)
+            else:
+                file_path = write_article(entry, url_hash, raw_md)
+                result_entry.update({
+                    "status": "ok", "char_count": len(raw_md),
+                    "file": str(file_path.relative_to(Path.cwd()) if file_path.is_absolute() else file_path),
+                    "elapsed_s": round(elapsed, 2), "wait_strategy": "domcontentloaded",
+                })
+                print(f"  ok — {len(raw_md):,} chars in {elapsed:.1f}s [domcontentloaded]", file=sys.stderr)
+        except Exception as exc:
+            result_entry.update({"status": "failed", "error": str(exc)})
+            print(f"  FAILED: {exc}", file=sys.stderr)
+    return result_entry
 
 
-# Write YAML-frontmatter article file, return path
+# Map raw asyncio.gather results (dict or escaped exception) to manifest entries.
+def _collect_manifest(entries: list[dict], raw_results: tuple) -> list[dict]:
+    manifest = []
+    for i, r in enumerate(raw_results):
+        if isinstance(r, dict):
+            manifest.append(r)
+        else:
+            url = entries[i]["url"]
+            manifest.append({
+                "url": url, "hash": hashlib.sha256(url.encode()).hexdigest()[:12],
+                "file": None, "char_count": None,
+                "status": "failed", "error": str(r), "wait_strategy": None,
+            })
+    return manifest
+
+
+# Write YAML-frontmatter article file; return path.
 def write_article(entry: dict, url_hash: str, content: str) -> Path:
     scraped_at = datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
     frontmatter = (
@@ -156,33 +164,53 @@ def write_article(entry: dict, url_hash: str, content: str) -> Path:
     return file_path
 
 
-# Write manifest JSON after all URLs processed
-def write_manifest(manifest: list[dict]):
+# Regwall guard: WARN per-run; ERROR + exit(1) if fraction >= REGWALL_FAIL_THRESHOLD.
+def _check_regwall_guard(manifest: list[dict]) -> None:
+    regwalled = [e for e in manifest if e["status"] == "regwall"]
+    if not regwalled:
+        return
+    print(f"WARNING: {len(regwalled)} regwall(s) detected:", file=sys.stderr)
+    for e in regwalled:
+        print(f"  REGWALL {e['url']}", file=sys.stderr)
+    total = len(manifest)
+    if total > 0 and len(regwalled) / total >= REGWALL_FAIL_THRESHOLD:
+        print(
+            f"ERROR: isolation likely broken — {len(regwalled)}/{total} regwalled"
+            f" (>= {REGWALL_FAIL_THRESHOLD:.0%} threshold). Aborting.",
+            file=sys.stderr,
+        )
+        sys.exit(1)
+
+
+# Write manifest JSON after all URLs processed.
+def write_manifest(manifest: list[dict]) -> None:
     manifest_path = OUTPUT_DIR / "manifest.json"
     manifest_path.write_text(json.dumps(manifest, indent=2, ensure_ascii=False), encoding="utf-8")
     print(f"Manifest: {manifest_path}", file=sys.stderr)
 
 
-# Print run summary to stdout
-def print_summary(manifest: list[dict], total_s: float):
+# Print run summary to stdout — preserves orchestrator-parsed line format (ok / failed).
+def print_summary(manifest: list[dict], total_s: float) -> None:
     ok = [e for e in manifest if e["status"] == "ok"]
     ok_fb = [e for e in manifest if e["status"] == "ok_fallback"]
     failed = [e for e in manifest if e["status"] == "failed"]
     empty = [e for e in manifest if e["status"] == "empty"]
+    regwall_e = [e for e in manifest if e["status"] == "regwall"]
     all_ok = ok + ok_fb
     total_chars = sum(e["char_count"] or 0 for e in all_ok)
     slowest = max(all_ok, key=lambda e: e.get("elapsed_s", 0), default=None)
 
     print(f"\nDone in {total_s:.0f}s")
-    print(f"  ok      : {len(ok) + len(ok_fb)} ({len(ok_fb)} via fallback)")
+    print(f"  ok      : {len(all_ok)} ({len(ok_fb)} via fallback)")
     print(f"  empty   : {len(empty)}")
     print(f"  failed  : {len(failed)}")
+    print(f"  regwall : {len(regwall_e)}")
     print(f"  total chars: {total_chars:,}")
     if slowest:
         print(f"  slowest : {slowest['url']} ({slowest.get('elapsed_s', '?')}s)")
 
 
-# Auto-pick newest discover_*.json from 01_output/
+# Auto-pick newest discover_*.json from 01_output/.
 def pick_latest_input() -> Path:
     candidates = sorted(INPUT_DIR.glob("discover_*.json"), key=lambda p: p.stat().st_mtime)
     if not candidates:
@@ -192,7 +220,10 @@ def pick_latest_input() -> Path:
 
 def main():
     parser = argparse.ArgumentParser(
-        description="CoinDesk raw scrape (fresh context) — fresh AsyncWebCrawler per URL, no shared cookie state."
+        description=(
+            "CoinDesk raw scrape — fresh AsyncWebCrawler per URL, concurrent via "
+            "asyncio.gather + Semaphore(8), domcontentloaded + fixed delay, loud regwall guard."
+        )
     )
     parser.add_argument(
         "--input", default=None,
