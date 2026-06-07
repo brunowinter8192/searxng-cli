@@ -1,16 +1,19 @@
 #!/usr/bin/env python3
 # INFRASTRUCTURE
-import argparse
 import asyncio
 import json
 import re
+import shutil
+import socket
+import subprocess
 import sys
 import tempfile
-from datetime import datetime, timezone
+import time
+import urllib.request
+from datetime import datetime, timedelta, timezone
 from pathlib import Path
 
 from pydoll.browser import Chrome
-from pydoll.browser.options import ChromiumOptions
 
 TARGET_URL = "https://www.coindesk.com/latest-crypto-news"
 REAL_UA = (
@@ -18,10 +21,12 @@ REAL_UA = (
     "AppleWebKit/537.36 (KHTML, like Gecko) "
     "Chrome/146.0.7680.154 Safari/537.36"
 )
+CHROME_BINARY = "/Applications/Google Chrome.app/Contents/MacOS/Google Chrome"
 MAX_CLICK_ROUNDS = 8   # safety cap: 8 × ~16 URLs/batch ≈ 128 URLs max
 POLL_INTERVAL = 0.5
 POLL_MAX = 40          # 20s max wait per click
-PRE_TODAY_THRESHOLD = 3
+PRE_48H_THRESHOLD = 3  # stop when this many articles older than 48h are seen
+CUTOFF_DAYS = 2        # collect back N days; terminate on articles older than cutoff
 DATE_RE = re.compile(r'/(\d{4})/(\d{2})/(\d{2})/')
 OUTPUT_DIR = Path(__file__).parent / "01_output"
 
@@ -110,12 +115,19 @@ _JS_CLICK_BTN = """
 
 
 # ORCHESTRATOR
-async def discover_workflow(headless: bool):
+async def discover_workflow():
     session_dir = tempfile.mkdtemp(prefix="coindesk_discover_")
     today = datetime.now(timezone.utc).date()
+    cutoff = compute_cutoff(today)
+    port = get_free_port()
 
-    browser = Chrome(build_options(headless, session_dir))
-    tab = await browser.start()
+    print(f"Launching background Chrome on port {port} …", file=sys.stderr)
+    launch_background_chrome(port, session_dir)
+    ws_url = wait_for_ws_url(port)
+    print(f"Connected: {ws_url}", file=sys.stderr)
+
+    chrome = Chrome()
+    tab = await chrome.connect(ws_url)
     try:
         print(f"Navigating to {TARGET_URL} …", file=sys.stderr)
         await tab.go_to(TARGET_URL, timeout=60)
@@ -126,9 +138,9 @@ async def discover_workflow(headless: bool):
         print(f"Batch 0: {len(initial)} initial articles", file=sys.stderr)
 
         for click_n in range(1, MAX_CLICK_ROUNDS + 1):
-            pre = count_pre_today(list(all_urls.values()), today)
-            if pre >= PRE_TODAY_THRESHOLD:
-                print(f"Coverage reached: {pre} pre-today articles (before click {click_n}).", file=sys.stderr)
+            pre = count_older_than_cutoff(list(all_urls.values()), cutoff)
+            if pre >= PRE_48H_THRESHOLD:
+                print(f"Coverage reached: {pre} articles older than 48h (before click {click_n}).", file=sys.stderr)
                 break
 
             prev_count = len(all_urls)
@@ -142,11 +154,11 @@ async def discover_workflow(headless: bool):
             fresh = await extract_articles(tab)
             added = {a["url"]: a for a in fresh if a["url"] not in all_urls}
             all_urls.update(added)
-            pre = count_pre_today(list(all_urls.values()), today)
-            print(f"Batch {click_n}: +{len(added)} | total={len(all_urls)} | pre-today={pre}", file=sys.stderr)
+            pre = count_older_than_cutoff(list(all_urls.values()), cutoff)
+            print(f"Batch {click_n}: +{len(added)} | total={len(all_urls)} | older-than-48h={pre}", file=sys.stderr)
 
-            if pre >= PRE_TODAY_THRESHOLD:
-                print(f"Coverage reached: {pre} pre-today articles after {click_n} click(s).", file=sys.stderr)
+            if pre >= PRE_48H_THRESHOLD:
+                print(f"Coverage reached: {pre} articles older than 48h after {click_n} click(s).", file=sys.stderr)
                 break
         else:
             print(
@@ -157,9 +169,12 @@ async def discover_workflow(headless: bool):
     finally:
         await tab.close()
         try:
-            await browser.stop()
+            await chrome.close()
         except Exception as e:
-            print(f"Browser stop (non-fatal): {e}", file=sys.stderr)
+            print(f"Chrome WS close (non-fatal): {e}", file=sys.stderr)
+        kill_chrome_on_port(port)
+        shutil.rmtree(session_dir, ignore_errors=True)
+        print(f"Chrome on port {port} killed, session dir removed.", file=sys.stderr)
 
     entries = build_entries(all_urls)
     # Live-blogs are continuously-updated multi-story containers that don't fit a daily-cron
@@ -173,17 +188,58 @@ async def discover_workflow(headless: bool):
 
 # FUNCTIONS
 
-# Build pydoll ChromiumOptions with UA + anti-detection flags
-def build_options(headless: bool, session_dir: str) -> ChromiumOptions:
-    opts = ChromiumOptions()
-    opts.headless = headless
-    opts.add_argument(f"--user-data-dir={session_dir}")
-    opts.add_argument(f"--user-agent={REAL_UA}")
-    opts.add_argument("--window-size=1920,1080")
-    opts.add_argument("--disable-blink-features=AutomationControlled")
-    opts.block_popups = True
-    opts.block_notifications = True
-    return opts
+# Bind to port 0 to get a free OS-assigned port
+def get_free_port() -> int:
+    with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
+        s.bind(("127.0.0.1", 0))
+        return s.getsockname()[1]
+
+
+# Launch Chrome in background via open -gna (new instance, no foreground)
+def launch_background_chrome(port: int, session_dir: str) -> None:
+    subprocess.run(
+        [
+            "open", "-gna", "Google Chrome", "--args",
+            f"--remote-debugging-port={port}",
+            f"--user-data-dir={session_dir}",
+            f"--user-agent={REAL_UA}",
+            "--window-size=1920,1080",
+            "--disable-blink-features=AutomationControlled",
+            "--no-first-run",
+            "--no-default-browser-check",
+        ],
+        check=True,
+    )
+
+
+# Poll /json/version until Chrome responds; return webSocketDebuggerUrl
+def wait_for_ws_url(port: int, timeout: float = 30.0) -> str:
+    url = f"http://localhost:{port}/json/version"
+    deadline = time.monotonic() + timeout
+    while time.monotonic() < deadline:
+        try:
+            with urllib.request.urlopen(url, timeout=2) as resp:
+                data = json.loads(resp.read())
+                return data["webSocketDebuggerUrl"]
+        except Exception:
+            time.sleep(0.5)
+    raise TimeoutError(f"Chrome did not start on port {port} within {timeout}s")
+
+
+# Kill the Chrome process bound to this debug port
+def kill_chrome_on_port(port: int) -> None:
+    try:
+        subprocess.run(
+            ["pkill", "-f", f"remote-debugging-port={port}"],
+            check=False,
+        )
+    except Exception as e:
+        print(f"pkill (non-fatal): {e}", file=sys.stderr)
+
+
+# Return cutoff date: articles strictly before this date are outside the 48h window
+def compute_cutoff(today) -> object:
+    return today - timedelta(days=CUTOFF_DAYS - 1)
 
 
 # Unpack CDP execute_script result dict
@@ -234,9 +290,9 @@ def parse_url_date(url: str) -> datetime | None:
         return None
 
 
-# Count articles whose URL date is before today
-def count_pre_today(articles: list[dict], today) -> int:
-    return sum(1 for a in articles if (d := parse_url_date(a["url"])) and d.date() < today)
+# Count articles whose URL date is before cutoff_date (i.e., older than 48h window)
+def count_older_than_cutoff(articles: list[dict], cutoff_date) -> int:
+    return sum(1 for a in articles if (d := parse_url_date(a["url"])) and d.date() < cutoff_date)
 
 
 # Convert URL date to ISO-8601 string (UTC midnight); empty string if no date in URL
@@ -299,13 +355,7 @@ def print_summary(entries: list[dict], output_path: Path):
 
 
 def main():
-    parser = argparse.ArgumentParser(
-        description="CoinDesk /latest-crypto-news discovery via pydoll UI pagination (headed by default)"
-    )
-    parser.add_argument("--headless", action="store_true", default=False,
-                        help="Run headless (default: headed, for visual inspection)")
-    args = parser.parse_args()
-    asyncio.run(discover_workflow(args.headless))
+    asyncio.run(discover_workflow())
 
 
 if __name__ == "__main__":
