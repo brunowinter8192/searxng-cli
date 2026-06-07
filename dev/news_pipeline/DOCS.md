@@ -6,7 +6,7 @@ Per-domain news scraping pipeline for trading-bot data layer. CoinDesk → RAG c
 
 ## Convention
 
-**Browser automation:** `01_coindesk_discover.py` uses pydoll + background Chrome launched via `open -gna` (macOS, no focus steal). `02b_coindesk_scrape_fresh_context.py` uses crawl4ai (Playwright) with `headless=True`; fresh `AsyncWebCrawler` per URL defeats CoinDesk regwall.
+**Browser automation:** `01_coindesk_discover.py` uses pydoll + background Chrome launched via `open -gna` (macOS, no focus steal). `02b_coindesk_scrape_fresh_context.py` uses crawl4ai (Playwright) with `headless=True`; fresh `AsyncWebCrawler` per URL run concurrently (Semaphore(8)) defeats CoinDesk's cookie-metered regwall and achieves ~30s on 32 URLs.
 
 ## Documentation Tree
 
@@ -53,13 +53,15 @@ Per-domain news scraping pipeline for trading-bot data layer. CoinDesk → RAG c
 
 ### 02b_coindesk_scrape_fresh_context.py
 
-**Purpose:** Scrape each URL with fresh `AsyncWebCrawler` per URL — new Chrome process + clean cookie jar each fetch (crawl4ai/Playwright, `headless=True`). Resolves CoinDesk regwall (iter 2: 23/25 real bodies, 0 regwall hits). **Use this for production-quality scrapes.** No browser changes needed: headless Playwright has no focus-stealing issue.
+**Purpose:** Scrape each URL with fresh `AsyncWebCrawler` per URL — new Chromium process + clean cookie jar each fetch. Runs CONCURRENTLY via `asyncio.gather` + `Semaphore(8)` with `0.5–1.0s` jitter. `domcontentloaded` + `delay_before_return_html=0.5`, `page_timeout=15000`, no networkidle, no custom UA. Loud regwall guard: per-page WARN + per-run ERROR + exit non-zero if ≥20% regwalled. **Use this for production-quality scrapes.**
+
+Validated: 0/32 regwall, 32/32 ok, ~31s on 32 CoinDesk URLs. Mechanism confirmed in `scrape_isolation_smoke.py` (B2 path). Real-B1 (shared crawler + timezone cache-bust) empirically failed (25/32 timeout) — see `decisions/OldThemes/news_pipeline_layers/12_scrape_prod_rebuild.md`.
 
 **Input:** `--input <path>` or auto-picks newest `01_output/discover_*.json`. Pipeline passes the 04_dedup output explicitly via `--input`.
 
 **Output:**
-- `02b_output/<sha256[:12]>.md` per article — YAML frontmatter + raw markdown body
-- `02b_output/manifest.json`
+- `02b_output/<sha256[:12]>.md` per article — YAML frontmatter (url, lastmod, publication_date, title, section, scraped_at) + raw markdown body. Regwalled pages NOT written.
+- `02b_output/manifest.json` — status values: `ok`, `empty`, `failed`, `regwall`.
 
 ```bash
 ./venv/bin/python dev/news_pipeline/02b_coindesk_scrape_fresh_context.py
@@ -109,6 +111,26 @@ Per-domain news scraping pipeline for trading-bot data layer. CoinDesk → RAG c
 ./venv/bin/python dev/news_pipeline/05_publish.py --skip-index
 ```
 
+### prod_scrape_smoke.py ← investigation tool
+
+**Purpose:** Smoke A — empirical regwall baseline. Runs all 32 URLs from a discover-filtered JSON through the PRODUCTION `scrape_urls_workflow` (from `src/crawler/pipe_scraper.py`, shared session). Produces `smoke_output/raw/` + `smoke_output/regwall_review.md` with summary table (slug / bytes / lines / marker_hits / verdict_hint) and 50-line previews. Verdict heuristic: `REGWALL?` if bytes<3000 OR marker_hits≥3. NOT committed: `smoke_output/` is gitignored.
+
+**Result:** 17/32 REGWALL? (9k bytes, 5 marker hits), 15/32 article? (17k-35k bytes). Confirmed shared-session accumulates cookie counter → regwall after quota.
+
+```bash
+./venv/bin/python dev/news_pipeline/prod_scrape_smoke.py
+```
+
+### scrape_isolation_smoke.py ← investigation tool
+
+**Purpose:** Smoke B — two isolation candidates over same 32 URLs. B1: shared crawler + per-URL `timezone_id` (intended to bust crawl4ai 0.8.6 context cache). B2: fresh `AsyncWebCrawler` per URL, concurrent via `asyncio.gather` + `Semaphore(8)`. Produces `smoke_output/b1_regwall_review.md` + `smoke_output/b2_regwall_review.md` and a comparison table (stdout). NOT committed: `smoke_output/` is gitignored.
+
+**Result:** Both rows 0/32 regwall, 24s — but B1 row was invalid (script edited while running; B1 actually executed as B2). Real-B1 subsequently failed 25/32 timeout. B2 is the shipped mechanism. See `decisions/OldThemes/news_pipeline_layers/12_scrape_prod_rebuild.md`.
+
+```bash
+./venv/bin/python dev/news_pipeline/scrape_isolation_smoke.py
+```
+
 ## Output Directories
 
 | Directory | Contents | Gitignored |
@@ -119,3 +141,4 @@ Per-domain news scraping pipeline for trading-bot data layer. CoinDesk → RAG c
 | `02b_output/` | Iter 2+ fresh-context outputs + `manifest.json` | ✅ yes |
 | `03_output/` | Cleaned article bodies + `manifest.json` | ✅ yes |
 | `04_output/` | `discover_filtered_<ts>.json` files | ✅ yes |
+| `smoke_output/` | Smoke A/B raw scrapes + review MDs (investigation only) | ✅ yes |
