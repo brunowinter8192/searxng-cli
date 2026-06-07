@@ -1,0 +1,339 @@
+# INFRASTRUCTURE
+import asyncio
+import json
+import re
+import shutil
+import socket
+import subprocess
+import sys
+import tempfile
+import time
+import urllib.request
+from datetime import datetime, timedelta, timezone
+from urllib.parse import urlparse
+
+from pydoll.browser import Chrome
+
+from src.news.platforms.coindesk.config import (
+    TARGET_URL,
+    MAX_CLICK_ROUNDS,
+    POLL_INTERVAL,
+    POLL_MAX,
+    PRE_48H_THRESHOLD,
+    CUTOFF_DAYS,
+)
+
+REAL_UA = (
+    "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) "
+    "AppleWebKit/537.36 (KHTML, like Gecko) "
+    "Chrome/146.0.7680.154 Safari/537.36"
+)
+DATE_RE = re.compile(r'/(\d{4})/(\d{2})/(\d{2})/')
+
+# Extract feed article URLs + title + nearest time label — excludes aside/nav/footer/sidebar noise
+_JS_EXTRACT = """
+(function() {
+    var dateRe = /\\/\\d{4}\\/\\d{2}\\/\\d{2}\\//;
+    var skipTags = {ASIDE: 1, NAV: 1, FOOTER: 1, HEADER: 1};
+    var skipCls = /related|recommendation|popular|trending|sidebar/i;
+    var links = document.querySelectorAll('a[href]');
+    var results = [];
+    var seen = {};
+    for (var i = 0; i < links.length; i++) {
+        var a = links[i];
+        var href = a.href;
+        if (!dateRe.test(href) || seen[href]) continue;
+        var skip = false;
+        var node = a.parentElement;
+        while (node && node !== document.body) {
+            if (skipTags[node.tagName]) { skip = true; break; }
+            if (node.className && skipCls.test(node.className)) { skip = true; break; }
+            node = node.parentElement;
+        }
+        if (skip) continue;
+        seen[href] = true;
+        var timeLabel = '';
+        node = a;
+        for (var d = 0; d < 10; d++) {
+            node = node.parentElement;
+            if (!node) break;
+            var te = node.querySelector('time');
+            if (te) { timeLabel = te.getAttribute('datetime') || te.textContent.trim(); break; }
+            var kids = node.querySelectorAll('span, p, div');
+            for (var j = 0; j < kids.length; j++) {
+                var t = kids[j].textContent.trim();
+                if (t.length < 40 && /\\d+\\s*(min|hour|hr|day|h|m)\\s*(ago|s)?|just now/i.test(t)) {
+                    timeLabel = t; break;
+                }
+            }
+            if (timeLabel) break;
+        }
+        results.push({url: href, timeLabel: timeLabel, title: a.textContent.trim()});
+    }
+    return JSON.stringify(results);
+})();
+"""
+
+# Count feed-scoped article URLs (same exclusions as _JS_EXTRACT, fast poll)
+_JS_COUNT = """
+(function() {
+    var dateRe = /\\/\\d{4}\\/\\d{2}\\/\\d{2}\\//;
+    var skipTags = {ASIDE: 1, NAV: 1, FOOTER: 1, HEADER: 1};
+    var skipCls = /related|recommendation|popular|trending|sidebar/i;
+    var seen = {};
+    var count = 0;
+    document.querySelectorAll('a[href]').forEach(function(a) {
+        if (!dateRe.test(a.href) || seen[a.href]) return;
+        var skip = false;
+        var node = a.parentElement;
+        while (node && node !== document.body) {
+            if (skipTags[node.tagName]) { skip = true; break; }
+            if (node.className && skipCls.test(node.className)) { skip = true; break; }
+            node = node.parentElement;
+        }
+        if (!skip) { seen[a.href] = true; count++; }
+    });
+    return count;
+})();
+"""
+
+# Scroll "More stories" button into view and click it; return true if found
+_JS_CLICK_BTN = """
+(function() {
+    var candidates = Array.from(document.querySelectorAll('button, a[role="button"], [role="button"]'));
+    for (var i = 0; i < candidates.length; i++) {
+        var t = candidates[i].textContent.trim();
+        if (/more\\s+stories|load\\s+more|show\\s+more/i.test(t)) {
+            candidates[i].scrollIntoView({block: 'center', behavior: 'smooth'});
+            candidates[i].click();
+            return true;
+        }
+    }
+    return false;
+})();
+"""
+
+
+# ORCHESTRATOR
+
+# Paginate CoinDesk latest-news feed via Chrome; return list of entry dicts.
+async def discover() -> list[dict]:
+    session_dir = tempfile.mkdtemp(prefix="coindesk_discover_")
+    today = datetime.now(timezone.utc).date()
+    cutoff = compute_cutoff(today)
+    port = get_free_port()
+
+    print(f"Launching background Chrome on port {port} …", file=sys.stderr)
+    launch_background_chrome(port, session_dir)
+    ws_url = wait_for_ws_url(port)
+    print(f"Connected: {ws_url}", file=sys.stderr)
+
+    chrome = Chrome()
+    tab = await chrome.connect(ws_url)
+    try:
+        print(f"Navigating to {TARGET_URL} …", file=sys.stderr)
+        await tab.go_to(TARGET_URL, timeout=60)
+        await asyncio.sleep(3.0)
+
+        initial = await extract_articles(tab)
+        all_urls: dict[str, dict] = {a["url"]: a for a in initial}
+        print(f"Batch 0: {len(initial)} initial articles", file=sys.stderr)
+
+        for click_n in range(1, MAX_CLICK_ROUNDS + 1):
+            pre = count_older_than_cutoff(list(all_urls.values()), cutoff)
+            if pre >= PRE_48H_THRESHOLD:
+                print(f"Coverage reached: {pre} articles older than 48h (before click {click_n}).", file=sys.stderr)
+                break
+
+            prev_count = len(all_urls)
+            clicked = await click_button(tab)
+            if not clicked:
+                print(f"Button gone at click {click_n} — end of feed.", file=sys.stderr)
+                break
+
+            await asyncio.sleep(2.0)
+            await wait_for_new_articles(tab, prev_count)
+            fresh = await extract_articles(tab)
+            added = {a["url"]: a for a in fresh if a["url"] not in all_urls}
+            all_urls.update(added)
+            pre = count_older_than_cutoff(list(all_urls.values()), cutoff)
+            print(f"Batch {click_n}: +{len(added)} | total={len(all_urls)} | older-than-48h={pre}", file=sys.stderr)
+
+            if pre >= PRE_48H_THRESHOLD:
+                print(f"Coverage reached: {pre} articles older than 48h after {click_n} click(s).", file=sys.stderr)
+                break
+        else:
+            print(
+                "WARNING: MAX_CLICK_ROUNDS reached without termination — coverage may be incomplete",
+                file=sys.stderr,
+            )
+
+    finally:
+        await tab.close()
+        try:
+            await chrome.close()
+        except Exception as e:
+            print(f"Chrome WS close (non-fatal): {e}", file=sys.stderr)
+        kill_chrome_on_port(port)
+        shutil.rmtree(session_dir, ignore_errors=True)
+        print(f"Chrome on port {port} killed, session dir removed.", file=sys.stderr)
+
+    entries = build_entries(all_urls)
+    entries, n_filtered = filter_live_blogs(entries)
+    if n_filtered:
+        print(f"Filtered {n_filtered} live-blog URLs (skipped)", file=sys.stderr)
+    return entries
+
+
+# FUNCTIONS
+
+# Bind to port 0 to get a free OS-assigned port
+def get_free_port() -> int:
+    with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
+        s.bind(("127.0.0.1", 0))
+        return s.getsockname()[1]
+
+
+# Launch Chrome in background via open -gna (new instance, no foreground)
+def launch_background_chrome(port: int, session_dir: str) -> None:
+    subprocess.run(
+        [
+            "open", "-gna", "Google Chrome", "--args",
+            f"--remote-debugging-port={port}",
+            f"--user-data-dir={session_dir}",
+            f"--user-agent={REAL_UA}",
+            "--window-size=1920,1080",
+            "--disable-blink-features=AutomationControlled",
+            "--no-first-run",
+            "--no-default-browser-check",
+        ],
+        check=True,
+    )
+
+
+# Poll /json/version until Chrome responds; return webSocketDebuggerUrl
+def wait_for_ws_url(port: int, timeout: float = 30.0) -> str:
+    url = f"http://localhost:{port}/json/version"
+    deadline = time.monotonic() + timeout
+    while time.monotonic() < deadline:
+        try:
+            with urllib.request.urlopen(url, timeout=2) as resp:
+                data = json.loads(resp.read())
+                return data["webSocketDebuggerUrl"]
+        except Exception:
+            time.sleep(0.5)
+    raise TimeoutError(f"Chrome did not start on port {port} within {timeout}s")
+
+
+# Kill the Chrome process bound to this debug port
+def kill_chrome_on_port(port: int) -> None:
+    try:
+        subprocess.run(
+            ["pkill", "-f", f"remote-debugging-port={port}"],
+            check=False,
+        )
+    except Exception as e:
+        print(f"pkill (non-fatal): {e}", file=sys.stderr)
+
+
+# Return cutoff date: articles strictly before this date are outside the 48h window
+def compute_cutoff(today) -> object:
+    return today - timedelta(days=CUTOFF_DAYS - 1)
+
+
+# Unpack CDP execute_script result dict
+def _extract_value(raw):
+    try:
+        return raw["result"]["result"]["value"]
+    except (KeyError, TypeError):
+        return None
+
+
+# Run extract JS + decode JSON response into list of article dicts
+async def extract_articles(tab) -> list[dict]:
+    raw = await tab.execute_script(_JS_EXTRACT)
+    val = _extract_value(raw)
+    if not val:
+        return []
+    try:
+        return json.loads(val)
+    except (json.JSONDecodeError, TypeError):
+        return []
+
+
+# Click "More stories" button via JS; return True if clicked
+async def click_button(tab) -> bool:
+    raw = await tab.execute_script(_JS_CLICK_BTN)
+    return bool(_extract_value(raw))
+
+
+# Poll feed-scoped count up to POLL_MAX × POLL_INTERVAL; return when it grows
+async def wait_for_new_articles(tab, prev_count: int) -> int:
+    for _ in range(POLL_MAX):
+        await asyncio.sleep(POLL_INTERVAL)
+        raw = await tab.execute_script(_JS_COUNT)
+        count = _extract_value(raw)
+        if count is not None and int(count) > prev_count:
+            return int(count)
+    return prev_count
+
+
+# Parse date from CoinDesk URL path (/YYYY/MM/DD/) → UTC midnight datetime
+def parse_url_date(url: str) -> datetime | None:
+    m = DATE_RE.search(url)
+    if not m:
+        return None
+    try:
+        return datetime(int(m.group(1)), int(m.group(2)), int(m.group(3)), tzinfo=timezone.utc)
+    except ValueError:
+        return None
+
+
+# Count articles whose URL date is before cutoff_date (i.e., older than 48h window)
+def count_older_than_cutoff(articles: list[dict], cutoff_date) -> int:
+    return sum(1 for a in articles if (d := parse_url_date(a["url"])) and d.date() < cutoff_date)
+
+
+# Convert URL date to ISO-8601 string (UTC midnight); empty string if no date in URL
+def _url_to_iso(url: str) -> str:
+    dt = parse_url_date(url)
+    if dt is None:
+        return ""
+    return dt.strftime("%Y-%m-%dT%H:%M:%S+00:00")
+
+
+# Extract first path segment as section (e.g. /markets/2026/... → markets)
+def _extract_section(url: str) -> str:
+    try:
+        path = url.split("coindesk.com", 1)[1]
+        return path.strip("/").split("/")[0]
+    except (IndexError, ValueError):
+        return "unknown"
+
+
+# Build sorted output entry list from all_urls dict
+def build_entries(all_urls: dict) -> list[dict]:
+    entries = []
+    for url, article in all_urls.items():
+        iso = _url_to_iso(url)
+        entries.append({
+            "url": url,
+            "lastmod": iso,
+            "publication_date": iso,
+            "title": article.get("title", ""),
+            "section": _extract_section(url),
+        })
+    entries.sort(key=lambda e: e["lastmod"], reverse=True)
+    return entries
+
+
+# Return True if URL is a CoinDesk live-blog: slug (last path segment) starts with "live-".
+def _is_live_blog(url: str) -> bool:
+    slug = urlparse(url).path.rstrip("/").split("/")[-1]
+    return slug.startswith("live-")
+
+
+# Remove CoinDesk live-blog URLs (slug starts with "live-"); return (filtered_list, count_removed).
+def filter_live_blogs(entries: list[dict]) -> tuple[list[dict], int]:
+    kept = [e for e in entries if not _is_live_blog(e["url"])]
+    return kept, len(entries) - len(kept)
