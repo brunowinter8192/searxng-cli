@@ -1,12 +1,12 @@
 # dev/news_pipeline/
 
-Per-domain news scraping probe for trading-bot data layer. CoinDesk first; raw-output stage before site-specific filter design. No `src/` integration yet.
+Per-domain news scraping pipeline for trading-bot data layer. CoinDesk → RAG collection `searxng_crypto`. End-to-end runnable; single-command daily runner.
 
-**Status:** Probe stage — raw output for filter-design inspection. No src/ integration yet.
+**Status:** End-to-end complete (discover → dedup → scrape → cleanup → publish). Stays in `dev/`; `src/` promotion deferred.
 
 ## Convention
 
-**Probes laufen headed (headless=False)** für visuelle Mit-Inspektion durch den User. Gilt für alle `dev/news_pipeline/`-Probes mit Browser-Automation. `--headless` flag als explizites Opt-out vorhanden.
+**Browser automation:** `01_coindesk_discover.py` uses pydoll + background Chrome launched via `open -gna` (macOS, no focus steal). `02b_coindesk_scrape_fresh_context.py` uses crawl4ai (Playwright) with `headless=True`; fresh `AsyncWebCrawler` per URL defeats CoinDesk regwall.
 
 ## Documentation Tree
 
@@ -14,19 +14,26 @@ Per-domain news scraping probe for trading-bot data layer. CoinDesk first; raw-o
 
 ## Scripts
 
+### run_pipeline.py ← entry point
+
+**Purpose:** Single-command orchestrator. Chains precondition checks → discover (48h) → dedup → scrape → cleanup → publish. Logs per-stage counts and failure modes to `src/logs/coindesk_pipeline_YYYYMMDD.log`. Writes `src/logs/coindesk_pipeline_last_run.txt` on successful completion. Clears `02b_output/` and `03_output/` at start so publish only indexes current-run articles.
+
+**Preconditions:** (a) internet reachable (HTTP to coindesk.com), (b) `rag-cli list_collections` exits 0.
+
+```bash
+./venv/bin/python dev/news_pipeline/run_pipeline.py
+```
+
 ### 01_coindesk_discover.py
 
-**Purpose:** Discover CoinDesk articles via UI pagination on `/latest-crypto-news`. pydoll headed browser navigates the page, extracts feed-scoped article links via JS, clicks "More stories" until ≥3 pre-today articles are collected (24h coverage heuristic). Replaces sitemap-based approach (iter 4, 2026-05-27): removes 25-URL cap, picks up yesterday's articles that sitemap missed.
+**Purpose:** Discover CoinDesk articles via UI pagination on `/latest-crypto-news`. Background Chrome launched via `open -gna "Google Chrome" --args --remote-debugging-port=<PORT> ...` (no focus steal); pydoll connects via `Chrome().connect(ws_url)`. Clicks "More stories" until ≥3 articles older than 48h are found (`PRE_48H_THRESHOLD=3`, `CUTOFF_DAYS=2`). Chrome killed via `pkill -f remote-debugging-port=<PORT>` on cleanup.
 
-**Approach:** `_JS_EXTRACT` (DOM traversal, skipTags/skipCls noise filter) + `_JS_CLICK_BTN` + `_JS_COUNT` poll loop. `lastmod` and `publication_date` derived from URL's `/YYYY/MM/DD/` path → UTC midnight ISO string. Title captured from `<a>` text. Terminates on `PRE_TODAY_THRESHOLD=3` or `MAX_CLICK_ROUNDS=8` safety cap (warns to stderr if cap fires). **Live-blog URLs (`/live-markets-*`) filtered post-discovery** — continuously-updated containers don't fit URL-dedup daily-cron pipeline.
+**Approach:** `_JS_EXTRACT` (DOM traversal, skipTags/skipCls noise filter) + `_JS_CLICK_BTN` + `_JS_COUNT` poll loop. `lastmod` and `publication_date` derived from URL's `/YYYY/MM/DD/` path → UTC midnight ISO string. Title captured from `<a>` text. `MAX_CLICK_ROUNDS=8` safety cap. **Live-blog URLs (`/live-markets-*`) filtered post-discovery.**
 
-**Output:** `01_output/discover_<UTC-timestamp>.json` — list of `{url, lastmod, publication_date, title, section}` sorted by lastmod desc. Schema identical to sitemap-based predecessor — Stage 2 requires zero changes.
-
-**CLI:** `--headless` opt-in for cron; default headed for visual inspection.
+**Output:** `01_output/discover_<UTC-timestamp>.json` — list of `{url, lastmod, publication_date, title, section}` sorted by lastmod desc.
 
 ```bash
 ./venv/bin/python dev/news_pipeline/01_coindesk_discover.py
-./venv/bin/python dev/news_pipeline/01_coindesk_discover.py --headless
 ```
 
 ### 02_coindesk_scrape.py
@@ -46,9 +53,9 @@ Per-domain news scraping probe for trading-bot data layer. CoinDesk first; raw-o
 
 ### 02b_coindesk_scrape_fresh_context.py
 
-**Purpose:** Same as `02_coindesk_scrape.py` but with fresh `AsyncWebCrawler` per URL — new Chrome process + clean cookie jar each fetch. Resolves CoinDesk regwall (iter 2: 23/25 real bodies, 0 regwall hits). **Use this for production-quality scrapes.**
+**Purpose:** Scrape each URL with fresh `AsyncWebCrawler` per URL — new Chrome process + clean cookie jar each fetch (crawl4ai/Playwright, `headless=True`). Resolves CoinDesk regwall (iter 2: 23/25 real bodies, 0 regwall hits). **Use this for production-quality scrapes.** No browser changes needed: headless Playwright has no focus-stealing issue.
 
-**Input:** `--input <path>` or auto-picks newest `01_output/discover_*.json`.
+**Input:** `--input <path>` or auto-picks newest `01_output/discover_*.json`. Pipeline passes the 04_dedup output explicitly via `--input`.
 
 **Output:**
 - `02b_output/<sha256[:12]>.md` per article — YAML frontmatter + raw markdown body
@@ -56,7 +63,7 @@ Per-domain news scraping probe for trading-bot data layer. CoinDesk first; raw-o
 
 ```bash
 ./venv/bin/python dev/news_pipeline/02b_coindesk_scrape_fresh_context.py
-./venv/bin/python dev/news_pipeline/02b_coindesk_scrape_fresh_context.py --input dev/news_pipeline/01_output/discover_<ts>.json
+./venv/bin/python dev/news_pipeline/02b_coindesk_scrape_fresh_context.py --input dev/news_pipeline/04_output/discover_filtered_<ts>.json
 ```
 
 ### 03_coindesk_cleanup.py
@@ -76,6 +83,32 @@ Per-domain news scraping probe for trading-bot data layer. CoinDesk first; raw-o
 ./venv/bin/python dev/news_pipeline/03_coindesk_cleanup.py --input dev/news_pipeline/02b_output/ --output /tmp/clean/
 ```
 
+### 04_dedup.py
+
+**Purpose:** Dedup gate — drops URLs whose `coindesk__<YYYY-MM-DD>__<hash>.md` already exists in the `searxng_crypto` RAG collection dir. Pure Python, no browser, no network. Filesystem presence of the target filename IS the seen-state; no separate state file.
+
+**Input:** `--input <path>` or auto-picks newest `01_output/discover_*.json`. **Collection dir:** `/Users/brunowinter2000/Documents/ai/Meta/ClaudeCode/cli/rag-cli/data/documents/searxng_crypto/`.
+
+**Output:** `04_output/discover_filtered_<UTC-timestamp>.json` — same schema as discover, subset of entries.
+
+```bash
+./venv/bin/python dev/news_pipeline/04_dedup.py
+./venv/bin/python dev/news_pipeline/04_dedup.py --input dev/news_pipeline/01_output/discover_<ts>.json
+```
+
+### 05_publish.py
+
+**Purpose:** Copy cleaned MDs from `03_output/` to the `searxng_crypto` RAG collection dir as `coindesk__<YYYY-MM-DD>__<hash>.md`, then run `rag-cli index --collection searxng_crypto`. Idempotent (safe to re-run; rag-cli hash-skip handles re-index of already-indexed files).
+
+**Input:** `03_output/manifest.json` + `03_output/*.md`. **Collection dir:** same as 04.
+
+**Output:** files copied to `/Users/.../rag-cli/data/documents/searxng_crypto/coindesk__<date>__<hash>.md`. Triggers rag-cli indexing.
+
+```bash
+./venv/bin/python dev/news_pipeline/05_publish.py
+./venv/bin/python dev/news_pipeline/05_publish.py --skip-index
+```
+
 ## Output Directories
 
 | Directory | Contents | Gitignored |
@@ -85,3 +118,4 @@ Per-domain news scraping probe for trading-bot data layer. CoinDesk first; raw-o
 | `02_output/` | Iter 1 shared-session outputs + `manifest.json` | ✅ yes |
 | `02b_output/` | Iter 2+ fresh-context outputs + `manifest.json` | ✅ yes |
 | `03_output/` | Cleaned article bodies + `manifest.json` | ✅ yes |
+| `04_output/` | `discover_filtered_<ts>.json` files | ✅ yes |

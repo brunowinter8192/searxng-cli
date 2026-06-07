@@ -47,6 +47,9 @@ dev/search_pipeline/01_reports/snippet_quality_*.md
 # News pipeline outputs (discover JSONs accumulate — gitignored; cleaned content tracked)
 dev/news_pipeline/01_output/
 dev/news_pipeline/02_output/
+dev/news_pipeline/02b_output/
+dev/news_pipeline/03_output/
+dev/news_pipeline/04_output/
 dev/news_pipeline/exploration/01_output/
 
 # eval full-run corpus dirs (summary reports stay, raw markdown does not)
