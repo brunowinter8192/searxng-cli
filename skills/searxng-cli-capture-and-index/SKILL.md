@@ -11,6 +11,8 @@ description: Worker-side skill — discover URLs agentic (worker writes /tmp scr
 
 Pipeline: Discovery → URL Selection (pre-scrape) → Scrape (raw) → Cleanup (incl. post-scrape drop) → Index.
 
+**Scraper posture — best-effort, not guaranteed.** `src/crawler/pipe_scraper.py` is a GENERAL scraper validated on cooperative sites; it is NOT guaranteed to work on the site in front of you. Cookie-metered regwalls, hard paywalls, JS/bot-walls and aggressive rate-WAFs each defeat it differently. This skill is the FLEXIBLE, human-in-the-loop path — the opposite of a per-site-tuned pipeline like `src/news/` that trades flexibility for one optimized site. Web scraping forces that choice: be flexible, or optimize for a single site — here you are flexible, which means you do NOT assume the scrape worked. Coverage verification is a first-class duty: every discovered URL that survives the cull must actually yield real content, because discover-count ≠ content-count. On ANY systemic, diagnosable problem — a patterned coverage gap, a repeating block-type, a dominant error class (NOT scattered legit 404s) — STOP, do not push a half-broken capture into indexing, and report the IDENTIFIED problem to Opus: what fails, the evidence, your read of the cause. Iteration happens from there (different wait strategy, per-URL isolation, stealth, a per-site discover tweak — then re-run). The `>50%` / dozens-of-blocks thresholds below are hard floors, not the bar — a clearly-diagnosed problem warrants a STOP even under them.
+
 #### Phase 0 — Discovery
 
 Deliverable: `/tmp/<domain>_discovered_urls.txt` — one URL per line, maximum coverage of the target domain/section.
@@ -120,7 +122,7 @@ The scraper's own output is short: a console line with **success count, error co
 
 Take from that console line for the Completion Report: scraped N, errors K, **duration T**. The error breakdown (429 / timeout / http_error) is already itemized in the scrape report md.
 
-If `>50%` failed → STOP, report to Opus, do not proceed.
+**Coverage gate — verify, don't assume.** Compare the scrape outcome against the cull-survived URL list — every URL should have yielded a usable body. `>50%` failed → STOP, report to Opus, do not proceed. STOP below that threshold too when the shortfall is SYSTEMIC and diagnosable: one block-type or error class hitting a coherent slice of URLs (e.g. all article pages regwalled while index pages pass). Report the identified problem to Opus — what failed, the evidence (block text / coverage delta / error breakdown), the suspected cause — and iterate; do NOT carry a patterned gap into Cleanup/Index. Scattered legit 404s / thin pages are NOT a stop — those flow to the post-scrape drop.
 
 #### Phase 3 — Cleanup
 
