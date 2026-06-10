@@ -57,3 +57,9 @@ data/news/
 
 # eval full-run corpus dirs (summary reports stay, raw markdown does not)
 dev/scrape_pipeline/A_pipe_scrape_eval_reports/full_run_*/
+
+# monosans/proxy-scraper-checker: binary, docker build context, proxy pool dumps (large/ephemeral)
+dev/news_pipeline/theblock/monosans_bin/
+dev/news_pipeline/theblock/monosans_docker/
+dev/news_pipeline/theblock/monosans_out_neutral/
+dev/news_pipeline/theblock/monosans_out_theblock/
