@@ -134,8 +134,17 @@ web-md: STOP at Phase 1b — report the URL-list path + per-section breakdown an
 ```
 
 ```bash
-worker-cli spawn capture-<collection_lower> /tmp/spawn-<name>.md <project_root> sonnet
+# project_root = the CURRENT project's root — the project the session is working in.
+# Pass it EXPLICITLY. Never a bare path that lets worker-cli walk up to a parent
+# mono-repo git root: the worker MUST land in the current project's OWN worktree.
+worker-cli spawn capture-<collection_lower> /tmp/spawn-<name>.md <current_project_root> sonnet
 ```
+
+**Verify worktree placement after spawn (MANDATORY).** The spawn output reports a `Worktree:` path and a `Session:` name. Confirm:
+- `Worktree:` is `<current_project_root>/.claude/worktrees/<name>`
+- `Session:` is `worker-<basename(current_project_root)>-<name>`
+
+If the worktree landed under a PARENT directory instead (session named after an enclosing repo), the current project is nested inside a larger git repo and `worker-cli` resolved to the parent git root. STOP and resolve before sending the cull go — make the current project its own git repo, or pass its real root explicitly.
 
 **4.** Cull review (web-md only — the highest-leverage step). When the worker stops at Phase 1b it reports the URL-list path + a per-section breakdown. Review it against **what the user actually needs this session** — drop sections that are valid content but off-topic (e.g. a GitHub REST capture aimed at search/contents/git-trees does not need `actions`/`enterprise-admin`/`scim`). Send the worker the sections/patterns to drop. The worker applies the cull and proceeds. This is YOUR call, not the worker's — only you hold the user-need context.
 
