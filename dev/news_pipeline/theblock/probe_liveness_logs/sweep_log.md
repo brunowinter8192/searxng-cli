@@ -152,3 +152,25 @@
 | bad_body | 2 | 0.1% |
 | unknown | 3 | 0.1% |
 
+---
+## 2026-06-11T20:44:35Z | sample | n=3,000 | concurrency=64 | timeout=5.0s/5.0s
+
+| Wall-clock | Throughput | Alive | Alive% | Dead |
+|---|---|---|---|---|
+| 493.7s | 6/s | 280 | 9.3% | 2,720 |
+
+### Dead Reason Histogram
+
+| Reason | Count | % of dead |
+|---|---|---|
+| connect_timeout | 38 | 1.4% |
+| read_timeout | 162 | 6.0% |
+| hard_timeout | 1,399 | 51.4% |
+| connection_refused | 367 | 13.5% |
+| proxy_handshake_error | 693 | 25.5% |
+| resolve_error | 0 | 0.0% |
+| tls_error | 0 | 0.0% |
+| http_non200 | 54 | 2.0% |
+| bad_body | 3 | 0.1% |
+| unknown | 4 | 0.1% |
+
