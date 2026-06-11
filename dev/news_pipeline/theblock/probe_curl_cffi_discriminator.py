@@ -1,0 +1,261 @@
+#!/usr/bin/env python3
+# Discriminate: curl_cffi impersonate=chrome passability test against theblock.co
+#
+# WHY: monosans run found 494 alive proxies under neutral check_url but 0 under
+# theblock.co (rustls JA3). This probe re-tests with the CORRECT browser signature
+# (curl_cffi chrome) to discriminate:
+#   (a) signature was the blocker => some proxies now pass => free loop viable
+#   (b) proxy IPs are CF-reputation-blocked => still 0, failures dominated by 403/429
+#   (c) pool stale => still 0, failures dominated by connection errors
+#
+# Primary target:  https://www.theblock.co/sitemap_tbco_post_0.xml  (real fetch target,
+#                  same endpoint that returned 403/429 in the discovery run)
+# Secondary target: https://www.theblock.co/sitemap_tbco_index.xml  (index, tested on
+#                  passing proxies only for cross-check; results reported separately)
+#
+# Output: dev/news_pipeline/theblock/probe_curl_cffi_discriminator_reports/discriminator_<ts>.md
+# Usage:  ./venv/bin/python dev/news_pipeline/theblock/probe_curl_cffi_discriminator.py
+
+# INFRASTRUCTURE
+import json
+import sys
+import time
+from collections import Counter, defaultdict
+from concurrent.futures import ThreadPoolExecutor, as_completed
+from datetime import datetime, timezone
+from pathlib import Path
+
+from curl_cffi import requests as cffi_requests
+
+PROXIES_JSON   = Path("dev/news_pipeline/theblock/monosans_out_neutral/proxies.json")
+TARGET_PRIMARY = "https://www.theblock.co/sitemap_tbco_post_type_post_0.xml"  # real /post/ sub (from index)
+TARGET_SECONDARY = "https://www.theblock.co/sitemap_tbco_index.xml"
+# NOTE: earlier guess "sitemap_tbco_post_0.xml" was wrong — returned 404 via proxies because
+# the URL doesn't exist; real pattern is sitemap_tbco_post_type_post_N.xml
+CONCURRENCY    = 20
+TIMEOUT        = 15  # seconds, total per request
+REPORT_DIR     = Path("dev/news_pipeline/theblock/probe_curl_cffi_discriminator_reports")
+
+XML_MARKERS    = [b"<?xml", b"<sitemapindex", b"<urlset", b"<sitemap>"]
+
+# ORCHESTRATOR
+
+def probe_curl_cffi_discriminator_workflow():
+    REPORT_DIR.mkdir(parents=True, exist_ok=True)
+    ts = datetime.now(timezone.utc).strftime("%Y%m%d_%H%M%S")
+
+    print(f"Loading proxy pool from {PROXIES_JSON} ...")
+    proxies = load_proxies()
+    print(f"Pool: {len(proxies)} proxies (http {sum(1 for p in proxies if p['protocol']=='http')}, "
+          f"socks4 {sum(1 for p in proxies if p['protocol']=='socks4')}, "
+          f"socks5 {sum(1 for p in proxies if p['protocol']=='socks5')})")
+
+    print(f"\n=== PRIMARY: {TARGET_PRIMARY} ===")
+    print(f"Concurrency {CONCURRENCY}, timeout {TIMEOUT}s ...")
+    start = time.time()
+    primary_results = run_checks(proxies, TARGET_PRIMARY)
+    elapsed_primary = time.time() - start
+    print(f"Done in {elapsed_primary:.0f}s")
+
+    passing_proxies = [p for p, r in zip(proxies, primary_results) if r[0] == "pass"]
+
+    secondary_results = []
+    if passing_proxies:
+        print(f"\n=== SECONDARY: {TARGET_SECONDARY} ({len(passing_proxies)} passing proxies) ===")
+        start2 = time.time()
+        secondary_results = run_checks(passing_proxies, TARGET_SECONDARY)
+        elapsed_secondary = time.time() - start2
+        print(f"Done in {elapsed_secondary:.0f}s")
+    else:
+        print("\nNo passing proxies on primary — skipping secondary target.")
+        elapsed_secondary = 0.0
+
+    report_path = REPORT_DIR / f"discriminator_{ts}.md"
+    report = build_report(proxies, primary_results, passing_proxies, secondary_results,
+                          elapsed_primary, elapsed_secondary, ts)
+    report_path.write_text(report)
+    print(f"\nReport: {report_path}")
+
+# FUNCTIONS
+
+def load_proxies():
+    return json.loads(PROXIES_JSON.read_text())
+
+def proxy_url(entry):
+    return f"{entry['protocol']}://{entry['host']}:{entry['port']}"
+
+def classify_response(r):
+    if r.status_code == 200:
+        content = r.content[:500]
+        if any(m in content for m in XML_MARKERS):
+            return ("pass", 200)
+        return ("fail_200_not_xml", 200)
+    elif r.status_code == 403:
+        return ("fail_403", 403)
+    elif r.status_code == 429:
+        return ("fail_429", 429)
+    else:
+        return (f"fail_http_{r.status_code}", r.status_code)
+
+def classify_exception(e):
+    code = getattr(e, "code", None)
+    if code is not None:
+        code_int = int(code)
+        # libcurl CURLcode values
+        if code_int == 28:   # CURLE_OPERATION_TIMEDOUT
+            return ("fail_timeout", code_int)
+        elif code_int in (7, 5, 97):   # COULDNT_CONNECT, COULDNT_RESOLVE_PROXY, PROXY_*
+            return ("fail_connection", code_int)
+        elif code_int == 6:  # COULDNT_RESOLVE_HOST
+            return ("fail_connection", code_int)
+        elif code_int in (35, 51, 58, 60):  # SSL errors
+            return ("fail_ssl", code_int)
+        elif code_int in (55, 56):  # SEND_ERROR, RECV_ERROR
+            return ("fail_connection", code_int)
+        else:
+            return (f"fail_curl_{code_int}", code_int)
+    # fallback: classify by message
+    msg = str(e).lower()
+    if "timeout" in msg or "timed out" in msg:
+        return ("fail_timeout", -1)
+    return ("fail_connection", -1)
+
+def check_one(entry, target):
+    purl = proxy_url(entry)
+    proxies_dict = {"http": purl, "https": purl}
+    try:
+        s = cffi_requests.Session(impersonate="chrome")
+        r = s.get(target, proxies=proxies_dict, timeout=TIMEOUT)
+        s.close()
+        return classify_response(r)
+    except Exception as e:
+        return classify_exception(e)
+
+def run_checks(entries, target):
+    results = [None] * len(entries)
+    done = 0
+    with ThreadPoolExecutor(max_workers=CONCURRENCY) as executor:
+        futures = {executor.submit(check_one, e, target): i
+                   for i, e in enumerate(entries)}
+        for fut in as_completed(futures):
+            idx = futures[fut]
+            try:
+                results[idx] = fut.result()
+            except Exception as e:
+                results[idx] = (f"fail_unexpected:{type(e).__name__}", -1)
+            done += 1
+            if done % 50 == 0 or done == len(entries):
+                sys.stdout.write(f"\r  {done}/{len(entries)} checked  ")
+                sys.stdout.flush()
+    print()
+    return results
+
+def build_report(proxies, primary_results, passing_proxies, secondary_results,
+                 elapsed_primary, elapsed_secondary, ts):
+    total = len(proxies)
+    primary_counts = Counter(r[0] for r in primary_results)
+    pass_count = primary_counts.get("pass", 0)
+
+    # Failure mode breakdown
+    cf_block   = primary_counts.get("fail_403", 0) + primary_counts.get("fail_429", 0)
+    conn_err   = sum(v for k, v in primary_counts.items()
+                     if "connection" in k or "ssl" in k or "curl_" in k)
+    timeout    = primary_counts.get("fail_timeout", 0)
+    other_http = sum(v for k, v in primary_counts.items()
+                     if k.startswith("fail_http_") or k == "fail_200_not_xml")
+
+    # ASN distribution of passing proxies
+    passing_asns = Counter(
+        p["asn"]["autonomous_system_organization"]
+        for p in passing_proxies
+        if p.get("asn")
+    ) if passing_proxies else Counter()
+
+    # ASN distribution of neutral pool (to document DC-IP prior)
+    pool_asns = Counter(
+        p["asn"]["autonomous_system_organization"]
+        for p in proxies
+        if p.get("asn")
+    ).most_common(10)
+
+    # Verdict
+    if pass_count > 0:
+        verdict = "(a) — SIGNATURE was the blocker. curl_cffi-chrome passes; free proxy loop is viable."
+    elif cf_block > (conn_err + timeout) * 2:
+        verdict = "(b) — IP REPUTATION. Failures dominated by 403/429 CF blocks (not connection errors). curl_cffi cannot fix reputation blocks. Free approach DEAD => residential required."
+    elif (conn_err + timeout) > cf_block * 2:
+        verdict = "(c) — STALE POOL inconclusive. Failures dominated by connection errors/timeouts (proxy IPs dead), not CF responses. Cannot distinguish (a) from (b) without a fresher/larger pool."
+    else:
+        verdict = "(b/c ambiguous) — Mixed failure modes; neither CF-block nor stale-proxy clearly dominant."
+
+    lines = []
+    lines.append("# theblock.co curl_cffi-chrome Discriminator Run")
+    lines.append(f"\nGenerated: {datetime.now(timezone.utc).strftime('%Y-%m-%d %H:%M UTC')}")
+    lines.append(f"Pool source: `{PROXIES_JSON}` ({total} proxies)")
+    lines.append(f"Primary target: `{TARGET_PRIMARY}`")
+    lines.append(f"Secondary target: `{TARGET_SECONDARY}` (tested on passing proxies only)")
+    lines.append(f"Concurrency: {CONCURRENCY}, timeout: {TIMEOUT}s/request")
+
+    lines.append("\n---")
+    primary_label = TARGET_PRIMARY.split("/")[-1]
+    lines.append(f"\n## Primary Results — `{primary_label}`")
+    lines.append(f"\nWall-clock: **{elapsed_primary:.0f}s**")
+    lines.append(f"\n| result | count | % |")
+    lines.append("|----|----|----|")
+    for label, count in sorted(primary_counts.items(), key=lambda x: -x[1]):
+        lines.append(f"| {label} | {count} | {count/total*100:.1f}% |")
+
+    lines.append(f"\n**PASSING (200 + XML):** {pass_count} / {total}")
+    lines.append(f"\n**Failure mode summary:**")
+    lines.append(f"| category | count |")
+    lines.append("|---|---|")
+    lines.append(f"| CF-block (403+429) | {cf_block} |")
+    lines.append(f"| connection errors (refused/reset/SSL) | {conn_err} |")
+    lines.append(f"| timeout | {timeout} |")
+    lines.append(f"| other HTTP | {other_http} |")
+
+    if passing_proxies:
+        lines.append("\n### Passing Proxies")
+        lines.append(f"\n{len(passing_proxies)} proxies returned HTTP 200 + XML content:\n")
+        for p in passing_proxies:
+            asn_org = p.get("asn", {}).get("autonomous_system_organization", "unknown")
+            country = p.get("geolocation", {}).get("country", {}).get("iso_code", "??")
+            lines.append(f"- `{proxy_url(p)}` — {asn_org} ({country})")
+
+    lines.append("\n---")
+    lines.append("\n## Secondary Results — `sitemap_tbco_index.xml`")
+    if secondary_results:
+        sec_counts = Counter(r[0] for r in secondary_results)
+        sec_pass = sec_counts.get("pass", 0)
+        lines.append(f"\nTested {len(passing_proxies)} proxies that passed primary. Wall-clock: {elapsed_secondary:.0f}s")
+        lines.append(f"\n| result | count |")
+        lines.append("|---|---|")
+        for label, count in sorted(sec_counts.items(), key=lambda x: -x[1]):
+            lines.append(f"| {label} | {count} |")
+        lines.append(f"\nIndex pass: {sec_pass} / {len(passing_proxies)}")
+    else:
+        lines.append("\nNot run (no proxies passed primary target).")
+
+    lines.append("\n---")
+    lines.append("\n## ASN Context")
+    lines.append("\n### Full pool ASN distribution (top 10 — confirming datacenter composition)")
+    lines.append("\n| ASN org | count |")
+    lines.append("|---|---|")
+    for org, count in pool_asns:
+        lines.append(f"| {org} | {count} |")
+
+    if passing_asns:
+        lines.append("\n### Passing proxy ASN distribution")
+        lines.append("\n| ASN org | count |")
+        lines.append("|---|---|")
+        for org, count in passing_asns.most_common():
+            lines.append(f"| {org} | {count} |")
+
+    lines.append("\n---")
+    lines.append("\n## Verdict")
+    lines.append(f"\n**{verdict}**")
+
+    return "\n".join(lines) + "\n"
+
+if __name__ == "__main__":
+    probe_curl_cffi_discriminator_workflow()

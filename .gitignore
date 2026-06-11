@@ -63,3 +63,6 @@ dev/news_pipeline/theblock/monosans_bin/
 dev/news_pipeline/theblock/monosans_docker/
 dev/news_pipeline/theblock/monosans_out_neutral/
 dev/news_pipeline/theblock/monosans_out_theblock/
+
+# curl_cffi discriminator per-run reports (numbers lifted to OldThemes 17)
+dev/news_pipeline/theblock/probe_curl_cffi_discriminator_reports/
