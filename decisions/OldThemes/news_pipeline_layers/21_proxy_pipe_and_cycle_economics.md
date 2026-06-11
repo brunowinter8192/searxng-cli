@@ -114,3 +114,39 @@ The 0.8% CF-rate (vs assumed 18.8%) makes backfill via this approach prohibitive
 ### Structural Finding
 
 The pipe architecture (Stage 1→2→3) is validated and working. The main variable is CF-pass rate per cycle, which scales with batch size. 5k batch is intentionally conservative (dev run); production runs should use larger samples.
+
+---
+
+## Per-Source Scoreboard — The MuRongPIG Dilution (supersedes the "bigger sample" lever)
+
+**Date:** 2026-06-12 | **Source:** `source_scoreboard.md` run #1 (2 pipe runs accumulated), `source_tracker.py`.
+
+Second pipe run corroborates the CF-rate: **4/475 = 0.8%** (run 1 was 4/488). So 0.8% is robust, not noise. The scoreboard (per-source attribution of raw/alive/CF) explains WHY — and it reframes the backfill outlook.
+
+### Smoking gun: MuRongPIG/Proxy-Master is a CF-worthless alive flood
+
+| Source | Raw/run | Alive% | CF-checked | CF-passed |
+|---|---|---|---|---|
+| `Proxy-Master/http.txt` | 101,620 | 10.2% | 464 | **0** |
+| `Proxy-Master/socks4.txt` | 89,709 | 11.0% | 464 | **0** |
+| `Proxy-Master/socks5.txt` | 100,664 | 10.3% | 464 | **0** |
+
+MuRongPIG = ~282k raw (~88% of the pool), ~10% alive, but **0 CF-passes across ~1,400 CF-checks**. Its alive proxies are pure datacenter IPs that Cloudflare reputation-blocks. Because it is ~88% of raw and ~10% alive, it is roughly **~93% of the entire ALIVE pool** (≈28k of ~30k alive) — and every one of them fails CF.
+
+### The 0.8% is dilution, not a pool property
+
+Of ~475 neutral-alive in a 5k sample, ~440 are MuRongPIG (all CF-dead). The 4 CF-passers come from the remaining ~35 non-MuRongPIG alive → **non-MuRongPIG CF-rate ≈ 4/35 ≈ ~11%**, close to the old 18.8%. The headline 0.8% is MuRongPIG averaging the real signal into the floor.
+
+CF-passers concentrate in a handful of smaller socks5/http sources: `proxifly`, `ALIILAPRO`, `TheSpeedX` (PROXY-List), `monosans/proxy-list`, `Free-Proxy` (dpangestuw), `mzyui`.
+
+### Implication — curation likely rescues the backfill
+
+Curating MuRongPIG (+ the many 0-CF, 0-unique sources) out should lift the effective CF-rate dramatically — plausibly toward ~11% — AND shrink the pool ~10× (faster proxy-gen, the generation-bound bottleneck). This **supersedes the worker's "bigger sample" suggestion above**: a larger MuRongPIG-heavy sample adds more CF-worthless junk, not more CF-passers. Curation is the lever.
+
+**Caveat:** CF-n is still small (~8 CF-passers over 2 runs). The MuRongPIG-0-CF signal is robust (n~1,400); the ~11% non-MuRongPIG estimate is not yet (small n). The decisive test: re-run the pipe on a CURATED source set and measure the curated CF-rate directly.
+
+### Recommendation (SOLL update)
+
+1. Build a curated source set — drop the MuRongPIG mega-files + sources with 0 CF-hits and 0 uniqueness; keep the CF-yielding socks5/http sources + the high-exclusivity ones.
+2. Re-run the pipe on the curated set → measure curated CF-rate. If it jumps toward ~5–11%, backfill is feasible again.
+3. Then build the incremental-source-prioritized selector (evaluated-memory: dead durable / alive time-boxed; each cycle check only NEW proxies from the top sources). Efficiency layer on top of curation.
