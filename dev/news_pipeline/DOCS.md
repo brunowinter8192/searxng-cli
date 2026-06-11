@@ -208,7 +208,13 @@ bash dev/news_pipeline/theblock/probe_monosans.sh theblock
 ./venv/bin/python dev/news_pipeline/theblock/probe_liveness.py --full --concurrency 1000
 ```
 
-### theblock/pipe_theblock.py (331 LOC)
+### theblock/source_tracker.py (283 LOC)
+
+**Purpose:** Per-source attribution, cumulative scoreboard, and freshness tracking. Called once per pipe run via `update_and_flush()`. Reads `source_results` + `hp_to_sources` from `pipe_theblock.fetch_fresh_pool()` and computes per-source `checked`/`alive`/`cf_checked`/`cf_passed`/`unique_latest` counters. Merges run stats into `source_scoreboard.json`, re-renders `source_scoreboard.md`, diffs against `source_snapshots/` for freshness, appends to `freshness_log.md`.
+
+**Not run standalone** — called by `pipe_theblock.py`.
+
+### theblock/pipe_theblock.py (339 LOC)
 
 **Purpose:** Full proxy pipeline — Stage 1 (neutral liveness, 5k sample @ conc 128) → Stage 2 (CF-pass check via curl_cffi chrome impersonation) → Stage 3 (sitemap sub-URL discovery with sequential-exhaustion B-capture). Appends one funnel entry to `pipe_log.md` per run. Resume-safe: per-sub checkpoint JSONs in `theblock/cache/`.
 
@@ -227,6 +233,14 @@ bash dev/news_pipeline/theblock/probe_monosans.sh theblock
 
 **Purpose:** Funnel log — one structured entry per pipe run. Tracks Stage 1 neutral-alive %, Stage 2 CF-pass rate, Stage 3 subs fetched + cache progress, per-IP budget B distribution, and wall-clock per stage. Appended (never overwritten); comparable across runs like `sweep_log.md`. **Tracked in git** (run history is institutional knowledge for cycle-economics decisions).
 
+### theblock/source_scoreboard.json + source_scoreboard.md
+
+**Purpose:** Cumulative per-source proxy quality tracking across runs. JSON is the canonical state (loaded + merged each run); MD is the rendered ranking table (re-generated each run, tracked). Columns: raw/run, alive%, CF-hits (absolute count — early CF signal), CF% (n), unique%/run, rank score, runs. **Rank score:** `cf_rate` if `cf_checked ≥ 30`, else `alive_rate × exclusivity`. **Tracked in git** — cumulative state across worktrees/merges.
+
+### theblock/freshness_log.md
+
+**Purpose:** Per-run new/dropped proxy diff per source. Appended each run. First run sets baseline snapshot (no diff). Second+ run shows which sources inject fresh proxies (high new%) vs stale sources. **Tracked in git.**
+
 ## Output Directories
 
 | Directory | Contents | Gitignored |
@@ -239,6 +253,10 @@ bash dev/news_pipeline/theblock/probe_monosans.sh theblock
 | `04_output/` | `discover_filtered_<ts>.json` files | ✅ yes |
 | `smoke_output/` | Smoke A/B raw scrapes + review MDs (investigation only) | ✅ yes |
 | `theblock/pipe_log.md` | Funnel log per pipe run (tracked — run history, like sweep_log.md) | ❌ no |
+| `theblock/source_scoreboard.json` | Cumulative per-source proxy quality state (tracked) | ❌ no |
+| `theblock/source_scoreboard.md` | Rendered source ranking table (tracked, re-generated each run) | ❌ no |
+| `theblock/freshness_log.md` | Per-run new/dropped proxy diffs per source (tracked, appended) | ❌ no |
+| `theblock/source_snapshots/` | Per-source proxy sets for freshness diffing (gitignored) | ✅ yes |
 | `theblock/cache/` | Per-sub sitemap checkpoint JSONs + news_sitemap.json + bulk run data | ✅ yes |
 | `theblock/monosans_bin/` | monosans native binary (ephemeral) | ✅ yes |
 | `theblock/monosans_docker/` | monosans Docker build context (ephemeral) | ✅ yes |
