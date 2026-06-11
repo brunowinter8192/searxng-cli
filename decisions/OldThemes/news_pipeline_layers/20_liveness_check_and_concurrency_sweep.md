@@ -129,15 +129,127 @@ Fixed sample: `random.Random(42).sample(all_entries, 20_000)` — deterministic 
 
 **Wall-clock for full 320k run at 512:** ~84% hard_timeout × 320,334 = ~269k hits × 12s / 512 ≈ 6,300s ≈ 1.75 hours. Budget accordingly.
 
-## Concurrency Recommendation
+## Concurrency Recommendation (Upward Sweep Only — superseded below)
 
-**512 for the full 118k/320k run.**
+~~**512 for the full 118k/320k run.**~~
 
-Rationale: 512 is the only tested level where the home router delivers a biologically plausible alive rate (3.9%). Every higher level shows monotonic collapse driven by router NAT/conntrack saturation, not by proxy quality. Increasing concurrency beyond 512 trades alive-rate fidelity for wall-clock speed: at 1000, we gain 3× speed but lose 60% of alive detections — an unacceptable trade for a pool-building exercise where false-negatives (missing live proxies) are the primary error.
+This recommendation was based only on the upward sweep (512–3000). The downward sweep below shows 512 is still in the router-saturated zone. See revised recommendation at end.
 
-The sweep range tested (512–3000) straddles the threshold cleanly: 512 is below or at the router ceiling, 1000 is demonstrably above it. Lower concurrency (e.g. 256, 128) was not tested — it would likely improve alive% further but at 2–4× wall-clock cost. Given the 3.9% alive rate is already reasonable for a public proxy pool, 512 is the recommended operating point.
+---
+
+## Downward Sweep (2026-06-11, same session)
+
+Sample=3000, seed=42, timeout=5s/5s. Two bookend runs at concurrency=512 bracket the sweep to measure pool churn over the ~30 min window.
+
+### Results
+
+| Concurrency | Wall-clock | Throughput | Alive | Alive% | hard_timeout% |
+|---|---|---|---|---|---|
+| 512 (start) | 72.0s | 42/s | 51 | 1.7% | 92.6% |
+| 256 | 137.1s | 22/s | 120 | 4.0% | 77.5% |
+| 128 | 265.3s | 11/s | 236 | 7.9% | 60.0% |
+| 64 | 493.7s | 6/s | 280 | 9.3% | 51.4% |
+| 512 (end) | 72.0s | 42/s | 51 | 1.7% | 92.3% |
+
+### Dead Reason Histograms (downward sweep)
+
+**concurrency=512 start-bookend** (n=3,000 | elapsed=72.0s | alive=51/1.7%)
+
+| Reason | Count | % of dead |
+|---|---|---|
+| connect_timeout | 37 | 1.3% |
+| read_timeout | 18 | 0.6% |
+| hard_timeout | 2,731 | 92.6% |
+| connection_refused | 39 | 1.3% |
+| proxy_handshake_error | 111 | 3.8% |
+| http_non200 | 12 | 0.4% |
+| unknown | 1 | 0.0% |
+
+**concurrency=256** (n=3,000 | elapsed=137.1s | alive=120/4.0%)
+
+| Reason | Count | % of dead |
+|---|---|---|
+| connect_timeout | 85 | 3.0% |
+| read_timeout | 23 | 0.8% |
+| hard_timeout | 2,233 | 77.5% |
+| connection_refused | 166 | 5.8% |
+| proxy_handshake_error | 349 | 12.1% |
+| http_non200 | 22 | 0.8% |
+| bad_body | 1 | 0.0% |
+| unknown | 1 | 0.0% |
+
+**concurrency=128** (n=3,000 | elapsed=265.3s | alive=236/7.9%)
+
+| Reason | Count | % of dead |
+|---|---|---|
+| connect_timeout | 75 | 2.7% |
+| read_timeout | 49 | 1.8% |
+| hard_timeout | 1,658 | 60.0% |
+| connection_refused | 327 | 11.8% |
+| proxy_handshake_error | 610 | 22.1% |
+| http_non200 | 40 | 1.4% |
+| bad_body | 2 | 0.1% |
+| unknown | 3 | 0.1% |
+
+**concurrency=64** (n=3,000 | elapsed=493.7s | alive=280/9.3%)
+
+| Reason | Count | % of dead |
+|---|---|---|
+| connect_timeout | 38 | 1.4% |
+| read_timeout | 162 | 6.0% |
+| hard_timeout | 1,399 | 51.4% |
+| connection_refused | 367 | 13.5% |
+| proxy_handshake_error | 693 | 25.5% |
+| http_non200 | 54 | 2.0% |
+| bad_body | 3 | 0.1% |
+| unknown | 4 | 0.1% |
+
+**concurrency=512 end-bookend** (n=3,000 | elapsed=72.0s | alive=51/1.7%)
+
+| Reason | Count | % of dead |
+|---|---|---|
+| connect_timeout | 43 | 1.5% |
+| read_timeout | 13 | 0.4% |
+| hard_timeout | 2,721 | 92.3% |
+| connection_refused | 44 | 1.5% |
+| proxy_handshake_error | 116 | 3.9% |
+| http_non200 | 12 | 0.4% |
+
+### Churn Assessment
+
+Start-bookend: 51 alive. End-bookend: 51 alive. Count identical; elapsed ~30 min between them. **Pool churn over the measurement window is effectively zero.** The proxy pool is stable at the minute-to-hour timescale, so sweep results are directly comparable and a single full run will not be invalidated by pool decay during the run.
+
+### Analysis
+
+**Alive rate climbs monotonically as concurrency drops:** 1.7% → 4.0% → 7.9% → 9.3%. Improvement ratios per halving: 2.4× (512→256), 2.0× (256→128), 1.2× (128→64). The gain is clearly bending at 128→64 — the curve is entering plateau territory.
+
+**512 was deep in the saturated zone.** The upward sweep (previous section) showed 3.9% at 512 on the 20k sample. The downward sweep shows 1.7% at 512 on the 3k sample. These are different seeds' subsets of the same pool, so the absolute numbers aren't directly comparable — but both confirm 512 is well above the router's NAT ceiling. The 512 upward-sweep alive rate of 3.9% was itself suppressed; it was not a clean measurement.
+
+**hard_timeout% as NAT-saturation signal:** 92.6% at 512 → 77.5% at 256 → 60.0% at 128 → 51.4% at 64. At 64, over half of dead proxies still hit the Python `wait_for` (not curl's own timeouts). True plateau — where hard_timeout% stabilises and `connection_refused`/`proxy_handshake_error` dominate — is likely below 64, probably around 32–48.
+
+**Taxonomy shift confirms real failures emerging:** At 512, `proxy_handshake_error` is suppressed to 3.8% (the router drops most connections before SOCKS negotiation even starts). At 64, `proxy_handshake_error` rises to 25.5% and `connection_refused` to 13.5% — these are genuine proxy-quality failures, not router artifacts. The dead-reason mix at 64 is substantially more truthful than at 512.
+
+**read_timeout at 64 jumps to 6.0%** (vs <1% at all higher concurrencies). At 64, curl's own 5s read timeout fires for some proxies that connect and start responding but are slow — a class completely masked by the 12s `hard_timeout` at higher concurrency. This further confirms 64 is closer to the "real" failure taxonomy.
+
+**Wall-clock projection for full 320,334-proxy run** (scaling from 3k sample):
+
+| Concurrency | 3k wall-clock | 320k estimate | Expected alive (×320k) |
+|---|---|---|---|
+| 128 | 265s | ~28,300s (~7.9 h) | ~25,300 |
+| 64 | 494s | ~52,700s (~14.6 h) | ~29,800 |
+
+The marginal gain from 128→64 is +4,500 alive proxies (~18% more) at the cost of +6.7 extra hours (+85% wall-clock). Whether that trade is worth it depends on how many alive proxies the pipeline needs downstream.
+
+### Revised Concurrency Recommendation
+
+**128** for the full run, as the practical operating point. The curve bends sharply between 128 and 64 (1.2× gain vs. 2.0× gain per previous step), and 128's taxonomy already shows healthy `proxy_handshake_error` and `connection_refused` fractions — the router is no longer the dominant bottleneck. Expected yield: ~7.9% × 320k ≈ 25,300 alive proxies in ~8 hours.
+
+**64** is the maximum-fidelity alternative — gets closest to the true plateau (~9.3%, ~29,800 alive from 320k) but at ~15 hours. Viable for a one-time pool build if completeness matters more than time.
+
+**Do NOT use 512** for the full run. It is demonstrably in the saturated zone: only 1.7% alive on the 3k sample vs. 9.3% at 64 — the router false-negatives swamp the true signal by ~5.5×.
 
 ## Raw Data Locations
 
-- `dev/news_pipeline/theblock/probe_liveness_logs/sweep_log.md` — all 4 structured entries
-- `/tmp/sweep_512.txt`, `/tmp/sweep_1000.txt`, `/tmp/sweep_2000.txt`, `/tmp/sweep_3000.txt` — per-run stdout (local, not committed)
+- `dev/news_pipeline/theblock/probe_liveness_logs/sweep_log.md` — all 9 structured entries (4 upward + 5 downward)
+- `/tmp/sweep_512.txt`, `/tmp/sweep_1000.txt`, `/tmp/sweep_2000.txt`, `/tmp/sweep_3000.txt` — upward sweep stdout (local)
+- `/tmp/sweep_dn_512a.txt`, `/tmp/sweep_dn_256.txt`, `/tmp/sweep_dn_128.txt`, `/tmp/sweep_dn_64.txt`, `/tmp/sweep_dn_512b.txt` — downward sweep stdout (local)
