@@ -134,7 +134,7 @@ Validated: 0/32 regwall, 32/32 ok, ~32s on 32 CoinDesk URLs. See `decisions/OldT
 
 ## The Block — Discovery Probes (`theblock/`)
 
-Status: discovery IN PROGRESS (Cloudflare-blocked mid-run; ~43/64 sub-sitemaps pending). Proxy pool evidence complete; residential proxy test is the next open step. See `decisions/OldThemes/news_pipeline_layers/` files 14–16 for full state.
+Status: discovery IN PROGRESS (~43/64 sub-sitemaps pending). CF discrimination complete: curl_cffi-chrome passes CF (80/425 free proxies return 200+XML). Fetch loop is the next step. See `decisions/OldThemes/news_pipeline_layers/` files 14–17 for full state.
 
 ### theblock/probe_discovery.py
 
@@ -163,6 +163,18 @@ bash dev/news_pipeline/theblock/probe_monosans.sh neutral
 bash dev/news_pipeline/theblock/probe_monosans.sh theblock
 ```
 
+### theblock/probe_curl_cffi_discriminator.py
+
+**Purpose:** Discriminates OldThemes 16's ambiguous 0/17202 monosans result: re-tests the neutral pool with `curl_cffi impersonate=chrome` (correct browser JA3 vs monosans' rustls) against a real `/post/` sub-sitemap (`sitemap_tbco_post_type_post_0.xml`). Identifies which failure mode dominates: CF signature block (a), CF IP-reputation block (b), or stale pool (c).
+
+**Results:** `decisions/OldThemes/news_pipeline_layers/17_curl_cffi_passability_discriminator.md`. Key finding: **80/425 (18.8%) pass** → verdict **(a)**: rustls was the blocker; curl_cffi-chrome passes CF; free proxy loop is viable for the discovery gap. URL correction required mid-run: real sub URL is `sitemap_tbco_post_type_post_N.xml` (not `post_N.xml`).
+
+**Ephemeral output (gitignored):** `theblock/probe_curl_cffi_discriminator_reports/`
+
+```bash
+./venv/bin/python dev/news_pipeline/theblock/probe_curl_cffi_discriminator.py
+```
+
 ## Output Directories
 
 | Directory | Contents | Gitignored |
@@ -179,3 +191,4 @@ bash dev/news_pipeline/theblock/probe_monosans.sh theblock
 | `theblock/monosans_docker/` | monosans Docker build context (ephemeral) | ✅ yes |
 | `theblock/monosans_out_neutral/` | Neutral pool run output (ephemeral) | ✅ yes |
 | `theblock/monosans_out_theblock/` | TheBlock pool run output (ephemeral) | ✅ yes |
+| `theblock/probe_curl_cffi_discriminator_reports/` | Per-run discriminator reports (ephemeral) | ✅ yes |
