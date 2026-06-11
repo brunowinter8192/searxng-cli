@@ -111,12 +111,10 @@ Launch the pipe-scraper as a **background Bash call** (`run_in_background=true`)
 SEARXNG=/Users/brunowinter2000/Documents/ai/Meta/ClaudeCode/cli/searxng-cli
 cd "$SEARXNG" && ./venv/bin/python -m src.crawler.pipe_scraper \
     --url-file /tmp/<domain>_discovered_urls.txt \
-    --output-dir $OUTPUT_DIR > /tmp/<domain>_scrape.log 2>&1 &
+    --output-dir $OUTPUT_DIR > /tmp/<domain>_scrape.log 2>&1
 ```
 
-> `src/crawler/pipe_scraper.py` is the validated production scraper (crawl4ai browser, raw markdown, Scrapy-style per-domain pacing — see `decisions/pipe_scraper.md`). Launch it as a background Bash call (`run_in_background=true`) and go idle — CC wakes you when the background process completes. Do NOT `pgrep`/name-poll/`wait`-loop. On the completion notification, read `/tmp/<domain>_scrape.log` ONCE for the `Scraped N/N ok` summary, then continue **on your own** to Cleanup → Index → final report.
->
-> **Opus is hands-off from the cull-go until your final report.** You own the entire Scrape → Cleanup → Index pipeline end-to-end. NEVER hand back to Opus mid-pipeline (no "resume me", no intermediate status request) — Opus does nothing until you present the funnel. The only thing that wakes you between phases is CC's own background-completion notification for the task you launched.
+> You own Scrape → Cleanup → Index end-to-end — never hand back to Opus mid-pipeline. After launch, go idle; do NOT `pgrep`/name-poll/`wait`-loop. When the run completes, read `/tmp/<domain>_scrape.log` ONCE for the `Scraped N/N ok` summary, then continue on your own to Cleanup → Index → final report.
 
 The scraper's own output is short: a console line with **success count, error count, and total duration**, plus a full per-URL report written to `/tmp/<domain>_scrape_report.md` (per-URL status + outcome). It does NOT dump a per-URL list to the console — failures live in the report md and can be inspected there if needed.
 
@@ -266,7 +264,7 @@ If MinerU fails for any PDF: log + skip + continue. Report failed PDFs at end.
 
 ##### Background Convert — launch + go idle
 
-For any non-trivial convert (PDF >50 MB, a batch over a directory, or a single PDF expected to exceed ~60 s — any academic paper >10 MB, any book PDF): launch `workflow.py convert` as a background Bash call (`run_in_background=true`) and go idle. CC wakes you on background completion; then run the post-convert verify and continue. Do NOT `pgrep`/name-poll/`wait`-loop — you own the pipeline end-to-end, Opus stays hands-off until the final report.
+For any non-trivial convert (PDF >50 MB, a batch over a directory, or a single PDF expected to exceed ~60 s — any academic paper >10 MB, any book PDF): launch `workflow.py convert` as a background Bash call (`run_in_background=true`) and go idle; then run the post-convert verify and continue. Do NOT `pgrep`/name-poll/`wait`-loop.
 
 ##### Post-Convert Verify
 
@@ -280,12 +278,6 @@ Threshold: **≥ 100 words** = meaningful conversion. Below threshold:
 - Log `WARNING: $STEM.md has <N> words — expected ≥100`
 - Retry: add `--timeout 300` (or higher) to the `workflow.py convert` call
 - If retry also fails: skip file, add to failed list, continue batch
-
-##### Why launch-and-idle, not a foreground call
-
-MinerU convert on large PDFs is CPU-bound and silent for long stretches. A naive foreground `Bash(workflow.py convert ...)` gets auto-backgrounded by CC after ~60 s of quiet output, and the tool-result returns exit 0 (CC's backgrounding exit, NOT MinerU's) — so the worker wrongly concludes "convert done" and moves on while MinerU is still running, leaving an empty/partial `.md`.
-
-Launching explicitly with `run_in_background=true` removes the ambiguity: the worker goes idle and is woken by CC's genuine background-completion notification (MinerU truly gone), THEN runs the post-convert verify. Never infer completion from a returned Bash exit on a long convert.
 
 #### Phase 1 — Cleanup
 
@@ -347,7 +339,7 @@ Then launch index as a background Bash call:
 
 ```bash
 PYTHONUNBUFFERED=1 rag-cli index --collection "$COLLECTION" \
-    > /tmp/${COLLECTION}_index.log 2>&1 &
+    > /tmp/${COLLECTION}_index.log 2>&1
 ```
 
 The script prints per file `Indexed <doc> -> N chunks` and a final summary line:
@@ -358,7 +350,7 @@ Done: N files indexed (X chunks), Y skipped, Z adopted
 
 Report `N` (files indexed) and `X` (chunks) from that line — `N` is the **final md** count for the Completion Report.
 
-Launch index as a background Bash call (`run_in_background=true`) and go idle — CC wakes you on background completion. Do NOT `pgrep`/name-poll/`wait`-loop. On the completion notification, read `/tmp/${COLLECTION}_index.log` ONCE for the summary line, then output the Completion Report. Indexing blocks RAG globally for ALL projects while it runs — going idle (not busy-waiting) is doubly right here. Opus stays hands-off until your final report.
+Launch index as a background Bash call (`run_in_background=true`) and go idle; do NOT `pgrep`/name-poll/`wait`-loop. When it completes, read `/tmp/${COLLECTION}_index.log` ONCE for the summary line, then output the Completion Report. Indexing blocks RAG globally for ALL projects while it runs.
 
 No separate verify step inside the pipe: the real verification is the research done on the indexed data back in the main session, not a query here.
 
