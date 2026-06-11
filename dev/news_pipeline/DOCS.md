@@ -175,6 +175,18 @@ bash dev/news_pipeline/theblock/probe_monosans.sh theblock
 ./venv/bin/python dev/news_pipeline/theblock/probe_curl_cffi_discriminator.py
 ```
 
+### theblock/probe_pool_size.py
+
+**Purpose:** Measure the raw proxy pool size from 68 public source URLs — pure fetch+parse+count, NO liveness checking, NO proxy contacted. Fetches all sources concurrently (`httpx.AsyncClient`, `Semaphore(20)`, 15s timeout), parses `host:port` entries from bare, `proto://`, and `proto://user:pass@` formats, reports per-source counts + per-protocol bucket breakdown + global unique dedup vs baseline.
+
+**Results:** `decisions/OldThemes/news_pipeline_layers/19_maxed_source_expansion.md`. Key finding: 68/68 sources OK (1.7s), **422,873 raw** / **119,413 globally unique** host:port entries (24.6× monosans single-source baseline of ~17,202).
+
+**Ephemeral output (gitignored):** `theblock/probe_pool_size_reports/`
+
+```bash
+./venv/bin/python dev/news_pipeline/theblock/probe_pool_size.py
+```
+
 ## Output Directories
 
 | Directory | Contents | Gitignored |
@@ -192,3 +204,4 @@ bash dev/news_pipeline/theblock/probe_monosans.sh theblock
 | `theblock/monosans_out_neutral/` | Neutral pool run output (ephemeral) | ✅ yes |
 | `theblock/monosans_out_theblock/` | TheBlock pool run output (ephemeral) | ✅ yes |
 | `theblock/probe_curl_cffi_discriminator_reports/` | Per-run discriminator reports (ephemeral) | ✅ yes |
+| `theblock/probe_pool_size_reports/` | Per-run pool-size reports (ephemeral) | ✅ yes |

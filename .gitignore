@@ -66,3 +66,6 @@ dev/news_pipeline/theblock/monosans_out_theblock/
 
 # curl_cffi discriminator per-run reports (numbers lifted to OldThemes 17)
 dev/news_pipeline/theblock/probe_curl_cffi_discriminator_reports/
+
+# pool-size per-run reports (numbers lifted to OldThemes 19)
+dev/news_pipeline/theblock/probe_pool_size_reports/
