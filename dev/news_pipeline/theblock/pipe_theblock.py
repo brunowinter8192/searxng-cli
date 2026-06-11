@@ -28,11 +28,12 @@ from pathlib import Path
 from curl_cffi import requests as cffi_requests
 
 sys.path.insert(0, str(Path(__file__).parent))
-from probe_pool_size import fetch_all_sources   # noqa: E402
+from probe_pool_size  import fetch_all_sources   # noqa: E402
 from probe_liveness   import run_checks          # noqa: E402
 from probe_discovery  import (                   # noqa: E402
     load_sub_cache, save_sub_cache, extract_locs, normalize_url, CACHE_DIR,
 )
+from source_tracker   import update_and_flush as tracker_flush  # noqa: E402
 
 SCRIPT_DIR            = Path(__file__).parent
 PIPE_LOG              = SCRIPT_DIR / "pipe_log.md"
@@ -57,7 +58,7 @@ async def pipe_theblock_workflow() -> None:
 
     print("[Stage 1] Fetching fresh pool + neutral liveness check ...")
     t1 = time.monotonic()
-    all_entries = await fetch_fresh_pool()
+    all_entries, source_results, hp_to_sources = await fetch_fresh_pool()
     sample = random.sample(all_entries, min(BATCH_SIZE, len(all_entries)))
     print(f"  Pool: {len(all_entries):,} entries → sample: {len(sample):,}")
     liveness_results = await run_checks(
@@ -83,6 +84,8 @@ async def pipe_theblock_workflow() -> None:
         print("  No CF-passing proxies — aborting Stage 3.")
         append_pipe_log(ts, len(sample), len(neutral_alive), 0, 0, 0, [], [],
                         elapsed_s1, elapsed_s2, 0.0)
+        tracker_flush(ts, source_results, sample, liveness_results, neutral_alive, [],
+                      hp_to_sources)
         return
 
     print("[Stage 3] Discovery fetch (sequential exhaustion for B-capture) ...")
@@ -97,20 +100,25 @@ async def pipe_theblock_workflow() -> None:
     append_pipe_log(ts, len(sample), len(neutral_alive), len(cf_passing),
                     subs_fetched, total_subs, b_exhausted, b_active,
                     elapsed_s1, elapsed_s2, elapsed_s3)
+    tracker_flush(ts, source_results, sample, liveness_results, neutral_alive, cf_passing,
+                  hp_to_sources)
 
 # FUNCTIONS
 
-async def fetch_fresh_pool() -> list[tuple[str, str]]:
-    """Fetch all 68 sources fresh; return flat list of (proto, host_port)."""
+async def fetch_fresh_pool() -> tuple[list[tuple[str, str]], list[dict], dict[str, set[str]]]:
+    """Fetch all 68 sources fresh; return (entries, source_results, hp_to_sources)."""
     source_results = await fetch_all_sources()
     bucket: dict[str, set[str]] = {"http": set(), "socks4": set(), "socks5": set()}
+    hp_to_sources: dict[str, set[str]] = {}
     for r in source_results:
         bucket[r["bucket"]].update(r["proxies"])
+        for hp in r["proxies"]:
+            hp_to_sources.setdefault(hp, set()).add(r["url"])
     entries: list[tuple[str, str]] = []
     for proto, proxies in bucket.items():
         for hp in proxies:
             entries.append((proto, hp))
-    return entries
+    return entries, source_results, hp_to_sources
 
 
 def build_proxy_urls(liveness_results: list[dict]) -> list[str]:
