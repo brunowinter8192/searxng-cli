@@ -74,3 +74,4 @@ dev/news_pipeline/theblock/probe_pool_size_reports/
 # sweep_log.md is NOT ignored — it is the committed comparable-over-time record
 dev/news_pipeline/theblock/frozen_pool/
 dev/news_pipeline/theblock/probe_liveness_logs/unknown_errors_*.log
+dev/news_pipeline/theblock/cache/

@@ -49,3 +49,68 @@ Build the pipe in `dev/` (neutral-check → CF-check → fetch), 5k batches, fun
 ## Quellen
 
 Internal: OldThemes 14–20 (theblock discovery + proxy method + liveness sweep), `dev/news_pipeline/theblock/probe_liveness_logs/sweep_log.md`.
+
+---
+
+## Pipe Build + First Sitemap Run
+
+**Date:** 2026-06-12  
+**Script:** `dev/news_pipeline/theblock/pipe_theblock.py`  
+**Run timestamp:** 2026-06-11T21:57:12Z  
+**Log:** `dev/news_pipeline/theblock/pipe_log.md` (first entry)
+
+### Funnel
+
+| Stage | Count | Rate | Wall-clock |
+|---|---|---|---|
+| Raw batch (68-source fresh sample) | 5,000 | — | — |
+| Stage 1 neutral-alive | 488 | 9.8% of raw | 442s |
+| Stage 2 CF-passing | 4 | **0.8% of neutral** / 0.1% of raw | 16s |
+| Stage 3 subs fetched this run | 36 | — | 247s |
+| Stage 3 cache progress | 36/64 | — | — |
+
+**Total elapsed: 705s (~11.8 min)**
+
+### Stage 2 — CF-Pass Rate: 0.8% (vs old 18.8%)
+
+OldThemes 17 measured 18.8% (80/425) on a smaller, older pool with `probe_curl_cffi_discriminator`. This run: **0.8% (4/488)** on a fresh 5k sample from the full 68-source pool. The collapse is real:
+- Pool is now 24.9× larger (118k unique); dilution with low-quality IP ranges is substantial
+- Time gap between OldThemes 17 run and this run — IP reputation may have shifted for the specific IPs in the older pool
+- The 4 CF-passing proxies ARE genuine (they successfully fetched sub-sitemaps in Stage 3)
+
+Absolute yield: 4 CF-passing proxies per 5k sample ≈ ~0.26 CF-passing per 1k raw. At 118k pool, estimated ~31 CF-passing total in the live pool (single check cycle).
+
+### Stage 3 — Per-IP Budget B
+
+Sequential exhaustion B-capture (one proxy drained until 403/429, then rotate):
+
+| Proxy | B (fetches before block) | Block type |
+|---|---|---|
+| socks5h://103.18.77.4:1080 | 3 (index + 3 subs) | 403 |
+| socks5h://134.122.1.61:11679 | **20** | 429 (rate-limit) |
+| socks5h://170.64.170.204:1080 | 4 | 403 |
+| socks5h://103.18.77.4:1080 | 4 | 403 |
+| socks5h://206.123.156.233:6458 | ≥8 (still active at run end) | — |
+
+Exhausted proxies (n=3): B values = 4, 4, 20 → min=4, max=20, mean=9.3  
+Active proxy at end: lower-bound B=8
+
+**B summary:** Two proxies hit CF block at B=4 (fast burn), one lasted B=20 (possibly better IP/session). Realistic working estimate: **B ≈ 4–10** for free-pool proxies. The cycle economics from §"Cycle Economics" used B=2–21 as range; the measured data falls in B=4–20.
+
+**Discovery gaps:** 28 subs skipped (all-transient failures on last remaining proxy — types: `linked`, `daily`, `page`, `token`, `index`, `etf`, `stock`, `press-release`, `converter`, `rating`, `treasury`, `category taxonomies`, `authors`, `news`). These are lower-priority content types (non-`post_type_post`). The 23 `post_type_post` subs (the main article content) are all in the cached 36.
+
+### Revised Cycle Economics
+
+Updated with measured CF-rate (0.8%) and B data:
+
+| B | CF-passing / 5k cycle | pages/cycle | cycles for 27k pages | ~total |
+|---|---|---|---|---|
+| 20 (optimistic) | 4 | 80 | 338 | **~66 h** |
+| 9 (mean) | 4 | 36 | 750 | ~150 h |
+| 4 (pessimistic) | 4 | 16 | 1,688 | **~328 h** |
+
+The 0.8% CF-rate (vs assumed 18.8%) makes backfill via this approach prohibitively slow at 5k batch size. **Effective lever: increase sample size per cycle to 50k+ to extract more CF-passing proxies per run.** At 50k sample: expect ~40 CF-passing → ~360 pages/cycle at mean B=9 → ~75 cycles → ~15h total. Source curation (dropping low-yield sources) would also improve throughput.
+
+### Structural Finding
+
+The pipe architecture (Stage 1→2→3) is validated and working. The main variable is CF-pass rate per cycle, which scales with batch size. 5k batch is intentionally conservative (dev run); production runs should use larger samples.
