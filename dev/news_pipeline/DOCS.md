@@ -179,12 +179,33 @@ bash dev/news_pipeline/theblock/probe_monosans.sh theblock
 
 **Purpose:** Measure the raw proxy pool size from 68 public source URLs — pure fetch+parse+count, NO liveness checking, NO proxy contacted. Fetches all sources concurrently (`httpx.AsyncClient`, `Semaphore(20)`, 15s timeout), parses `host:port` entries from bare, `proto://`, and `proto://user:pass@` formats, reports per-source counts + per-protocol bucket breakdown + global unique dedup vs baseline.
 
-**Results:** `decisions/OldThemes/news_pipeline_layers/19_maxed_source_expansion.md`. Key finding: 68/68 sources OK (1.7s), **422,873 raw** / **119,413 globally unique** host:port entries (24.6× monosans single-source baseline of ~17,202).
+**Results:** `decisions/OldThemes/news_pipeline_layers/19_maxed_source_expansion.md`. Key finding: 68/68 sources OK (1.7s), **428,500 raw** / **118,701 globally unique** host:port entries (24.9× monosans single-source baseline of ~17,202).
 
 **Ephemeral output (gitignored):** `theblock/probe_pool_size_reports/`
 
 ```bash
 ./venv/bin/python dev/news_pipeline/theblock/probe_pool_size.py
+```
+
+### theblock/probe_liveness.py
+
+**Purpose:** Instrumented async liveness checker + concurrency sweep. Stage 1 deliverable. Imports the 68 source URL lists from `probe_pool_size.py` (no re-typing). Two modes: `--freeze` (fetch sources → write sorted, deduped `frozen_pool/{http,socks4,socks5}.txt`); `--sample N` / `--full` (check liveness via `curl_cffi.AsyncSession`, classify every dead proxy into a reason bucket, append structured entry to `sweep_log.md`). socks5 uses `socks5h://` (remote DNS through proxy). Timeout split: elapsed-time primary + libcurl message fallback + unknown on mismatch (version-drift signal). 
+
+**Results:** `decisions/OldThemes/news_pipeline_layers/20_liveness_check_and_concurrency_sweep.md`. Sweep: 20k sample × 4 concurrency levels (512/1000/2000/3000), timeout 5s/5s.
+
+**Persistent output (committed):** `theblock/probe_liveness_logs/sweep_log.md`  
+**Ephemeral (gitignored):** `theblock/frozen_pool/`, `theblock/probe_liveness_logs/unknown_errors_*.log`
+
+```bash
+# Freeze (once, or to refresh pool):
+./venv/bin/python dev/news_pipeline/theblock/probe_liveness.py --freeze
+
+# Sweep run at specific concurrency:
+./venv/bin/python dev/news_pipeline/theblock/probe_liveness.py --sample 20000 --concurrency 512
+./venv/bin/python dev/news_pipeline/theblock/probe_liveness.py --sample 20000 --concurrency 1000
+
+# Full pool check (Stage 2):
+./venv/bin/python dev/news_pipeline/theblock/probe_liveness.py --full --concurrency 1000
 ```
 
 ## Output Directories
@@ -205,3 +226,5 @@ bash dev/news_pipeline/theblock/probe_monosans.sh theblock
 | `theblock/monosans_out_theblock/` | TheBlock pool run output (ephemeral) | ✅ yes |
 | `theblock/probe_curl_cffi_discriminator_reports/` | Per-run discriminator reports (ephemeral) | ✅ yes |
 | `theblock/probe_pool_size_reports/` | Per-run pool-size reports (ephemeral) | ✅ yes |
+| `theblock/frozen_pool/` | Frozen deduped pool per bucket (ephemeral, regenerated with --freeze) | ✅ yes |
+| `theblock/probe_liveness_logs/` | sweep_log.md (committed) + unknown_errors_*.log (gitignored) | partial |
