@@ -100,7 +100,7 @@ SOCKS5_SOURCES: list[tuple[str, bool]] = [
     ("https://raw.githubusercontent.com/MuRongPIG/Proxy-Master/main/socks5.txt",                      False),
 ]
 
-_PROXY_RE = re.compile(r'^([a-zA-Z0-9.\-]+):(\d{1,5})$')
+_PROXY_RE = re.compile(r'^([a-zA-Z0-9.\-]+):(\d{1,5})(?=[:\s]|$)')
 
 # ORCHESTRATOR
 
