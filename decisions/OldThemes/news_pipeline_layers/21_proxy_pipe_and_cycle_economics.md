@@ -150,3 +150,22 @@ Curating MuRongPIG (+ the many 0-CF, 0-unique sources) out should lift the effec
 1. Build a curated source set — drop the MuRongPIG mega-files + sources with 0 CF-hits and 0 uniqueness; keep the CF-yielding socks5/http sources + the high-exclusivity ones.
 2. Re-run the pipe on the curated set → measure curated CF-rate. If it jumps toward ~5–11%, backfill is feasible again.
 3. Then build the incremental-source-prioritized selector (evaluated-memory: dead durable / alive time-boxed; each cycle check only NEW proxies from the top sources). Efficiency layer on top of curation.
+
+---
+
+## Curated Source Set (Run-1 cut — go-first priority)
+
+Derived from `source_scoreboard.md` run #1 (~8 CF-passers — sparse, refines over runs). Robust signals: CF-passers are **SOCKS5-heavy**; MuRongPIG is a CF-worthless flood. Exact URLs in `probe_pool_size.py` (`HTTP_SOURCES`/`SOCKS4_SOURCES`/`SOCKS5_SOURCES`).
+
+**Tier 1 — check first (CF-yielders):**
+- SOCKS5: TheSpeedX, monosans/proxy-list, mzyui, dpangestuw (socks5, 3 CF each); r00tee `Socks5` (2 CF, 37% unique); ALIILAPRO, iplocate socks5 (1 CF, ~11% alive, ~21% unique); proxifly socks5; proxyscrape socks5 API.
+- HTTP: monosans/proxy-list http (2 CF, 10% alive); mzyui http (2 CF); TheSpeedX http; proxyscrape https API.
+- SOCKS4: sunny9577 (11% alive, 27% unique); mzyui, monosans/proxy-list socks4 (2 CF); iplocate socks4.
+
+**Drop (definitive):** `MuRongPIG/Proxy-Master` http+socks4+socks5 — 0 CF over ~1,400 checks, ~88% of raw. Removing it = ~10× smaller pool, zero CF loss.
+
+**Drop candidates (0% alive in run 1 — confirm over 2-3 runs before final cut):** ShiftyTR, zloi-user/hideip.me, jetkai, themiralay, clarketm, ErcinDedeoglu http/https, Zaeem20 http.
+
+**Tier 2 (fallback):** databay-labs, mmpx12, roosterkid, hookzof, proxifly http/socks4, dpangestuw http/socks4, remaining socks4/http of the Tier-1 aggregators.
+
+**Next session:** build the curated set (Tier 1 + drop MuRongPIG), re-run the pipe → measure the curated CF-rate = the backfill feasibility test.
