@@ -48,7 +48,7 @@ SAMPLE_SEED = 42
 _IP_RE      = re.compile(r"^\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3}$")
 
 DEAD_BUCKETS = [
-    "connect_timeout", "read_timeout", "connection_refused",
+    "connect_timeout", "read_timeout", "hard_timeout", "connection_refused",
     "proxy_handshake_error", "resolve_error", "tls_error",
     "http_non200", "bad_body", "unknown",
 ]
@@ -191,11 +191,14 @@ async def check_proxy(
         t0      = time.monotonic()          # measure from semaphore-acquire, not queue-entry
         elapsed = 0.0
         try:
-            resp    = await session.get(
-                CHECK_URL,
-                proxy=proxy_url,
-                timeout=(connect_s, read_s),
-                allow_redirects=False,
+            resp    = await asyncio.wait_for(
+                session.get(
+                    CHECK_URL,
+                    proxy=proxy_url,
+                    timeout=(connect_s, read_s),
+                    allow_redirects=False,
+                ),
+                timeout=connect_s + read_s + 2.0,   # hard Python deadline: curl timeout + 2s slack
             )
             elapsed = time.monotonic() - t0
             body    = resp.text.strip() if resp.text else ""
@@ -206,6 +209,10 @@ async def check_proxy(
                 return _res(proto, host_port, False, "bad_body",    body[:80],            elapsed)
             return     _res(proto, host_port, False, "http_non200", f"status={resp.status_code}", elapsed)
 
+        except asyncio.TimeoutError:
+            elapsed = time.monotonic() - t0
+            return _res(proto, host_port, False, "hard_timeout",
+                        f"asyncio.wait_for exceeded at {elapsed:.2f}s", elapsed)
         except RequestException as e:
             elapsed = time.monotonic() - t0
             bucket, detail = classify_error(e, elapsed, connect_s, read_s)
