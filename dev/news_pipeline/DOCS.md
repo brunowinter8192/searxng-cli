@@ -132,6 +132,37 @@ Validated: 0/32 regwall, 32/32 ok, ~32s on 32 CoinDesk URLs. See `decisions/OldT
 ./venv/bin/python dev/news_pipeline/scrape_isolation_smoke.py
 ```
 
+## The Block — Discovery Probes (`theblock/`)
+
+Status: discovery IN PROGRESS (Cloudflare-blocked mid-run; ~43/64 sub-sitemaps pending). Proxy pool evidence complete; residential proxy test is the next open step. See `decisions/OldThemes/news_pipeline_layers/` files 14–16 for full state.
+
+### theblock/probe_discovery.py
+
+**Purpose:** Measure discovery coverage + URL taxonomy. Fetches the 64-sub sitemap union, news sitemap, RSS, and bounded UI crawl; outputs `theblock/discover_coverage_report.md`. Resume-safe: per-sub checkpoint files in `theblock/cache/`.
+
+**CF behaviour:** IP-level 403/429 fires after ~21 sequential sub-sitemap fetches. See `decisions/OldThemes/news_pipeline_layers/15_theblock_cf_block_and_anti_cf_method.md`.
+
+```bash
+./venv/bin/python dev/news_pipeline/theblock/probe_discovery.py
+```
+
+### theblock/probe_monosans.sh + monosans_cfg_*.toml
+
+**Purpose:** Evidence probe for `monosans/proxy-scraper-checker` proxy pool yield against theblock.co. Two runs: neutral `check_url` (icanhazip) and theblock.co sitemap `check_url`. Wrapper handles Docker invocation (native TUI binary requires TTY; Docker path works headless).
+
+**Results:** `decisions/OldThemes/news_pipeline_layers/16_monosans_pool_evidence.md`. Key finding: neutral pool yields 494/17,202 proxies; theblock check_url yields 0/17,202. Conclusion: use neutral check_url only; theblock.co CF validation is the `curl_cffi impersonate="chrome"` fetch loop's responsibility.
+
+**Configs:**
+- `monosans_cfg_neutral.toml` — `check_url = https://ipv4.icanhazip.com`, concurrency 512
+- `monosans_cfg_theblock.toml` — `check_url = https://www.theblock.co/sitemap_tbco_news.xml`, concurrency 50
+
+**Ephemeral dirs (gitignored):** `theblock/monosans_bin/`, `theblock/monosans_docker/`, `theblock/monosans_out_neutral/`, `theblock/monosans_out_theblock/`.
+
+```bash
+bash dev/news_pipeline/theblock/probe_monosans.sh neutral
+bash dev/news_pipeline/theblock/probe_monosans.sh theblock
+```
+
 ## Output Directories
 
 | Directory | Contents | Gitignored |
@@ -143,3 +174,8 @@ Validated: 0/32 regwall, 32/32 ok, ~32s on 32 CoinDesk URLs. See `decisions/OldT
 | `03_output/` | Cleaned article bodies + `manifest.json` | ✅ yes |
 | `04_output/` | `discover_filtered_<ts>.json` files | ✅ yes |
 | `smoke_output/` | Smoke A/B raw scrapes + review MDs (investigation only) | ✅ yes |
+| `theblock/cache/` | Per-sub sitemap checkpoint JSONs + news_sitemap.json | ❌ no |
+| `theblock/monosans_bin/` | monosans native binary (ephemeral) | ✅ yes |
+| `theblock/monosans_docker/` | monosans Docker build context (ephemeral) | ✅ yes |
+| `theblock/monosans_out_neutral/` | Neutral pool run output (ephemeral) | ✅ yes |
+| `theblock/monosans_out_theblock/` | TheBlock pool run output (ephemeral) | ✅ yes |

@@ -1,0 +1,91 @@
+#:schema ./config-schema.json
+
+# Enable debug logging to see detailed checking process for each proxy
+# Warning: Extremely verbose - logs every connection attempt and failure
+debug = false
+
+[output]
+# Output directory (Docker overrides this to /app/out via volume mount)
+path = "/Users/brunowinter2000/Documents/ai/Meta/ClaudeCode/cli/searxng-cli/.claude/worktrees/theblock-proxy-evidence/dev/news_pipeline/theblock/monosans_out_theblock"
+
+# Sort proxies by response time (true) or by IP address (false)
+# Speed sorting: fastest proxies first. IP sorting: natural order by protocol, IP and port.
+sort_by_speed = true
+
+# Plain text output (.txt files)
+[output.txt]
+enabled = true
+
+# JSON output with metadata (.json files)
+[output.json]
+enabled = true
+
+# Add ASN (network provider) info to JSON output
+# Uses offline database
+include_asn = true
+
+# Add geolocation data to JSON output
+# Uses offline database
+include_geolocation = true
+
+[checking]
+# check_url = theblock.co news sitemap — basic connect/read check; filters on HTTP 2xx
+# (monosans checker.rs: error_for_status()? — 403/429 → proxy dropped, 200 → proxy passes)
+check_url = "https://www.theblock.co/sitemap_tbco_news.xml"
+
+# Reduced concurrency: avoid hammering theblock.co origin simultaneously
+max_concurrent_checks = 50
+
+# Proxy response timeout (seconds)
+timeout = 10.0
+connect_timeout = 5.0
+
+# User-Agent header for proxy check requests
+user_agent = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/147.0.0.0 Safari/537.36"
+
+[scraping]
+# Maximum proxies to collect per source (0 = unlimited)
+max_proxies_per_source = 100000
+
+# Request timeout for fetching proxy sources (seconds)
+timeout = 10.0
+connect_timeout = 5.0
+
+# HTTP(S), SOCKS4, or SOCKS5 proxy used for fetching sources. Leave empty to disable.
+proxy = ""
+
+# User-Agent header for scraping requests
+user_agent = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/147.0.0.0 Safari/537.36"
+
+[scraping.http]
+enabled = true
+urls = [
+  "https://api.proxyscrape.com/v3/free-proxy-list/get?request=getproxies&protocol=http",
+  "https://api.proxyscrape.com/v3/free-proxy-list/get?request=getproxies&protocol=https",
+  "https://raw.githubusercontent.com/TheSpeedX/PROXY-List/refs/heads/master/http.txt",
+  "https://raw.githubusercontent.com/proxifly/free-proxy-list/refs/heads/main/proxies/protocols/http/data.txt",
+  "https://raw.githubusercontent.com/proxifly/free-proxy-list/refs/heads/main/proxies/protocols/https/data.txt",
+  "https://raw.githubusercontent.com/roosterkid/openproxylist/refs/heads/main/HTTPS_RAW.txt",
+  "https://raw.githubusercontent.com/sunny9577/proxy-scraper/refs/heads/master/generated/http_proxies.txt",
+]
+
+[scraping.socks4]
+enabled = true
+urls = [
+  "https://api.proxyscrape.com/v3/free-proxy-list/get?request=getproxies&protocol=socks4",
+  "https://raw.githubusercontent.com/TheSpeedX/PROXY-List/refs/heads/master/socks4.txt",
+  "https://raw.githubusercontent.com/proxifly/free-proxy-list/refs/heads/main/proxies/protocols/socks4/data.txt",
+  "https://raw.githubusercontent.com/roosterkid/openproxylist/refs/heads/main/SOCKS4_RAW.txt",
+  "https://raw.githubusercontent.com/sunny9577/proxy-scraper/refs/heads/master/generated/socks4_proxies.txt",
+]
+
+[scraping.socks5]
+enabled = true
+urls = [
+  "https://api.proxyscrape.com/v3/free-proxy-list/get?request=getproxies&protocol=socks5",
+  "https://raw.githubusercontent.com/TheSpeedX/PROXY-List/refs/heads/master/socks5.txt",
+  "https://raw.githubusercontent.com/hookzof/socks5_list/refs/heads/master/proxy.txt",
+  "https://raw.githubusercontent.com/proxifly/free-proxy-list/refs/heads/main/proxies/protocols/socks5/data.txt",
+  "https://raw.githubusercontent.com/roosterkid/openproxylist/refs/heads/main/SOCKS5_RAW.txt",
+  "https://raw.githubusercontent.com/sunny9577/proxy-scraper/refs/heads/master/generated/socks5_proxies.txt",
+]
