@@ -134,7 +134,7 @@ Validated: 0/32 regwall, 32/32 ok, ~32s on 32 CoinDesk URLs. See `decisions/OldT
 
 ## The Block — Discovery Probes (`theblock/`)
 
-Status: discovery IN PROGRESS (~43/64 sub-sitemaps pending). CF discrimination complete: curl_cffi-chrome passes CF (80/425 free proxies return 200+XML). Fetch loop is the next step. See `decisions/OldThemes/news_pipeline_layers/` files 14–17 for full state.
+Status: discovery 36/64 sub-sitemaps cached (first pipe run). CF-pass rate measured at **0.8%** on live pool (vs old 18.8% discriminator probe). Per-IP budget B: min=4, max=20, mean=9.3 (3 exhausted proxies). See `decisions/OldThemes/news_pipeline_layers/` files 14–21 for full state.
 
 ### theblock/probe_discovery.py
 
@@ -208,6 +208,25 @@ bash dev/news_pipeline/theblock/probe_monosans.sh theblock
 ./venv/bin/python dev/news_pipeline/theblock/probe_liveness.py --full --concurrency 1000
 ```
 
+### theblock/pipe_theblock.py (331 LOC)
+
+**Purpose:** Full proxy pipeline — Stage 1 (neutral liveness, 5k sample @ conc 128) → Stage 2 (CF-pass check via curl_cffi chrome impersonation) → Stage 3 (sitemap sub-URL discovery with sequential-exhaustion B-capture). Appends one funnel entry to `pipe_log.md` per run. Resume-safe: per-sub checkpoint JSONs in `theblock/cache/`.
+
+**Stage design:**
+- Stage 1: Fetch fresh 68-source pool, random 5k sample, neutral liveness @ conc=128 (5s/5s timeouts).
+- Stage 2: CF-pass check on neutral-alive proxies using `curl_cffi.requests.Session(impersonate="chrome")` vs `sitemap_tbco_post_type_post_0.xml`. Returns 200+valid-XML = pass.
+- Stage 3: Sequential exhaustion — drain ONE proxy until it 403/429s (records B), then rotate. Guarantees real B observations per proxy (vs round-robin which never exhausts).
+
+**Output:** `theblock/pipe_log.md` (appended), `theblock/cache/sub_*.json` (per-sub checkpoint).
+
+```bash
+./venv/bin/python dev/news_pipeline/theblock/pipe_theblock.py
+```
+
+### theblock/pipe_log.md
+
+**Purpose:** Funnel log — one structured entry per pipe run. Tracks Stage 1 neutral-alive %, Stage 2 CF-pass rate, Stage 3 subs fetched + cache progress, per-IP budget B distribution, and wall-clock per stage. Appended (never overwritten); comparable across runs like `sweep_log.md`. **Tracked in git** (run history is institutional knowledge for cycle-economics decisions).
+
 ## Output Directories
 
 | Directory | Contents | Gitignored |
@@ -219,7 +238,8 @@ bash dev/news_pipeline/theblock/probe_monosans.sh theblock
 | `03_output/` | Cleaned article bodies + `manifest.json` | ✅ yes |
 | `04_output/` | `discover_filtered_<ts>.json` files | ✅ yes |
 | `smoke_output/` | Smoke A/B raw scrapes + review MDs (investigation only) | ✅ yes |
-| `theblock/cache/` | Per-sub sitemap checkpoint JSONs + news_sitemap.json | ❌ no |
+| `theblock/pipe_log.md` | Funnel log per pipe run (tracked — run history, like sweep_log.md) | ❌ no |
+| `theblock/cache/` | Per-sub sitemap checkpoint JSONs + news_sitemap.json + bulk run data | ✅ yes |
 | `theblock/monosans_bin/` | monosans native binary (ephemeral) | ✅ yes |
 | `theblock/monosans_docker/` | monosans Docker build context (ephemeral) | ✅ yes |
 | `theblock/monosans_out_neutral/` | Neutral pool run output (ephemeral) | ✅ yes |
