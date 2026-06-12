@@ -39,7 +39,7 @@ sys.path.insert(0, str(Path(__file__).parent))
 from probe_pool_size import HTTP_SOURCES, SOCKS4_SOURCES, SOCKS5_SOURCES, fetch_all_sources  # noqa: E402
 from monosans_loader import load_monosans_proxies  # noqa: E402
 from proxy_status_log import record_run, partition_fresh  # noqa: E402
-from curated_sources import load_curated_proxies  # noqa: E402
+from curated_sources import load_curated_proxies, load_thespeedx_proxies  # noqa: E402
 
 SCRIPT_DIR  = Path(__file__).parent
 FROZEN_DIR  = SCRIPT_DIR / "frozen_pool"
@@ -77,6 +77,10 @@ async def probe_liveness_workflow() -> None:
         print(f"Freshness filter: {len(to_check)} to check, {len(skipped_fresh)} skipped (last_seen < {args.recheck_window}s ago)")
         entries = to_check
         mode    = "curated"
+    elif args.source == "thespeedx":
+        entries = load_thespeedx_proxies()
+        print(f"TheSpeedX eval: {len(entries)} proxies (no freshness filter, no log write)")
+        mode    = "thespeedx"
     else:
         frozen_dir = Path(args.input)
         entries    = load_frozen_pool(frozen_dir)
@@ -106,7 +110,8 @@ async def probe_liveness_workflow() -> None:
     )
     if any(r["bucket"] == "unknown" for r in results):
         write_unknown_log(results, ts)
-    record_run(results, mode)
+    if args.source != "thespeedx":
+        record_run(results, mode)
 
 
 # FUNCTIONS
@@ -114,8 +119,8 @@ async def probe_liveness_workflow() -> None:
 def parse_args() -> argparse.Namespace:
     p = argparse.ArgumentParser(description="Proxy liveness checker + concurrency sweep")
     p.add_argument("--freeze", action="store_true", help="Fetch 68 sources, write frozen_pool/")
-    p.add_argument("--source", choices=["frozen", "monosans", "curated"], default="frozen",
-                   help="Proxy source: frozen pool dir (default), monosans live JSON, or curated (monosans+proxifly)")
+    p.add_argument("--source", choices=["frozen", "monosans", "curated", "thespeedx"], default="frozen",
+                   help="Proxy source: frozen pool dir (default), monosans live JSON, curated (monosans+proxifly), or thespeedx eval")
     p.add_argument("--sample", type=int, metavar="N", help="Check N random proxies (seeded)")
     p.add_argument("--full", action="store_true", help="Check full frozen pool")
     p.add_argument("--seed", type=int, default=SAMPLE_SEED, help=f"RNG seed (default {SAMPLE_SEED})")
