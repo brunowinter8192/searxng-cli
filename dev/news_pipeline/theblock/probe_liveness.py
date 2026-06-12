@@ -37,6 +37,8 @@ from curl_cffi.const import CurlECode
 # Source lists + async fetcher imported from probe_pool_size — do not re-type the 68 URLs
 sys.path.insert(0, str(Path(__file__).parent))
 from probe_pool_size import HTTP_SOURCES, SOCKS4_SOURCES, SOCKS5_SOURCES, fetch_all_sources  # noqa: E402
+from monosans_loader import load_monosans_proxies  # noqa: E402
+from proxy_status_log import record_run  # noqa: E402
 
 SCRIPT_DIR  = Path(__file__).parent
 FROZEN_DIR  = SCRIPT_DIR / "frozen_pool"
@@ -62,14 +64,17 @@ async def probe_liveness_workflow() -> None:
         await freeze_pool()
         return
 
-    frozen_dir = Path(args.input)
-    entries    = load_frozen_pool(frozen_dir)
-
-    if args.sample:
-        entries = build_sample(entries, args.sample, args.seed)
-        mode    = "sample"
+    if args.source == "monosans":
+        entries = load_monosans_proxies()
+        mode    = "monosans"
     else:
-        mode    = "full"
+        frozen_dir = Path(args.input)
+        entries    = load_frozen_pool(frozen_dir)
+        if args.sample:
+            entries = build_sample(entries, args.sample, args.seed)
+            mode    = "sample"
+        else:
+            mode    = "full"
 
     ts      = datetime.now(timezone.utc)
     t0_wall = time.monotonic()
@@ -89,6 +94,7 @@ async def probe_liveness_workflow() -> None:
     )
     if any(r["bucket"] == "unknown" for r in results):
         write_unknown_log(results, ts)
+    record_run(results, mode)
 
 
 # FUNCTIONS
@@ -96,6 +102,8 @@ async def probe_liveness_workflow() -> None:
 def parse_args() -> argparse.Namespace:
     p = argparse.ArgumentParser(description="Proxy liveness checker + concurrency sweep")
     p.add_argument("--freeze", action="store_true", help="Fetch 68 sources, write frozen_pool/")
+    p.add_argument("--source", choices=["frozen", "monosans"], default="frozen",
+                   help="Proxy source: frozen pool dir (default) or monosans live JSON")
     p.add_argument("--sample", type=int, metavar="N", help="Check N random proxies (seeded)")
     p.add_argument("--full", action="store_true", help="Check full frozen pool")
     p.add_argument("--seed", type=int, default=SAMPLE_SEED, help=f"RNG seed (default {SAMPLE_SEED})")

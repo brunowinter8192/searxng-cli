@@ -187,18 +187,21 @@ bash dev/news_pipeline/theblock/probe_monosans.sh theblock
 ./venv/bin/python dev/news_pipeline/theblock/probe_pool_size.py
 ```
 
-### theblock/probe_liveness.py
+### theblock/probe_liveness.py (370 LOC)
 
-**Purpose:** Instrumented async liveness checker + concurrency sweep. Stage 1 deliverable. Imports the 68 source URL lists from `probe_pool_size.py` (no re-typing). Two modes: `--freeze` (fetch sources → write sorted, deduped `frozen_pool/{http,socks4,socks5}.txt`); `--sample N` / `--full` (check liveness via `curl_cffi.AsyncSession`, classify every dead proxy into a reason bucket, append structured entry to `sweep_log.md`). socks5 uses `socks5h://` (remote DNS through proxy). Timeout split: elapsed-time primary + libcurl message fallback + unknown on mismatch (version-drift signal). 
+**Purpose:** Instrumented async liveness checker + concurrency sweep. Stage 1 deliverable. Imports the 68 source URL lists from `probe_pool_size.py` (no re-typing). Modes: `--freeze` (fetch sources → write sorted, deduped `frozen_pool/{http,socks4,socks5}.txt`); `--sample N` / `--full` (check frozen pool via `curl_cffi.AsyncSession`); `--source monosans` (fetch live monosans JSON via `monosans_loader`, check without freeze). Classifies every dead proxy into a reason bucket, appends structured entry to `sweep_log.md`. After every run (all modes except `--freeze`), folds results into the cumulative `logs/proxy_status_log.json` via `proxy_status_log.record_run()`. socks5 uses `socks5h://` (remote DNS through proxy). Timeout split: elapsed-time primary + libcurl message fallback + unknown on mismatch (version-drift signal).
 
 **Results:** `decisions/OldThemes/news_pipeline_layers/20_liveness_check_and_concurrency_sweep.md`. Sweep: 20k sample × 4 concurrency levels (512/1000/2000/3000), timeout 5s/5s.
 
-**Persistent output (committed):** `theblock/probe_liveness_logs/sweep_log.md`  
+**Persistent output (committed):** `theblock/probe_liveness_logs/sweep_log.md`, `theblock/logs/proxy_status_log.json`
 **Ephemeral (gitignored):** `theblock/frozen_pool/`, `theblock/probe_liveness_logs/unknown_errors_*.log`
 
 ```bash
 # Freeze (once, or to refresh pool):
 ./venv/bin/python dev/news_pipeline/theblock/probe_liveness.py --freeze
+
+# monosans live source (no freeze needed):
+./venv/bin/python dev/news_pipeline/theblock/probe_liveness.py --source monosans
 
 # Sweep run at specific concurrency:
 ./venv/bin/python dev/news_pipeline/theblock/probe_liveness.py --sample 20000 --concurrency 512
@@ -207,6 +210,18 @@ bash dev/news_pipeline/theblock/probe_monosans.sh theblock
 # Full pool check (Stage 2):
 ./venv/bin/python dev/news_pipeline/theblock/probe_liveness.py --full --concurrency 1000
 ```
+
+### theblock/monosans_loader.py (39 LOC)
+
+**Purpose:** Fetch `monosans/proxy-list` live JSON (`proxies.json`) and return `[(protocol, host:port)]` — same tuple shape as `load_frozen_pool()`. Single synchronous `httpx.get`. Handles optional auth fields (currently always null in monosans). Called by `probe_liveness.py` when `--source monosans` is set.
+
+### theblock/proxy_status_log.py (73 LOC)
+
+**Purpose:** Cumulative proxy-status log — keyed by `"protocol://host:port"`, bounded by unique proxy count (not run count). `record_run(results, source_label)` loads `logs/proxy_status_log.json`, upserts every result (alive + dead), writes back. Per-entry schema: `{protocol, host, port, checks, alive, dead, last_status, first_seen, last_seen}`. Explicit `protocol`/`host`/`port` fields enable subnet/ASN/port grouping without re-parsing the key.
+
+### theblock/logs/proxy_status_log.json
+
+**Purpose:** Cumulative proxy identity + alive/dead history across all `probe_liveness.py` runs. Keyed by `"protocol://host:port"`. **Tracked in git** — institutional data (analogous to `source_scoreboard.json`). Size bounded by unique proxy count, not run count.
 
 ### theblock/source_tracker.py (283 LOC)
 
@@ -266,3 +281,4 @@ bash dev/news_pipeline/theblock/probe_monosans.sh theblock
 | `theblock/probe_pool_size_reports/` | Per-run pool-size reports (ephemeral) | ✅ yes |
 | `theblock/frozen_pool/` | Frozen deduped pool per bucket (ephemeral, regenerated with --freeze) | ✅ yes |
 | `theblock/probe_liveness_logs/` | sweep_log.md (committed) + unknown_errors_*.log (gitignored) | partial |
+| `theblock/logs/` | proxy_status_log.json (cumulative keyed proxy history — committed) | ❌ no |
