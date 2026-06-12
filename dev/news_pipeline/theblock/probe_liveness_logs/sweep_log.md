@@ -218,3 +218,25 @@
 | bad_body | 4 | 0.0% |
 | unknown | 8 | 0.1% |
 
+---
+## 2026-06-12T01:12:01Z | monosans | n=81 | concurrency=512 | timeout=5.0s/5.0s
+
+| Wall-clock | Throughput | Alive | Alive% | Dead |
+|---|---|---|---|---|
+| 12.0s | 7/s | 37 | 45.7% | 44 |
+
+### Dead Reason Histogram
+
+| Reason | Count | % of dead |
+|---|---|---|
+| connect_timeout | 2 | 4.5% |
+| read_timeout | 4 | 9.1% |
+| hard_timeout | 29 | 65.9% |
+| connection_refused | 2 | 4.5% |
+| proxy_handshake_error | 2 | 4.5% |
+| resolve_error | 0 | 0.0% |
+| tls_error | 0 | 0.0% |
+| http_non200 | 5 | 11.4% |
+| bad_body | 0 | 0.0% |
+| unknown | 0 | 0.0% |
+
