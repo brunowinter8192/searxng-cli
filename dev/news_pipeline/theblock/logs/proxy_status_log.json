@@ -3,12 +3,12 @@
     "protocol": "http",
     "host": "185.200.188.234",
     "port": 10001,
-    "checks": 1,
-    "alive": 1,
+    "checks": 2,
+    "alive": 2,
     "dead": 0,
     "last_status": "alive",
     "first_seen": "2026-06-12T01:12:13Z",
-    "last_seen": "2026-06-12T01:12:13Z"
+    "last_seen": "2026-06-12T19:58:25Z"
   },
   "http://176.111.37.216:39811": {
     "protocol": "http",
@@ -36,34 +36,34 @@
     "protocol": "http",
     "host": "77.42.127.4",
     "port": 8080,
-    "checks": 1,
-    "alive": 1,
+    "checks": 2,
+    "alive": 2,
     "dead": 0,
     "last_status": "alive",
     "first_seen": "2026-06-12T01:12:13Z",
-    "last_seen": "2026-06-12T01:12:13Z"
+    "last_seen": "2026-06-12T19:58:25Z"
   },
   "http://150.241.116.167:443": {
     "protocol": "http",
     "host": "150.241.116.167",
     "port": 443,
-    "checks": 1,
+    "checks": 2,
     "alive": 1,
-    "dead": 0,
-    "last_status": "alive",
+    "dead": 1,
+    "last_status": "dead",
     "first_seen": "2026-06-12T01:12:13Z",
-    "last_seen": "2026-06-12T01:12:13Z"
+    "last_seen": "2026-06-12T19:58:25Z"
   },
   "http://91.233.223.147:3128": {
     "protocol": "http",
     "host": "91.233.223.147",
     "port": 3128,
-    "checks": 1,
+    "checks": 2,
     "alive": 0,
-    "dead": 1,
+    "dead": 2,
     "last_status": "dead",
     "first_seen": "2026-06-12T01:12:13Z",
-    "last_seen": "2026-06-12T01:12:13Z"
+    "last_seen": "2026-06-12T19:58:25Z"
   },
   "http://62.133.62.17:1081": {
     "protocol": "http",
@@ -80,23 +80,23 @@
     "protocol": "http",
     "host": "37.49.224.15",
     "port": 3128,
-    "checks": 1,
+    "checks": 2,
     "alive": 1,
-    "dead": 0,
-    "last_status": "alive",
+    "dead": 1,
+    "last_status": "dead",
     "first_seen": "2026-06-12T01:12:13Z",
-    "last_seen": "2026-06-12T01:12:13Z"
+    "last_seen": "2026-06-12T19:58:25Z"
   },
   "socks5://51.250.86.201:2080": {
     "protocol": "socks5",
     "host": "51.250.86.201",
     "port": 2080,
-    "checks": 1,
+    "checks": 2,
     "alive": 1,
-    "dead": 0,
-    "last_status": "alive",
+    "dead": 1,
+    "last_status": "dead",
     "first_seen": "2026-06-12T01:12:13Z",
-    "last_seen": "2026-06-12T01:12:13Z"
+    "last_seen": "2026-06-12T19:58:25Z"
   },
   "http://50.114.102.16:8888": {
     "protocol": "http",
@@ -124,23 +124,23 @@
     "protocol": "http",
     "host": "45.84.222.25",
     "port": 1080,
-    "checks": 1,
-    "alive": 0,
+    "checks": 2,
+    "alive": 1,
     "dead": 1,
-    "last_status": "dead",
+    "last_status": "alive",
     "first_seen": "2026-06-12T01:12:13Z",
-    "last_seen": "2026-06-12T01:12:13Z"
+    "last_seen": "2026-06-12T19:58:25Z"
   },
   "http://57.129.144.178:40000": {
     "protocol": "http",
     "host": "57.129.144.178",
     "port": 40000,
-    "checks": 1,
+    "checks": 2,
     "alive": 0,
-    "dead": 1,
+    "dead": 2,
     "last_status": "dead",
     "first_seen": "2026-06-12T01:12:13Z",
-    "last_seen": "2026-06-12T01:12:13Z"
+    "last_seen": "2026-06-12T19:58:25Z"
   },
   "http://2.26.87.216:1080": {
     "protocol": "http",
@@ -157,45 +157,45 @@
     "protocol": "http",
     "host": "51.250.86.201",
     "port": 2080,
-    "checks": 1,
+    "checks": 2,
     "alive": 1,
-    "dead": 0,
-    "last_status": "alive",
+    "dead": 1,
+    "last_status": "dead",
     "first_seen": "2026-06-12T01:12:13Z",
-    "last_seen": "2026-06-12T01:12:13Z"
+    "last_seen": "2026-06-12T19:58:25Z"
   },
   "http://198.199.86.11:3128": {
     "protocol": "http",
     "host": "198.199.86.11",
     "port": 3128,
-    "checks": 1,
+    "checks": 2,
     "alive": 0,
-    "dead": 1,
+    "dead": 2,
     "last_status": "dead",
     "first_seen": "2026-06-12T01:12:13Z",
-    "last_seen": "2026-06-12T01:12:13Z"
+    "last_seen": "2026-06-12T19:58:25Z"
   },
   "http://209.97.150.167:3128": {
     "protocol": "http",
     "host": "209.97.150.167",
     "port": 3128,
-    "checks": 1,
+    "checks": 2,
     "alive": 0,
-    "dead": 1,
+    "dead": 2,
     "last_status": "dead",
     "first_seen": "2026-06-12T01:12:13Z",
-    "last_seen": "2026-06-12T01:12:13Z"
+    "last_seen": "2026-06-12T19:58:25Z"
   },
   "http://52.188.28.218:3128": {
     "protocol": "http",
     "host": "52.188.28.218",
     "port": 3128,
-    "checks": 1,
-    "alive": 0,
+    "checks": 2,
+    "alive": 1,
     "dead": 1,
-    "last_status": "dead",
+    "last_status": "alive",
     "first_seen": "2026-06-12T01:12:13Z",
-    "last_seen": "2026-06-12T01:12:13Z"
+    "last_seen": "2026-06-12T19:58:25Z"
   },
   "http://34.43.46.91:443": {
     "protocol": "http",
@@ -212,23 +212,23 @@
     "protocol": "http",
     "host": "159.203.61.169",
     "port": 3128,
-    "checks": 1,
+    "checks": 2,
     "alive": 0,
-    "dead": 1,
+    "dead": 2,
     "last_status": "dead",
     "first_seen": "2026-06-12T01:12:13Z",
-    "last_seen": "2026-06-12T01:12:13Z"
+    "last_seen": "2026-06-12T19:58:25Z"
   },
   "http://34.43.46.91:80": {
     "protocol": "http",
     "host": "34.43.46.91",
     "port": 80,
-    "checks": 1,
-    "alive": 1,
+    "checks": 2,
+    "alive": 2,
     "dead": 0,
     "last_status": "alive",
     "first_seen": "2026-06-12T01:12:13Z",
-    "last_seen": "2026-06-12T01:12:13Z"
+    "last_seen": "2026-06-12T19:58:25Z"
   },
   "http://2.27.62.9:8888": {
     "protocol": "http",
@@ -245,34 +245,34 @@
     "protocol": "http",
     "host": "138.68.60.8",
     "port": 3128,
-    "checks": 1,
+    "checks": 2,
     "alive": 0,
-    "dead": 1,
+    "dead": 2,
     "last_status": "dead",
     "first_seen": "2026-06-12T01:12:13Z",
-    "last_seen": "2026-06-12T01:12:13Z"
+    "last_seen": "2026-06-12T19:58:25Z"
   },
   "http://159.198.35.187:1080": {
     "protocol": "http",
     "host": "159.198.35.187",
     "port": 1080,
-    "checks": 1,
+    "checks": 2,
     "alive": 1,
-    "dead": 0,
-    "last_status": "alive",
+    "dead": 1,
+    "last_status": "dead",
     "first_seen": "2026-06-12T01:12:13Z",
-    "last_seen": "2026-06-12T01:12:13Z"
+    "last_seen": "2026-06-12T19:58:25Z"
   },
   "socks4://51.250.86.201:2080": {
     "protocol": "socks4",
     "host": "51.250.86.201",
     "port": 2080,
-    "checks": 1,
-    "alive": 1,
+    "checks": 2,
+    "alive": 2,
     "dead": 0,
     "last_status": "alive",
     "first_seen": "2026-06-12T01:12:13Z",
-    "last_seen": "2026-06-12T01:12:13Z"
+    "last_seen": "2026-06-12T19:58:25Z"
   },
   "http://14.143.222.113:57788": {
     "protocol": "http",
@@ -300,23 +300,23 @@
     "protocol": "http",
     "host": "113.160.132.26",
     "port": 8080,
-    "checks": 1,
-    "alive": 1,
+    "checks": 2,
+    "alive": 2,
     "dead": 0,
     "last_status": "alive",
     "first_seen": "2026-06-12T01:12:13Z",
-    "last_seen": "2026-06-12T01:12:13Z"
+    "last_seen": "2026-06-12T19:58:25Z"
   },
   "http://202.28.194.139:31280": {
     "protocol": "http",
     "host": "202.28.194.139",
     "port": 31280,
-    "checks": 1,
-    "alive": 1,
+    "checks": 2,
+    "alive": 2,
     "dead": 0,
     "last_status": "alive",
     "first_seen": "2026-06-12T01:12:13Z",
-    "last_seen": "2026-06-12T01:12:13Z"
+    "last_seen": "2026-06-12T19:58:25Z"
   },
   "http://217.142.238.66:3128": {
     "protocol": "http",
@@ -410,12 +410,12 @@
     "protocol": "http",
     "host": "91.149.254.154",
     "port": 443,
-    "checks": 1,
-    "alive": 1,
+    "checks": 2,
+    "alive": 2,
     "dead": 0,
     "last_status": "alive",
     "first_seen": "2026-06-12T01:12:13Z",
-    "last_seen": "2026-06-12T01:12:13Z"
+    "last_seen": "2026-06-12T19:58:25Z"
   },
   "socks5://195.19.49.206:1080": {
     "protocol": "socks5",
@@ -443,12 +443,12 @@
     "protocol": "http",
     "host": "4.221.164.109",
     "port": 9443,
-    "checks": 1,
+    "checks": 2,
     "alive": 1,
-    "dead": 0,
-    "last_status": "alive",
+    "dead": 1,
+    "last_status": "dead",
     "first_seen": "2026-06-12T01:12:13Z",
-    "last_seen": "2026-06-12T01:12:13Z"
+    "last_seen": "2026-06-12T19:58:25Z"
   },
   "socks5://43.157.247.44:1080": {
     "protocol": "socks5",
@@ -509,12 +509,12 @@
     "protocol": "http",
     "host": "116.80.63.158",
     "port": 3172,
-    "checks": 1,
+    "checks": 2,
     "alive": 1,
-    "dead": 0,
-    "last_status": "alive",
+    "dead": 1,
+    "last_status": "dead",
     "first_seen": "2026-06-12T01:12:13Z",
-    "last_seen": "2026-06-12T01:12:13Z"
+    "last_seen": "2026-06-12T19:58:25Z"
   },
   "http://116.80.63.155:3172": {
     "protocol": "http",
@@ -531,12 +531,12 @@
     "protocol": "http",
     "host": "157.245.143.65",
     "port": 7890,
-    "checks": 1,
+    "checks": 2,
     "alive": 0,
-    "dead": 1,
+    "dead": 2,
     "last_status": "dead",
     "first_seen": "2026-06-12T01:12:13Z",
-    "last_seen": "2026-06-12T01:12:13Z"
+    "last_seen": "2026-06-12T19:58:25Z"
   },
   "http://178.156.224.42:3128": {
     "protocol": "http",
@@ -630,12 +630,12 @@
     "protocol": "socks5",
     "host": "147.45.146.97",
     "port": 1080,
-    "checks": 1,
-    "alive": 1,
+    "checks": 2,
+    "alive": 2,
     "dead": 0,
     "last_status": "alive",
     "first_seen": "2026-06-12T01:12:13Z",
-    "last_seen": "2026-06-12T01:12:13Z"
+    "last_seen": "2026-06-12T19:58:25Z"
   },
   "http://18.162.200.96:17955": {
     "protocol": "http",
@@ -762,12 +762,12 @@
     "protocol": "http",
     "host": "169.212.15.161",
     "port": 5000,
-    "checks": 1,
+    "checks": 2,
     "alive": 0,
-    "dead": 1,
+    "dead": 2,
     "last_status": "dead",
     "first_seen": "2026-06-12T01:12:13Z",
-    "last_seen": "2026-06-12T01:12:13Z"
+    "last_seen": "2026-06-12T19:58:25Z"
   },
   "http://116.80.91.203:3172": {
     "protocol": "http",
@@ -817,12 +817,12 @@
     "protocol": "http",
     "host": "45.95.233.237",
     "port": 1082,
-    "checks": 1,
+    "checks": 2,
     "alive": 0,
-    "dead": 1,
+    "dead": 2,
     "last_status": "dead",
     "first_seen": "2026-06-12T01:12:13Z",
-    "last_seen": "2026-06-12T01:12:13Z"
+    "last_seen": "2026-06-12T19:58:25Z"
   },
   "http://103.189.197.43:7778": {
     "protocol": "http",
@@ -850,12 +850,12 @@
     "protocol": "http",
     "host": "43.161.239.147",
     "port": 8888,
-    "checks": 1,
+    "checks": 2,
     "alive": 0,
-    "dead": 1,
+    "dead": 2,
     "last_status": "dead",
     "first_seen": "2026-06-12T01:12:13Z",
-    "last_seen": "2026-06-12T01:12:13Z"
+    "last_seen": "2026-06-12T19:58:25Z"
   },
   "http://15.152.75.215:43035": {
     "protocol": "http",
@@ -872,12 +872,12 @@
     "protocol": "http",
     "host": "4.221.164.109",
     "port": 443,
-    "checks": 1,
+    "checks": 2,
     "alive": 0,
-    "dead": 1,
+    "dead": 2,
     "last_status": "dead",
     "first_seen": "2026-06-12T01:12:13Z",
-    "last_seen": "2026-06-12T01:12:13Z"
+    "last_seen": "2026-06-12T19:58:25Z"
   },
   "http://89.127.207.174:18080": {
     "protocol": "http",
@@ -889,5 +889,896 @@
     "last_status": "dead",
     "first_seen": "2026-06-12T01:12:13Z",
     "last_seen": "2026-06-12T01:12:13Z"
+  },
+  "http://45.140.169.241:1081": {
+    "protocol": "http",
+    "host": "45.140.169.241",
+    "port": 1081,
+    "checks": 1,
+    "alive": 0,
+    "dead": 1,
+    "last_status": "dead",
+    "first_seen": "2026-06-12T19:58:25Z",
+    "last_seen": "2026-06-12T19:58:25Z"
+  },
+  "http://151.243.180.211:2080": {
+    "protocol": "http",
+    "host": "151.243.180.211",
+    "port": 2080,
+    "checks": 1,
+    "alive": 0,
+    "dead": 1,
+    "last_status": "dead",
+    "first_seen": "2026-06-12T19:58:25Z",
+    "last_seen": "2026-06-12T19:58:25Z"
+  },
+  "http://213.165.42.185:7443": {
+    "protocol": "http",
+    "host": "213.165.42.185",
+    "port": 7443,
+    "checks": 1,
+    "alive": 0,
+    "dead": 1,
+    "last_status": "dead",
+    "first_seen": "2026-06-12T19:58:25Z",
+    "last_seen": "2026-06-12T19:58:25Z"
+  },
+  "http://91.107.172.30:82": {
+    "protocol": "http",
+    "host": "91.107.172.30",
+    "port": 82,
+    "checks": 1,
+    "alive": 1,
+    "dead": 0,
+    "last_status": "alive",
+    "first_seen": "2026-06-12T19:58:25Z",
+    "last_seen": "2026-06-12T19:58:25Z"
+  },
+  "http://77.246.101.204:55555": {
+    "protocol": "http",
+    "host": "77.246.101.204",
+    "port": 55555,
+    "checks": 1,
+    "alive": 0,
+    "dead": 1,
+    "last_status": "dead",
+    "first_seen": "2026-06-12T19:58:25Z",
+    "last_seen": "2026-06-12T19:58:25Z"
+  },
+  "http://138.124.113.102:7443": {
+    "protocol": "http",
+    "host": "138.124.113.102",
+    "port": 7443,
+    "checks": 1,
+    "alive": 0,
+    "dead": 1,
+    "last_status": "dead",
+    "first_seen": "2026-06-12T19:58:25Z",
+    "last_seen": "2026-06-12T19:58:25Z"
+  },
+  "http://65.108.203.37:18080": {
+    "protocol": "http",
+    "host": "65.108.203.37",
+    "port": 18080,
+    "checks": 1,
+    "alive": 1,
+    "dead": 0,
+    "last_status": "alive",
+    "first_seen": "2026-06-12T19:58:25Z",
+    "last_seen": "2026-06-12T19:58:25Z"
+  },
+  "http://135.125.154.103:8899": {
+    "protocol": "http",
+    "host": "135.125.154.103",
+    "port": 8899,
+    "checks": 1,
+    "alive": 0,
+    "dead": 1,
+    "last_status": "dead",
+    "first_seen": "2026-06-12T19:58:25Z",
+    "last_seen": "2026-06-12T19:58:25Z"
+  },
+  "http://172.86.92.68:58000": {
+    "protocol": "http",
+    "host": "172.86.92.68",
+    "port": 58000,
+    "checks": 1,
+    "alive": 1,
+    "dead": 0,
+    "last_status": "alive",
+    "first_seen": "2026-06-12T19:58:25Z",
+    "last_seen": "2026-06-12T19:58:25Z"
+  },
+  "http://85.192.28.65:7443": {
+    "protocol": "http",
+    "host": "85.192.28.65",
+    "port": 7443,
+    "checks": 1,
+    "alive": 0,
+    "dead": 1,
+    "last_status": "dead",
+    "first_seen": "2026-06-12T19:58:25Z",
+    "last_seen": "2026-06-12T19:58:25Z"
+  },
+  "http://89.169.53.40:7443": {
+    "protocol": "http",
+    "host": "89.169.53.40",
+    "port": 7443,
+    "checks": 1,
+    "alive": 0,
+    "dead": 1,
+    "last_status": "dead",
+    "first_seen": "2026-06-12T19:58:25Z",
+    "last_seen": "2026-06-12T19:58:25Z"
+  },
+  "http://174.137.134.182:2999": {
+    "protocol": "http",
+    "host": "174.137.134.182",
+    "port": 2999,
+    "checks": 1,
+    "alive": 0,
+    "dead": 1,
+    "last_status": "dead",
+    "first_seen": "2026-06-12T19:58:25Z",
+    "last_seen": "2026-06-12T19:58:25Z"
+  },
+  "http://13.53.139.178:40157": {
+    "protocol": "http",
+    "host": "13.53.139.178",
+    "port": 40157,
+    "checks": 1,
+    "alive": 1,
+    "dead": 0,
+    "last_status": "alive",
+    "first_seen": "2026-06-12T19:58:25Z",
+    "last_seen": "2026-06-12T19:58:25Z"
+  },
+  "http://64.188.77.26:3128": {
+    "protocol": "http",
+    "host": "64.188.77.26",
+    "port": 3128,
+    "checks": 1,
+    "alive": 0,
+    "dead": 1,
+    "last_status": "dead",
+    "first_seen": "2026-06-12T19:58:25Z",
+    "last_seen": "2026-06-12T19:58:25Z"
+  },
+  "http://104.154.186.48:80": {
+    "protocol": "http",
+    "host": "104.154.186.48",
+    "port": 80,
+    "checks": 1,
+    "alive": 1,
+    "dead": 0,
+    "last_status": "alive",
+    "first_seen": "2026-06-12T19:58:25Z",
+    "last_seen": "2026-06-12T19:58:25Z"
+  },
+  "http://85.192.28.62:7443": {
+    "protocol": "http",
+    "host": "85.192.28.62",
+    "port": 7443,
+    "checks": 1,
+    "alive": 0,
+    "dead": 1,
+    "last_status": "dead",
+    "first_seen": "2026-06-12T19:58:25Z",
+    "last_seen": "2026-06-12T19:58:25Z"
+  },
+  "http://103.161.16.195:50580": {
+    "protocol": "http",
+    "host": "103.161.16.195",
+    "port": 50580,
+    "checks": 1,
+    "alive": 1,
+    "dead": 0,
+    "last_status": "alive",
+    "first_seen": "2026-06-12T19:58:25Z",
+    "last_seen": "2026-06-12T19:58:25Z"
+  },
+  "http://195.9.238.34:8080": {
+    "protocol": "http",
+    "host": "195.9.238.34",
+    "port": 8080,
+    "checks": 1,
+    "alive": 0,
+    "dead": 1,
+    "last_status": "dead",
+    "first_seen": "2026-06-12T19:58:25Z",
+    "last_seen": "2026-06-12T19:58:25Z"
+  },
+  "http://157.245.100.190:442": {
+    "protocol": "http",
+    "host": "157.245.100.190",
+    "port": 442,
+    "checks": 1,
+    "alive": 0,
+    "dead": 1,
+    "last_status": "dead",
+    "first_seen": "2026-06-12T19:58:25Z",
+    "last_seen": "2026-06-12T19:58:25Z"
+  },
+  "http://139.59.1.14:8080": {
+    "protocol": "http",
+    "host": "139.59.1.14",
+    "port": 8080,
+    "checks": 1,
+    "alive": 0,
+    "dead": 1,
+    "last_status": "dead",
+    "first_seen": "2026-06-12T19:58:25Z",
+    "last_seen": "2026-06-12T19:58:25Z"
+  },
+  "http://14.143.222.113:10144": {
+    "protocol": "http",
+    "host": "14.143.222.113",
+    "port": 10144,
+    "checks": 1,
+    "alive": 1,
+    "dead": 0,
+    "last_status": "alive",
+    "first_seen": "2026-06-12T19:58:25Z",
+    "last_seen": "2026-06-12T19:58:25Z"
+  },
+  "http://185.245.35.88:9443": {
+    "protocol": "http",
+    "host": "185.245.35.88",
+    "port": 9443,
+    "checks": 1,
+    "alive": 1,
+    "dead": 0,
+    "last_status": "alive",
+    "first_seen": "2026-06-12T19:58:25Z",
+    "last_seen": "2026-06-12T19:58:25Z"
+  },
+  "http://138.124.114.42:7443": {
+    "protocol": "http",
+    "host": "138.124.114.42",
+    "port": 7443,
+    "checks": 1,
+    "alive": 1,
+    "dead": 0,
+    "last_status": "alive",
+    "first_seen": "2026-06-12T19:58:25Z",
+    "last_seen": "2026-06-12T19:58:25Z"
+  },
+  "http://154.223.77.54:10001": {
+    "protocol": "http",
+    "host": "154.223.77.54",
+    "port": 10001,
+    "checks": 1,
+    "alive": 1,
+    "dead": 0,
+    "last_status": "alive",
+    "first_seen": "2026-06-12T19:58:25Z",
+    "last_seen": "2026-06-12T19:58:25Z"
+  },
+  "http://216.57.107.50:8445": {
+    "protocol": "http",
+    "host": "216.57.107.50",
+    "port": 8445,
+    "checks": 1,
+    "alive": 0,
+    "dead": 1,
+    "last_status": "dead",
+    "first_seen": "2026-06-12T19:58:25Z",
+    "last_seen": "2026-06-12T19:58:25Z"
+  },
+  "http://62.133.62.3:1082": {
+    "protocol": "http",
+    "host": "62.133.62.3",
+    "port": 1082,
+    "checks": 1,
+    "alive": 0,
+    "dead": 1,
+    "last_status": "dead",
+    "first_seen": "2026-06-12T19:58:25Z",
+    "last_seen": "2026-06-12T19:58:25Z"
+  },
+  "http://180.2.108.38:8080": {
+    "protocol": "http",
+    "host": "180.2.108.38",
+    "port": 8080,
+    "checks": 1,
+    "alive": 1,
+    "dead": 0,
+    "last_status": "alive",
+    "first_seen": "2026-06-12T19:58:25Z",
+    "last_seen": "2026-06-12T19:58:25Z"
+  },
+  "http://203.30.9.8:8443": {
+    "protocol": "http",
+    "host": "203.30.9.8",
+    "port": 8443,
+    "checks": 1,
+    "alive": 0,
+    "dead": 1,
+    "last_status": "dead",
+    "first_seen": "2026-06-12T19:58:25Z",
+    "last_seen": "2026-06-12T19:58:25Z"
+  },
+  "http://85.192.28.47:7443": {
+    "protocol": "http",
+    "host": "85.192.28.47",
+    "port": 7443,
+    "checks": 1,
+    "alive": 0,
+    "dead": 1,
+    "last_status": "dead",
+    "first_seen": "2026-06-12T19:58:25Z",
+    "last_seen": "2026-06-12T19:58:25Z"
+  },
+  "http://185.191.239.248:3128": {
+    "protocol": "http",
+    "host": "185.191.239.248",
+    "port": 3128,
+    "checks": 1,
+    "alive": 0,
+    "dead": 1,
+    "last_status": "dead",
+    "first_seen": "2026-06-12T19:58:25Z",
+    "last_seen": "2026-06-12T19:58:25Z"
+  },
+  "http://164.92.165.209:18080": {
+    "protocol": "http",
+    "host": "164.92.165.209",
+    "port": 18080,
+    "checks": 1,
+    "alive": 1,
+    "dead": 0,
+    "last_status": "alive",
+    "first_seen": "2026-06-12T19:58:25Z",
+    "last_seen": "2026-06-12T19:58:25Z"
+  },
+  "http://185.41.152.110:3128": {
+    "protocol": "http",
+    "host": "185.41.152.110",
+    "port": 3128,
+    "checks": 1,
+    "alive": 0,
+    "dead": 1,
+    "last_status": "dead",
+    "first_seen": "2026-06-12T19:58:25Z",
+    "last_seen": "2026-06-12T19:58:25Z"
+  },
+  "socks5://158.178.198.31:1080": {
+    "protocol": "socks5",
+    "host": "158.178.198.31",
+    "port": 1080,
+    "checks": 1,
+    "alive": 1,
+    "dead": 0,
+    "last_status": "alive",
+    "first_seen": "2026-06-12T19:58:25Z",
+    "last_seen": "2026-06-12T19:58:25Z"
+  },
+  "http://77.110.116.93:7443": {
+    "protocol": "http",
+    "host": "77.110.116.93",
+    "port": 7443,
+    "checks": 1,
+    "alive": 0,
+    "dead": 1,
+    "last_status": "dead",
+    "first_seen": "2026-06-12T19:58:25Z",
+    "last_seen": "2026-06-12T19:58:25Z"
+  },
+  "http://64.176.6.165:13920": {
+    "protocol": "http",
+    "host": "64.176.6.165",
+    "port": 13920,
+    "checks": 1,
+    "alive": 0,
+    "dead": 1,
+    "last_status": "dead",
+    "first_seen": "2026-06-12T19:58:25Z",
+    "last_seen": "2026-06-12T19:58:25Z"
+  },
+  "http://37.187.92.9:1031": {
+    "protocol": "http",
+    "host": "37.187.92.9",
+    "port": 1031,
+    "checks": 1,
+    "alive": 0,
+    "dead": 1,
+    "last_status": "dead",
+    "first_seen": "2026-06-12T19:58:25Z",
+    "last_seen": "2026-06-12T19:58:25Z"
+  },
+  "http://43.161.239.147:11090": {
+    "protocol": "http",
+    "host": "43.161.239.147",
+    "port": 11090,
+    "checks": 1,
+    "alive": 0,
+    "dead": 1,
+    "last_status": "dead",
+    "first_seen": "2026-06-12T19:58:25Z",
+    "last_seen": "2026-06-12T19:58:25Z"
+  },
+  "http://174.138.161.213:8086": {
+    "protocol": "http",
+    "host": "174.138.161.213",
+    "port": 8086,
+    "checks": 1,
+    "alive": 0,
+    "dead": 1,
+    "last_status": "dead",
+    "first_seen": "2026-06-12T19:58:25Z",
+    "last_seen": "2026-06-12T19:58:25Z"
+  },
+  "http://8.210.93.183:8213": {
+    "protocol": "http",
+    "host": "8.210.93.183",
+    "port": 8213,
+    "checks": 1,
+    "alive": 0,
+    "dead": 1,
+    "last_status": "dead",
+    "first_seen": "2026-06-12T19:58:25Z",
+    "last_seen": "2026-06-12T19:58:25Z"
+  },
+  "http://45.140.169.241:8081": {
+    "protocol": "http",
+    "host": "45.140.169.241",
+    "port": 8081,
+    "checks": 1,
+    "alive": 0,
+    "dead": 1,
+    "last_status": "dead",
+    "first_seen": "2026-06-12T19:58:25Z",
+    "last_seen": "2026-06-12T19:58:25Z"
+  },
+  "http://95.165.152.252:3128": {
+    "protocol": "http",
+    "host": "95.165.152.252",
+    "port": 3128,
+    "checks": 1,
+    "alive": 0,
+    "dead": 1,
+    "last_status": "dead",
+    "first_seen": "2026-06-12T19:58:25Z",
+    "last_seen": "2026-06-12T19:58:25Z"
+  },
+  "http://116.80.48.17:3172": {
+    "protocol": "http",
+    "host": "116.80.48.17",
+    "port": 3172,
+    "checks": 1,
+    "alive": 0,
+    "dead": 1,
+    "last_status": "dead",
+    "first_seen": "2026-06-12T19:58:25Z",
+    "last_seen": "2026-06-12T19:58:25Z"
+  },
+  "http://116.80.48.147:3172": {
+    "protocol": "http",
+    "host": "116.80.48.147",
+    "port": 3172,
+    "checks": 1,
+    "alive": 0,
+    "dead": 1,
+    "last_status": "dead",
+    "first_seen": "2026-06-12T19:58:25Z",
+    "last_seen": "2026-06-12T19:58:25Z"
+  },
+  "http://185.178.44.115:10443": {
+    "protocol": "http",
+    "host": "185.178.44.115",
+    "port": 10443,
+    "checks": 1,
+    "alive": 0,
+    "dead": 1,
+    "last_status": "dead",
+    "first_seen": "2026-06-12T19:58:25Z",
+    "last_seen": "2026-06-12T19:58:25Z"
+  },
+  "http://1.231.81.166:3128": {
+    "protocol": "http",
+    "host": "1.231.81.166",
+    "port": 3128,
+    "checks": 1,
+    "alive": 0,
+    "dead": 1,
+    "last_status": "dead",
+    "first_seen": "2026-06-12T19:58:25Z",
+    "last_seen": "2026-06-12T19:58:25Z"
+  },
+  "http://210.170.24.239:8080": {
+    "protocol": "http",
+    "host": "210.170.24.239",
+    "port": 8080,
+    "checks": 1,
+    "alive": 0,
+    "dead": 1,
+    "last_status": "dead",
+    "first_seen": "2026-06-12T19:58:25Z",
+    "last_seen": "2026-06-12T19:58:25Z"
+  },
+  "http://38.191.80.23:999": {
+    "protocol": "http",
+    "host": "38.191.80.23",
+    "port": 999,
+    "checks": 1,
+    "alive": 0,
+    "dead": 1,
+    "last_status": "dead",
+    "first_seen": "2026-06-12T19:58:25Z",
+    "last_seen": "2026-06-12T19:58:25Z"
+  },
+  "http://45.32.8.165:6688": {
+    "protocol": "http",
+    "host": "45.32.8.165",
+    "port": 6688,
+    "checks": 1,
+    "alive": 0,
+    "dead": 1,
+    "last_status": "dead",
+    "first_seen": "2026-06-12T19:58:25Z",
+    "last_seen": "2026-06-12T19:58:25Z"
+  },
+  "http://103.252.120.18:8090": {
+    "protocol": "http",
+    "host": "103.252.120.18",
+    "port": 8090,
+    "checks": 1,
+    "alive": 0,
+    "dead": 1,
+    "last_status": "dead",
+    "first_seen": "2026-06-12T19:58:25Z",
+    "last_seen": "2026-06-12T19:58:25Z"
+  },
+  "http://38.127.179.147:37234": {
+    "protocol": "http",
+    "host": "38.127.179.147",
+    "port": 37234,
+    "checks": 1,
+    "alive": 0,
+    "dead": 1,
+    "last_status": "dead",
+    "first_seen": "2026-06-12T19:58:25Z",
+    "last_seen": "2026-06-12T19:58:25Z"
+  },
+  "http://192.9.182.6:20172": {
+    "protocol": "http",
+    "host": "192.9.182.6",
+    "port": 20172,
+    "checks": 1,
+    "alive": 0,
+    "dead": 1,
+    "last_status": "dead",
+    "first_seen": "2026-06-12T19:58:25Z",
+    "last_seen": "2026-06-12T19:58:25Z"
+  },
+  "http://157.20.239.167:8080": {
+    "protocol": "http",
+    "host": "157.20.239.167",
+    "port": 8080,
+    "checks": 1,
+    "alive": 0,
+    "dead": 1,
+    "last_status": "dead",
+    "first_seen": "2026-06-12T19:58:25Z",
+    "last_seen": "2026-06-12T19:58:25Z"
+  },
+  "http://77.221.154.39:8081": {
+    "protocol": "http",
+    "host": "77.221.154.39",
+    "port": 8081,
+    "checks": 1,
+    "alive": 0,
+    "dead": 1,
+    "last_status": "dead",
+    "first_seen": "2026-06-12T19:58:25Z",
+    "last_seen": "2026-06-12T19:58:25Z"
+  },
+  "http://131.222.253.78:8080": {
+    "protocol": "http",
+    "host": "131.222.253.78",
+    "port": 8080,
+    "checks": 1,
+    "alive": 0,
+    "dead": 1,
+    "last_status": "dead",
+    "first_seen": "2026-06-12T19:58:25Z",
+    "last_seen": "2026-06-12T19:58:25Z"
+  },
+  "http://116.80.47.81:3172": {
+    "protocol": "http",
+    "host": "116.80.47.81",
+    "port": 3172,
+    "checks": 1,
+    "alive": 0,
+    "dead": 1,
+    "last_status": "dead",
+    "first_seen": "2026-06-12T19:58:25Z",
+    "last_seen": "2026-06-12T19:58:25Z"
+  },
+  "http://116.80.66.25:3172": {
+    "protocol": "http",
+    "host": "116.80.66.25",
+    "port": 3172,
+    "checks": 1,
+    "alive": 0,
+    "dead": 1,
+    "last_status": "dead",
+    "first_seen": "2026-06-12T19:58:25Z",
+    "last_seen": "2026-06-12T19:58:25Z"
+  },
+  "http://116.80.83.17:3172": {
+    "protocol": "http",
+    "host": "116.80.83.17",
+    "port": 3172,
+    "checks": 1,
+    "alive": 0,
+    "dead": 1,
+    "last_status": "dead",
+    "first_seen": "2026-06-12T19:58:25Z",
+    "last_seen": "2026-06-12T19:58:25Z"
+  },
+  "http://38.127.179.161:37234": {
+    "protocol": "http",
+    "host": "38.127.179.161",
+    "port": 37234,
+    "checks": 1,
+    "alive": 0,
+    "dead": 1,
+    "last_status": "dead",
+    "first_seen": "2026-06-12T19:58:25Z",
+    "last_seen": "2026-06-12T19:58:25Z"
+  },
+  "http://37.191.95.202:80": {
+    "protocol": "http",
+    "host": "37.191.95.202",
+    "port": 80,
+    "checks": 1,
+    "alive": 0,
+    "dead": 1,
+    "last_status": "dead",
+    "first_seen": "2026-06-12T19:58:25Z",
+    "last_seen": "2026-06-12T19:58:25Z"
+  },
+  "http://103.61.16.92:8080": {
+    "protocol": "http",
+    "host": "103.61.16.92",
+    "port": 8080,
+    "checks": 1,
+    "alive": 0,
+    "dead": 1,
+    "last_status": "dead",
+    "first_seen": "2026-06-12T19:58:25Z",
+    "last_seen": "2026-06-12T19:58:25Z"
+  },
+  "http://85.192.60.187:7443": {
+    "protocol": "http",
+    "host": "85.192.60.187",
+    "port": 7443,
+    "checks": 1,
+    "alive": 0,
+    "dead": 1,
+    "last_status": "dead",
+    "first_seen": "2026-06-12T19:58:25Z",
+    "last_seen": "2026-06-12T19:58:25Z"
+  },
+  "http://79.175.188.203:443": {
+    "protocol": "http",
+    "host": "79.175.188.203",
+    "port": 443,
+    "checks": 1,
+    "alive": 0,
+    "dead": 1,
+    "last_status": "dead",
+    "first_seen": "2026-06-12T19:58:25Z",
+    "last_seen": "2026-06-12T19:58:25Z"
+  },
+  "http://131.222.210.172:8080": {
+    "protocol": "http",
+    "host": "131.222.210.172",
+    "port": 8080,
+    "checks": 1,
+    "alive": 0,
+    "dead": 1,
+    "last_status": "dead",
+    "first_seen": "2026-06-12T19:58:25Z",
+    "last_seen": "2026-06-12T19:58:25Z"
+  },
+  "http://77.221.154.39:1080": {
+    "protocol": "http",
+    "host": "77.221.154.39",
+    "port": 1080,
+    "checks": 1,
+    "alive": 0,
+    "dead": 1,
+    "last_status": "dead",
+    "first_seen": "2026-06-12T19:58:25Z",
+    "last_seen": "2026-06-12T19:58:25Z"
+  },
+  "http://128.140.113.110:8081": {
+    "protocol": "http",
+    "host": "128.140.113.110",
+    "port": 8081,
+    "checks": 1,
+    "alive": 0,
+    "dead": 1,
+    "last_status": "dead",
+    "first_seen": "2026-06-12T19:58:25Z",
+    "last_seen": "2026-06-12T19:58:25Z"
+  },
+  "http://205.235.1.36:999": {
+    "protocol": "http",
+    "host": "205.235.1.36",
+    "port": 999,
+    "checks": 1,
+    "alive": 0,
+    "dead": 1,
+    "last_status": "dead",
+    "first_seen": "2026-06-12T19:58:25Z",
+    "last_seen": "2026-06-12T19:58:25Z"
+  },
+  "http://41.78.168.118:8080": {
+    "protocol": "http",
+    "host": "41.78.168.118",
+    "port": 8080,
+    "checks": 1,
+    "alive": 0,
+    "dead": 1,
+    "last_status": "dead",
+    "first_seen": "2026-06-12T19:58:25Z",
+    "last_seen": "2026-06-12T19:58:25Z"
+  },
+  "http://113.11.2.118:7333": {
+    "protocol": "http",
+    "host": "113.11.2.118",
+    "port": 7333,
+    "checks": 1,
+    "alive": 0,
+    "dead": 1,
+    "last_status": "dead",
+    "first_seen": "2026-06-12T19:58:25Z",
+    "last_seen": "2026-06-12T19:58:25Z"
+  },
+  "http://174.138.161.212:32023": {
+    "protocol": "http",
+    "host": "174.138.161.212",
+    "port": 32023,
+    "checks": 1,
+    "alive": 0,
+    "dead": 1,
+    "last_status": "dead",
+    "first_seen": "2026-06-12T19:58:25Z",
+    "last_seen": "2026-06-12T19:58:25Z"
+  },
+  "http://103.174.122.186:8085": {
+    "protocol": "http",
+    "host": "103.174.122.186",
+    "port": 8085,
+    "checks": 1,
+    "alive": 0,
+    "dead": 1,
+    "last_status": "dead",
+    "first_seen": "2026-06-12T19:58:25Z",
+    "last_seen": "2026-06-12T19:58:25Z"
+  },
+  "http://38.191.193.162:999": {
+    "protocol": "http",
+    "host": "38.191.193.162",
+    "port": 999,
+    "checks": 1,
+    "alive": 0,
+    "dead": 1,
+    "last_status": "dead",
+    "first_seen": "2026-06-12T19:58:25Z",
+    "last_seen": "2026-06-12T19:58:25Z"
+  },
+  "http://38.127.172.94:37234": {
+    "protocol": "http",
+    "host": "38.127.172.94",
+    "port": 37234,
+    "checks": 1,
+    "alive": 0,
+    "dead": 1,
+    "last_status": "dead",
+    "first_seen": "2026-06-12T19:58:25Z",
+    "last_seen": "2026-06-12T19:58:25Z"
+  },
+  "http://139.167.218.162:3127": {
+    "protocol": "http",
+    "host": "139.167.218.162",
+    "port": 3127,
+    "checks": 1,
+    "alive": 0,
+    "dead": 1,
+    "last_status": "dead",
+    "first_seen": "2026-06-12T19:58:25Z",
+    "last_seen": "2026-06-12T19:58:25Z"
+  },
+  "http://148.224.7.58:999": {
+    "protocol": "http",
+    "host": "148.224.7.58",
+    "port": 999,
+    "checks": 1,
+    "alive": 0,
+    "dead": 1,
+    "last_status": "dead",
+    "first_seen": "2026-06-12T19:58:25Z",
+    "last_seen": "2026-06-12T19:58:25Z"
+  },
+  "http://144.31.134.29:1050": {
+    "protocol": "http",
+    "host": "144.31.134.29",
+    "port": 1050,
+    "checks": 1,
+    "alive": 0,
+    "dead": 1,
+    "last_status": "dead",
+    "first_seen": "2026-06-12T19:58:25Z",
+    "last_seen": "2026-06-12T19:58:25Z"
+  },
+  "http://37.187.109.70:10111": {
+    "protocol": "http",
+    "host": "37.187.109.70",
+    "port": 10111,
+    "checks": 1,
+    "alive": 0,
+    "dead": 1,
+    "last_status": "dead",
+    "first_seen": "2026-06-12T19:58:25Z",
+    "last_seen": "2026-06-12T19:58:25Z"
+  },
+  "http://85.117.56.43:8080": {
+    "protocol": "http",
+    "host": "85.117.56.43",
+    "port": 8080,
+    "checks": 1,
+    "alive": 0,
+    "dead": 1,
+    "last_status": "dead",
+    "first_seen": "2026-06-12T19:58:25Z",
+    "last_seen": "2026-06-12T19:58:25Z"
+  },
+  "http://205.235.1.37:999": {
+    "protocol": "http",
+    "host": "205.235.1.37",
+    "port": 999,
+    "checks": 1,
+    "alive": 0,
+    "dead": 1,
+    "last_status": "dead",
+    "first_seen": "2026-06-12T19:58:25Z",
+    "last_seen": "2026-06-12T19:58:25Z"
+  },
+  "http://103.144.181.74:80": {
+    "protocol": "http",
+    "host": "103.144.181.74",
+    "port": 80,
+    "checks": 1,
+    "alive": 0,
+    "dead": 1,
+    "last_status": "dead",
+    "first_seen": "2026-06-12T19:58:25Z",
+    "last_seen": "2026-06-12T19:58:25Z"
+  },
+  "socks5://206.123.156.218:12862": {
+    "protocol": "socks5",
+    "host": "206.123.156.218",
+    "port": 12862,
+    "checks": 1,
+    "alive": 0,
+    "dead": 1,
+    "last_status": "dead",
+    "first_seen": "2026-06-12T19:58:25Z",
+    "last_seen": "2026-06-12T19:58:25Z"
+  },
+  "http://14.143.222.113:26705": {
+    "protocol": "http",
+    "host": "14.143.222.113",
+    "port": 26705,
+    "checks": 1,
+    "alive": 0,
+    "dead": 1,
+    "last_status": "dead",
+    "first_seen": "2026-06-12T19:58:25Z",
+    "last_seen": "2026-06-12T19:58:25Z"
   }
 }

@@ -38,7 +38,7 @@ from curl_cffi.const import CurlECode
 sys.path.insert(0, str(Path(__file__).parent))
 from probe_pool_size import HTTP_SOURCES, SOCKS4_SOURCES, SOCKS5_SOURCES, fetch_all_sources  # noqa: E402
 from monosans_loader import load_monosans_proxies  # noqa: E402
-from proxy_status_log import record_run  # noqa: E402
+from proxy_status_log import record_run, partition_fresh  # noqa: E402
 
 SCRIPT_DIR  = Path(__file__).parent
 FROZEN_DIR  = SCRIPT_DIR / "frozen_pool"
@@ -66,6 +66,9 @@ async def probe_liveness_workflow() -> None:
 
     if args.source == "monosans":
         entries = load_monosans_proxies()
+        to_check, skipped_fresh = partition_fresh(entries, args.recheck_window)
+        print(f"Freshness filter: {len(to_check)} to check, {len(skipped_fresh)} skipped (last_seen < {args.recheck_window}s ago)")
+        entries = to_check
         mode    = "monosans"
     else:
         frozen_dir = Path(args.input)
@@ -86,11 +89,13 @@ async def probe_liveness_workflow() -> None:
         read_s=args.read_timeout,
     )
 
-    elapsed = time.monotonic() - t0_wall
+    elapsed       = time.monotonic() - t0_wall
+    skipped_count = len(skipped_fresh) if args.source == "monosans" else 0
     print_console_summary(results, args.concurrency, elapsed)
     append_sweep_log(
         results, ts, mode, len(entries),
         args.concurrency, args.connect_timeout, args.read_timeout, elapsed,
+        skipped=skipped_count,
     )
     if any(r["bucket"] == "unknown" for r in results):
         write_unknown_log(results, ts)
@@ -111,6 +116,8 @@ def parse_args() -> argparse.Namespace:
     p.add_argument("--connect-timeout", type=float, default=5.0, metavar="S")
     p.add_argument("--read-timeout",    type=float, default=5.0, metavar="S")
     p.add_argument("--input", default=str(FROZEN_DIR), help="Frozen pool dir")
+    p.add_argument("--recheck-window", type=int, default=3600, metavar="S",
+                   help="Skip monosans proxies whose last check is younger than S seconds (default 3600)")
     return p.parse_args()
 
 
@@ -312,6 +319,7 @@ def append_sweep_log(
     connect_s: float,
     read_s: float,
     elapsed: float,
+    skipped: int = 0,
 ) -> None:
     """Append one structured markdown entry to sweep_log.md (committed — comparable-over-time record)."""
     LOG_DIR.mkdir(parents=True, exist_ok=True)
@@ -326,9 +334,10 @@ def append_sweep_log(
         if not r["alive"]:
             histogram[r["bucket"]] += 1
 
+    skipped_part = f" | skipped_fresh={skipped:,}" if skipped else ""
     lines = [
         "---",
-        f"## {ts.strftime('%Y-%m-%dT%H:%M:%SZ')} | {mode} | n={n:,} | "
+        f"## {ts.strftime('%Y-%m-%dT%H:%M:%SZ')} | {mode} | n={n:,}{skipped_part} | "
         f"concurrency={concurrency} | timeout={connect_s}s/{read_s}s",
         "",
         "| Wall-clock | Throughput | Alive | Alive% | Dead |",

@@ -60,6 +60,35 @@ def _save_log(data: dict) -> None:
     LOG_PATH.write_text(json.dumps(data, indent=2, ensure_ascii=False) + "\n", encoding="utf-8")
 
 
+# Partition loaded monosans entries into (to_check, skipped_fresh)
+def partition_fresh(
+    entries: list[tuple[str, str]],
+    window_s: int,
+) -> tuple[list[tuple[str, str]], list[tuple[str, str]]]:
+    """Return (to_check, skipped_fresh).
+
+    to_check:      key absent from log  OR  last_seen age >= window_s
+    skipped_fresh: key present in log  AND  last_seen age < window_s
+    """
+    data = _load_log()
+    now  = datetime.now(timezone.utc)
+    to_check: list[tuple[str, str]]      = []
+    skipped_fresh: list[tuple[str, str]] = []
+    for proto, host_port in entries:
+        key   = _proxy_key(proto, host_port)
+        entry = data.get(key)
+        if entry is None:
+            to_check.append((proto, host_port))
+            continue
+        last_seen_dt = datetime.strptime(entry["last_seen"], "%Y-%m-%dT%H:%M:%SZ").replace(tzinfo=timezone.utc)
+        age_s        = (now - last_seen_dt).total_seconds()
+        if age_s >= window_s:
+            to_check.append((proto, host_port))
+        else:
+            skipped_fresh.append((proto, host_port))
+    return to_check, skipped_fresh
+
+
 def _proxy_key(proto: str, host_port: str) -> str:
     """Build canonical key: protocol://host:port (auth stripped if present)."""
     host, port = _parse_host_port(host_port)
