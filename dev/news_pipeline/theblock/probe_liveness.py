@@ -39,7 +39,10 @@ sys.path.insert(0, str(Path(__file__).parent))
 from probe_pool_size import HTTP_SOURCES, SOCKS4_SOURCES, SOCKS5_SOURCES, fetch_all_sources  # noqa: E402
 from monosans_loader import load_monosans_proxies  # noqa: E402
 from proxy_status_log import record_run, partition_fresh  # noqa: E402
-from curated_sources import load_curated_proxies, load_thespeedx_proxies  # noqa: E402
+from curated_sources import (  # noqa: E402
+    load_curated_proxies, load_thespeedx_proxies,
+    load_databay_proxies, load_jetkai_proxies, load_roosterkid_proxies,
+)
 
 SCRIPT_DIR  = Path(__file__).parent
 FROZEN_DIR  = SCRIPT_DIR / "frozen_pool"
@@ -55,6 +58,9 @@ DEAD_BUCKETS = [
     "proxy_handshake_error", "resolve_error", "tls_error",
     "http_non200", "bad_body", "unknown",
 ]
+
+# Eval-only sources: no freshness filter, no record_run (proxy_status_log untouched)
+EVAL_ONLY_SOURCES = {"thespeedx", "databay", "jetkai", "roosterkid"}
 
 # ORCHESTRATOR
 
@@ -81,6 +87,18 @@ async def probe_liveness_workflow() -> None:
         entries = load_thespeedx_proxies()
         print(f"TheSpeedX eval: {len(entries)} proxies (no freshness filter, no log write)")
         mode    = "thespeedx"
+    elif args.source == "databay":
+        entries = load_databay_proxies()
+        print(f"databay eval: {len(entries)} proxies (no freshness filter, no log write)")
+        mode    = "databay"
+    elif args.source == "jetkai":
+        entries = load_jetkai_proxies()
+        print(f"jetkai eval: {len(entries)} proxies (no freshness filter, no log write)")
+        mode    = "jetkai"
+    elif args.source == "roosterkid":
+        entries = load_roosterkid_proxies()
+        print(f"roosterkid eval: {len(entries)} proxies (no freshness filter, no log write)")
+        mode    = "roosterkid"
     else:
         frozen_dir = Path(args.input)
         entries    = load_frozen_pool(frozen_dir)
@@ -110,7 +128,7 @@ async def probe_liveness_workflow() -> None:
     )
     if any(r["bucket"] == "unknown" for r in results):
         write_unknown_log(results, ts)
-    if args.source != "thespeedx":
+    if args.source not in EVAL_ONLY_SOURCES:
         record_run(results, mode)
 
 
@@ -119,8 +137,9 @@ async def probe_liveness_workflow() -> None:
 def parse_args() -> argparse.Namespace:
     p = argparse.ArgumentParser(description="Proxy liveness checker + concurrency sweep")
     p.add_argument("--freeze", action="store_true", help="Fetch 68 sources, write frozen_pool/")
-    p.add_argument("--source", choices=["frozen", "monosans", "curated", "thespeedx"], default="frozen",
-                   help="Proxy source: frozen pool dir (default), monosans live JSON, curated (monosans+proxifly), or thespeedx eval")
+    p.add_argument("--source", choices=["frozen", "monosans", "curated", "thespeedx", "databay", "jetkai", "roosterkid"],
+                   default="frozen",
+                   help="Proxy source: frozen/monosans/curated (log-writing) or thespeedx/databay/jetkai/roosterkid (eval-only)")
     p.add_argument("--sample", type=int, metavar="N", help="Check N random proxies (seeded)")
     p.add_argument("--full", action="store_true", help="Check full frozen pool")
     p.add_argument("--seed", type=int, default=SAMPLE_SEED, help=f"RNG seed (default {SAMPLE_SEED})")
