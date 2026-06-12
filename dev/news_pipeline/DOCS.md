@@ -187,11 +187,11 @@ bash dev/news_pipeline/theblock/probe_monosans.sh theblock
 ./venv/bin/python dev/news_pipeline/theblock/probe_pool_size.py
 ```
 
-### theblock/probe_liveness.py (379 LOC)
+### theblock/probe_liveness.py (386 LOC)
 
-**Purpose:** Instrumented async liveness checker + concurrency sweep. Stage 1 deliverable. Imports the 68 source URL lists from `probe_pool_size.py` (no re-typing). Modes: `--freeze` (fetch sources → write sorted, deduped `frozen_pool/{http,socks4,socks5}.txt`); `--sample N` / `--full` (check frozen pool via `curl_cffi.AsyncSession`); `--source monosans` (fetch live monosans JSON via `monosans_loader`, apply staleness filter, check without freeze). Classifies every dead proxy into a reason bucket, appends structured entry to `sweep_log.md`. After every run (all modes except `--freeze`), folds results into the cumulative `logs/proxy_status_log.json` via `proxy_status_log.record_run()`. socks5 uses `socks5h://` (remote DNS through proxy). Timeout split: elapsed-time primary + libcurl message fallback + unknown on mismatch (version-drift signal).
+**Purpose:** Instrumented async liveness checker + concurrency sweep. Stage 1 deliverable. Imports the 68 source URL lists from `probe_pool_size.py` (no re-typing). Modes: `--freeze` (fetch sources → write sorted, deduped `frozen_pool/{http,socks4,socks5}.txt`); `--sample N` / `--full` (check frozen pool via `curl_cffi.AsyncSession`); `--source monosans` (fetch live monosans JSON via `monosans_loader`, apply staleness filter, check without freeze); `--source curated` (fetch monosans+proxifly unified list via `curated_sources`, apply staleness filter, check without freeze). Classifies every dead proxy into a reason bucket, appends structured entry to `sweep_log.md`. After every run (all modes except `--freeze`), folds results into the cumulative `logs/proxy_status_log.json` via `proxy_status_log.record_run()`. socks5 uses `socks5h://` (remote DNS through proxy). Timeout split: elapsed-time primary + libcurl message fallback + unknown on mismatch (version-drift signal).
 
-**Staleness filter (`--source monosans` only):** after loading the live list, calls `proxy_status_log.partition_fresh(entries, window_s)` to split into `(to_check, skipped_fresh)`. Only `to_check` enters `run_checks` and `record_run`; skipped proxies keep their existing `last_seen`. `--recheck-window S` (int, default `3600`) controls the freshness threshold in seconds. Console and `sweep_log.md` report `skipped_fresh=N` when non-zero. Frozen/sample path is unaffected.
+**Staleness filter (`--source monosans` and `--source curated`):** after loading the live list, calls `proxy_status_log.partition_fresh(entries, window_s)` to split into `(to_check, skipped_fresh)`. Only `to_check` enters `run_checks` and `record_run`; skipped proxies keep their existing `last_seen`. `--recheck-window S` (int, default `3600`) controls the freshness threshold in seconds. Console and `sweep_log.md` report `skipped_fresh=N` when non-zero. Frozen/sample path is unaffected.
 
 **Results:** `decisions/OldThemes/news_pipeline_layers/20_liveness_check_and_concurrency_sweep.md`. Sweep: 20k sample × 4 concurrency levels (512/1000/2000/3000), timeout 5s/5s.
 
@@ -206,6 +206,9 @@ bash dev/news_pipeline/theblock/probe_monosans.sh theblock
 ./venv/bin/python dev/news_pipeline/theblock/probe_liveness.py --source monosans
 ./venv/bin/python dev/news_pipeline/theblock/probe_liveness.py --source monosans --recheck-window 1800
 
+# curated unified source (monosans+proxifly merged+deduped); staleness filter applied:
+./venv/bin/python dev/news_pipeline/theblock/probe_liveness.py --source curated --concurrency 128
+
 # Sweep run at specific concurrency:
 ./venv/bin/python dev/news_pipeline/theblock/probe_liveness.py --sample 20000 --concurrency 512
 ./venv/bin/python dev/news_pipeline/theblock/probe_liveness.py --sample 20000 --concurrency 1000
@@ -216,11 +219,15 @@ bash dev/news_pipeline/theblock/probe_monosans.sh theblock
 
 ### theblock/monosans_loader.py (39 LOC)
 
-**Purpose:** Fetch `monosans/proxy-list` live JSON (`proxies.json`) and return `[(protocol, host:port)]` — same tuple shape as `load_frozen_pool()`. Single synchronous `httpx.get`. Handles optional auth fields (currently always null in monosans). Called by `probe_liveness.py` when `--source monosans` is set.
+**Purpose:** Fetch `monosans/proxy-list` live JSON (`proxies.json`) and return `[(protocol, host:port)]` — same tuple shape as `load_frozen_pool()`. Single synchronous `httpx.get`. Handles optional auth fields (currently always null in monosans). Called by `probe_liveness.py` (`--source monosans`) and by `curated_sources.load_curated_proxies()`.
+
+### theblock/curated_sources.py (40 LOC)
+
+**Purpose:** Unified proxy source — fetches monosans + proxifly, merges, deduplicates, returns one `[(protocol, host:port)]` list. Called by `probe_liveness.py` when `--source curated` is set. Entry point: `load_curated_proxies()`. Monosans fetched via `monosans_loader.load_monosans_proxies()`; proxifly fetched by internal helper `_fetch_proxifly()` from `https://raw.githubusercontent.com/proxifly/free-proxy-list/main/proxies/all/data.json` (`{"protocol","ip","port"}` fields, no auth). Dedup via `_merge_dedup()` using `proxy_status_log.proxy_key` — same canonical keyspace as the log, guaranteeing Dedup-key == Log-match-key. Monosans entries first; first occurrence wins on overlap. Extensible: add further sources as additional `_fetch_<source>()` helpers and concat into `_merge_dedup`.
 
 ### theblock/proxy_status_log.py (102 LOC)
 
-**Purpose:** Cumulative proxy-status log — keyed by `"protocol://host:port"`, bounded by unique proxy count (not run count). `record_run(results, source_label)` loads `logs/proxy_status_log.json`, upserts every result (alive + dead), writes back. Per-entry schema: `{protocol, host, port, checks, alive, dead, last_status, first_seen, last_seen}`. Explicit `protocol`/`host`/`port` fields enable subnet/ASN/port grouping without re-parsing the key. `partition_fresh(entries, window_s)` — called by `probe_liveness.py` on the monosans path — partitions `[(proto, host_port)]` into `(to_check, skipped_fresh)` using the log's `last_seen` field; auth-stripped key lookup via `_proxy_key`; age comparison is timezone-aware (`last_seen` parsed as UTC via `.replace(tzinfo=timezone.utc)`).
+**Purpose:** Cumulative proxy-status log — keyed by `"protocol://host:port"`, bounded by unique proxy count (not run count). `record_run(results, source_label)` loads `logs/proxy_status_log.json`, upserts every result (alive + dead), writes back. Per-entry schema: `{protocol, host, port, checks, alive, dead, last_status, first_seen, last_seen}`. Explicit `protocol`/`host`/`port` fields enable subnet/ASN/port grouping without re-parsing the key. `proxy_key(proto, host_port)` — **public** canonical key builder (auth-stripped `proto://host:port`); shared by `record_run`, `partition_fresh`, and `curated_sources._merge_dedup` — single source of truth for the entire keyspace. `partition_fresh(entries, window_s)` — called by `probe_liveness.py` on the monosans and curated paths — partitions `[(proto, host_port)]` into `(to_check, skipped_fresh)` using the log's `last_seen` field; age comparison is timezone-aware (`last_seen` parsed as UTC via `.replace(tzinfo=timezone.utc)`).
 
 ### theblock/logs/proxy_status_log.json
 
