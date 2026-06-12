@@ -18,7 +18,7 @@ def record_run(results: list[dict], source_label: str) -> None:
     data = _load_log()
 
     for r in results:
-        key = _proxy_key(r["proto"], r["host_port"])
+        key = proxy_key(r["proto"], r["host_port"])
         host, port = _parse_host_port(r["host_port"])
 
         if key not in data:
@@ -75,7 +75,7 @@ def partition_fresh(
     to_check: list[tuple[str, str]]      = []
     skipped_fresh: list[tuple[str, str]] = []
     for proto, host_port in entries:
-        key   = _proxy_key(proto, host_port)
+        key   = proxy_key(proto, host_port)
         entry = data.get(key)
         if entry is None:
             to_check.append((proto, host_port))
@@ -89,7 +89,7 @@ def partition_fresh(
     return to_check, skipped_fresh
 
 
-def _proxy_key(proto: str, host_port: str) -> str:
+def proxy_key(proto: str, host_port: str) -> str:
     """Build canonical key: protocol://host:port (auth stripped if present)."""
     host, port = _parse_host_port(host_port)
     return f"{proto}://{host}:{port}"
