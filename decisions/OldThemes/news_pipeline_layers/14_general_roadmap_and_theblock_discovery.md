@@ -9,7 +9,7 @@ Methodical procedure, crystallized from CoinDesk (iter 01–13) + The Block. App
 
 1. **Pull the source** — identify discovery surfaces (sitemap families, RSS, UI listing).
 2. **Find the method that yields the MOST unique article URLs.** Anchor = max total unique URLs on the domain (= backfill coverage), NOT the 48h window. Compare methods empirically; this step INCLUDES solving any anti-bot (e.g. Cloudflare) that gates the URLs. Winner = the method (or union) with the most unique URLs.
-3. **Backfill + site-specific cleaning** — scrape the full available archive; cleaning adapted per-site (NOT dynamic).
+3. **Backfill as deep as the source's own surface allows + site-specific cleaning** — scrape the full available archive; take whatever depth the source's discovery surface gives (2017, 2023, whatever the floor is — the exact depth target is secondary, max available coverage is the goal). No external-aggregator chase for deeper-than-source history. Cleaning adapted per-site (NOT dynamic).
 4. **Add the 48h going-forward pipe** — the daily delta on top of the backfill.
 
 **Principles:** no assumptions — read sources, define empirically. No PRODUCTION fallback chains (explorative roadmaps to FIND the one method are correct and encouraged). Per-site cleaning, not dynamic. (Step 2's anchor + the "2 contradictory results" resolution: OldThemes 11; channel-independence selection: OldThemes 07.)

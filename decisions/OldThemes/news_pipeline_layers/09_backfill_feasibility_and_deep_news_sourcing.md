@@ -1,7 +1,7 @@
 # Iter 09 — Deep News Backfill Feasibility & Sourcing (parked)
 
 **Date:** 2026-06-07
-**State:** PARKED — resume at the very end of the project, after the going-forward pipe is in production.
+**State:** CLOSED/FOLDED (2026-06-12) — the dedicated deep-history-to-2017 track (issue #2) is dropped. Backfill depth is now bounded by each source's own discovery surface, folded into the playbook (OldThemes 14, step 3). Findings below kept as record. See Resolution at end.
 
 ## Motivation
 
@@ -98,4 +98,12 @@
 
 ## Status
 
-PARKED. Resume trigger: after the going-forward CoinDesk pipe is in production. First action on resume: GDELT probe.
+CLOSED/FOLDED (2026-06-12). The dedicated deep-2017 track is dropped (issue #2 closed); backfill depth is bounded by each source's own surface, folded into the playbook (OldThemes 14, step 3). Findings above kept as record.
+
+---
+
+## Resolution (2026-06-12) — Dedicated deep-2017 track dropped
+
+Issue #2 closed. Pre-sitemap-floor history via external aggregators (GDELT / paid vendors) is NOT pursued as a separate track. Decision: backfill goes **as deep as each source's own discovery surface allows** — the floor is whatever the source gives (CoinDesk ~1yr, The Block ~2018); the exact depth (2017/2023/whatever) is secondary to maximizing available coverage. This principle is baked into the general playbook (OldThemes 14, step 3).
+
+The findings above (CoinDesk sitemap ~1yr floor, GDELT free-tier option, paid-vendor options, cross-outlet dedup via HDBSCAN clustering, the 5-min-volatility signal data point) are preserved as record. If deeper-than-source history is ever wanted again, this iteration is the starting point — but it is no longer a tracked roadmap item.

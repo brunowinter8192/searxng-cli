@@ -1,14 +1,7 @@
 {
   "collection": "searxng-cli-docs",
   "include": [
-    "DOCS.md",
-    "src/DOCS.md",
-    "src/*/DOCS.md",
-    "dev/DOCS.md",
-    "dev/*/DOCS.md",
-    "dev/*/*/DOCS.md",
-    "decisions/*.md",
-    "decisions/OldThemes/*.md",
-    "decisions/OldThemes/**/*.md"
+    "**/DOCS.md",
+    "decisions/**/*.md"
   ]
 }
