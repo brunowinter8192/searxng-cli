@@ -266,6 +266,10 @@ bash dev/news_pipeline/theblock/probe_monosans.sh theblock
 
 **Purpose:** Per-run new/dropped proxy diff per source. Appended each run. First run sets baseline snapshot (no diff). Second+ run shows which sources inject fresh proxies (high new%) vs stale sources. **Tracked in git.**
 
+### theblock/jhao104/
+
+jhao104/proxy_pool probe (self-maintaining pool: scrape → Redis → validate/evict → Flask API). Setup, dep-compat fixes, env-proxy findings, Stage 1 baseline: [theblock/jhao104/NOTES.md](theblock/jhao104/NOTES.md).
+
 ## Output Directories
 
 | Directory | Contents | Gitignored |
