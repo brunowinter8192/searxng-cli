@@ -76,6 +76,7 @@ dev/news_pipeline/theblock/frozen_pool/
 dev/news_pipeline/theblock/probe_liveness_logs/unknown_errors_*.log
 dev/news_pipeline/theblock/cache/
 dev/news_pipeline/theblock/source_snapshots/
+dev/news_pipeline/theblock/probe_curated_theblock_cf_reports/
 
 # proxy_status_log: cumulative keyed proxy history (tracked — institutional data)
 !dev/news_pipeline/theblock/logs/
