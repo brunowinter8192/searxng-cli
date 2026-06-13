@@ -48,7 +48,7 @@ class Platform(Protocol):
 ## Flow
 
 1. **discover** — `platform.discover()` → entry list `[{url, lastmod, publication_date, title, section}]`; JSON snapshot written to `data/news/{name}/discover/`.
-2. **dedup** — `filter_new_entries()` checks the external rag-cli collection dir (`COLLECTION_BASE/{collection}/`, where `COLLECTION_BASE` in `pipeline.py` points at the rag-cli project's `data/documents`) for `{name}__{date}__{hash}.md`; drops already-indexed URLs.
+2. **dedup** — `filter_new_entries()` checks the external rag-cli collection dir (`COLLECTION_BASE` in `pipeline.py` — an absolute path into the rag-cli project, joined with `platform.collection`) for `{name}__{date}__{hash}.md`; drops already-indexed URLs.
 3. **scrape** — `scrape_entries()` — fresh `AsyncWebCrawler` per URL, concurrent, Scrapy gate pacing. Writes raw body to `data/news/{name}/scrape/{hash}.md`. Raises `RegwallGuardError` if fraction regwalled ≥ 20%.
 4. **cleanup** — `platform.cleanup(body, entry)` in-process for each status=ok entry. Writes pure content (NO frontmatter) to `data/news/{name}/clean/{hash}.md`.
 5. **publish** — `publish_articles()` copies clean files to RAG collection dir as `{name}__{pubdate}__{hash}.md`; runs `rag-cli index --collection {collection}` unless `--skip-index`.
