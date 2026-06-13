@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
-# jhao104/proxy_pool — Stage 1 setup script
+# jhao104/proxy_pool — Stage 2 setup script
 # Run from: dev/news_pipeline/theblock/jhao104/
-# Brings up Redis (Docker), creates venv, clones upstream, starts scheduler + server.
+# Brings up Redis (Docker), creates venv, clones upstream, applies patches, starts daemons.
 #
 # Prerequisites: docker, python3.12, git
 # All proxy env vars stripped from jhao104 processes — see NOTES.md §Env-Proxy.
@@ -11,6 +11,7 @@ set -euo pipefail
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 UPSTREAM="$SCRIPT_DIR/upstream"
 VENV="$SCRIPT_DIR/venv"
+PATCHES="$SCRIPT_DIR/patches"
 PYTHON=/opt/homebrew/bin/python3.12
 
 # ── 1. Clone upstream (skip if already present) ────────────────────────────
@@ -22,17 +23,29 @@ else
   echo "[setup] Upstream already cloned — skipping"
 fi
 
-# ── 2. Create venv (Python 3.12) ───────────────────────────────────────────
+# ── 2. Apply patches (overlay files over upstream) ─────────────────────────
+# patches/ mirrors upstream directory structure; files are copied verbatim.
+# Currently: patches/helper/validator.py — Stage 2 theblock CF-pass validator.
+# Changes from stock validator.py:
+#   - httpTimeOutValidator / customValidatorExample: decorators removed (not in http_validator)
+#   - httpsTimeOutValidator: decorator removed (https_validator empty → passers get https=True)
+#   - theblockValidator: sole @addHttpValidator — curl_cffi chrome impersonation vs theblock
+echo "[setup] Applying patches..."
+cp -r "$PATCHES/"* "$UPSTREAM/"
+echo "[setup] Patches applied: $(find "$PATCHES" -type f | wc -l | tr -d ' ') file(s)"
+
+# ── 3. Create venv (Python 3.12) ───────────────────────────────────────────
 if [ ! -d "$VENV" ]; then
   echo "[setup] Creating venv with $PYTHON..."
   "$PYTHON" -m venv "$VENV"
 fi
 
-# ── 3. Install deps (relaxed pins for Python 3.12 compat) ─────────────────
+# ── 4. Install deps (relaxed pins for Python 3.12 compat) ─────────────────
 # Divergences from upstream requirements.txt:
 #   lxml==4.9.2      → lxml>=4.9.4   (4.9.2 fails to build: PyLong ob_digit removed in 3.12)
 #   APScheduler==3.10.0 → APScheduler>=3.11.0  (3.10.0 uses pkg_resources not in 3.12 venv)
 #   gunicorn==19.9.0 → gunicorn>=21.2.0  (19.9.0 uses bundled six.moves, broken on 3.12)
+#   curl_cffi        → added (Stage 2 theblock validator)
 echo "[setup] Installing deps..."
 "$VENV/bin/pip" install --quiet --trusted-host pypi.org --trusted-host files.pythonhosted.org \
   "requests==2.31.0" \
@@ -42,9 +55,10 @@ echo "[setup] Installing deps..."
   "click==8.0.1" \
   "Flask==2.1.1" \
   "werkzeug>=2.0,<2.2" \
-  "gunicorn>=21.2.0"
+  "gunicorn>=21.2.0" \
+  "curl_cffi"
 
-# ── 4. Redis via Docker ────────────────────────────────────────────────────
+# ── 5. Redis via Docker ────────────────────────────────────────────────────
 # Default setting.py uses: redis://:pwdstring@127.0.0.1:6379/0
 if docker ps --format '{{.Names}}' | grep -q '^jhao104-redis$'; then
   echo "[setup] Redis container already running"
@@ -64,12 +78,13 @@ until docker exec jhao104-redis redis-cli -a pwdstring ping 2>/dev/null | grep -
 done
 echo "[setup] Redis ready"
 
-# ── 5. Start scheduler + server ───────────────────────────────────────────
+# ── 6. Start scheduler + server ───────────────────────────────────────────
 # HTTP_PROXY / HTTPS_PROXY stripped so fetchers go direct (no mitmproxy dep).
-# Validators use explicit proxies= arg anyway — env stripping has no effect on validation.
+# MAX_FAIL_COUNT=2: tolerates transient check failures before eviction (was 0 — too aggressive).
+# ConfigHandler reads MAX_FAIL_COUNT from env first (overrides setting.py default of 0).
 echo "[setup] Starting scheduler (logs → /tmp/jhao104_schedule.log)..."
 cd "$UPSTREAM"
-HTTP_PROXY='' HTTPS_PROXY='' "$VENV/bin/python3" proxyPool.py schedule \
+HTTP_PROXY='' HTTPS_PROXY='' MAX_FAIL_COUNT=2 "$VENV/bin/python3" proxyPool.py schedule \
   > /tmp/jhao104_schedule.log 2>&1 &
 echo "  Scheduler PID: $!"
 
@@ -80,7 +95,7 @@ HTTP_PROXY='' HTTPS_PROXY='' "$VENV/bin/python3" proxyPool.py server \
 echo "  Server PID: $!"
 
 echo ""
-echo "[setup] Done. First fetch+check cycle completes in ~2 min."
+echo "[setup] Done. First raw-check cycle: ceil(~540/20)*15s ≈ 6-7 min."
 echo "  API:       http://localhost:5010/"
 echo "  Count:     curl http://localhost:5010/count/"
 echo "  Get proxy: curl http://localhost:5010/get/"

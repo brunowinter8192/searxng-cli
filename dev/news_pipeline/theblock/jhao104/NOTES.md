@@ -120,18 +120,66 @@ GET /get/?type=https
 
 **Case (c): pool filled normally.** 117 proxies in pool after first cycle. The env `HTTPS_PROXY` did NOT corrupt validation — validators use explicit `proxies=` (overrides env). Fetchers ran with env stripped (`HTTP_PROXY='' HTTPS_PROXY=''`).
 
+## Stage 2 — theblock CF-pass validator (2026-06-13)
+
+### Validator overlay
+
+`patches/helper/validator.py` replaces `upstream/helper/validator.py` after clone (applied by `setup.sh` step 2).
+
+Changes from stock:
+| Function | Change | Reason |
+|---|---|---|
+| `httpTimeOutValidator` | Decorator removed | Not in `http_validator`; theblockValidator is sole gate |
+| `customValidatorExample` | Decorator removed | Not in `http_validator` |
+| `httpsTimeOutValidator` | Decorator removed | `https_validator` empty → all http-passers get `https=True` (accurate: they tunnelled HTTPS to theblock); no wasted qq.com HEAD per cycle |
+| `theblockValidator` | `@addHttpValidator` | curl_cffi `impersonate="chrome"` → `sitemap_tbco_index.xml`; `http://` scheme for both proxy keys; 15s timeout; XML marker check |
+
+`MAX_FAIL_COUNT=2` passed as env var at scheduler startup (ConfigHandler reads env first; overrides setting.py default of 0). Tolerates transient check failures before eviction.
+
+### Stage 2 baseline data (2026-06-13)
+
+**Cycle 1 (startup raw-check):**
+
+| Metric | Value |
+|---|---|
+| Fetched | 538 |
+| Pre-validated (formatValidator rejected) | 12 |
+| Checked (theblock CF gate) | 526 |
+| Passed | **1** |
+| Failed | 525 |
+| CF-pass rate | **0.19%** |
+| Cycle time (raw-check) | 3m 17s |
+
+Passing proxy: `103.24.214.190:8082` — source: geonode, region: ID (Indonesia), `https=True` (correct: tunnelled HTTPS to theblock).
+
+**Cycle 2 (scheduled, +~5min — pool < poolSizeMin=20 → replenish triggered first):**
+
+| Metric | Value |
+|---|---|
+| Fetched (cycle 2) | ~1016 |
+| Checked (raw) | 651 |
+| Passed | 0 |
+| Use-check on surviving proxy | pass (still alive) |
+| Pool after cycle 2 | **1** |
+
+**Per-source breakdown (combined cycles):** geonode: 1 pass, all other sources: 0.
+
+**Pool sustainability:** 1 proxy stable across 2 cycles. USE-check passed on the survivor → eviction counter reset. With MAX_FAIL_COUNT=2 it would tolerate 2 consecutive use-check failures before deletion.
+
+**CF-pass rate context:** 0.19% vs OldThemes 17 discriminator result of 18.8% on a purposefully-selected fresh pool. Free proxy pool CF pass rates are highly variable by source composition and timing. The jhao104 source set skews heavily toward CN/generic IPs with low CF reputation.
+
 ## Gotchas
 
 1. **lxml / APScheduler / gunicorn pins all need relaxing on 3.12** — see Dep Compatibility table.
-2. **`MAX_FAIL_COUNT=0` is extremely strict** — a proxy that happened to time out on first check is gone immediately. Pool will shrink fast between 5-min replenish cycles.
-3. **0 HTTPS proxies on first run** — expected: public free proxies rarely support HTTPS tunneling; qq.com may also block non-CN IPs. HTTPS pool requires a less restrictive check target.
+2. **`MAX_FAIL_COUNT=0` default is extremely strict** — Stage 2 sets it to 2 via env var; tolerates transient failures.
+3. **https_validator empty → all http-passers get `https=True`** — accurate for theblock gate (they did tunnel HTTPS), but means the flag is no longer a HTTPS-capable indicator in the traditional sense.
 4. **ihuan + zdaye returned 0 proxies** — site timeouts during the run; they will retry on next 5-min fetch cycle.
 5. **Region geo lookup** (`api.ip.sb/geoip/`) uses `WebRequest` without explicit proxies — goes through env proxy (fine with mitmproxy, but adds latency per new proxy).
 6. **`PROXY_REGION=True` (default)** — geo-lookup fires for every newly added proxy, adding ~2s per proxy to the raw-check pass path.
 7. **Docker container name `jhao104-redis`** — if Redis container already exists (stopped), `docker run` will fail. `setup.sh` handles this with `docker start`.
+8. **Cycle time dominated by timeout, not network** — with 15s timeout and 20 threads, 526 proxies took 3m17s. Most proxies fail fast (connect refused/timeout), so practical rate is ~2.7 proxies/thread/min rather than the theoretical 1/15s minimum.
 
 ## Next stages (pending separate Go)
 
-- Stage 2: point check targets at theblock.co (change `HTTP_URL` / `HTTPS_URL`)
-- Stage 3: custom `curl_cffi` validator for Cloudflare-passing check
+- Stage 3: recently-evicted dedup patch (prevent re-checking proxies evicted this cycle)
 - Stage 4: benchmark against monosans machinery in `dev/news_pipeline/theblock/`
