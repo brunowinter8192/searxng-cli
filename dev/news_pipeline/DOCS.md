@@ -270,6 +270,10 @@ bash dev/news_pipeline/theblock/probe_monosans.sh theblock
 
 jhao104/proxy_pool probe (self-maintaining pool: scrape → Redis → validate/evict → Flask API). Stage 2: sole validator is `theblockValidator` (curl_cffi chrome impersonation vs sitemap_tbco_index.xml); measured CF-pass rate **~0.085%** (1/1177 across 2 cycles). Setup, dep-compat fixes, env-proxy findings, Stage 1 + 2 baselines: [theblock/jhao104/NOTES.md](theblock/jhao104/NOTES.md).
 
+### theblock/probe_curated_theblock_cf.py
+
+Standalone direct CF-pass probe on the monosans+proxifly curated list (no alive pre-filter; curl_cffi chrome impersonation; same gate as jhao104 Stage 2). Key finding: **52/3477 = 1.496% overall** (http: 0.944%, socks4: **3.567%**, socks5: 0.698%); socks4 leads 3.8×; curated list 17.6× better than jhao104 scraped sources. Home-IP direct check: CF-reputation-clear (200 + XML). Reports to gitignored `probe_curated_theblock_cf_reports/`.
+
 ## Output Directories
 
 | Directory | Contents | Gitignored |
