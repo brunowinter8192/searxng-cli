@@ -28,7 +28,7 @@ Pacing: Scrapy per-domain gate — `lastseen` dict + `asyncio.Lock` (serializes 
 
 ---
 
-## crawl_site.py (325 LOC)
+## crawl_site.py (353 LOC)
 
 **Purpose:** Discovery engine + content crawl. Provides `discover_urls_playwright()` (Playwright-per-page BFS, single discovery method) and `crawl_urls()` (parallel content crawl via `arun_many()`). Saves pages as markdown files with `<!-- source: URL -->` header.
 **Called by:** `crawl_site_workflow` (standalone CLI entry point); `discover_urls_playwright` called internally by `crawl_site_workflow` only.

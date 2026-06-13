@@ -84,6 +84,72 @@ async def _fetch_page(crawler: AsyncWebCrawler, url: str,
         return None, [], latency_ms
 
 
+# Build CrawlerRunConfig and AsyncWebCrawler keyword args for discovery (stealth or normal)
+def _build_crawler_config(delay_s: float, page_timeout_ms: int, stealth: bool) -> tuple:
+    run_cfg = CrawlerRunConfig(
+        cache_mode=CacheMode.BYPASS,
+        wait_until="domcontentloaded",
+        delay_before_return_html=delay_s,
+        page_timeout=page_timeout_ms,
+        verbose=False,
+    )
+    if stealth:
+        browser_cfg = BrowserConfig(headless=True, verbose=False, enable_stealth=True)
+        crawler_strategy = AsyncPlaywrightCrawlerStrategy(
+            browser_config=browser_cfg,
+            browser_adapter=UndetectedAdapter(),
+        )
+    else:
+        browser_cfg = BrowserConfig(headless=True, verbose=False)
+        crawler_strategy = None
+    kw: dict = {"config": browser_cfg}
+    if crawler_strategy:
+        kw["crawler_strategy"] = crawler_strategy
+    return run_cfg, kw
+
+
+# Account for 429s in a batch; back off once on first, stop on second consecutive; return updated counters
+async def _handle_429_batch(results: list, batch: list,
+                            four_two_nine_count: int, consecutive_batches_429: int) -> tuple:
+    batch_429 = sum(1 for status, _, _ in results if status == 429)
+    if batch_429 > 0:
+        four_two_nine_count += batch_429
+        consecutive_batches_429 += 1
+        urls_429 = [u for (u, _), (s, _, _) in zip(batch, results) if s == 429]
+        logger.warning("429 on: %s", urls_429)
+        if consecutive_batches_429 == 1:
+            logger.warning("Backing off 5s (first 429 batch)...")
+            await asyncio.sleep(5)
+        else:
+            logger.warning("429 persists — stopping BFS.")
+            return four_two_nine_count, consecutive_batches_429, "429_persistent"
+    else:
+        consecutive_batches_429 = 0
+    return four_two_nine_count, consecutive_batches_429, None
+
+
+# Filter page links against domain, include/exclude patterns, and visited; return new (url, depth) pairs
+def _extract_frontier_links(links: list, seed_netloc: str, include_pats: list,
+                            exclude_pats: list, visited: set, depth: int) -> list:
+    new_links = []
+    seen_in_batch: set = set()
+    for lk in links:
+        href = lk.get("href", "") if isinstance(lk, dict) else str(lk)
+        if not href.startswith("http"):
+            continue
+        norm = normalize_url(href)
+        if urlparse(norm).netloc != seed_netloc:
+            continue
+        if include_pats and not any(p in norm for p in include_pats):
+            continue
+        if exclude_pats and any(p in norm for p in exclude_pats):
+            continue
+        if norm not in visited and norm not in seen_in_batch:
+            seen_in_batch.add(norm)
+            new_links.append((norm, depth + 1))
+    return new_links
+
+
 # Playwright-per-page BFS: render each page, extract links.internal from post-JS DOM
 # Returns (found_urls, stats) where stats has stop_reason, four_two_nine_count, avg_latency_ms
 # stop_reason: "frontier_exhausted" | "max_pages_reached" | "429_persistent"
@@ -107,28 +173,9 @@ async def discover_urls_playwright(seed: str, include_patterns: str | None,
 
     frontier.append((seed_norm, 0))
 
-    run_cfg = CrawlerRunConfig(
-        cache_mode=CacheMode.BYPASS,
-        wait_until="domcontentloaded",
-        delay_before_return_html=delay_s,
-        page_timeout=page_timeout_ms,
-        verbose=False,
-    )
-    if stealth:
-        browser_cfg = BrowserConfig(headless=True, verbose=False, enable_stealth=True)
-        crawler_strategy = AsyncPlaywrightCrawlerStrategy(
-            browser_config=browser_cfg,
-            browser_adapter=UndetectedAdapter(),
-        )
-    else:
-        browser_cfg = BrowserConfig(headless=True, verbose=False)
-        crawler_strategy = None
+    run_cfg, crawler_kw = _build_crawler_config(delay_s, page_timeout_ms, stealth)
 
-    kw: dict = {"config": browser_cfg}
-    if crawler_strategy:
-        kw["crawler_strategy"] = crawler_strategy
-
-    async with AsyncWebCrawler(**kw) as crawler:
+    async with AsyncWebCrawler(**crawler_kw) as crawler:
         while frontier and len(found) < max_pages and stop_reason is None:
             batch: list[tuple[str, int]] = []
             while frontier and len(batch) < concurrency:
@@ -141,21 +188,11 @@ async def discover_urls_playwright(seed: str, include_patterns: str | None,
             tasks = [_fetch_page(crawler, url, run_cfg) for url, _ in batch]
             results = await asyncio.gather(*tasks)
 
-            # 429 batch accounting — back off once, stop on second consecutive batch
-            batch_429 = sum(1 for status, _, _ in results if status == 429)
-            if batch_429 > 0:
-                four_two_nine_count += batch_429
-                consecutive_batches_429 += 1
-                urls_429 = [u for (u, _), (s, _, _) in zip(batch, results) if s == 429]
-                logger.warning("429 on: %s", urls_429)
-                if consecutive_batches_429 == 1:
-                    logger.warning("Backing off 5s (first 429 batch)...")
-                    await asyncio.sleep(5)
-                else:
-                    logger.warning("429 persists — stopping BFS.")
-                    stop_reason = "429_persistent"
-            else:
-                consecutive_batches_429 = 0
+            four_two_nine_count, consecutive_batches_429, batch_stop = await _handle_429_batch(
+                results, batch, four_two_nine_count, consecutive_batches_429
+            )
+            if batch_stop:
+                stop_reason = batch_stop
 
             for (url, depth), (status, links, latency_ms) in zip(batch, results):
                 page_latencies.append(latency_ms)
@@ -168,20 +205,11 @@ async def discover_urls_playwright(seed: str, include_patterns: str | None,
                 logger.debug("[%3d] %s (%dms)", len(found), url, latency_ms)
                 if depth >= max_depth:
                     continue
-                for lk in links:
-                    href = lk.get("href", "") if isinstance(lk, dict) else str(lk)
-                    if not href.startswith("http"):
-                        continue
-                    norm = normalize_url(href)
-                    if urlparse(norm).netloc != seed_netloc:
-                        continue
-                    if include_pats and not any(p in norm for p in include_pats):
-                        continue
-                    if exclude_pats and any(p in norm for p in exclude_pats):
-                        continue
-                    if norm not in visited:
-                        visited.add(norm)
-                        frontier.append((norm, depth + 1))
+                for norm, next_depth in _extract_frontier_links(
+                    links, seed_netloc, include_pats, exclude_pats, visited, depth
+                ):
+                    visited.add(norm)
+                    frontier.append((norm, next_depth))
 
     if stop_reason is None:
         stop_reason = "frontier_exhausted" if not frontier else "max_pages_reached"
