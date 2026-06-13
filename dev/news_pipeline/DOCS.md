@@ -268,7 +268,7 @@ bash dev/news_pipeline/theblock/probe_monosans.sh theblock
 
 ### theblock/jhao104/
 
-jhao104/proxy_pool probe (self-maintaining pool: scrape → Redis → validate/evict → Flask API). Setup, dep-compat fixes, env-proxy findings, Stage 1 baseline: [theblock/jhao104/NOTES.md](theblock/jhao104/NOTES.md).
+jhao104/proxy_pool probe (self-maintaining pool: scrape → Redis → validate/evict → Flask API). Stage 2: sole validator is `theblockValidator` (curl_cffi chrome impersonation vs sitemap_tbco_index.xml); measured CF-pass rate **~0.085%** (1/1177 across 2 cycles). Setup, dep-compat fixes, env-proxy findings, Stage 1 + 2 baselines: [theblock/jhao104/NOTES.md](theblock/jhao104/NOTES.md).
 
 ## Output Directories
 
