@@ -1,17 +1,11 @@
 # Source Modules
 
-Python packages for web search, scraping, and crawling. Utility script for spawning Claude Code workers.
+Python packages for web search, scraping, crawling, and news ingestion. Utility script for spawning Claude Code workers.
 
 ## log_janitor.py
 
 **Purpose:** 14-day log retention janitor. On-write trigger with 1h marker-throttled slow-path. Three public functions: `get_retention_days()` (env override), `maybe_prune_jsonl(log_path)` (ts-based JSONL filter + atomic rewrite), `maybe_prune_sidecars(sidecar_dir)` (mtime-based `.md` unlink). All failures logged as WARNING and swallowed. Called by `query_logger.py`, `scrape_logger.py`, `download_logger.py`. `cli.py` imports `get_retention_days` for `TimedRotatingFileHandler` backupCount.
 **Called by:** `src/search/query_logger.py`, `src/scraper/scrape_logger.py`, `src/scraper/download_logger.py`, `cli.py`.
-
-## routing.py
-
-**Purpose:** Plugin domain routing. Maps known domains that must be accessed via dedicated MCP plugins (GitHub, Reddit, arXiv, YouTube) and returns a blocking TextContent error when a scrape is attempted on those domains.
-**Input:** URL string.
-**Output:** List with one TextContent (error + plugin instruction) if domain is plugin-routed, else None.
 
 ## tmux_spawn.sh
 
@@ -40,3 +34,4 @@ pane=$(spawn_claude_worker_from_file "workers" "my-task" "/path/to/project" "opu
 - [search/DOCS.md](search/DOCS.md) — multi-engine search pipeline (10 active engines: Google, DuckDuckGo, Mojeek, Lobsters, Google Scholar, Semantic Scholar via pydoll; CrossRef, OpenAlex, Stack Exchange, Open Library via HTTP; parallel fanout, score-based snippet selection, slot-allocated 12 GENERAL / 6 ACADEMIC / 2 QA)
 - [scraper/DOCS.md](scraper/DOCS.md) — URL scraping and site exploration tools
 - [crawler/DOCS.md](crawler/DOCS.md) — BFS discovery (`crawl_site_workflow`) + capture-pipe scrape step (`pipe_scraper.py`)
+- [news/DOCS.md](news/DOCS.md) — multi-platform news ingestion pipeline (discover → dedup → scrape → clean → publish to RAG); `python -m src.news` entry point

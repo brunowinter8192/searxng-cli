@@ -12,12 +12,12 @@ Auto-registers via `register(CoinDeskPlatform())` at module end.
 
 ## Modules
 
-### config.py (15 LOC)
+### config.py (20 LOC)
 
 **Purpose:** Platform constants — REGWALL_SIGNALS, SCRAPE_CONFIG (ScrapeConfig()), discovery params.
 **Called by:** `__init__.py`, `discover.py`.
 
-### discover.py (185 LOC)
+### discover.py (339 LOC)
 
 **Purpose:** Pydoll UI pagination of CoinDesk latest-news feed. Launches Chrome via `open -gna`,
 connects via CDP, clicks "More stories" up to MAX_CLICK_ROUNDS, extracts article links via JS,
@@ -27,7 +27,7 @@ filters live-blogs. Returns entry list `[{url, lastmod, publication_date, title,
 
 Termination: stops when ≥ PRE_48H_THRESHOLD articles older than CUTOFF_DAYS (2) are seen.
 
-### cleanup.py (100 LOC)
+### cleanup.py (123 LOC)
 
 **Purpose:** Strip CoinDesk page chrome from raw crawl4ai markdown → pure article body.
 Logic: H1 start-anchor → first end-anchor (_END_ANCHORS: MORE_FOR_YOU, PRIVACY, TAG_FOOTER) →
@@ -37,7 +37,7 @@ clean_body (tag-footer strip, image strip, byline/date strip, inline-link substi
 
 No H1 found → returns `raw_markdown.strip()` (fallback, logged upstream).
 
-### __init__.py (20 LOC)
+### __init__.py (27 LOC)
 
 **Purpose:** `CoinDeskPlatform` class wrapping config + discover + cleanup; auto-registers on import.
 **Called by:** `__main__.py` (side-effect import).

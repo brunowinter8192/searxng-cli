@@ -8,7 +8,7 @@ or collection paths except in `publish.py`'s `rag-cli` invocation).
 
 ## Modules
 
-### scrape.py (120 LOC)
+### scrape.py (194 LOC)
 
 **Purpose:** Concurrent async scraper — fresh `AsyncWebCrawler` per URL, Scrapy gate pacing, regwall guard.
 **Reads:** entries list (in-memory), ScrapeConfig, regwall_signals list.
@@ -18,7 +18,7 @@ or collection paths except in `publish.py`'s `rag-cli` invocation).
 
 Key: `RegwallGuardError` is raised (not sys.exit) when regwall fraction ≥ `REGWALL_FAIL_THRESHOLD` (0.20).
 
-### dedup.py (30 LOC)
+### dedup.py (44 LOC)
 
 **Purpose:** Filter discover entries to those not yet in the RAG collection by checking filename existence.
 **Reads:** entries list (in-memory), collection_dir (filesystem), source name.
@@ -28,7 +28,7 @@ Key: `RegwallGuardError` is raised (not sys.exit) when regwall fraction ≥ `REG
 
 Filename key: `{source}__{pubdate}__{url_hash}.md` — matches publish convention.
 
-### publish.py (65 LOC)
+### publish.py (101 LOC)
 
 **Purpose:** Copy cleaned MDs to RAG collection dir; optionally run `rag-cli index`.
 **Reads:** clean_manifest (in-memory), clean_dir (filesystem).

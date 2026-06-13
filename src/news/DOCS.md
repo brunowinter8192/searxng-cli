@@ -38,17 +38,17 @@ class Platform(Protocol):
 
 | Path | Role | LOC |
 |---|---|---|
-| `platform.py` | ScrapeConfig dataclass + Platform Protocol | 20 |
-| `registry.py` | name → Platform registry; register() / get() | 15 |
-| `pipeline.py` | Async orchestrator; stages 1–5 in-process | 130 |
-| `__main__.py` | argparse entry point; --source + --skip-index | 30 |
+| `platform.py` | ScrapeConfig dataclass + Platform Protocol | 25 |
+| `registry.py` | name → Platform registry; register() / get() | 19 |
+| `pipeline.py` | Async orchestrator; stages 1–5 in-process | 205 |
+| `__main__.py` | argparse entry point; --source + --skip-index | 35 |
 | `engine/` | Generic scrape / dedup / publish modules | — |
 | `platforms/coindesk/` | CoinDesk platform implementation | — |
 
 ## Flow
 
 1. **discover** — `platform.discover()` → entry list `[{url, lastmod, publication_date, title, section}]`; JSON snapshot written to `data/news/{name}/discover/`.
-2. **dedup** — `filter_new_entries()` checks `data/documents/{collection}/` for `{name}__{date}__{hash}.md`; drops already-indexed URLs.
+2. **dedup** — `filter_new_entries()` checks the external rag-cli collection dir (`COLLECTION_BASE/{collection}/`, where `COLLECTION_BASE` in `pipeline.py` points at the rag-cli project's `data/documents`) for `{name}__{date}__{hash}.md`; drops already-indexed URLs.
 3. **scrape** — `scrape_entries()` — fresh `AsyncWebCrawler` per URL, concurrent, Scrapy gate pacing. Writes raw body to `data/news/{name}/scrape/{hash}.md`. Raises `RegwallGuardError` if fraction regwalled ≥ 20%.
 4. **cleanup** — `platform.cleanup(body, entry)` in-process for each status=ok entry. Writes pure content (NO frontmatter) to `data/news/{name}/clean/{hash}.md`.
 5. **publish** — `publish_articles()` copies clean files to RAG collection dir as `{name}__{pubdate}__{hash}.md`; runs `rag-cli index --collection {collection}` unless `--skip-index`.
