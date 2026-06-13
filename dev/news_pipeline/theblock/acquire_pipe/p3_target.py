@@ -1,0 +1,68 @@
+# INFRASTRUCTURE
+
+import sys
+import re
+from pathlib import Path
+
+import httpx
+
+sys.path.insert(0, str(Path(__file__).parent.parent))
+from curated_sources import load_curated_proxies
+
+sys.path.insert(0, str(Path(__file__).parent))
+from p1_fetch import fetch_url, THEBLOCK_INDEX, XML_MARKERS
+from p2_cooldown import CooldownManager
+
+DIRECT_TIMEOUT = 15.0
+_LOC_RE        = re.compile(rb"<loc>(https?://[^<]+)</loc>")
+
+
+# ORCHESTRATOR
+
+def build_sitemap_target() -> list[str]:
+    """Fetch theblock sitemap index; return list of 64 sub-sitemap <loc> URLs.
+
+    Direct GET first (home IP may be CF-clear); falls back to proxy rotation on
+    any non-XML response (403, challenge page, error).
+    """
+    content = _fetch_index_direct()
+    if content is None:
+        content = _fetch_index_via_proxy()
+    return _parse_loc_urls(content)
+
+
+# FUNCTIONS
+
+# Attempt direct httpx fetch of sitemap index; return bytes on XML success, None otherwise
+def _fetch_index_direct() -> bytes | None:
+    try:
+        r = httpx.get(THEBLOCK_INDEX, timeout=DIRECT_TIMEOUT, follow_redirects=True)
+        head = r.content[:500]
+        if r.status_code == 200 and any(m in head for m in XML_MARKERS):
+            print(f"[sitemap] Direct fetch OK ({len(r.content):,} bytes)")
+            return r.content
+        print(f"[sitemap] Direct fetch: status={r.status_code}, no XML marker — proxy fallback")
+        return None
+    except Exception as e:
+        print(f"[sitemap] Direct fetch error: {e} — proxy fallback")
+        return None
+
+
+# Fetch sitemap index through curated proxy pool (socks4-first); raise on exhaustion
+def _fetch_index_via_proxy() -> bytes:
+    pool = load_curated_proxies()
+    cm   = CooldownManager()
+    candidates = cm.eligible_candidates(pool)
+    print(f"[sitemap] Proxy fallback: {len(candidates)} candidates")
+    for proto, hp in candidates:
+        ok, content = fetch_url(proto, hp, THEBLOCK_INDEX, "xml")
+        if ok:
+            print(f"[sitemap] Proxy OK via {proto}://{hp} ({len(content):,} bytes)")
+            return content
+        cm.mark_burned(proto, hp)
+    raise RuntimeError("sitemap index fetch failed: all proxy candidates exhausted")
+
+
+# Extract all <loc> URLs from raw XML bytes
+def _parse_loc_urls(content: bytes) -> list[str]:
+    return [m.group(1).decode().strip() for m in _LOC_RE.finditer(content)]
