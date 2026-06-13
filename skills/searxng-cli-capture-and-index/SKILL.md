@@ -11,13 +11,13 @@ description: Worker-side skill — discover URLs agentic (worker writes /tmp scr
 
 Pipeline: Discovery → URL Selection (pre-scrape) → Scrape (raw) → Cleanup (incl. post-scrape drop) → Index.
 
-**Scraper posture — best-effort, not guaranteed.** `src/crawler/pipe_scraper.py` is a GENERAL scraper validated on cooperative sites; it is NOT guaranteed to work on the site in front of you. Cookie-metered regwalls, hard paywalls, JS/bot-walls and aggressive rate-WAFs each defeat it differently. This skill is the FLEXIBLE, human-in-the-loop path — the opposite of a per-site-tuned pipeline like `src/news/` that trades flexibility for one optimized site. Web scraping forces that choice: be flexible, or optimize for a single site — here you are flexible, which means you do NOT assume the scrape worked. Coverage verification is a first-class duty: every discovered URL that survives the cull must actually yield real content, because discover-count ≠ content-count. On ANY systemic, diagnosable problem — a patterned coverage gap, a repeating block-type, a dominant error class (NOT scattered legit 404s) — STOP, do not push a half-broken capture into indexing, and report the IDENTIFIED problem to Opus: what fails, the evidence, your read of the cause. Iteration happens from there (different wait strategy, per-URL isolation, stealth, a per-site discover tweak — then re-run). The `>50%` / dozens-of-blocks thresholds below are hard floors, not the bar — a clearly-diagnosed problem warrants a STOP even under them.
+**Scraper posture — best-effort, not guaranteed.** `src/crawler/pipe_scraper.py` is a GENERAL scraper; do NOT assume the scrape worked. Coverage verification is a first-class duty: every discovered URL that survives the cull must actually yield real content. On ANY systemic, diagnosable problem — a patterned coverage gap, a repeating block-type, a dominant error class (NOT scattered legit 404s) — STOP, do not push a half-broken capture into indexing, and report the IDENTIFIED problem to Opus: what fails, the evidence, your read of the cause. Iterate from there (different wait strategy, per-URL isolation, stealth, a per-site discover tweak — then re-run). The `>50%` / dozens-of-blocks thresholds below are hard floors, not the bar — a clearly-diagnosed problem warrants a STOP even under them.
 
 #### Phase 0 — Discovery
 
 Deliverable: `/tmp/<domain>_discovered_urls.txt` — one URL per line, maximum coverage of the target domain/section.
 
-Write your discovery scripts to `/tmp` — no pinned reference script. Choose the path below based on structural signals from the seed page. **Any errors during discovery (HTTP failures, 429s, blocked fetches) MUST be recorded for the Completion Report** — they distinguish complete coverage from coverage the site blocked.
+Write your discovery scripts to `/tmp` — no pinned reference script. Choose the path below based on structural signals from the seed page. **Any errors during discovery (HTTP failures, 429s, blocked fetches) MUST be recorded for the Completion Report.**
 
 ##### Step 0 — Structural Signals (always, ~30s)
 
@@ -26,13 +26,13 @@ Fetch the seed page HTML (plain HTTP, no browser). Check:
 - `/sitemap.xml` and `/sitemaps/sitemap-0.xml` — does one exist?
 - `<script id="__NEXT_DATA__">` in the raw HTML — signals Next.js SSR (see Path A).
 
-`robots.txt` is NOT consulted — we capture every URL that matters to us regardless of disallow rules.
+`robots.txt` is NOT consulted.
 
 ##### Path A — `__NEXT_DATA__` Extraction (Next.js SSR sites, preferred)
 
 Applicable when: `<script id="__NEXT_DATA__">` found in seed HTML.
 
-No browser needed — the full nav tree is in the initial SSR HTML.
+No browser needed.
 
 **Procedure:**
 
@@ -45,12 +45,12 @@ No browser needed — the full nav tree is in the initial SSR HTML.
    - Extract its nav tree (same walk logic).
    - Normalize version-prefixed URLs to canonical form (strip the version segment: `/de/enterprise-cloud@latest/rest/X` → `/de/rest/X`).
    - Union into the main set.
-5. **Always check the OLDEST version.** Deprecated pages are removed from newer versions' sidebars but persist in the oldest, and their pages still return HTTP 200. Missing the oldest version means missing deprecated content — this pattern recurs on any versioned doc site.
+5. **Always check the OLDEST version** (same walk: construct its root URL, extract nav, union in).
 6. Write the normalized union to `/tmp/<domain>_discovered_urls.txt`.
 
-**Expected outcome:** 100% of pages appearing in ANY version's sidebar, in ~1–5s (O(versions) HTTP fetches, no browser).
+**Expected outcome:** 100% of pages appearing in ANY version's sidebar, in ~1–5s.
 
-**Sitemap-coverage trap:** if the site also exposes a sitemap, verify it covers the target section (spot-check ≥5 known pages against the sitemap) before trusting it as an alternative. Sitemaps are often root-only or homepage-only even on sites where `__NEXT_DATA__` yields full coverage.
+**Sitemap-coverage trap:** if the site also exposes a sitemap, verify it covers the target section (spot-check ≥5 known pages against the sitemap) before trusting it as an alternative.
 
 ##### Path B — Sitemap (non-Next.js, sitemap exists and is verified)
 
@@ -73,7 +73,7 @@ concurrency = 1                  # WAF-safe default
 
 429 policy: back off 5s once; stop if second consecutive batch also 429 — report `stop_reason="429_persistent"`. No retry loops.
 
-**Known ceiling:** sites with section-scoped navigation (sidebar shows only the current section's nav, not a global tree) produce a structural recall ceiling regardless of rendering quality. `stop_reason="frontier_exhausted"` means all link-reachable pages found; orphan pages (never linked from anywhere) are an inherent BFS blind spot.
+`stop_reason="frontier_exhausted"` means all link-reachable pages were found.
 
 Write discovered URLs to `/tmp/<domain>_discovered_urls.txt`.
 
@@ -87,25 +87,25 @@ Do NOT read page content here; that is impossible pre-scrape. This step is purel
 
 #### Phase 1b — Opus Cull Review (MANDATORY STOP)
 
-After the pattern-noise cull, the list still contains pages that are valid content but may be **irrelevant to what the user actually needs**. You (worker) cannot judge user-relevance — you lack the session context, and the cull is domain-specific. So you do NOT edit the list for relevance; you present, **Opus edits the `/tmp` file directly** (it is shared between sessions).
+After the pattern-noise cull, the list still contains pages that are valid content but may be **irrelevant to what the user actually needs**. Do NOT edit the list for relevance; present it, and **Opus edits the `/tmp` file directly**.
 
 STOP here. Report to Opus:
 - the URL-list path (`/tmp/<domain>_discovered_urls.txt`) and total count
 - a **per-section breakdown**: group URLs by their first path segment under the target root, with counts — e.g. `rest/actions: 41 · rest/repos: 28 · rest/enterprise-admin: 35 · …`
 
-Then WAIT. Opus strips the unwanted URLs from `/tmp/<domain>_discovered_urls.txt` itself (its own bash — the cull patterns are domain-specific). When Opus says go, re-read the now-shorter file and proceed to Phase 2 — do NOT modify the list yourself.
+Then WAIT. Opus strips the unwanted URLs from `/tmp/<domain>_discovered_urls.txt` itself. When Opus says go, re-read the now-shorter file and proceed to Phase 2 — do NOT modify the list yourself.
 
-Do NOT scrape before Opus says go. Scraping the full list wastes scrape + index time, blocks RAG globally during indexing, and dilutes retrieval with irrelevant pages. This STOP is the single highest-leverage step for retrieval quality.
+Do NOT scrape before Opus says go.
 
 #### Phase 2 — Scrape
 
-Scrape every URL in the filtered list **raw and maximal** — no content filter, no truncation. Cleanup strips chrome after the fact, but content not captured here is gone for good.
+Scrape every URL in the filtered list **raw and maximal** — no content filter, no truncation.
 
 ```bash
 mkdir -p $OUTPUT_DIR
 ```
 
-Launch the pipe-scraper as a **background Bash call** (`run_in_background=true`), then go idle. It lives in the searxng SOURCE — the plugin **cache has NO venv**, so a plugin-relative `./venv/bin/python` resolves into the worktree and fails. Invoke via the absolute source path (so both the venv and the `src.crawler` module resolve):
+Launch the pipe-scraper as a **background Bash call** (`run_in_background=true`), then go idle. Invoke via the absolute source path:
 
 ```bash
 SEARXNG=/Users/brunowinter2000/Documents/ai/Meta/ClaudeCode/cli/searxng-cli
@@ -116,7 +116,7 @@ cd "$SEARXNG" && ./venv/bin/python -m src.crawler.pipe_scraper \
 
 > You own Scrape → Cleanup → Index end-to-end — never hand back to Opus mid-pipeline. After launch, go idle; do NOT `pgrep`/name-poll/`wait`-loop. When the run completes, read `/tmp/<domain>_scrape.log` ONCE for the `Scraped N/N ok` summary, then continue on your own to Cleanup → Index → final report.
 
-The scraper's own output is short: a console line with **success count, error count, and total duration**, plus a full per-URL report written to `/tmp/<domain>_scrape_report.md` (per-URL status + outcome). It does NOT dump a per-URL list to the console — failures live in the report md and can be inspected there if needed.
+The scraper's own output is short: a console line with **success count, error count, and total duration**, plus a full per-URL report written to `/tmp/<domain>_scrape_report.md` (per-URL status + outcome). It does NOT dump a per-URL list to the console — failures live in the report md.
 
 Take from that console line for the Completion Report: scraped N, errors K, **duration T**. The error breakdown (429 / timeout / http_error) is already itemized in the scrape report md.
 
@@ -130,7 +130,7 @@ Diagnose first. Don't write cleanup regex before classifying shape.
 
 Build a small script that scans ALL `.md` files in OUTPUT_DIR, extracts per-file fingerprints (h1 count, h2 count, prose density, table presence, source domain from `<!-- source: URL -->` comment, total LOC). Cluster by fingerprint similarity to identify 4-5 shape groups. ~50 LOC, ~5s runtime.
 
-**Fold in — Block Detection (cookie / paywall / JS-wall / captcha).** The diagnose script already holds every file's content in memory — so ALSO match each file against a BROAD, high-recall block-signature list (it deliberately over-catches; block text is too fuzzy across domains for a precise list to generalize — over-catch + verify is the model). Case-insensitive substring set, extend freely:
+**Fold in — Block Detection (cookie / paywall / JS-wall / captcha).** In the same diagnose pass, ALSO match each file against a BROAD, high-recall block-signature list (case-insensitive substring set, extend freely):
 
 ```
 cookie/consent : "accept cookies", "we use cookies", "cookie policy", "consent", "gdpr", "manage preferences"
@@ -138,17 +138,17 @@ paywall/sub    : "subscribe to", "sign in to continue", "members only", "create 
 js/bot wall    : "enable javascript", "javascript is required", "verify you are human", "captcha", "checking your browser", "access denied"
 ```
 
-A file is a CANDIDATE when it matches a signature AND is small (byte-size in the thin-page range — large matches are legit content merely mentioning the term). For every candidate, the diagnose script PRINTS its `<!-- source -->` URL + first ~15 lines into its own output — so you confirm real-block vs false-positive from the already-returned output, no extra call. If the candidate set is large (dozens+), that signals a systemic crawl block → STOP and report to Opus.
+A file is a CANDIDATE when it matches a signature AND is small (byte-size in the thin-page range). For every candidate, the diagnose script PRINTS its `<!-- source -->` URL + first ~15 lines into its own output — confirm real-block vs false-positive from that output. If the candidate set is large (dozens+) → STOP and report to Opus.
 
 A confirmed block page is garbage → **DELETE it** (same as a thin page) — no content-stripping. REPORT the confirmed-block count + example URLs in the Completion Report.
 
 ##### Post-Scrape Drop — thin successful pages (part of the diagnose pass)
 
-Scrape gaps (429 / timeout / http_error) are already reported by the scraper — they never produced a usable `.md`. The only thing to analyse here are the **successful but very small** `.md` files (HTTP 200, tiny byte size): pages that scraped fine but genuinely carry little or no real content (stub, redirect landing, pure nav).
+Scrape gaps (429 / timeout / http_error) are already reported by the scraper. The only thing to analyse here are the **successful but very small** `.md` files (HTTP 200, tiny byte size): pages that scraped fine but carry little or no real content (stub, redirect landing, pure nav).
 
-Delete those — they are thin/noise. Record the count for the Completion Report. There is no per-file content re-read of every page; only the small successful ones get this look.
+Delete those. Record the count for the Completion Report. Re-read only the small successful files, not every page.
 
-The two numbers stay separate in the report: scrape errors come from the scraper, thin/noise comes from this check. Together they tell us whether a dropped URL was a scraper problem or just an empty page.
+The two numbers stay separate in the report: scrape errors come from the scraper, thin/noise comes from this check.
 
 ##### The Five Shapes
 
@@ -174,7 +174,7 @@ The two numbers stay separate in the report: scrape errors come from the scraper
 
 ##### Web-Specific: Sphinx Documentation
 
-Sphinx-generated docs (SearXNG, ReadTheDocs, many Python project docs) have a distinctive pattern. Header avg 10.7 lines, footer avg 52.6 lines, total noise ~37% of chars (verified on 278 files).
+Sphinx-generated docs (SearXNG, ReadTheDocs, many Python project docs) have a distinctive pattern.
 
 Header (top of file, before first `# ` heading):
 - `### Navigation` block with index/modules/next/previous links
@@ -192,15 +192,15 @@ Inline noise (`_modules_*` files only): `[docs][](URL)` markers before class/fun
 
 For each detected shape, write ONE small script in `/tmp/clean_<shape>_<COLLECTION_lower>.py` (~20-30 LOC each). NOT one big function with N patterns.
 
-##### Script Safety Rules (CRITICAL — previous runs failed here)
+##### Script Safety Rules (CRITICAL)
 
 - Every `while` loop MUST increment in ALL code paths (skip/continue/break/normal — all)
 - Test on 1 file FIRST, then run on all
 - ALWAYS `python3` (not `python`)
 - Use `Path(__file__).parent` — NEVER hardcode absolute paths like `/Users/...`
-- Preserve `<!-- source: URL -->` comments in every file (they are crawl metadata)
+- Preserve `<!-- source: URL -->` comments in every file
 - Overwrite originals in-place
-- After cleaning, spot-check 2-3 files — strip% can lie; eyeballing catches over-strip
+- After cleaning, spot-check 2-3 files
 
 ##### Edge Cases
 
@@ -247,18 +247,14 @@ for PDF in "$PDF_DIR"/*.pdf; do
 done
 ```
 
-Note on STEM derivation: cannot be `basename "$PDF" .pdf` mechanically — original filenames are often hashes, ISBN-strings, library-uploader patterns. Derive a descriptive PascalCase name per file: read the first page header / title metadata, condense to ~30 chars (e.g. `AslamMontague2001MetasearchModels`, `ManningRaghavanSchutze2008IRTextbook`). Filename collisions inside one batch must be avoided — append year or first-author-initial when needed.
+Note on STEM derivation: do NOT use `basename "$PDF" .pdf` mechanically. Derive a descriptive PascalCase name per file: read the first page header / title metadata, condense to ~30 chars (e.g. `AslamMontague2001MetasearchModels`, `ManningRaghavanSchutze2008IRTextbook`). Filename collisions inside one batch must be avoided — append year or first-author-initial when needed.
 
-**STEM character constraints (hard rules):** alphanumeric + underscore ONLY. NEVER include brackets `[ ]`, parentheses `( )`, dots `.` (other than the trailing `.md` extension), commas, spaces, or any glob metachar. MinerU's internal `find_output_md` uses the stem as a glob pattern; characters like `[10.1007_978-3-642-14267-3]` from DOI-style filenames get interpreted as character classes and produce zero matches. The `glob.escape()` patch in MinerU `workflow.py` (2026-05-08) covers this defensively, but the cleanest preventive is sanitizing the stem at derivation time.
+**STEM character constraints (hard rules):** alphanumeric + underscore ONLY. NEVER include brackets `[ ]`, parentheses `( )`, dots `.` (other than the trailing `.md` extension), commas, spaces, or any glob metachar. Sanitize the stem at derivation time.
 
-**Why both guards matter:** an empty `$STEM` at line 4 produces output path `$OUTPUT_DIR/.md`. MinerU happily writes to it, exits 0, and the next iteration overwrites the same file. Without GUARD 1, ten papers collapse into one `.md` and the bug is invisible until the directory is listed. GUARD 2 catches the rarer case where MinerU silently produces an empty file — index-time would skip it without explanation.
+**STEM mapping — do NOT use bash associative arrays in a zsh worker session.** Two patterns:
 
-**ZSH trap to know about — bash assoc-arrays don't transfer.** A natural-looking pattern is `declare -A STEMS; STEMS["MyFile.pdf"]="MyStem"; for f in *.pdf; do stem="${STEMS[$f]}"; ...; done`. This works in bash. In zsh (default macOS shell, default in worker tmux sessions) `${STEMS[$f]}` does NOT expand when the key contains `.` or `-` — `$stem` silently becomes empty, GUARD 1 fires, and the batch aborts. Two safer patterns:
-
-1. **Python script for any batch >3 files** (recommended): zero shell-quoting risk, easy to add per-file timing/error handling, single tool-call per batch. Build a small `subprocess.run([...])` loop over a `dict[str, str]` of `pdf_basename → stem` mappings.
-2. **Bash-only loop with literal stems** (small batches): write the STEM literally inside the loop body per file, avoid associative arrays entirely.
-
-Do NOT carry a bash assoc-array pattern into a zsh worker session expecting it to work — the GUARD will catch it but the whole batch is wasted.
+1. **Python script for any batch >3 files (recommended):** a small `subprocess.run([...])` loop over a `dict[str, str]` of `pdf_basename → stem` mappings.
+2. **Bash-only loop with literal stems (small batches):** write the STEM literally inside the loop body per file, avoid associative arrays entirely.
 
 If MinerU fails for any PDF: log + skip + continue. Report failed PDFs at end.
 
@@ -312,9 +308,7 @@ For each issue type, create `/tmp/fix_<issue>_<STEM>.py`. Run, verify count reac
 
 ##### Stop Criteria — "Good Enough"
 
-The pipeline downstream is: convert → clean (this phase) → embedding/index. Embedding handles small residual noise. Don't over-engineer.
-
-Stop when:
+Don't over-engineer. Stop when:
 - All known issue categories have 0 remaining matches in the file
 - Word count is stable
 - Spot-check 10-15 lines from the middle reads as natural text
@@ -323,9 +317,9 @@ Stop when:
 
 ### Index — Final Phase (both modes)
 
-One script call. `rag-cli index` is incremental (hash-based skip) — re-running only embeds new/changed files; existing chunks are never touched or re-embedded.
+One script call. `rag-cli index` is incremental (hash-based skip) — re-running only embeds new/changed files.
 
-**Important — OUTPUT_DIR must be the collection dir.** Set `OUTPUT_DIR` to the rag-cli collection directory so cleaned MDs land exactly where `rag-cli index` expects them:
+**Important — OUTPUT_DIR must be the collection dir.** Set `OUTPUT_DIR` to the rag-cli collection directory:
 
 ```bash
 RAG_ROOT=~/Documents/ai/Meta/ClaudeCode/cli/rag-cli
@@ -333,7 +327,7 @@ OUTPUT_DIR="$RAG_ROOT/data/documents/$COLLECTION"
 mkdir -p "$OUTPUT_DIR"
 ```
 
-Set this BEFORE the Scrape phase (Phase 2) so the scraper writes directly into the collection dir.
+Set this BEFORE the Scrape phase (Phase 2).
 
 Then launch index as a background Bash call:
 
@@ -350,9 +344,9 @@ Done: N files indexed (X chunks), Y skipped, Z adopted
 
 Report `N` (files indexed) and `X` (chunks) from that line — `N` is the **final md** count for the Completion Report.
 
-Launch index as a background Bash call (`run_in_background=true`) and go idle; do NOT `pgrep`/name-poll/`wait`-loop. When it completes, read `/tmp/${COLLECTION}_index.log` ONCE for the summary line, then output the Completion Report. Indexing blocks RAG globally for ALL projects while it runs.
+Launch index as a background Bash call (`run_in_background=true`) and go idle; do NOT `pgrep`/name-poll/`wait`-loop. When it completes, read `/tmp/${COLLECTION}_index.log` ONCE for the summary line, then output the Completion Report.
 
-No separate verify step inside the pipe: the real verification is the research done on the indexed data back in the main session, not a query here.
+No separate verify step inside the pipe.
 
 ---
 
@@ -373,7 +367,7 @@ Final md indexed:                   M − D
 Collection:                         <COLLECTION>
 ```
 
-Keep the two drop reasons separate: scrape errors **E** come from the scraper (a scraper/WAF gap), thin/noise **D** comes from the cleanup check (pages that scraped fine but carry no content). Together they tell us whether the scraper has gaps or the URLs were just empty.
+Keep the two drop reasons separate: scrape errors **E** come from the scraper, thin/noise **D** comes from the cleanup check.
 
 **pdf:** `convert: M ok, K failed` · `cleanup issues: [...]` · `indexed: N chunks across M documents`.
 

@@ -9,7 +9,7 @@ Ad-hoc web research via `searxng-cli`: search across 9 engines, drill into one e
 
 ## CLI Invocation
 
-All tools run via the `searxng-cli` wrapper (in PATH). Run them in the foreground — output lands directly in context, no `&`, no redirect.
+All tools run via the `searxng-cli` wrapper (in PATH). Run them in the foreground — no `&`, no redirect.
 
 ```bash
 # Search — engine breakdown (counts per engine, no URLs)
@@ -95,13 +95,13 @@ Returns 15k-capped markdown (PruningContentFilter) with a `# Content from: <url>
 
 ## Search Strategy
 
-1. `search_web` for the engine breakdown. For a deep dive, fire 2–4 parallel calls with query variations — each surfaces a different engines' URL set.
+1. `search_web` for the engine breakdown. For a deep dive, fire 2–4 parallel calls with query variations.
 2. `search_engine_drilldown` per engine with a useful count to get its URLs. Drilldowns reuse the search_web cache (1h TTL).
 3. `scrape_url` the relevant URLs. If a URL ends in `.pdf`, use `download_pdf` instead.
 
-Write the query in the language you want results in — a German query returns German results.
+Write the query in the language you want results in.
 
-Query diversity: when investigating an entity X, vary the angle across queries — X as the anchor (canonical sources), the broader category without X (academic landscape), alternatives/competitors (discussion engines), the underlying technique (academic engines). The same anchor on every query just returns the same top sources.
+Query diversity: when investigating an entity X, vary the angle across queries — X as the anchor, the broader category without X, alternatives/competitors, the underlying technique.
 
 Mode flags: `--books` / `--pdf` / `--docs` restrict to google/duckduckgo/mojeek, append the modifier to the query, and post-filter the URLs. Use the same flag on `search_web` and its drilldowns.
 
@@ -135,8 +135,7 @@ web-md: STOP at Phase 1b — report the URL-list path + per-section breakdown an
 
 ```bash
 # project_root = the CURRENT project's root — the project the session is working in.
-# Pass it EXPLICITLY. Never a bare path that lets worker-cli walk up to a parent
-# mono-repo git root: the worker MUST land in the current project's OWN worktree.
+# Pass it EXPLICITLY, never a bare path. The worker MUST land in the current project's OWN worktree.
 worker-cli spawn capture-<collection_lower> /tmp/spawn-<name>.md <current_project_root> sonnet
 ```
 
@@ -144,10 +143,10 @@ worker-cli spawn capture-<collection_lower> /tmp/spawn-<name>.md <current_projec
 - `Worktree:` is `<current_project_root>/.claude/worktrees/<name>`
 - `Session:` is `worker-<basename(current_project_root)>-<name>`
 
-If the worktree landed under a PARENT directory instead (session named after an enclosing repo), the current project is nested inside a larger git repo and `worker-cli` resolved to the parent git root. STOP and resolve before sending the cull go — make the current project its own git repo, or pass its real root explicitly.
+If the worktree landed under a PARENT directory instead (session named after an enclosing repo): STOP and resolve before sending the cull go — make the current project its own git repo, or pass its real root explicitly.
 
-**4.** Cull review (web-md only — the highest-leverage step). When the worker stops at Phase 1b it reports the URL-list path + a per-section breakdown. Review it against **what the user actually needs this session** — drop sections that are valid content but off-topic (e.g. a GitHub REST capture aimed at search/contents/git-trees does not need `actions`/`enterprise-admin`/`scim`). Send the worker the sections/patterns to drop. The worker applies the cull and proceeds. This is YOUR call, not the worker's — only you hold the user-need context.
+**4.** Cull review (web-md only). When the worker stops at Phase 1b it reports the URL-list path + a per-section breakdown. Review it against what the user actually needs this session — drop sections that are valid content but off-topic (e.g. a GitHub REST capture aimed at search/contents/git-trees does not need `actions`/`enterprise-admin`/`scim`). Send the worker the sections/patterns to drop. The worker applies the cull and proceeds. This is YOUR call, not the worker's.
 
 **5.** When the worker reports the funnel, check `blocks detected` — non-zero means it found cookie/paywall MDs (not auto-stripped). Decide from the reported patterns whether a `src/` strip-script is warranted.
 
-**Between step 4 and step 5, Opus does NOTHING.** No log-checking, no `rag-cli status` polling, no waking the worker for Cleanup/Index, no progress probes. The worker owns Scrape → Cleanup → Index end-to-end. Opus intervenes at exactly TWO points in the whole capture: (a) hand the worker the culled `/tmp` URL list + go (step 4), and (b) receive the final funnel report (step 5). The scrape / index wait mechanics are the worker's concern — never Opus's.
+**Between step 4 and step 5, Opus does NOTHING.** No log-checking, no `rag-cli status` polling, no waking the worker for Cleanup/Index, no progress probes. The worker owns Scrape → Cleanup → Index end-to-end. Opus intervenes at exactly TWO points in the whole capture: (a) hand the worker the culled `/tmp` URL list + go (step 4), and (b) receive the final funnel report (step 5).
