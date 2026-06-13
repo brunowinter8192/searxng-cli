@@ -67,7 +67,7 @@ def probe_repo_cf_survey_workflow() -> None:
         repo_results[repo_key] = result
         # Incremental write — partial results survive a crash
         write_repo_result(report_path, repo_key, result)
-        total = result["total"]
+        total = result["sample"]
         passed = result["passed"]
         rate = passed / total * 100 if total else 0
         print(f"    → {passed}/{total} passed ({rate:.2f}%)", flush=True)
