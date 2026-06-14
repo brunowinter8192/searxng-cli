@@ -55,14 +55,14 @@ of proxies currently in the cooldown window.
 
 ---
 
-### p3_target.py (68 LOC)
+### p3_target.py (64 LOC)
 **Purpose:** Sitemap target builder. Fetches theblock index → parses 64 sub-sitemap
 `<loc>` URLs. Direct httpx GET first; falls back to proxy rotation on non-XML response
-(403, CF challenge, error).
+(403, CF challenge, error). Proxy pool is caller-supplied (no internal pool load).
 **Reads:** `THEBLOCK_INDEX` via httpx (direct) or `p1_fetch.fetch_url` (proxy fallback).
 **Writes:** returns `list[str]` of 64 sub-sitemap URLs.
 **Called by:** `acquire_pipe.py`.
-**Calls out:** `httpx`, `p1_fetch`, `p2_cooldown`, `curated_sources`.
+**Calls out:** `httpx`, `p1_fetch`, `p2_cooldown`.
 
 ---
 
@@ -157,11 +157,12 @@ Only `acquire_pipe_jobs/<job_id>/` survives after `end_job`.
 
 ---
 
-### acquire_pipe.py (131 LOC)
-**Purpose:** Job orchestrator. Generates `job_id` (UTC timestamp) → `box_lock.acquire`
-(`LockBusyError` → print+exit(1)) → `janitor.start_job` → `PersistentCooldownManager` (in-memory,
-fresh per job) → `build_sitemap_target` (64 sub-sitemap URLs) → sustained `run_loop` with
-`content_handler` (persist raw XML + parse `<loc>` bytes) → dedup article URLs →
+### acquire_pipe.py (140 LOC)
+**Purpose:** Job orchestrator. Eager-loads chosen pool (+ stdout print) → `build_sitemap_target`
+(64 sub-sitemap URLs, same pool) → `job_id` → `box_lock.acquire` (`LockBusyError` → print+exit(1))
+→ `janitor.start_job` → `PersistentCooldownManager` (in-memory, fresh per job) → sustained
+`run_loop` via `_pool_provider` closure (returns eager pool on first call, re-fetches on refresh)
+→ `content_handler` (persist raw XML + parse `<loc>` bytes) → dedup article URLs →
 `theblock_article_urls.txt` → `logger.close()` → `janitor.end_job` (job.md + plot + wipe transient).
 **Reads:** proxy pool (curated or backfill) + theblock sitemap index (via p3_target).
 **Writes:** `acquire_pipe_output/<slug>.xml` (raw sub-sitemaps, gitignored) +
