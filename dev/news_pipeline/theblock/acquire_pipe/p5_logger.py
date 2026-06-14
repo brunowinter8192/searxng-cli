@@ -14,44 +14,52 @@ from proxy_status_log import proxy_key
 # ORCHESTRATOR
 
 class AcquireLogger:
-    """Accumulates all 5 logging surfaces; no I/O until finalize()."""
+    """Streams events to JSONL on every attempt; in-memory only for small counters.
+
+    JSONL is written incrementally (line-buffered) so a kill at any point leaves
+    all recorded events on disk. finalize() closes the stream and writes the MD
+    summary; all surfaces including throughput-over-time derive from the JSONL.
+    """
 
     def __init__(self, total_urls: int, log_dir: Path):
-        self._total     = total_urls
-        self._log_dir   = log_dir
-        self._t0        = time.monotonic()
+        self._total    = total_urls
+        self._t0       = time.monotonic()
 
-        # Surface 1 — progress
-        self._done      = 0   # target URLs completed (ok fetches)
-        self._attempts  = 0   # total fetch attempts
+        # Surface 1 — progress (in-memory scalars, small)
+        self._done     = 0
+        self._attempts = 0
 
-        # Surface 2 — B-per-proxy distribution (requests-before-burn)
+        # Surface 2 — B-per-proxy distribution (in-memory, max ~pool-size entries)
         self._b_dist: list[int] = []
 
-        # Surface 3 — working-set snapshots: [(elapsed_s, eligible_count)]
+        # Surface 3 — working-set snapshots (in-memory, one per batch)
         self._ws_snapshots: list[tuple[float, int]] = []
 
-        # Surface 4 — failed attempts per success (derived from 1 at finalize)
-        # stored inline: _attempts - _done = total fails
+        # Surface 4 — derived from _done/_attempts at finalize
 
-        # Surface 5 — per-proxy event log
+        # Surface 5+6 — streamed to JSONL immediately on each record_attempt()
         self._proxy_successes: dict[str, int] = {}   # proxy_key → running ok count
-        self._events: list[dict] = []
+        log_dir.mkdir(parents=True, exist_ok=True)
+        ts = datetime.now(timezone.utc).strftime("%Y%m%dT%H%M%SZ")
+        self._ts         = ts
+        self._jsonl_path = log_dir / f"acquire_events_{ts}.jsonl"
+        self._jsonl_fh   = self._jsonl_path.open("a", encoding="utf-8", buffering=1)
 
     def record_attempt(self, proto: str, host_port: str, url: str, ok: bool) -> None:
-        """Record one fetch attempt — drives surfaces 1, 4, 5."""
+        """Stream one fetch event to JSONL — drives surfaces 1, 4, 5, 6."""
         self._attempts += 1
         key = proxy_key(proto, host_port)
         if ok:
             self._done += 1
             self._proxy_successes[key] = self._proxy_successes.get(key, 0) + 1
-        self._events.append({
+        event = {
             "proxy_key":           key,
             "ts":                  datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ"),
             "url":                 url,
             "result":              "ok" if ok else "fail",
             "proxy_success_count": self._proxy_successes.get(key, 0),
-        })
+        }
+        self._jsonl_fh.write(json.dumps(event) + "\n")
 
     def record_burn(self, proto: str, host_port: str, b_count: int) -> None:
         """Record proxy retirement — drives surface 2 (B-per-proxy distribution)."""
@@ -62,42 +70,56 @@ class AcquireLogger:
         self._ws_snapshots.append((time.monotonic() - self._t0, eligible_count))
 
     def finalize(self, report_dir: Path) -> Path:
-        """Write JSONL event log + MD summary. Return MD path."""
-        self._log_dir.mkdir(parents=True, exist_ok=True)
+        """Close JSONL stream; write MD summary from in-memory counters + JSONL. Return MD path."""
+        self._jsonl_fh.close()
         report_dir.mkdir(parents=True, exist_ok=True)
-        ts = datetime.now(timezone.utc).strftime("%Y%m%dT%H%M%SZ")
-
-        jsonl_path = _write_event_log(self._log_dir, ts, self._events)
-        md_path    = _write_summary(report_dir, ts, self, jsonl_path)
+        buckets  = _throughput_buckets(self._jsonl_path)
+        md_path  = _write_summary(report_dir, self._ts, self, buckets)
         return md_path
 
 
 # FUNCTIONS
 
-# Write per-proxy event log as JSONL; return path
-def _write_event_log(log_dir: Path, ts: str, events: list[dict]) -> Path:
-    path = log_dir / f"acquire_events_{ts}.jsonl"
-    path.write_text("\n".join(json.dumps(e) for e in events) + "\n", encoding="utf-8")
-    return path
+# Derive per-minute ok-fetch counts from JSONL; t0 = min ts across all events
+def _throughput_buckets(jsonl_path: Path) -> dict[int, int]:
+    events: list[dict] = []
+    for line in jsonl_path.read_text(encoding="utf-8").splitlines():
+        line = line.strip()
+        if line:
+            events.append(json.loads(line))
+    if not events:
+        return {}
+    t0 = min(
+        datetime.strptime(e["ts"], "%Y-%m-%dT%H:%M:%SZ").replace(tzinfo=timezone.utc)
+        for e in events
+    )
+    buckets: dict[int, int] = {}
+    for e in events:
+        if e.get("result") != "ok":
+            continue
+        ts  = datetime.strptime(e["ts"], "%Y-%m-%dT%H:%M:%SZ").replace(tzinfo=timezone.utc)
+        minute = int((ts - t0).total_seconds() // 60)
+        buckets[minute] = buckets.get(minute, 0) + 1
+    return buckets
 
 
-# Write MD summary covering all 5 surfaces; return path
-def _write_summary(report_dir: Path, ts: str, lg: AcquireLogger, jsonl_path: Path) -> Path:
+# Write MD summary covering all 6 surfaces; return path
+def _write_summary(report_dir: Path, ts: str, lg: AcquireLogger, buckets: dict[int, int]) -> Path:
     elapsed    = time.monotonic() - lg._t0
     done       = lg._done
     total      = lg._total
     attempts   = lg._attempts
     fails      = attempts - done
     rate_pct   = done / total * 100 if total else 0.0
-    fetch_rate = done / elapsed * 60 if elapsed else 0.0   # URLs/min
+    fetch_rate = done / elapsed * 60 if elapsed else 0.0
 
     lines = [
         f"# Acquire-pipe run — {ts}",
         "",
         "## Surface 1 — Fetch progress",
         "",
-        f"| Metric | Value |",
-        f"|---|---|",
+        "| Metric | Value |",
+        "|---|---|",
         f"| Target URLs | {total} |",
         f"| Completed | {done} ({rate_pct:.1f}%) |",
         f"| Total attempts | {attempts} |",
@@ -111,7 +133,7 @@ def _write_summary(report_dir: Path, ts: str, lg: AcquireLogger, jsonl_path: Pat
     if lg._b_dist:
         b_counter = Counter(lg._b_dist)
         lines += [
-            f"| B (requests) | Count |",
+            "| B (requests) | Count |",
             "|---|---|",
         ]
         for b in sorted(b_counter):
@@ -144,18 +166,37 @@ def _write_summary(report_dir: Path, ts: str, lg: AcquireLogger, jsonl_path: Pat
         "",
         "## Surface 4 — Failed attempts per successful fetch",
         "",
-        f"| Metric | Value |",
+        "| Metric | Value |",
         "|---|---|",
         f"| Successful fetches | {done} |",
         f"| Failed attempts | {fails} |",
-        f"| Ratio (fails/success) | {fails/done:.2f} |" if done else "| Ratio | — (no successes) |",
+        (f"| Ratio (fails/success) | {fails/done:.2f} |" if done else "| Ratio | — (no successes) |"),
         "",
         "## Surface 5 — Per-proxy event log",
         "",
-        f"JSONL: `{jsonl_path}`",
-        f"Events recorded: {len(lg._events)}",
+        f"JSONL: `{lg._jsonl_path}`",
+        f"Events recorded: {attempts}",
+        "",
+        "## Surface 6 — Throughput over time (ok fetches per minute)",
         "",
     ]
+
+    if buckets:
+        lines += [
+            "| Minute | OK fetches |",
+            "|---|---|",
+        ]
+        for minute in sorted(buckets):
+            lines.append(f"| {minute} | {buckets[minute]} |")
+        total_ok  = sum(buckets.values())
+        max_min   = max(buckets, key=buckets.get)
+        lines += [
+            "",
+            f"- Peak minute: {max_min} ({buckets[max_min]} ok)",
+            f"- Total ok from JSONL: {total_ok}",
+        ]
+    else:
+        lines.append("No ok events recorded.")
 
     path = report_dir / f"acquire_run_{ts}.md"
     path.write_text("\n".join(lines) + "\n", encoding="utf-8")
