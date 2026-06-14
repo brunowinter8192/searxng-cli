@@ -11,7 +11,7 @@ from curated_sources import load_curated_proxies
 
 sys.path.insert(0, str(Path(__file__).parent))
 from p1_fetch import fetch_url, THEBLOCK_INDEX, XML_MARKERS
-from p2_cooldown import CooldownManager
+from p2_cooldown import PersistentCooldownManager
 
 DIRECT_TIMEOUT = 15.0
 _LOC_RE        = re.compile(rb"<loc>(https?://[^<]+)</loc>")
@@ -51,7 +51,7 @@ def _fetch_index_direct() -> bytes | None:
 # Fetch sitemap index through curated proxy pool (socks4-first); raise on exhaustion
 def _fetch_index_via_proxy() -> bytes:
     pool = load_curated_proxies()
-    cm   = CooldownManager()
+    cm   = PersistentCooldownManager()
     candidates = cm.eligible_candidates(pool)
     print(f"[sitemap] Proxy fallback: {len(candidates)} candidates")
     for proto, hp in candidates:

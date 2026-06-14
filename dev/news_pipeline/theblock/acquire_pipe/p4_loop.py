@@ -125,7 +125,6 @@ def run_loop(
                     else:
                         _consec_fail[key] = fails
 
-        cm.flush()
         logger.record_working_set(len(wset))
 
     return done, list(queue)

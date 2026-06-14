@@ -12,42 +12,6 @@ LOG_PATH   = SCRIPT_DIR / "logs" / "proxy_status_log.json"
 
 # ORCHESTRATOR
 
-# Load cooled_at timestamps for all proxies in the log
-def load_cooled_at() -> dict[str, str | None]:
-    """Return {proxy_key: cooled_at_iso} for every log entry; value is None if field absent."""
-    data = _load_log()
-    return {key: entry.get("cooled_at") for key, entry in data.items()}
-
-
-# Batch-write cooled_at for every key in burns; create minimal entry if key absent
-def mark_cooled_batch(burns: dict[str, str]) -> None:
-    """Upsert cooled_at (UTC ISO) for each proxy_key in burns.
-
-    One load + one save per call regardless of how many keys are in burns.
-    Creates a minimal log entry for proxies not yet seen by record_run().
-    """
-    data   = _load_log()
-    ts_now = datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
-    for key, iso_ts in burns.items():
-        if key in data:
-            data[key]["cooled_at"] = iso_ts
-        else:
-            proto, host, port = _parse_proxy_key(key)
-            data[key] = {
-                "protocol":    proto,
-                "host":        host,
-                "port":        port,
-                "checks":      0,
-                "alive":       0,
-                "dead":        0,
-                "last_status": "",
-                "first_seen":  ts_now,
-                "last_seen":   ts_now,
-                "cooled_at":   iso_ts,
-            }
-    _save_log(data)
-
-
 def record_run(results: list[dict], source_label: str) -> None:
     """Upsert every result (alive + dead) into the cumulative proxy-status log."""
     ts   = datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
@@ -129,13 +93,6 @@ def proxy_key(proto: str, host_port: str) -> str:
     """Build canonical key: protocol://host:port (auth stripped if present)."""
     host, port = _parse_host_port(host_port)
     return f"{proto}://{host}:{port}"
-
-
-def _parse_proxy_key(key: str) -> tuple[str, str, int]:
-    """Parse canonical key 'proto://host:port' → (proto, host, port_int)."""
-    proto, rest  = key.split("://", 1)
-    host, port_s = rest.rsplit(":", 1)
-    return proto, host, int(port_s)
 
 
 def _parse_host_port(host_port: str) -> tuple[str, int]:
