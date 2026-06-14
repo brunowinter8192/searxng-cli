@@ -95,15 +95,19 @@ all events, so the function works on any partial JSONL without runtime context.
 
 ---
 
-### acquire_pipe.py (83 LOC)
-**Purpose:** Stage 5 orchestrator. `load_curated_proxies` → `build_sitemap_target` (64 sub-sitemap
+### acquire_pipe.py (89 LOC)
+**Purpose:** Stage 5 orchestrator. pool → `build_sitemap_target` (64 sub-sitemap
 URLs) → `run_loop` with `content_handler` (persist raw XML + parse `<loc>` bytes) →
 dedup article URLs → write `theblock_article_urls.txt` → `logger.finalize`.
-**Reads:** curated proxy pool + theblock sitemap index (via p3_target).
+**Reads:** proxy pool (curated or backfill) + theblock sitemap index (via p3_target).
 **Writes:** `acquire_pipe_output/<slug>.xml` (raw sub-sitemaps, gitignored) +
 `acquire_pipe_output/theblock_article_urls.txt` (44,041 unique URLs, tracked).
-**Called by:** CLI — `python acquire_pipe.py [--concurrency N]`.
+**Called by:** CLI — `python acquire_pipe.py [--concurrency N] [--pool {curated,backfill}]`.
 **Calls out:** `p3_target`, `p4_loop`, `p5_logger`, `curated_sources`.
+**CLI flags:**
+- `--concurrency N` — concurrent (proxy, URL) pairs per round (default 128)
+- `--pool {curated,backfill}` — proxy pool selection (default `curated`):
+  `curated` = monosans+proxifly ~3.5k; `backfill` = top-13 repos ~22.7k unique
 
 ---
 

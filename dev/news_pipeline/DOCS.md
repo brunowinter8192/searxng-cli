@@ -221,9 +221,24 @@ bash dev/news_pipeline/theblock/probe_monosans.sh theblock
 
 **Purpose:** Fetch `monosans/proxy-list` live JSON (`proxies.json`) and return `[(protocol, host:port)]` — same tuple shape as `load_frozen_pool()`. Single synchronous `httpx.get`. Handles optional auth fields (currently always null in monosans). Called by `probe_liveness.py` (`--source monosans`) and by `curated_sources.load_curated_proxies()`.
 
-### theblock/curated_sources.py (40 LOC)
+### theblock/curated_sources.py (262 LOC)
 
-**Purpose:** Unified proxy source — fetches monosans + proxifly, merges, deduplicates, returns one `[(protocol, host:port)]` list. Called by `probe_liveness.py` when `--source curated` is set. Entry point: `load_curated_proxies()`. Monosans fetched via `monosans_loader.load_monosans_proxies()`; proxifly fetched by internal helper `_fetch_proxifly()` from `https://raw.githubusercontent.com/proxifly/free-proxy-list/main/proxies/all/data.json` (`{"protocol","ip","port"}` fields, no auth). Dedup via `_merge_dedup()` using `proxy_status_log.proxy_key` — same canonical keyspace as the log, guaranteeing Dedup-key == Log-match-key. Monosans entries first; first occurrence wins on overlap. Extensible: add further sources as additional `_fetch_<source>()` helpers and concat into `_merge_dedup`.
+**Purpose:** Unified proxy source hub. Two production loaders + 13 standalone eval loaders + shared fetch/dedup helpers.
+
+**Production loaders:**
+- `load_curated_proxies()` — monosans + proxifly (~3.5k unique); used by existing sitemap dev-runs.
+- `load_backfill_pool()` — all 13 Top-Repo sources merged + deduped → **22,723 unique**; used by `acquire_pipe.py --pool backfill`. proxifly excluded (rank 15, below survey cutoff).
+
+**Standalone eval loaders (13 repos):**
+monosans (via `monosans_loader`), roosterkid, databay-labs, TheSpeedX (existing),
+themiralay, r00tee, iplocate, sunny9577, ALIILAPRO, dpangestuw, Zaeem20, zloi-user,
+hookzof (new — added for backfill pool).
+
+**Universal fetch helper:** `_fetch_roosterkid(proto, url)` applies `_IP_PORT_RE`
+(`\d{1,3}(?:\.\d{1,3}){3}:\d+`) to every line — handles bare, scheme-prefixed
+(`http://host:port`), and decorated (`host:port:Country`) formats.
+`_fetch_bare_txt` retained for existing callers; `_fetch_roosterkid` is the robust
+universal extractor used by all 9 new loaders.
 
 ### theblock/proxy_status_log.py (102 LOC)
 
