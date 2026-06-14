@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 # Unified curated proxy source: monosans + proxifly, merged and deduped.
 # Standalone eval sources: TheSpeedX, databay-labs, jetkai, roosterkid.
+# Backfill pool: all 13 Top-Repo sources merged and deduped (~22k unique).
 
 # INFRASTRUCTURE
 
@@ -34,6 +35,52 @@ ROOSTERKID_SOURCES: list[tuple[str, str]] = [
     ("http",   "https://raw.githubusercontent.com/roosterkid/openproxylist/main/HTTPS.txt"),
     ("socks4", "https://raw.githubusercontent.com/roosterkid/openproxylist/main/SOCKS4.txt"),
     ("socks5", "https://raw.githubusercontent.com/roosterkid/openproxylist/main/SOCKS5.txt"),
+]
+
+# Backfill pool — 9 additional Top-13 repos (all parsed via _fetch_roosterkid/_IP_PORT_RE)
+THEMIRALAY_SOURCES: list[tuple[str, str]] = [
+    ("http",   "https://raw.githubusercontent.com/themiralay/Proxy-List-World/master/data.txt"),
+]
+R00TEE_SOURCES: list[tuple[str, str]] = [
+    ("http",   "https://raw.githubusercontent.com/r00tee/Proxy-List/main/Https.txt"),
+    ("socks4", "https://raw.githubusercontent.com/r00tee/Proxy-List/main/Socks4.txt"),
+    ("socks5", "https://raw.githubusercontent.com/r00tee/Proxy-List/main/Socks5.txt"),
+]
+IPLOCATE_SOURCES: list[tuple[str, str]] = [
+    ("http",   "https://raw.githubusercontent.com/iplocate/free-proxy-list/main/protocols/http.txt"),
+    ("http",   "https://raw.githubusercontent.com/iplocate/free-proxy-list/main/protocols/https.txt"),
+    ("socks4", "https://raw.githubusercontent.com/iplocate/free-proxy-list/main/protocols/socks4.txt"),
+    ("socks5", "https://raw.githubusercontent.com/iplocate/free-proxy-list/main/protocols/socks5.txt"),
+]
+SUNNY9577_SOURCES: list[tuple[str, str]] = [
+    ("http",   "https://raw.githubusercontent.com/sunny9577/proxy-scraper/master/generated/http_proxies.txt"),
+    ("socks4", "https://raw.githubusercontent.com/sunny9577/proxy-scraper/master/generated/socks4_proxies.txt"),
+    ("socks5", "https://raw.githubusercontent.com/sunny9577/proxy-scraper/master/generated/socks5_proxies.txt"),
+]
+ALIILAPRO_SOURCES: list[tuple[str, str]] = [
+    ("http",   "https://raw.githubusercontent.com/ALIILAPRO/Proxy/main/http.txt"),
+    ("socks4", "https://raw.githubusercontent.com/ALIILAPRO/Proxy/main/socks4.txt"),
+    ("socks5", "https://raw.githubusercontent.com/ALIILAPRO/Proxy/main/socks5.txt"),
+]
+DPANGESTUW_SOURCES: list[tuple[str, str]] = [
+    ("http",   "https://raw.githubusercontent.com/dpangestuw/Free-Proxy/main/http_proxies.txt"),
+    ("socks4", "https://raw.githubusercontent.com/dpangestuw/Free-Proxy/main/socks4_proxies.txt"),
+    ("socks5", "https://raw.githubusercontent.com/dpangestuw/Free-Proxy/main/socks5_proxies.txt"),
+]
+ZAEEM20_SOURCES: list[tuple[str, str]] = [
+    ("http",   "https://raw.githubusercontent.com/Zaeem20/FREE_PROXIES_LIST/master/http.txt"),
+    ("http",   "https://raw.githubusercontent.com/Zaeem20/FREE_PROXIES_LIST/master/https.txt"),
+    ("socks4", "https://raw.githubusercontent.com/Zaeem20/FREE_PROXIES_LIST/master/socks4.txt"),
+    ("socks5", "https://raw.githubusercontent.com/Zaeem20/FREE_PROXIES_LIST/master/socks5.txt"),
+]
+ZLOI_SOURCES: list[tuple[str, str]] = [
+    ("http",   "https://raw.githubusercontent.com/zloi-user/hideip.me/main/http.txt"),
+    ("http",   "https://raw.githubusercontent.com/zloi-user/hideip.me/main/https.txt"),
+    ("socks4", "https://raw.githubusercontent.com/zloi-user/hideip.me/main/socks4.txt"),
+    ("socks5", "https://raw.githubusercontent.com/zloi-user/hideip.me/main/socks5.txt"),
+]
+HOOKZOF_SOURCES: list[tuple[str, str]] = [
+    ("socks5", "https://raw.githubusercontent.com/hookzof/socks5_list/master/proxy.txt"),
 ]
 
 _IP_PORT_RE = re.compile(r"\d{1,3}(?:\.\d{1,3}){3}:\d+")
@@ -76,6 +123,98 @@ def load_roosterkid_proxies() -> list[tuple[str, str]]:
     entries: list[tuple[str, str]] = []
     for proto, url in ROOSTERKID_SOURCES:
         entries.extend(_fetch_roosterkid(proto, url))
+    return _merge_dedup(entries)
+
+
+def load_themiralay_proxies() -> list[tuple[str, str]]:
+    """Fetch themiralay/Proxy-List-World http bare txt; regex-parse IP:PORT; dedup."""
+    entries: list[tuple[str, str]] = []
+    for proto, url in THEMIRALAY_SOURCES:
+        entries.extend(_fetch_roosterkid(proto, url))
+    return _merge_dedup(entries)
+
+
+def load_r00tee_proxies() -> list[tuple[str, str]]:
+    """Fetch r00tee/Proxy-List http/socks4/socks5 bare txt; regex-parse IP:PORT; dedup."""
+    entries: list[tuple[str, str]] = []
+    for proto, url in R00TEE_SOURCES:
+        entries.extend(_fetch_roosterkid(proto, url))
+    return _merge_dedup(entries)
+
+
+def load_iplocate_proxies() -> list[tuple[str, str]]:
+    """Fetch iplocate/free-proxy-list http/socks4/socks5 bare txt; regex-parse IP:PORT; dedup."""
+    entries: list[tuple[str, str]] = []
+    for proto, url in IPLOCATE_SOURCES:
+        entries.extend(_fetch_roosterkid(proto, url))
+    return _merge_dedup(entries)
+
+
+def load_sunny9577_proxies() -> list[tuple[str, str]]:
+    """Fetch sunny9577/proxy-scraper http/socks4/socks5 generated txt; regex-parse IP:PORT; dedup."""
+    entries: list[tuple[str, str]] = []
+    for proto, url in SUNNY9577_SOURCES:
+        entries.extend(_fetch_roosterkid(proto, url))
+    return _merge_dedup(entries)
+
+
+def load_aliilapro_proxies() -> list[tuple[str, str]]:
+    """Fetch ALIILAPRO/Proxy http/socks4/socks5 bare txt; regex-parse IP:PORT; dedup."""
+    entries: list[tuple[str, str]] = []
+    for proto, url in ALIILAPRO_SOURCES:
+        entries.extend(_fetch_roosterkid(proto, url))
+    return _merge_dedup(entries)
+
+
+def load_dpangestuw_proxies() -> list[tuple[str, str]]:
+    """Fetch dpangestuw/Free-Proxy http/socks4/socks5 scheme-prefixed txt; regex-parse IP:PORT; dedup."""
+    entries: list[tuple[str, str]] = []
+    for proto, url in DPANGESTUW_SOURCES:
+        entries.extend(_fetch_roosterkid(proto, url))
+    return _merge_dedup(entries)
+
+
+def load_zaeem20_proxies() -> list[tuple[str, str]]:
+    """Fetch Zaeem20/FREE_PROXIES_LIST http/socks4/socks5 bare txt; regex-parse IP:PORT; dedup."""
+    entries: list[tuple[str, str]] = []
+    for proto, url in ZAEEM20_SOURCES:
+        entries.extend(_fetch_roosterkid(proto, url))
+    return _merge_dedup(entries)
+
+
+def load_zloi_proxies() -> list[tuple[str, str]]:
+    """Fetch zloi-user/hideip.me http/socks4/socks5 decorated txt (host:port:Country); regex-parse; dedup."""
+    entries: list[tuple[str, str]] = []
+    for proto, url in ZLOI_SOURCES:
+        entries.extend(_fetch_roosterkid(proto, url))
+    return _merge_dedup(entries)
+
+
+def load_hookzof_proxies() -> list[tuple[str, str]]:
+    """Fetch hookzof/socks5_list socks5 bare txt; regex-parse IP:PORT; dedup."""
+    entries: list[tuple[str, str]] = []
+    for proto, url in HOOKZOF_SOURCES:
+        entries.extend(_fetch_roosterkid(proto, url))
+    return _merge_dedup(entries)
+
+
+def load_backfill_pool() -> list[tuple[str, str]]:
+    """Fetch all 13 Top-Repo sources; merge, dedup; return [(protocol, host:port)].
+
+    Top-13 by survey rank: monosans, roosterkid, databay-labs, TheSpeedX,
+    themiralay, r00tee, iplocate, sunny9577, ALIILAPRO, dpangestuw, Zaeem20,
+    zloi-user, hookzof. proxifly excluded (rank 15, below cutoff).
+    Target: ~22k unique.
+    """
+    entries: list[tuple[str, str]] = []
+    entries.extend(load_monosans_proxies())
+    for loader in [
+        load_roosterkid_proxies,  load_databay_proxies,   load_thespeedx_proxies,
+        load_themiralay_proxies,  load_r00tee_proxies,    load_iplocate_proxies,
+        load_sunny9577_proxies,   load_aliilapro_proxies, load_dpangestuw_proxies,
+        load_zaeem20_proxies,     load_zloi_proxies,      load_hookzof_proxies,
+    ]:
+        entries.extend(loader())
     return _merge_dedup(entries)
 
 # FUNCTIONS

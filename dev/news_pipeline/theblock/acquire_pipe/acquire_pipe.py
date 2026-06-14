@@ -12,7 +12,7 @@ from p4_loop import run_loop
 from p5_logger import AcquireLogger
 
 sys.path.insert(0, str(Path(__file__).parent.parent))
-from curated_sources import load_curated_proxies
+from curated_sources import load_curated_proxies, load_backfill_pool
 
 ACQUIRE_BASE      = Path(__file__).parent
 OUTPUT_DIR        = ACQUIRE_BASE / "acquire_pipe_output"
@@ -24,11 +24,11 @@ DEFAULT_CONCURRENCY = 128
 
 # ORCHESTRATOR
 
-def acquire_pipe_workflow(concurrency: int) -> None:
+def acquire_pipe_workflow(concurrency: int, pool_name: str = "curated") -> None:
     """Stage 5: sitemap dev-run. pool → 64 sub-sitemaps → ~27k article URLs."""
-    print(f"[acquire_pipe] Loading curated proxy pool...")
-    pool = load_curated_proxies()
-    print(f"[acquire_pipe] Pool: {len(pool)} candidates")
+    print(f"[acquire_pipe] Loading proxy pool ({pool_name})...")
+    pool = load_backfill_pool() if pool_name == "backfill" else load_curated_proxies()
+    print(f"[acquire_pipe] Pool ({pool_name}): {len(pool)} candidates")
 
     print(f"[acquire_pipe] Building sitemap target...")
     target_urls = build_sitemap_target()
@@ -79,5 +79,11 @@ if __name__ == "__main__":
         default=DEFAULT_CONCURRENCY,
         help=f"Concurrent (proxy, URL) pairs per round (default: {DEFAULT_CONCURRENCY})",
     )
+    parser.add_argument(
+        "--pool",
+        choices=["curated", "backfill"],
+        default="curated",
+        help="Proxy pool to use: curated (monosans+proxifly ~3.5k) or backfill (top-13 repos ~22k, default: curated)",
+    )
     args = parser.parse_args()
-    acquire_pipe_workflow(args.concurrency)
+    acquire_pipe_workflow(args.concurrency, args.pool)
