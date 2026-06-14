@@ -28,6 +28,7 @@ def run_loop(
     logger: AcquireLogger,
     cm: PersistentCooldownManager,
     concurrency: int = DEFAULT_CONCURRENCY,
+    buffer_size: int = BUFFER_SIZE,
     content_handler: Callable[[str, bytes], None] | None = None,
     max_wall_s: float = DEFAULT_MAX_WALL_S,
     refresh_interval_s: float = REFRESH_INTERVAL_S,
@@ -36,12 +37,13 @@ def run_loop(
 
     pool_provider() is called once on startup and again at each refresh_interval_s
     tick to fetch a fresh proxy list; build_active_buffer() filters it through cm
-    to rebuild the active buffer. 2-strikes lifecycle (Stage 3) drives burn→cooldown.
+    to rebuild the active buffer (up to buffer_size eligible, socks4-first).
+    2-strikes lifecycle (Stage 3) drives burn→cooldown.
 
     Exhaustion (buf + wset both empty): sleeps until the earlier of (next cooldown
     expiry, next refresh tick), then calls pool_provider() and rebuilds buf — no gap
     reported, no early exit. cap_remaining clamps the sleep so the safety cap is
-    never overshot. After sleep the outer loop resumes normally.
+    never overshot.
 
     Safety cap: after max_wall_s wall-seconds the loop exits cleanly, leaving any
     unfinished URLs in gap. refresh_interval_s is a separate parameter to allow
@@ -55,7 +57,7 @@ def run_loop(
     _consec_fail: dict[tuple[str, str], int] = {}
 
     pool_22k      = pool_provider()
-    buf           = build_active_buffer(pool_22k, cm)
+    buf           = build_active_buffer(pool_22k, cm, buffer_size)
     _last_refresh = time.monotonic()
 
     while queue:
@@ -66,11 +68,11 @@ def run_loop(
 
         if now - _last_refresh >= refresh_interval_s:
             pool_22k      = pool_provider()
-            buf           = build_active_buffer(pool_22k, cm)
+            buf           = build_active_buffer(pool_22k, cm, buffer_size)
             _last_refresh = time.monotonic()
 
-        if len(buf) < BUFFER_SIZE:
-            buf = refill_buffer(buf, pool_22k, cm)
+        if len(buf) < buffer_size:
+            buf = refill_buffer(buf, pool_22k, cm, buffer_size)
 
         batch = _build_batch(queue, wset, buf, concurrency)
         if not batch:
@@ -84,7 +86,7 @@ def run_loop(
             if sleep_s > 0:
                 _sleep(sleep_s)
             pool_22k      = pool_provider()
-            buf           = build_active_buffer(pool_22k, cm)
+            buf           = build_active_buffer(pool_22k, cm, buffer_size)
             _last_refresh = time.monotonic()
             continue
 
@@ -143,7 +145,7 @@ def _compute_sleep(
 
     earliest = cm.earliest_eligible_at()
     if earliest is None:
-        return secs_to_refresh   # no burned proxies → sleep until next refresh
+        return secs_to_refresh
 
     now_utc          = datetime.now(timezone.utc)
     secs_to_eligible = max(0.0, (earliest - now_utc).total_seconds())
