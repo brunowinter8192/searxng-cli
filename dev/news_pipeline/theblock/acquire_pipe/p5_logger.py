@@ -69,6 +69,15 @@ class AcquireLogger:
         """Snapshot eligible-candidate count — drives surface 3."""
         self._ws_snapshots.append((time.monotonic() - self._t0, eligible_count))
 
+    def record_pool_refresh(self, size: int) -> None:
+        """Record pool-provider call result (size) → JSONL pool_refresh event."""
+        event = {
+            "event": "pool_refresh",
+            "size":  size,
+            "ts":    datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ"),
+        }
+        self._jsonl_fh.write(json.dumps(event) + "\n")
+
     def finalize(self, report_dir: Path) -> Path:
         """Close JSONL stream; write MD summary from in-memory counters + JSONL. Return MD path."""
         self._jsonl_fh.close()
