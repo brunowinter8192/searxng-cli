@@ -1,100 +1,95 @@
 # INFRASTRUCTURE
 
 import argparse
+import random
 import re
 import sys
-import time
+from concurrent.futures import ThreadPoolExecutor, as_completed
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
 
 import httpx
 
-sys.path.insert(0, str(Path(__file__).parent))              # curated_sources, proxy_status_log
-sys.path.insert(0, str(Path(__file__).parent / "acquire_pipe"))  # p1_fetch, p2_cooldown
+sys.path.insert(0, str(Path(__file__).parent))              # curated_sources
+sys.path.insert(0, str(Path(__file__).parent / "acquire_pipe"))  # p1_fetch
 
 from curated_sources import load_backfill_pool
 from p1_fetch import fetch_url, XML_MARKERS
-from p2_cooldown import PersistentCooldownManager
 
-INDEX_URL         = "https://www.theblock.co/sitemap_tbco_index.xml"
-OUTPUT_DIR        = Path(__file__).parent / "probe_48h_output"
-DIRECT_TIMEOUT    = 15.0
-MAX_ARTICLE_TRIES = 30
-INTER_SUB_DELAY   = 1.0   # seconds between sub-sitemap fetches
+INDEX_URL      = "https://www.theblock.co/sitemap_tbco_index.xml"
+OUTPUT_DIR     = Path(__file__).parent / "probe_48h_output"
+DIRECT_TIMEOUT = 15.0
+RACE_WIDTH     = 128   # proxies fired in parallel per URL
 
 _INDEX_LOC_RE = re.compile(rb"<loc>(https?://[^<]+)</loc>")
 _URL_BLOCK_RE = re.compile(rb"<url>(.*?)</url>", re.DOTALL)
 _LOC_RE       = re.compile(rb"<loc>(https?://[^<]+)</loc>")
 _MOD_RE       = re.compile(rb"<lastmod>([^<]+)</lastmod>")
+_NUM_RE       = re.compile(r"_(\d+)\.xml$")
 
 
 # ORCHESTRATOR
 
-def probe_48h_article_fetch_workflow(hours: float, max_article_tries: int) -> None:
+def probe_48h_article_fetch_workflow(hours: float) -> None:
     OUTPUT_DIR.mkdir(parents=True, exist_ok=True)
     cutoff = datetime.now(timezone.utc) - timedelta(hours=hours)
 
-    print(f"[probe] Loading backfill pool...")
+    print("[probe] Loading backfill pool...")
     pool = load_backfill_pool()
     print(f"[probe] Pool: {len(pool)} proxies")
 
-    print(f"[probe] Fetching sitemap index...")
+    print("[probe] Fetching sitemap index...")
     post_subs = _fetch_index(pool)
-    print(f"[probe] Post sub-sitemaps: {len(post_subs)}")
+    if not post_subs:
+        raise RuntimeError("No post_type_post sub-sitemaps found in index")
+    print(f"[probe] post_type_post sub-sitemaps in index: {len(post_subs)}")
 
-    cm      = PersistentCooldownManager()
-    all_entries:    list[tuple[str, datetime]] = []
-    sub_hit_counts: dict[str, int]             = {}
-    fetched = 0
+    sub_url = _pick_highest_numbered(post_subs)
+    print(f"[probe] Selected (highest-numbered): {sub_url.split('/')[-1]}")
 
-    for i, sub_url in enumerate(post_subs):
-        name    = sub_url.split("/")[-1]
-        entries = _fetch_sub_sitemap(sub_url, pool, cm)
-        fetched += 1
-        recent  = [(u, m) for u, m in entries if m >= cutoff]
-        sub_hit_counts[name] = len(recent)
-        all_entries.extend(recent)
-        print(f"[probe] {name}: {len(entries)} entries, {len(recent)} in {hours:.0f}h window")
-        if i < len(post_subs) - 1:
-            time.sleep(INTER_SUB_DELAY)
+    print("[probe] Fetching sub-sitemap...")
+    ok, content = _fetch_parallel(sub_url, pool, "xml")
+    if not ok:
+        raise RuntimeError(f"Sub-sitemap fetch failed: {sub_url}")
 
-    print(f"[probe] Sub-sitemaps fetched: {fetched}/{len(post_subs)}")
-    print(f"[probe] {hours:.0f}h entries total: {len(all_entries)}")
+    entries = _parse_url_blocks(content)
+    print(f"[probe] Entries in sub-sitemap: {len(entries)}")
 
-    if not all_entries:
-        print(f"[probe] No articles found in last {hours:.0f}h — widen --hours and retry")
+    recent = [(u, m) for u, m in entries if m >= cutoff]
+    print(f"[probe] Entries in {hours:.0f}h window: {len(recent)}")
+
+    if len(recent) >= 2:
+        targets = recent[:2]
+        print(f"[probe] Using 2 entries from {hours:.0f}h window")
+    else:
+        by_date = sorted(entries, key=lambda x: x[1], reverse=True)
+        targets = by_date[:2]
+        print(f"[probe] <2 in {hours:.0f}h window — using 2 newest entries from sub-sitemap")
+
+    if not targets:
+        print("[probe] Sub-sitemap appears empty — nothing to fetch")
         return
 
-    recent_path = OUTPUT_DIR / "recent_articles.txt"
-    lines = [f"{mod.strftime('%Y-%m-%dT%H:%M:%SZ')}\t{url}" for url, mod in all_entries]
-    recent_path.write_text("\n".join(lines) + "\n", encoding="utf-8")
-    print(f"[probe] recent_articles.txt → {recent_path} ({len(all_entries)} entries)")
-
-    print("[probe] Sub-sitemap hit breakdown (non-zero only):")
-    for name, count in sub_hit_counts.items():
-        if count > 0:
-            print(f"  {name}: {count}")
-
-    targets = all_entries[:2]
     for idx, (url, mod) in enumerate(targets):
-        ok, content, attempts = _fetch_article(url, pool, cm, max_article_tries)
+        print(f"[probe] Fetching article {idx + 1}: {url}")
+        ok, content = _fetch_parallel(url, pool, "html")
         if ok:
             out_path = OUTPUT_DIR / f"article_{idx}.html"
             out_path.write_bytes(content)
-            print(f"[probe] Article {idx + 1}: {url}")
-            print(f"  → OK in {attempts} attempt(s), {len(content):,} bytes → {out_path.name}")
+            print(f"  → OK, {len(content):,} bytes → {out_path.name}")
         else:
-            print(f"[probe] Article {idx + 1}: {url}")
-            print(f"  → FAILED after {attempts} attempts")
+            print(f"  → FAILED (all {RACE_WIDTH} parallel proxies missed)")
 
 
 # FUNCTIONS
 
-# Fetch sitemap index (direct then proxy); return post_type_post sub-sitemap URLs only
+# Fetch sitemap index (direct then parallel); return post_type_post sub-sitemap URLs
 def _fetch_index(pool: list) -> list[str]:
     content = _fetch_index_direct()
     if content is None:
-        content = _fetch_index_via_proxy(pool)
+        ok, content = _fetch_parallel(INDEX_URL, pool, "xml")
+        if not ok:
+            raise RuntimeError("Index fetch failed (direct + parallel both failed)")
     locs = _INDEX_LOC_RE.findall(content)
     return [u.decode().strip() for u in locs if b"post_type_post" in u]
 
@@ -107,39 +102,36 @@ def _fetch_index_direct() -> bytes | None:
         if r.status_code == 200 and any(m in head for m in XML_MARKERS):
             print(f"[sitemap] Direct OK ({len(r.content):,} bytes)")
             return r.content
-        print(f"[sitemap] Direct: status={r.status_code}, no XML marker — proxy fallback")
+        print(f"[sitemap] Direct: status={r.status_code}, no XML marker — parallel fallback")
         return None
     except Exception as e:
-        print(f"[sitemap] Direct error: {e} — proxy fallback")
+        print(f"[sitemap] Direct error: {e} — parallel fallback")
         return None
 
 
-# Fetch index via proxy rotation; raise on exhaustion
-def _fetch_index_via_proxy(pool: list) -> bytes:
-    cm         = PersistentCooldownManager()
-    candidates = cm.eligible_candidates(pool)
-    print(f"[sitemap] Proxy fallback: {len(candidates)} candidates")
-    for proto, hp in candidates:
-        ok, content = fetch_url(proto, hp, INDEX_URL, "xml")
-        if ok:
-            print(f"[sitemap] Proxy OK via {proto}://{hp} ({len(content):,} bytes)")
-            return content
-        cm.mark_burned(proto, hp)
-    raise RuntimeError("sitemap index exhausted all proxy candidates")
+# Return the sub-sitemap URL with the highest trailing number (= newest page)
+def _pick_highest_numbered(urls: list[str]) -> str:
+    def _num(u: str) -> int:
+        m = _NUM_RE.search(u)
+        return int(m.group(1)) if m else -1
+    return max(urls, key=_num)
 
 
-# Fetch one post sub-sitemap via proxy rotation; return (url, lastmod) pairs
-def _fetch_sub_sitemap(
-    sub_url: str, pool: list, cm: PersistentCooldownManager
-) -> list[tuple[str, datetime]]:
-    candidates = cm.eligible_candidates(pool)
-    for proto, hp in candidates:
-        ok, content = fetch_url(proto, hp, sub_url, "xml")
-        if ok:
-            return _parse_url_blocks(content)
-        cm.mark_burned(proto, hp)
-    print(f"[probe] WARNING: {sub_url.split('/')[-1]} — all candidates exhausted, skipping")
-    return []
+# Fire n proxies in parallel on url; return (True, content) on first success, (False, b"") on all miss
+def _fetch_parallel(
+    url: str, pool: list, content_type: str, n: int = RACE_WIDTH
+) -> tuple[bool, bytes]:
+    sample = random.sample(pool, min(n, len(pool)))
+    ex     = ThreadPoolExecutor(max_workers=len(sample))
+    futs   = {ex.submit(fetch_url, p, hp, url, content_type): (p, hp) for p, hp in sample}
+    try:
+        for fut in as_completed(futs):
+            ok, content = fut.result()
+            if ok:
+                return True, content
+    finally:
+        ex.shutdown(wait=False, cancel_futures=True)
+    return False, b""
 
 
 # Parse <url> blocks from sub-sitemap XML; return (loc, lastmod) pairs with UTC datetimes
@@ -163,30 +155,13 @@ def _parse_url_blocks(content: bytes) -> list[tuple[str, datetime]]:
     return results
 
 
-# Fetch one article page via proxy rotation; return (ok, content, attempts_used)
-def _fetch_article(
-    url: str, pool: list, cm: PersistentCooldownManager, max_tries: int
-) -> tuple[bool, bytes, int]:
-    candidates = cm.eligible_candidates(pool)
-    for i, (proto, hp) in enumerate(candidates[:max_tries]):
-        ok, content = fetch_url(proto, hp, url, "html")
-        if ok:
-            return True, content, i + 1
-        cm.mark_burned(proto, hp)
-    return False, b"", min(max_tries, len(candidates))
-
-
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(
-        description="48h article delta probe: theblock.co post sitemaps → raw HTML fetch"
+        description="48h article delta probe: theblock.co highest post-sitemap → parallel race fetch → raw HTML"
     )
     parser.add_argument(
         "--hours", type=float, default=48.0,
-        help="Lookback window in hours (default: 48)",
-    )
-    parser.add_argument(
-        "--max_article_tries", type=int, default=MAX_ARTICLE_TRIES,
-        help=f"Max proxy attempts per article page fetch (default: {MAX_ARTICLE_TRIES})",
+        help="Lookback window in hours; <2 hits → fallback to 2 newest (default: 48)",
     )
     args = parser.parse_args()
-    probe_48h_article_fetch_workflow(hours=args.hours, max_article_tries=args.max_article_tries)
+    probe_48h_article_fetch_workflow(hours=args.hours)
