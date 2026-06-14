@@ -70,19 +70,28 @@ bytes at the fetch site. Rotation logic untouched; `None` default = backward com
 
 ---
 
-### p5_logger.py (162 LOC)
-**Purpose:** Accumulates 5 logging surfaces; no I/O until `finalize()`.
+### p5_logger.py (203 LOC)
+**Purpose:** Streams fetch events to JSONL on every attempt (kill-safe); in-memory
+only for small counters. `finalize()` closes the stream and writes an MD summary.
 **Reads:** events fed by `run_loop` via `record_attempt / record_burn / record_working_set`.
-**Writes:** JSONL event log (`acquire_pipe_logs/`) + MD summary (`acquire_pipe_reports/`).
-**Called by:** `p4_loop.run_loop`.
+**Writes:** `acquire_pipe_logs/acquire_events_<ts>.jsonl` (streamed, line-buffered) +
+`acquire_pipe_reports/acquire_run_<ts>.md` (at `finalize()`).
+**Called by:** `p4_loop.run_loop`, `acquire_pipe.py`.
 **Calls out:** `proxy_status_log.proxy_key`.
 
-**5 surfaces:**
+**Streaming design:** `record_attempt()` writes each event as `json.dumps(event)+"\n"`
+to an open file handle (`buffering=1`, line-buffered). No in-memory event list.
+A kill at any point leaves all recorded events on disk. `finalize()` reconstructs
+Surface 6 from the JSONL via `_throughput_buckets(jsonl_path)` — `t0 = min(ts)` across
+all events, so the function works on any partial JSONL without runtime context.
+
+**6 surfaces:**
 1. Fetch progress — URLs done/total + rate (URLs/min)
 2. B-per-proxy distribution — requests-before-burn histogram
 3. Working-set size over time — eligible candidate count per round
 4. Failed attempts per successful fetch — churn ratio
 5. Per-proxy event JSONL — `proxy_key`, `ts`, `url`, `result`, `proxy_success_count`
+6. Throughput over time — ok fetches per minute (bursty vs linear)
 
 ---
 
