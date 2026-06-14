@@ -240,11 +240,15 @@ hookzof (new — added for backfill pool).
 `_fetch_bare_txt` retained for existing callers; `_fetch_roosterkid` is the robust
 universal extractor used by all 9 new loaders.
 
-### theblock/proxy_status_log.py (145 LOC)
+### theblock/proxy_status_log.py (102 LOC)
 
 **Purpose:** Cumulative proxy-status log — keyed by `"protocol://host:port"`, bounded by unique proxy count (not run count). `record_run(results, source_label)` loads `logs/proxy_status_log.json`, upserts every result (alive + dead), writes back. Per-entry schema: `{protocol, host, port, checks, alive, dead, last_status, first_seen, last_seen, cooled_at?}`. Explicit `protocol`/`host`/`port` fields enable subnet/ASN/port grouping without re-parsing the key. `proxy_key(proto, host_port)` — **public** canonical key builder (auth-stripped `proto://host:port`); shared by `record_run`, `partition_fresh`, and `curated_sources._merge_dedup` — single source of truth for the entire keyspace. `partition_fresh(entries, window_s)` — called by `probe_liveness.py` on the monosans and curated paths — partitions `[(proto, host_port)]` into `(to_check, skipped_fresh)` using the log's `last_seen` field; age comparison is timezone-aware (`last_seen` parsed as UTC via `.replace(tzinfo=timezone.utc)`).
 
-**Cooldown store (added for the sustained acquire-pipe loop):** `cooled_at` (UTC ISO) is the per-proxy burn timestamp = the cooldown source of truth. `load_cooled_at()` returns `{proxy_key: cooled_at|None}` for every entry (None = never burned = eligible — additive, no migration). `mark_cooled_batch(burns: dict[key→iso])` upserts `cooled_at` in one load+save, creating a minimal entry for proxies not yet seen by `record_run`. Consumed by `acquire_pipe/p2_cooldown.PersistentCooldownManager`.
+**Cooldown store (added OT32, removed OT33):** Three functions — `load_cooled_at`,
+`mark_cooled_batch`, and `_parse_proxy_key` (helper for `mark_cooled_batch`) — were added in OT32
+Stage 1 and removed in OT33 Stage A when cooldown reverted to in-memory. The `cooled_at` field may
+still appear in existing log entries (legacy data; probe_liveness never reads it). `record_run`,
+`partition_fresh`, `proxy_key` are untouched and used by `probe_liveness.py`.
 
 ### theblock/logs/proxy_status_log.json
 
