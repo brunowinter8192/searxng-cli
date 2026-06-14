@@ -226,8 +226,8 @@ The markdown then simply inherits the PDF's basename: `STEM = basename(PDF witho
 `$OUTPUT_DIR/$STEM.md`. PDF name and md name stay identical.
 
 The whole convert is ONE job — every PDF in a single `workflow.py convert` call, never a
-per-PDF loop. workflow auto-selects the mode: **1 PDF → single, ≥2 PDFs → par2** (2× parallel).
-Output per PDF: `$OUTPUT_DIR/<stem>.md` (`stem = basename(PDF without .pdf)`).
+per-PDF loop. All PDFs convert in ONE MinerU process: the model loads **once** for the whole job,
+then each PDF is parsed in sequence. Output per PDF: `$OUTPUT_DIR/<stem>.md` (`stem = basename(PDF without .pdf)`).
 
 A directory of PDFs (rename any cryptic ones first — see below):
 
@@ -246,8 +246,8 @@ A single PDF — pass just that one path:
 ```
 
 The lock allows at most one job at a time; a second concurrent call fails immediately with
-exit 1. workflow prints only `job done` on success — all per-convert detail (timing, warnings,
-failures) goes to the job log, read in the Derail Check below, not to the console.
+exit 1. workflow prints only `job done` on success — per-PDF detail (output md, page/word counts)
+goes to the job log, read in the Derail Check below, not to the console.
 
 Note on naming a cryptic PDF: when a PDF's filename is not already speaking, derive a descriptive PascalCase name from the first page header / title metadata, condensed to ~30 chars (e.g. `AslamMontague2001MetasearchModels`, `ManningRaghavanSchutze2008IRTextbook`), and RENAME the PDF to it. Once the PDF carries a speaking name, `STEM = basename(PDF)` is correct and the md inherits it. Avoid filename collisions inside one batch — append year or first-author-initial when needed.
 
@@ -255,8 +255,8 @@ Note on naming a cryptic PDF: when a PDF's filename is not already speaking, der
 
 `STEM = basename(PDF)` — no `pdf → stem` mapping table. Rename cryptic PDFs once, BEFORE the job runs.
 
-A PDF that fails to convert surfaces as `warn: "fail"` in the job log (see Derail Check) — it is
-reported to the user there, not retried.
+A PDF that fails to convert surfaces in the job log with `md: null` (no output produced) — it is
+reported to the user there (see Derail Check), not retried.
 
 ##### Background Convert — launch + go idle
 
@@ -266,7 +266,7 @@ When the console prints `job done`, run the Derail Check.
 
 ##### Derail Check — read the job log (after `job done`)
 
-workflow writes one JSONL line per convert plus one `job_summary` line to
+workflow writes one JSONL line per PDF plus one `job_summary` line to
 `/Users/brunowinter2000/Documents/ai/Mineru/logs/jobs.jsonl`. You submitted N PDFs, so this job
 appended **N+1** lines. Read only the tail — never the whole growing file (N = number of PDFs you
 submitted):
@@ -275,28 +275,27 @@ submitted):
 tail -n $((N+1)) /Users/brunowinter2000/Documents/ai/Mineru/logs/jobs.jsonl
 ```
 
-The last line is the `job_summary`. Take its `job_id` and keep only the lines whose `job_id`
-matches it (guards against a missing line pulling in a prior job). Then read the summary's `n_warn`:
+The last line is the `job_summary`; take its `job_id` and keep only the lines with that `job_id`
+(guards against a missing line pulling in a prior job). Each per-PDF line carries
+`{pdf, md, pages, words, words_per_page}`. Check every line:
 
-- **`n_warn == 0`** → every convert is clean → proceed to Cleanup for all mds.
-- **`n_warn > 0`** → inspect the per-convert lines with `warn != "ok"`:
-  - **`warn: "fail"`** → no md was produced (convert errored or timed out). Do NOT clean. REPORT
-    to the user: the PDF name and that it failed.
-  - **`warn: "slow"` or `"fast"`** → the md exists but its timing was off → open that md and check
-    it for corruption (HOW below). If corrupt → do NOT clean, do NOT index, REPORT to the user
-    (PDF name + evidence). If it reads clean → proceed normally with that md.
+- **`md: null`** → no output produced for that PDF (convert failed). Do NOT clean. REPORT to the
+  user: the PDF name + that it failed.
+- **`md` present** → judge `words_per_page` for corruption. A clean academic md runs about
+  **550–600 words per page**; a corrupted (derailed) convert is far wordier — roughly **800+ words
+  per page** — and carries duplicated or garbled passages. Two steps: (1) scan all PDFs'
+  `words_per_page` and flag any that is a clear outlier versus the rest of the batch; (2) open each
+  flagged md and confirm — duplicated blocks / incoherent runs = corrupt. A genuinely dense paper
+  can sit high without being corrupt, so the open-and-read confirmation decides.
 
-**How to recognize a corrupted md:** a clean academic md runs about **550–600 words per page**; a
-corrupted one is far wordier — roughly **800+ words per page** — and carries duplicated or garbled
-passages. Compute words-per-page as `wc -w` of the md divided by the `pages` field from that
-convert's log line. An abnormally high ratio, or visibly duplicated / incoherent runs of text,
-means corrupt → report, do not clean.
+A confirmed-corrupt md → do NOT clean, do NOT index, REPORT to the user (PDF name + evidence).
+Everything that reads clean → proceed to Cleanup.
 
 #### Phase 1 — Cleanup
 
 PDFs come from MinerU as Markdown. Cleanup focuses on inline OCR artifacts, not block chrome.
-Clean only the mds that passed the Derail Check — skip any flagged `fail` or confirmed corrupt
-(those were reported to the user, never cleaned or indexed).
+Clean only the mds that passed the Derail Check — skip any with `md: null` (failed) or confirmed
+corrupt (those were reported to the user, never cleaned or indexed).
 
 ##### Pre-cleanup: Backup + Word Count Baseline
 
