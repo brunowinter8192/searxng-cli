@@ -119,8 +119,8 @@ if __name__ == "__main__":
         help=f"Hard wall-time safety cap in hours (default: {DEFAULT_MAX_WALL_S/3600:.0f})",
     )
     parser.add_argument(
-        "--pool", choices=["curated", "backfill"], default="curated",
-        help="Proxy pool: curated (monosans+proxifly ~3.5k) or backfill (top-13 ~22k, default: curated)",
+        "--pool", choices=["curated", "backfill"], default="backfill",
+        help="Proxy pool: curated (monosans+proxifly ~3.5k) or backfill (top-13 ~22k, default: backfill)",
     )
     args = parser.parse_args()
     acquire_pipe_workflow(

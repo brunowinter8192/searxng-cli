@@ -173,7 +173,7 @@ fresh per job) → `build_sitemap_target` (64 sub-sitemap URLs) → sustained `r
 - `--concurrency N` — concurrent (proxy, URL) pairs per batch (default 128)
 - `--buffer_size N` — active eligible-proxy buffer depth (default 1280)
 - `--max_hours H` — hard wall-time safety cap in hours (default 12)
-- `--pool {curated,backfill}` — proxy pool (default `curated`):
+- `--pool {curated,backfill}` — proxy pool (default `backfill`):
   `curated` = monosans+proxifly ~3.5k; `backfill` = top-13 repos ~22.7k unique
 
 ---
