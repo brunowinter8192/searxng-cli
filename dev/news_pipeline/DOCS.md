@@ -295,6 +295,25 @@ jhao104/proxy_pool probe (self-maintaining pool: scrape → Redis → validate/e
 
 Standalone direct CF-pass probe on the monosans+proxifly curated list (no alive pre-filter; curl_cffi chrome impersonation; same gate as jhao104 Stage 2). Key finding: **52/3477 = 1.496% overall** (http: 0.944%, socks4: **3.567%**, socks5: 0.698%); socks4 leads 3.8×; curated list 17.6× better than jhao104 scraped sources. Home-IP direct check: CF-reputation-clear (200 + XML). Reports to gitignored `probe_curated_theblock_cf_reports/`.
 
+### theblock/probe_48h_article_fetch.py (192 LOC)
+
+**Purpose:** 48h article delta probe — sitemap index → `post_type_post` sub-sitemaps → `<loc>` + `<lastmod>` parse → 48h filter → 2 raw article page fetches. Prod-near discover logic (mirrors the future `discover()` contract); no cleanup, no markdown conversion, no src/ touch.
+
+**Flow:** Load backfill pool (22k) → index direct-then-proxy → filter sub-sitemaps on `post_type_post` substring → fetch each sub-sitemap via proxy rotation (shared `PersistentCooldownManager`) → parse `<url>` blocks for both `<loc>` and `<lastmod>` → filter on `lastmod >= now − hours` → write `recent_articles.txt` (`lastmod\turl`) → log per-sub hit counts (chronological ordering signal) → fetch 2 article pages via `p1_fetch.fetch_url(..., "html")` → write `article_0.html` + `article_1.html`. Empty result → `"widen --hours"` hint + clean exit.
+
+**Reuse:** `fetch_url` + `XML_MARKERS` from `p1_fetch`; `PersistentCooldownManager` from `p2_cooldown`; `load_backfill_pool` from `curated_sources`; index direct-then-proxy pattern from `p3_target`.
+
+**Output (gitignored):** `theblock/probe_48h_output/recent_articles.txt`, `article_0.html`, `article_1.html`.
+
+**CLI flags:**
+- `--hours` (float, default 48) — lookback window
+- `--max_article_tries` (int, default 30) — max proxy attempts per article fetch
+
+```bash
+./venv/bin/python dev/news_pipeline/theblock/probe_48h_article_fetch.py
+./venv/bin/python dev/news_pipeline/theblock/probe_48h_article_fetch.py --hours 72
+```
+
 ## Output Directories
 
 | Directory | Contents | Gitignored |
@@ -321,3 +340,4 @@ Standalone direct CF-pass probe on the monosans+proxifly curated list (no alive 
 | `theblock/frozen_pool/` | Frozen deduped pool per bucket (ephemeral, regenerated with --freeze) | ✅ yes |
 | `theblock/probe_liveness_logs/` | sweep_log.md (committed) + unknown_errors_*.log (gitignored) | partial |
 | `theblock/logs/` | proxy_status_log.json (cumulative keyed proxy history — committed) | ❌ no |
+| `theblock/probe_48h_output/` | recent_articles.txt + raw article HTML (ephemeral probe output) | ✅ yes |
