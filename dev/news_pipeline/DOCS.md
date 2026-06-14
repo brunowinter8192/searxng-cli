@@ -295,19 +295,20 @@ jhao104/proxy_pool probe (self-maintaining pool: scrape → Redis → validate/e
 
 Standalone direct CF-pass probe on the monosans+proxifly curated list (no alive pre-filter; curl_cffi chrome impersonation; same gate as jhao104 Stage 2). Key finding: **52/3477 = 1.496% overall** (http: 0.944%, socks4: **3.567%**, socks5: 0.698%); socks4 leads 3.8×; curated list 17.6× better than jhao104 scraped sources. Home-IP direct check: CF-reputation-clear (200 + XML). Reports to gitignored `probe_curated_theblock_cf_reports/`.
 
-### theblock/probe_48h_article_fetch.py (192 LOC)
+### theblock/probe_48h_article_fetch.py (167 LOC)
 
-**Purpose:** 48h article delta probe — sitemap index → `post_type_post` sub-sitemaps → `<loc>` + `<lastmod>` parse → 48h filter → 2 raw article page fetches. Prod-near discover logic (mirrors the future `discover()` contract); no cleanup, no markdown conversion, no src/ touch.
+**Purpose:** 48h article delta probe — parallel race-fetch design: fires 128 proxies simultaneously per URL, returns on first success (no sequential rotation, no cooldown). Covers: index → highest-numbered `post_type_post` sub-sitemap → 48h filter → 2 raw article HTML files. No cleanup, no MD conversion, no src/ touch.
 
-**Flow:** Load backfill pool (22k) → index direct-then-proxy → filter sub-sitemaps on `post_type_post` substring → fetch each sub-sitemap via proxy rotation (shared `PersistentCooldownManager`) → parse `<url>` blocks for both `<loc>` and `<lastmod>` → filter on `lastmod >= now − hours` → write `recent_articles.txt` (`lastmod\turl`) → log per-sub hit counts (chronological ordering signal) → fetch 2 article pages via `p1_fetch.fetch_url(..., "html")` → write `article_0.html` + `article_1.html`. Empty result → `"widen --hours"` hint + clean exit.
+**Flow:** Load backfill pool (22k) → index direct httpx, on fail `_fetch_parallel(INDEX_URL, pool, "xml")` → filter on `post_type_post`, pick highest trailing-number (`_NUM_RE`) → `_fetch_parallel(sub_url, pool, "xml")` → parse `<url>` blocks (`<loc>` + `<lastmod>`) → filter `lastmod >= now − hours`; if `≥2` hits take 2, if `<2` take 2 newest by lastmod (guaranteed content) → `_fetch_parallel(url, pool, "html")` per article → `article_0.html` + `article_1.html`.
 
-**Reuse:** `fetch_url` + `XML_MARKERS` from `p1_fetch`; `PersistentCooldownManager` from `p2_cooldown`; `load_backfill_pool` from `curated_sources`; index direct-then-proxy pattern from `p3_target`.
+**`_fetch_parallel`:** `random.sample(pool, min(128, len(pool)))` for protocol mix → `ThreadPoolExecutor` → `as_completed` early-return on first `ok=True` → `shutdown(wait=False, cancel_futures=True)`. Lingering threads self-terminate at `FETCH_TIMEOUT`.
 
-**Output (gitignored):** `theblock/probe_48h_output/recent_articles.txt`, `article_0.html`, `article_1.html`.
+**Reuse:** `fetch_url` + `XML_MARKERS` from `p1_fetch`; `load_backfill_pool` from `curated_sources`.
+
+**Output (gitignored):** `theblock/probe_48h_output/article_0.html`, `article_1.html`.
 
 **CLI flags:**
-- `--hours` (float, default 48) — lookback window
-- `--max_article_tries` (int, default 30) — max proxy attempts per article fetch
+- `--hours` (float, default 48) — lookback window; `<2` hits → fallback to 2 newest
 
 ```bash
 ./venv/bin/python dev/news_pipeline/theblock/probe_48h_article_fetch.py
@@ -340,4 +341,4 @@ Standalone direct CF-pass probe on the monosans+proxifly curated list (no alive 
 | `theblock/frozen_pool/` | Frozen deduped pool per bucket (ephemeral, regenerated with --freeze) | ✅ yes |
 | `theblock/probe_liveness_logs/` | sweep_log.md (committed) + unknown_errors_*.log (gitignored) | partial |
 | `theblock/logs/` | proxy_status_log.json (cumulative keyed proxy history — committed) | ❌ no |
-| `theblock/probe_48h_output/` | recent_articles.txt + raw article HTML (ephemeral probe output) | ✅ yes |
+| `theblock/probe_48h_output/` | raw article HTML: article_0.html + article_1.html (ephemeral) | ✅ yes |
