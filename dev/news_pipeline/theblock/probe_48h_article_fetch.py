@@ -117,20 +117,25 @@ def _pick_highest_numbered(urls: list[str]) -> str:
     return max(urls, key=_num)
 
 
-# Fire n proxies in parallel on url; return (True, content) on first success, (False, b"") on all miss
+# Fire pool in shuffled 128-proxy waves; return (True, content) on first success in any wave
 def _fetch_parallel(
     url: str, pool: list, content_type: str, n: int = RACE_WIDTH
 ) -> tuple[bool, bytes]:
-    sample = random.sample(pool, min(n, len(pool)))
-    ex     = ThreadPoolExecutor(max_workers=len(sample))
-    futs   = {ex.submit(fetch_url, p, hp, url, content_type): (p, hp) for p, hp in sample}
-    try:
-        for fut in as_completed(futs):
-            ok, content = fut.result()
-            if ok:
-                return True, content
-    finally:
-        ex.shutdown(wait=False, cancel_futures=True)
+    candidates = pool[:]
+    random.shuffle(candidates)
+    total = (len(candidates) + n - 1) // n
+    for wi, start in enumerate(range(0, len(candidates), n), 1):
+        wave = candidates[start:start + n]
+        ex   = ThreadPoolExecutor(max_workers=len(wave))
+        futs = {ex.submit(fetch_url, p, hp, url, content_type): (p, hp) for p, hp in wave}
+        try:
+            for fut in as_completed(futs):
+                ok, content = fut.result()
+                if ok:
+                    return True, content
+        finally:
+            ex.shutdown(wait=False, cancel_futures=True)
+        print(f"[probe]   wave {wi}/{total} all missed, next...")
     return False, b""
 
 
