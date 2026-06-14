@@ -1,8 +1,10 @@
 # INFRASTRUCTURE
 
 import sys
+import time
 from collections import deque
 from concurrent.futures import ThreadPoolExecutor, as_completed
+from datetime import datetime, timezone
 from pathlib import Path
 from typing import Callable
 
@@ -10,51 +12,81 @@ sys.path.insert(0, str(Path(__file__).parent))
 from p1_fetch import fetch_url
 from p2_cooldown import PersistentCooldownManager
 from p5_logger import AcquireLogger
-from p6_buffer import refill_buffer, BUFFER_SIZE, DEFAULT_CONCURRENCY
+from p6_buffer import build_active_buffer, refill_buffer, BUFFER_SIZE, DEFAULT_CONCURRENCY
+
+_sleep             = time.sleep    # patchable in tests without affecting stdlib time
+REFRESH_INTERVAL_S = 3600          # full pool reload cadence (60 min)
+DEFAULT_MAX_WALL_S = 12 * 3600     # hard safety cap default (12 h)
 
 
 # ORCHESTRATOR
 
 def run_loop(
-    pool_22k: list[tuple[str, str]],
-    buf: list[tuple[str, str]],
+    pool_provider: Callable[[], list[tuple[str, str]]],
     target_urls: list[str],
     content_type: str,
     logger: AcquireLogger,
     cm: PersistentCooldownManager,
     concurrency: int = DEFAULT_CONCURRENCY,
     content_handler: Callable[[str, bytes], None] | None = None,
+    max_wall_s: float = DEFAULT_MAX_WALL_S,
+    refresh_interval_s: float = REFRESH_INTERVAL_S,
 ) -> tuple[list[str], list[str]]:
-    """Sustained concurrent working-set rotation loop with 2-strikes lifecycle.
+    """Sustained concurrent rotation loop: 60-min pool refresh + wait-on-exhaustion.
 
-    Draws batches from the active buffer (buf); working-set proxies (proven this
-    session) fill Slot 1, fresh buffer candidates fill Slot 2. buf is refilled
-    from pool_22k (eligible, socks4-first) whenever it drops below BUFFER_SIZE.
+    pool_provider() is called once on startup and again at each refresh_interval_s
+    tick to fetch a fresh proxy list; build_active_buffer() filters it through cm
+    to rebuild the active buffer. 2-strikes lifecycle (Stage 3) drives burn→cooldown.
 
-    2-strikes lifecycle:
-      1st consecutive fail  → URL back to queue; proxy stays eligible (NOT burned).
-      2nd consecutive fail  → burn: cm.mark_burned + remove from buf + wset.
-      Success               → proxy joins wset; consecutive-fail counter reset.
+    Exhaustion (buf + wset both empty): sleeps until the earlier of (next cooldown
+    expiry, next refresh tick), then calls pool_provider() and rebuilds buf — no gap
+    reported, no early exit. cap_remaining clamps the sleep so the safety cap is
+    never overshot. After sleep the outer loop resumes normally.
 
-    cm.flush() is called once per batch (after as_completed) — the only I/O path
-    for cooldown writes regardless of how many proxies burned in the batch.
-
-    Returns (done_urls, gap_urls). gap is non-empty when buf + wset are exhausted
-    before target is complete; Stage 4 adds wait-on-exhaustion around this function.
+    Safety cap: after max_wall_s wall-seconds the loop exits cleanly, leaving any
+    unfinished URLs in gap. refresh_interval_s is a separate parameter to allow
+    small values in tests without patching module globals.
     """
+    run_start     = time.monotonic()
     queue         = deque(target_urls)
-    done:         list[str]                      = []
-    wset:         set[tuple[str, str]]           = set()
-    psuccess:     dict[tuple[str, str], int]     = {}
-    _consec_fail: dict[tuple[str, str], int]     = {}
+    done:         list[str]                  = []
+    wset:         set[tuple[str, str]]       = set()
+    psuccess:     dict[tuple[str, str], int] = {}
+    _consec_fail: dict[tuple[str, str], int] = {}
+
+    pool_22k      = pool_provider()
+    buf           = build_active_buffer(pool_22k, cm)
+    _last_refresh = time.monotonic()
 
     while queue:
+        now = time.monotonic()
+
+        if now - run_start >= max_wall_s:
+            break   # hard safety cap
+
+        if now - _last_refresh >= refresh_interval_s:
+            pool_22k      = pool_provider()
+            buf           = build_active_buffer(pool_22k, cm)
+            _last_refresh = time.monotonic()
+
         if len(buf) < BUFFER_SIZE:
             buf = refill_buffer(buf, pool_22k, cm)
 
         batch = _build_batch(queue, wset, buf, concurrency)
         if not batch:
-            break   # buf + wset exhausted → caller handles wait / refresh
+            # buf + wset exhausted — wait until earliest useful wakeup
+            now_mono      = time.monotonic()
+            cap_remaining = max_wall_s - (now_mono - run_start)
+            if cap_remaining <= 0:
+                break
+            sleep_s = _compute_sleep(cm, _last_refresh, refresh_interval_s)
+            sleep_s = min(sleep_s, cap_remaining)
+            if sleep_s > 0:
+                _sleep(sleep_s)
+            pool_22k      = pool_provider()
+            buf           = build_active_buffer(pool_22k, cm)
+            _last_refresh = time.monotonic()
+            continue
 
         for _ in batch:
             queue.popleft()
@@ -77,28 +109,46 @@ def run_loop(
                     done.append(url)
                     wset.add(key)
                     psuccess[key] = psuccess.get(key, 0) + 1
-                    _consec_fail.pop(key, None)              # success resets counter
+                    _consec_fail.pop(key, None)
                 else:
-                    queue.append(url)                        # retry — back of queue
+                    queue.append(url)
                     fails = _consec_fail.get(key, 0) + 1
                     if fails >= 2:
-                        # 2nd consecutive fail → burn
                         logger.record_burn(proto, hp, b_count=psuccess.get(key, 0))
                         cm.mark_burned(proto, hp)
                         wset.discard(key)
-                        buf = [p for p in buf if p != key]  # remove from active buffer
-                        _consec_fail.pop(key, None)          # reset (proxy now cooling)
+                        buf = [p for p in buf if p != key]
+                        _consec_fail.pop(key, None)
                         psuccess.pop(key, None)
                     else:
-                        _consec_fail[key] = fails            # 1st fail: proxy stays eligible
+                        _consec_fail[key] = fails
 
-        cm.flush()                               # one I/O per batch, covers all burns
+        cm.flush()
         logger.record_working_set(len(wset))
 
     return done, list(queue)
 
 
 # FUNCTIONS
+
+# Seconds to sleep on exhaustion: min(next cooldown expiry, next refresh tick)
+def _compute_sleep(
+    cm: PersistentCooldownManager,
+    last_refresh_mono: float,
+    refresh_interval_s: float,
+) -> float:
+    """Return seconds to sleep; 0.0 means immediate wakeup."""
+    now_mono        = time.monotonic()
+    secs_to_refresh = max(0.0, (last_refresh_mono + refresh_interval_s) - now_mono)
+
+    earliest = cm.earliest_eligible_at()
+    if earliest is None:
+        return secs_to_refresh   # no burned proxies → sleep until next refresh
+
+    now_utc          = datetime.now(timezone.utc)
+    secs_to_eligible = max(0.0, (earliest - now_utc).total_seconds())
+    return min(secs_to_refresh, secs_to_eligible)
+
 
 # Build one batch: working-set proxies first, then fresh candidates from active buffer
 def _build_batch(
@@ -110,9 +160,8 @@ def _build_batch(
     """Return list of (proto, hp, url) up to concurrency; each proxy appears once."""
     batch:            list[tuple[str, str, str]] = []
     assigned_proxies: set[tuple[str, str]]       = set()
-    url_iter = iter(queue)   # front-to-back peek without popping
+    url_iter = iter(queue)
 
-    # Slot 1: working-set proxies (proven this session)
     for proto, hp in wset:
         if len(batch) >= concurrency:
             break
@@ -122,7 +171,6 @@ def _build_batch(
         batch.append((proto, hp, url))
         assigned_proxies.add((proto, hp))
 
-    # Slot 2: fresh candidates from active buffer (already eligible + socks4-first)
     for proto, hp in buf:
         if len(batch) >= concurrency:
             break

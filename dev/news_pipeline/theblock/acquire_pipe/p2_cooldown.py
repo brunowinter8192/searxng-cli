@@ -65,6 +65,12 @@ class PersistentCooldownManager:
         now = datetime.now(timezone.utc)
         return sum(1 for dt in self._burned_utc.values() if (now - dt) < self._cooldown_td)
 
+    def earliest_eligible_at(self) -> "datetime | None":
+        """UTC datetime when the next cooled proxy becomes eligible. None if none cooling."""
+        if not self._burned_utc:
+            return None
+        return min(self._burned_utc.values()) + self._cooldown_td
+
 
 # Backward-compat alias — p4_loop.py imports CooldownManager by name (unchanged until Stage 3)
 CooldownManager = PersistentCooldownManager
