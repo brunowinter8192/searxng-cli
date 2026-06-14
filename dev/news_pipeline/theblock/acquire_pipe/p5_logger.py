@@ -78,6 +78,10 @@ class AcquireLogger:
         }
         self._jsonl_fh.write(json.dumps(event) + "\n")
 
+    def close(self) -> None:
+        """Close the JSONL stream without writing per-run MD. Use before janitor.end_job()."""
+        self._jsonl_fh.close()
+
     def finalize(self, report_dir: Path) -> Path:
         """Close JSONL stream; write MD summary from in-memory counters + JSONL. Return MD path."""
         self._jsonl_fh.close()

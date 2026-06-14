@@ -3,9 +3,12 @@
 import argparse
 import re
 import sys
+from datetime import datetime, timezone
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).parent))
+import box_lock
+import p7_janitor as janitor
 from p2_cooldown import PersistentCooldownManager
 from p3_target import build_sitemap_target, _LOC_RE
 from p4_loop import run_loop, DEFAULT_MAX_WALL_S, REFRESH_INTERVAL_S
@@ -18,7 +21,6 @@ from curated_sources import load_curated_proxies, load_backfill_pool
 ACQUIRE_BASE      = Path(__file__).parent
 OUTPUT_DIR        = ACQUIRE_BASE / "acquire_pipe_output"
 LOG_DIR           = ACQUIRE_BASE / "acquire_pipe_logs"
-REPORT_DIR        = ACQUIRE_BASE / "acquire_pipe_reports"
 ARTICLE_URLS_FILE = OUTPUT_DIR / "theblock_article_urls.txt"
 
 
@@ -32,50 +34,63 @@ def acquire_pipe_workflow(
 ) -> None:
     """Sustained acquire-pipe: sitemap → 64 sub-sitemaps → ~27k article URLs.
 
-    Uses persistent cooldown (proxy_status_log.json cooled_at), active buffer of
-    buffer_size eligible proxies, 60-min pool refresh, wait-on-exhaustion, and a
-    hard safety cap of max_wall_s seconds.
+    One job at a time (box_lock global flock). Each job is a clean slate (in-memory
+    cooldown, start_job wipes transient logs). end_job derives the persistent
+    job.md + cumulative_hits.png and kills the transient JSONL.
+    On LockBusyError → print + sys.exit(1).
     """
-    cm        = PersistentCooldownManager()
-    pool_fn   = load_backfill_pool if pool_name == "backfill" else load_curated_proxies
+    cm      = PersistentCooldownManager()
+    pool_fn = load_backfill_pool if pool_name == "backfill" else load_curated_proxies
 
     print(f"[acquire_pipe] Building sitemap target...")
     target_urls = build_sitemap_target()
     print(f"[acquire_pipe] Target: {len(target_urls)} sub-sitemaps")
 
-    OUTPUT_DIR.mkdir(parents=True, exist_ok=True)
-    loc_urls: list[str] = []
-    logger = AcquireLogger(total_urls=len(target_urls), log_dir=LOG_DIR)
+    job_id      = datetime.now(timezone.utc).strftime("%Y%m%dT%H%M%SZ")
+    target_desc = f"theblock-{pool_name}-{len(target_urls)}"
 
-    def content_handler(url: str, content: bytes) -> None:
-        fname = OUTPUT_DIR / _url_to_filename(url)
-        fname.write_bytes(b"<!-- source: " + url.encode() + b" -->\n" + content)
-        for m in _LOC_RE.finditer(content):
-            loc_urls.append(m.group(1).decode().strip())
+    try:
+        with box_lock.acquire(job_id, target_desc):
+            janitor.start_job(job_id)
 
-    print(
-        f"[acquire_pipe] Starting sustained loop "
-        f"(concurrency={concurrency}, buffer={buffer_size}, "
-        f"max_hours={max_wall_s/3600:.2f}, pool={pool_name})..."
-    )
-    done, gap = run_loop(
-        pool_fn, target_urls, "xml", logger, cm,
-        concurrency=concurrency,
-        buffer_size=buffer_size,
-        content_handler=content_handler,
-        max_wall_s=max_wall_s,
-    )
-    print(f"[acquire_pipe] Loop done: {len(done)} completed, {len(gap)} remaining")
+            OUTPUT_DIR.mkdir(parents=True, exist_ok=True)
+            loc_urls: list[str] = []
+            logger = AcquireLogger(total_urls=len(target_urls), log_dir=LOG_DIR)
 
-    article_urls = list(dict.fromkeys(loc_urls))
-    ARTICLE_URLS_FILE.write_text("\n".join(article_urls) + "\n", encoding="utf-8")
-    print(f"[acquire_pipe] Article URLs: {len(article_urls)} unique → {ARTICLE_URLS_FILE}")
+            def content_handler(url: str, content: bytes) -> None:
+                fname = OUTPUT_DIR / _url_to_filename(url)
+                fname.write_bytes(b"<!-- source: " + url.encode() + b" -->\n" + content)
+                for m in _LOC_RE.finditer(content):
+                    loc_urls.append(m.group(1).decode().strip())
 
-    md_path = logger.finalize(REPORT_DIR)
-    print(f"[acquire_pipe] Report: {md_path}")
+            print(
+                f"[acquire_pipe] Starting sustained loop "
+                f"(concurrency={concurrency}, buffer={buffer_size}, "
+                f"max_hours={max_wall_s/3600:.2f}, pool={pool_name})..."
+            )
+            done, gap = run_loop(
+                pool_fn, target_urls, "xml", logger, cm,
+                concurrency=concurrency,
+                buffer_size=buffer_size,
+                content_handler=content_handler,
+                max_wall_s=max_wall_s,
+            )
+            print(f"[acquire_pipe] Loop done: {len(done)} completed, {len(gap)} remaining")
 
-    if gap:
-        print(f"[acquire_pipe] {len(gap)} sub-sitemaps incomplete (safety cap or exhaustion)")
+            article_urls = list(dict.fromkeys(loc_urls))
+            ARTICLE_URLS_FILE.write_text("\n".join(article_urls) + "\n", encoding="utf-8")
+            print(f"[acquire_pipe] Article URLs: {len(article_urls)} unique → {ARTICLE_URLS_FILE}")
+
+            logger.close()
+            janitor.end_job(job_id, logger._jsonl_path, len(target_urls), len(done))
+            print(f"[acquire_pipe] Job report: acquire_pipe_jobs/{job_id}/")
+
+            if gap:
+                print(f"[acquire_pipe] {len(gap)} sub-sitemaps incomplete (safety cap or exhaustion)")
+
+    except box_lock.LockBusyError as e:
+        print(e)
+        sys.exit(1)
 
 
 # FUNCTIONS

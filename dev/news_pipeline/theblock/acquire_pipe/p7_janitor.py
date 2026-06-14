@@ -47,7 +47,9 @@ def end_job(job_id: str, jsonl_path: Path, target_count: int, done_count: int) -
     _write_md(job_dir, job_id, target_count, done_count, stats)
 
     jsonl_path.unlink()
-    print(f"[janitor] end_job {job_id!r}: job.md + plot → {job_dir}  JSONL deleted")
+    _wipe_dir(LOG_DIR)
+    _wipe_dir(REPORT_DIR)
+    print(f"[janitor] end_job {job_id!r}: job.md + plot → {job_dir}  transient dirs wiped")
 
 
 # Read all JSONL lines into a list of dicts
