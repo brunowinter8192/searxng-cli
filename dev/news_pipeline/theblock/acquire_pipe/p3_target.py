@@ -6,9 +6,6 @@ from pathlib import Path
 
 import httpx
 
-sys.path.insert(0, str(Path(__file__).parent.parent))
-from curated_sources import load_curated_proxies
-
 sys.path.insert(0, str(Path(__file__).parent))
 from p1_fetch import fetch_url, THEBLOCK_INDEX, XML_MARKERS
 from p2_cooldown import PersistentCooldownManager
@@ -19,7 +16,7 @@ _LOC_RE        = re.compile(rb"<loc>(https?://[^<]+)</loc>")
 
 # ORCHESTRATOR
 
-def build_sitemap_target() -> list[str]:
+def build_sitemap_target(pool: list | None = None) -> list[str]:
     """Fetch theblock sitemap index; return list of 64 sub-sitemap <loc> URLs.
 
     Direct GET first (home IP may be CF-clear); falls back to proxy rotation on
@@ -27,7 +24,7 @@ def build_sitemap_target() -> list[str]:
     """
     content = _fetch_index_direct()
     if content is None:
-        content = _fetch_index_via_proxy()
+        content = _fetch_index_via_proxy(pool if pool is not None else [])
     return _parse_loc_urls(content)
 
 
@@ -48,9 +45,8 @@ def _fetch_index_direct() -> bytes | None:
         return None
 
 
-# Fetch sitemap index through curated proxy pool (socks4-first); raise on exhaustion
-def _fetch_index_via_proxy() -> bytes:
-    pool = load_curated_proxies()
+# Fetch sitemap index through caller-supplied proxy pool (socks4-first); raise on exhaustion
+def _fetch_index_via_proxy(pool: list) -> bytes:
     cm   = PersistentCooldownManager()
     candidates = cm.eligible_candidates(pool)
     print(f"[sitemap] Proxy fallback: {len(candidates)} candidates")

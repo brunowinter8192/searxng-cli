@@ -42,8 +42,10 @@ def acquire_pipe_workflow(
     cm      = PersistentCooldownManager()
     pool_fn = load_backfill_pool if pool_name == "backfill" else load_curated_proxies
 
+    initial_pool = pool_fn()
+    print(f"[acquire_pipe] Loaded {pool_name} pool: {len(initial_pool)} proxies")
     print(f"[acquire_pipe] Building sitemap target...")
-    target_urls = build_sitemap_target()
+    target_urls = build_sitemap_target(pool=initial_pool)
     print(f"[acquire_pipe] Target: {len(target_urls)} sub-sitemaps")
 
     job_id      = datetime.now(timezone.utc).strftime("%Y%m%dT%H%M%SZ")
@@ -68,8 +70,15 @@ def acquire_pipe_workflow(
                 f"(concurrency={concurrency}, buffer={buffer_size}, "
                 f"max_hours={max_wall_s/3600:.2f}, pool={pool_name})..."
             )
+            _used = [False]
+            def _pool_provider():
+                if not _used[0]:
+                    _used[0] = True
+                    return initial_pool
+                return pool_fn()
+
             done, gap = run_loop(
-                pool_fn, target_urls, "xml", logger, cm,
+                _pool_provider, target_urls, "xml", logger, cm,
                 concurrency=concurrency,
                 buffer_size=buffer_size,
                 content_handler=content_handler,
@@ -119,8 +128,8 @@ if __name__ == "__main__":
         help=f"Hard wall-time safety cap in hours (default: {DEFAULT_MAX_WALL_S/3600:.0f})",
     )
     parser.add_argument(
-        "--pool", choices=["curated", "backfill"], default="curated",
-        help="Proxy pool: curated (monosans+proxifly ~3.5k) or backfill (top-13 ~22k, default: curated)",
+        "--pool", choices=["curated", "backfill"], default="backfill",
+        help="Proxy pool: curated (monosans+proxifly ~3.5k) or backfill (top-13 ~22k, default: backfill)",
     )
     args = parser.parse_args()
     acquire_pipe_workflow(
