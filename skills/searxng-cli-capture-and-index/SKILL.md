@@ -225,64 +225,78 @@ place first — derive the name from the first page / title metadata, sanitize p
 The markdown then simply inherits the PDF's basename: `STEM = basename(PDF without .pdf)`, output =
 `$OUTPUT_DIR/$STEM.md`. PDF name and md name stay identical.
 
-If INPUT is a single PDF file:
+The whole convert is ONE job — every PDF in a single `workflow.py convert` call, never a
+per-PDF loop. workflow auto-selects the mode: **1 PDF → single, ≥2 PDFs → par2** (2× parallel).
+Output per PDF: `$OUTPUT_DIR/<stem>.md` (`stem = basename(PDF without .pdf)`).
+
+A directory of PDFs (rename any cryptic ones first — see below):
 
 ```bash
 mkdir -p $OUTPUT_DIR
-# Ensure $INPUT already carries a speaking name (rename first if cryptic), then:
-STEM="$(basename "$INPUT" .pdf)"
 cd /Users/brunowinter2000/Documents/ai/Mineru && \
 ./venv/bin/python workflow.py convert \
-    --input "$INPUT" \
-    --output "$OUTPUT_DIR/$STEM.md"
+    --pdf "$PDF_DIR"/*.pdf \
+    --out-dir "$OUTPUT_DIR"
 ```
 
-If INPUT is a directory: first ensure EVERY `*.pdf` carries a speaking name (rename the cryptic ones — read first page / title), then loop, taking `STEM` from the PDF basename. Report progress: `[N/M] <STEM>: phase 0 done`.
-
-**Concrete loop template — use exactly this shape, including both guards:**
+A single PDF — pass just that one path:
 
 ```bash
-for PDF in "$PDF_DIR"/*.pdf; do
-    STEM="$(basename "$PDF" .pdf)"   # PDF already carries its speaking name
-    # GUARD 1 — empty STEM means "$OUTPUT_DIR/.md" which silently overwrites every iteration
-    [ -z "$STEM" ] && { echo "BUG: empty STEM for $PDF — abort batch"; exit 1; }
-    cd /Users/brunowinter2000/Documents/ai/Mineru && \
-        ./venv/bin/python workflow.py convert \
-            --input "$PDF" \
-            --output "$OUTPUT_DIR/$STEM.md"
-    # GUARD 2 — convert may exit 0 but produce empty/missing output
-    [ -s "$OUTPUT_DIR/$STEM.md" ] || { echo "WARNING: empty or missing output for $STEM"; }
-done
+./venv/bin/python workflow.py convert --pdf "$INPUT" --out-dir "$OUTPUT_DIR"
 ```
+
+The lock allows at most one job at a time; a second concurrent call fails immediately with
+exit 1. workflow prints only `job done` on success — all per-convert detail (timing, warnings,
+failures) goes to the job log, read in the Derail Check below, not to the console.
 
 Note on naming a cryptic PDF: when a PDF's filename is not already speaking, derive a descriptive PascalCase name from the first page header / title metadata, condensed to ~30 chars (e.g. `AslamMontague2001MetasearchModels`, `ManningRaghavanSchutze2008IRTextbook`), and RENAME the PDF to it. Once the PDF carries a speaking name, `STEM = basename(PDF)` is correct and the md inherits it. Avoid filename collisions inside one batch — append year or first-author-initial when needed.
 
 **STEM character constraints (hard rules):** alphanumeric + underscore ONLY. NEVER include brackets `[ ]`, parentheses `( )`, dots `.` (other than the trailing `.md` extension), commas, spaces, or any glob metachar. Sanitize the stem at derivation time.
 
-`STEM = basename(PDF)` in the loop above — no `pdf → stem` mapping table. Rename cryptic PDFs once, BEFORE the batch runs.
+`STEM = basename(PDF)` — no `pdf → stem` mapping table. Rename cryptic PDFs once, BEFORE the job runs.
 
-If MinerU fails for any PDF: log + skip + continue. Report failed PDFs at end.
+A PDF that fails to convert surfaces as `warn: "fail"` in the job log (see Derail Check) — it is
+reported to the user there, not retried.
 
 ##### Background Convert — launch + go idle
 
-For any non-trivial convert (PDF >50 MB, a batch over a directory, or a single PDF expected to exceed ~60 s — any academic paper >10 MB, any book PDF): launch `workflow.py convert` as a background Bash call (`run_in_background=true`) and go idle; then run the post-convert verify and continue. Do NOT `pgrep`/name-poll/`wait`-loop.
+The job is GPU-heavy (book PDFs run many minutes). Launch the `workflow.py convert` job as a
+background Bash call (`run_in_background=true`) and go idle. Do NOT `pgrep`/name-poll/`wait`-loop.
+When the console prints `job done`, run the Derail Check.
 
-##### Post-Convert Verify
+##### Derail Check — read the job log (after `job done`)
 
-After every convert (single file or end of batch loop), verify the output is non-empty and substantial:
+workflow writes one JSONL line per convert plus one `job_summary` line to
+`/Users/brunowinter2000/Documents/ai/Mineru/logs/jobs.jsonl`. You submitted N PDFs, so this job
+appended **N+1** lines. Read only the tail — never the whole growing file (N = number of PDFs you
+submitted):
 
 ```bash
-[ -s "$OUTPUT_DIR/$STEM.md" ] && wc -w "$OUTPUT_DIR/$STEM.md"
+tail -n $((N+1)) /Users/brunowinter2000/Documents/ai/Mineru/logs/jobs.jsonl
 ```
 
-Threshold: **≥ 100 words** = meaningful conversion. Below threshold:
-- Log `WARNING: $STEM.md has <N> words — expected ≥100`
-- Retry: add `--timeout 300` (or higher) to the `workflow.py convert` call
-- If retry also fails: skip file, add to failed list, continue batch
+The last line is the `job_summary`. Take its `job_id` and keep only the lines whose `job_id`
+matches it (guards against a missing line pulling in a prior job). Then read the summary's `n_warn`:
+
+- **`n_warn == 0`** → every convert is clean → proceed to Cleanup for all mds.
+- **`n_warn > 0`** → inspect the per-convert lines with `warn != "ok"`:
+  - **`warn: "fail"`** → no md was produced (convert errored or timed out). Do NOT clean. REPORT
+    to the user: the PDF name and that it failed.
+  - **`warn: "slow"` or `"fast"`** → the md exists but its timing was off → open that md and check
+    it for corruption (HOW below). If corrupt → do NOT clean, do NOT index, REPORT to the user
+    (PDF name + evidence). If it reads clean → proceed normally with that md.
+
+**How to recognize a corrupted md:** a clean academic md runs about **550–600 words per page**; a
+corrupted one is far wordier — roughly **800+ words per page** — and carries duplicated or garbled
+passages. Compute words-per-page as `wc -w` of the md divided by the `pages` field from that
+convert's log line. An abnormally high ratio, or visibly duplicated / incoherent runs of text,
+means corrupt → report, do not clean.
 
 #### Phase 1 — Cleanup
 
 PDFs come from MinerU as Markdown. Cleanup focuses on inline OCR artifacts, not block chrome.
+Clean only the mds that passed the Derail Check — skip any flagged `fail` or confirmed corrupt
+(those were reported to the user, never cleaned or indexed).
 
 ##### Pre-cleanup: Backup + Word Count Baseline
 
@@ -374,6 +388,6 @@ Collection:                         <COLLECTION>
 
 Keep the two drop reasons separate: scrape errors **E** come from the scraper, thin/noise **D** comes from the cleanup check.
 
-**pdf:** `convert: M ok, K failed` · `cleanup issues: [...]` · `indexed: N chunks across M documents`.
+**pdf:** `convert: M ok, K failed` · `derail-flagged: D (reported, not indexed)` · `cleanup issues: [...]` · `indexed: N chunks across M documents`.
 
 End with this report. STOP. No commit needed (output is data files, not code).
