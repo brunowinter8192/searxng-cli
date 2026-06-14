@@ -6,23 +6,19 @@ TARGET (set of URLs) through a rotating proxy pool using curl_cffi chrome
 impersonation. Every request is a productive fetch — no separate proxy-check stage.
 Does NOT import from `src/`; self-contained dev implementation.
 
-## Design (SUSTAINED)
+## Design (RACE)
 
-**Sustained concurrent rotation loop with persistent cooldown.** (Full rationale: `decisions/OldThemes/news_pipeline_layers/32_sustained_loop.md`.)
-- **Active buffer:** up to `buffer_size` (default 1280 = 10× concurrency) ELIGIBLE proxies pulled
-  from the full pool (socks4-first), refilled as proxies burn out.
-- **Batches:** fires up to `concurrency` (default 128) (proxy, URL) pairs concurrently. Working-set
-  proxies (proven this session) fill Slot 1; fresh buffer candidates Slot 2.
-- **2-strikes lifecycle:** a proxy rides across URLs while it succeeds. 2 CONSECUTIVE fails → burn;
-  a success resets the per-proxy fail counter.
-- **In-memory cooldown (clean slate per job):** on burn, `burned_at = now` stored in a dict keyed by
-  proxy_key (`p2_cooldown.PersistentCooldownManager`). Eligibility = `now − burned_at ≥ 60min`. Pure
-  in-memory — each job starts with an empty burn set (no file I/O, no cross-job state).
-- **60-min pool refresh:** every `refresh_interval_s` (3600) the full pool is re-fetched via
-  `pool_provider()` and the buffer rebuilt from the now-eligible set.
-- **Wait-on-exhaustion:** when buffer + working-set are empty, the loop SLEEPS until the earlier of
-  (next cooldown expiry, next refresh) instead of gapping — then continues.
-- **Safety cap:** `max_wall_s` (default 12h) bounds the run; clean exit, unfinished URLs → gap.
+**Continuous 128-worker dispatch race.** (Full rationale: `decisions/OldThemes/news_pipeline_layers/36_race_loop.md`.)
+- **Workers:** `concurrency` (default 128) persistent worker threads. Each loops: pull next
+  unfinished URL (round-robin, skip-done) → pull next proxy (shuffled pool, sequential cursor) →
+  fetch → on success mark URL done (first-success-per-URL test-and-set).
+- **Tail-race (emergent):** while many URLs pending, round-robin hands each worker a distinct URL.
+  When fewer pending URLs than free workers remain, the same remaining URL is served to multiple
+  workers → they race it with different proxies; first success wins. No straggler tail.
+- **Each proxy used once:** sequential cursor through the shuffled pool. No cooldown, no burn, no
+  working-set, no refresh. Pool exhausted before all URLs done → unfetched URLs → `gap`.
+- **Supersedes** the sustained machine (OT32-33): cooldown / buffer / 60-min refresh /
+  wait-on-exhaustion / safety-cap removed — unnecessary for a minutes-long discovery run.
 
 ## Two chained targets
 | Target | Input | Output |
@@ -66,8 +62,9 @@ of proxies currently in the cooldown window.
 
 ---
 
-### p4_loop.py (189 LOC)
-**Purpose:** SUSTAINED concurrent rotation loop. Outer time-loop wraps the inner batch loop:
+### p4_loop.py (189 LOC) — DORMANT (superseded by p4_race.py, OT36)
+**Purpose:** SUSTAINED concurrent rotation loop. NO LONGER CALLED — `acquire_pipe` uses `run_race`
+(p4_race.py) since OT36; kept on disk pending the article-backfill decision. Outer time-loop wraps the inner batch loop:
 calls `pool_provider()` on start + every `refresh_interval_s` (3600) tick → `build_active_buffer`;
 records pool size via `logger.record_pool_refresh(len(pool_22k))` after each call (3 sites: startup,
 60-min refresh, exhaustion-wakeup). Inner loop draws batches from the active buffer (Slot 1
@@ -84,13 +81,32 @@ continue (no gap). `max_wall_s` safety cap. `_sleep` module attr (mockable in te
 
 ---
 
+### p4_race.py (99 LOC)
+**Purpose:** RACE fetch loop — replaces `run_loop`. `concurrency` (128) persistent worker threads;
+each pulls next unfinished URL (round-robin via `_next_url`, skip-done, under `_lock`) + next proxy
+(shuffled pool, sequential cursor via `_next_proxy`, under `_proxy_lock`), fetches, `record_attempt`,
+on ok `_mark_done` (test-and-set on `done_set`; progress print `[race] M/N done` + `content_handler`
+outside the lock, once per URL). Tail-race emergent (round-robin re-serves the same pending URL to
+free workers). Each proxy used once; no cooldown/buffer/refresh/cap. Returns `(done, gap)`.
+**Reads:** proxy pool (list) + target URL list.
+**Writes:** delegates events to `AcquireLogger.record_attempt`; returns `(done, gap)`.
+**Called by:** `acquire_pipe.py`.
+**Calls out:** `p1_fetch.fetch_url`, `p5_logger`, `p6_buffer` (DEFAULT_CONCURRENCY const).
+**Thread-safety:** shared state (URL cursor, proxy cursor, done_set) locked; logger JSONL writes
+serialized by the file-object lock + counters never read (close() not finalize()) → p5_logger untouched.
+
+---
+
 ### p5_logger.py (216 LOC)
 **Purpose:** Streams fetch events to JSONL on every attempt (kill-safe); in-memory only for small
 counters. `close()` closes the stream without writing MD (use before `janitor.end_job`). `finalize()`
 closes and also writes per-run MD (standalone use only, not called in wired flow).
-**Reads:** events fed by `run_loop` via `record_attempt / record_burn / record_working_set / record_pool_refresh`.
+**Reads:** events fed by `run_race` (`record_attempt`, from 128 worker threads) + `acquire_pipe` (`record_pool_refresh`). `record_burn`/`record_working_set` unused since OT36.
 **Writes:** `acquire_pipe_logs/acquire_events_<ts>.jsonl` (streamed, line-buffered).
-**Called by:** `p4_loop.run_loop`, `acquire_pipe.py`.
+**Called by:** `p4_race.run_race`, `acquire_pipe.py` (`p4_loop.run_loop` dormant).
+**Concurrency:** `record_attempt` is called from 128 worker threads. Safe untouched — CPython's
+`BufferedWriter` serializes each `write()` (no line interleave); in-memory counters race but are
+never read in the wired flow (`close()` not `finalize()`; janitor reads the JSONL directly).
 **Calls out:** `proxy_status_log.proxy_key`.
 
 **Streaming design:** `record_attempt()` writes each event as `json.dumps(event)+"\n"`
@@ -129,14 +145,15 @@ Crash-safe: kernel releases flock on process death; stale sidecar cleaned on nex
 ---
 
 ### p6_buffer.py (52 LOC)
-**Purpose:** Active-buffer helpers for the sustained loop. `build_active_buffer(pool, cm, max_size)`
+**Purpose:** Active-buffer helpers for the sustained loop — `build_active_buffer`/`refill_buffer`
+DORMANT since OT36 (only `run_loop` used them); the `DEFAULT_CONCURRENCY`/`BUFFER_SIZE` constants stay live (imported by `acquire_pipe` + `p4_race`). `build_active_buffer(pool, cm, max_size)`
 returns up to `max_size` eligible proxies (delegates eligibility + socks4-first ordering entirely to
 `cm.eligible_candidates()`). `refill_buffer(buf, pool, cm, target_size)` tops an existing buffer up to
 `target_size` from the eligible set (immutable — returns a new list; set-membership dedup; no-op when
 already full). Holds `BUFFER_SIZE = 1280` and `DEFAULT_CONCURRENCY = 128`.
 **Reads:** proxy pool + `cm` eligibility.
 **Writes:** returns new buffer lists (pure).
-**Called by:** `p4_loop.run_loop`, `acquire_pipe.py` (constants).
+**Called by:** `p4_loop.run_loop` (dormant); constants imported by `acquire_pipe.py` + `p4_race.py`.
 **Calls out:** `p2_cooldown.PersistentCooldownManager`.
 
 ---
@@ -157,23 +174,21 @@ Only `acquire_pipe_jobs/<job_id>/` survives after `end_job`.
 
 ---
 
-### acquire_pipe.py (140 LOC)
+### acquire_pipe.py (114 LOC)
 **Purpose:** Job orchestrator. Eager-loads chosen pool (+ stdout print) → `build_sitemap_target`
 (64 sub-sitemap URLs, same pool) → `job_id` → `box_lock.acquire` (`LockBusyError` → print+exit(1))
-→ `janitor.start_job` → `PersistentCooldownManager` (in-memory, fresh per job) → sustained
-`run_loop` via `_pool_provider` closure (returns eager pool on first call, re-fetches on refresh)
-→ `content_handler` (persist raw XML + parse `<loc>` bytes) → dedup article URLs →
-`theblock_article_urls.txt` → `logger.close()` → `janitor.end_job` (job.md + plot + wipe transient).
+→ `janitor.start_job` → `logger.record_pool_refresh(len(pool))` (once) → `run_race` (p4_race,
+continuous 128-worker dispatch) → `content_handler` (persist raw XML + parse `<loc>` bytes) →
+dedup article URLs → `theblock_article_urls.txt` → `logger.close()` → `janitor.end_job`
+(job.md + plot + wipe transient).
 **Reads:** proxy pool (curated or backfill) + theblock sitemap index (via p3_target).
 **Writes:** `acquire_pipe_output/<slug>.xml` (raw sub-sitemaps, gitignored) +
 `acquire_pipe_output/theblock_article_urls.txt` (tracked) +
 `acquire_pipe_jobs/<job_id>/job.md` + `cumulative_hits.png` (persistent, via janitor).
-**Called by:** CLI — `python acquire_pipe.py [--concurrency N] [--buffer_size N] [--max_hours H] [--pool {curated,backfill}]`.
-**Calls out:** `box_lock`, `p7_janitor`, `p2_cooldown`, `p3_target`, `p4_loop`, `p5_logger`, `p6_buffer`, `curated_sources`.
+**Called by:** CLI — `python acquire_pipe.py [--concurrency N] [--pool {curated,backfill}]`.
+**Calls out:** `box_lock`, `p7_janitor`, `p3_target`, `p4_race`, `p5_logger`, `p6_buffer` (const), `curated_sources`.
 **CLI flags:**
-- `--concurrency N` — concurrent (proxy, URL) pairs per batch (default 128)
-- `--buffer_size N` — active eligible-proxy buffer depth (default 1280)
-- `--max_hours H` — hard wall-time safety cap in hours (default 12)
+- `--concurrency N` — concurrent worker threads (default 128)
 - `--pool {curated,backfill}` — proxy pool (default `backfill`):
   `curated` = monosans+proxifly ~3.5k; `backfill` = top-13 repos ~22.7k unique
 
@@ -181,7 +196,11 @@ Only `acquire_pipe_jobs/<job_id>/` survives after `end_job`.
 
 ## Status
 
-**Machine: SUSTAINED + BOX/JANITOR (built, validated on dev).** OldThemes 32 built the sustained
+**Machine: RACE + BOX/JANITOR (built, reviewed on dev; not yet run at scale).** OT36 replaced the
+sustained loop with the continuous 128-worker race (`p4_race.run_race`) — see
+`decisions/OldThemes/news_pipeline_layers/36_race_loop.md`. Box-lock, janitor, logger unchanged.
+
+**Superseded — sustained machine (dormant):** OldThemes 32 built the sustained
 loop; OldThemes 33 added job/box/janitor (clean-slate cooldown, global lock, persistent job record).
 Full rationale: `decisions/OldThemes/news_pipeline_layers/33_box_janitor.md`.
 
@@ -206,10 +225,9 @@ Full analysis: `decisions/OldThemes/news_pipeline_layers/29_sitemap_devrun.md` (
 
 ## Gotchas
 - Home IP is CF-blocked for direct theblock GETs (403) — p3_target proxy fallback handles this.
-- Cooldown is IN-MEMORY only — does NOT survive process restarts. Each job starts with a fully fresh
-  burn set (intended: clean slate per job). No cross-job cooldown inheritance.
-- 2-strikes = 2 CONSECUTIVE fails (a success resets the counter) — a single transient fail does NOT burn.
-- Failed URLs go to the BACK of the queue (not front) to avoid hammering one URL with dead proxies.
+- RACE loop (p4_race): each proxy used at most ONCE per job; no cooldown/burn/reuse. Pool exhausted
+  before all URLs done → unfetched URLs → `gap`. At the tail, many workers race the same remaining URL
+  — redundant successes are possible (bounded waste), the deliberate price of killing the straggler tail.
 - `box_lock`: SIGTERM kills Python before `finally` runs → sidecar stays; kernel releases flock.
   Next `acquire()` recovers via `cleanup_stale()` (dead-PID detection). Not a problem in practice.
 - `p7_janitor._write_plot` imports `matplotlib.pyplot` lazily — first call builds font cache (~1s one-time).
