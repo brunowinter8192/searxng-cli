@@ -22,8 +22,8 @@ Does NOT import from `src/`; self-contained dev implementation.
 ## Two chained targets
 | Target | Input | Output |
 |---|---|---|
-| DEV-RUN (Stage 5 pending) | sitemap index → 64 sub-sitemap URLs | ~27k article `/post/` URLs |
-| BACKFILL (later) | ~27k article URLs | article page content |
+| DEV-RUN (done) | sitemap index → 64 sub-sitemap URLs | 44,041 unique URLs (26,003 `/post/`) |
+| BACKFILL (next) | 26k `/post/` article URLs | article page content |
 
 ## Modules
 
@@ -52,18 +52,21 @@ timestamp; provides socks4-first eligible candidate ordering.
 (403, CF challenge, error).
 **Reads:** `THEBLOCK_INDEX` via httpx (direct) or `p1_fetch.fetch_url` (proxy fallback).
 **Writes:** returns `list[str]` of 64 sub-sitemap URLs.
-**Called by:** `acquire_pipe.py` orchestrator (Stage 5, pending).
+**Called by:** `acquire_pipe.py`.
 **Calls out:** `httpx`, `p1_fetch`, `p2_cooldown`, `curated_sources`.
 
 ---
 
-### p4_loop.py (115 LOC)
+### p4_loop.py (121 LOC)
 **Purpose:** Core concurrent rotation loop. Runs `concurrency` (proxy, URL) pairs
 per round; manages working set, cooldown hand-off, gap detection.
 **Reads:** candidate pool + target URL list.
 **Writes:** delegates all state to `AcquireLogger`; returns `(done, gap)`.
-**Called by:** `acquire_pipe.py` orchestrator (Stage 5, pending).
+**Called by:** `acquire_pipe.py`.
 **Calls out:** `p1_fetch`, `p2_cooldown`, `p5_logger`.
+**content_handler hook:** `run_loop` accepts optional `content_handler: Callable[[str, bytes], None]`.
+Fires at the `if ok:` success branch before `done.append()` — persist or parse fetched
+bytes at the fetch site. Rotation logic untouched; `None` default = backward compatible.
 
 ---
 
@@ -83,10 +86,15 @@ per round; manages working set, cooldown hand-off, gap detection.
 
 ---
 
-### acquire_pipe.py (PENDING — Stage 5)
-**Purpose:** Orchestrator entry point. Wires `load_curated_proxies` → `build_sitemap_target`
-→ `run_loop` → `logger.finalize`. CLI: `--concurrency` param.
-**Status:** Not yet built.
+### acquire_pipe.py (83 LOC)
+**Purpose:** Stage 5 orchestrator. `load_curated_proxies` → `build_sitemap_target` (64 sub-sitemap
+URLs) → `run_loop` with `content_handler` (persist raw XML + parse `<loc>` bytes) →
+dedup article URLs → write `theblock_article_urls.txt` → `logger.finalize`.
+**Reads:** curated proxy pool + theblock sitemap index (via p3_target).
+**Writes:** `acquire_pipe_output/<slug>.xml` (raw sub-sitemaps, gitignored) +
+`acquire_pipe_output/theblock_article_urls.txt` (44,041 unique URLs, tracked).
+**Called by:** CLI — `python acquire_pipe.py [--concurrency N]`.
+**Calls out:** `p3_target`, `p4_loop`, `p5_logger`, `curated_sources`.
 
 ---
 
@@ -97,13 +105,15 @@ per round; manages working set, cooldown hand-off, gap detection.
 | 1 | p1_fetch + p2_cooldown | 5804321 | ✓ built + signed off |
 | 2 | p3_target (build_sitemap_target) | ce8679d | ✓ built + signed off |
 | 3 | p5_logger | 390b55d | ✓ built + signed off |
-| 4 | p4_loop (concurrent working-set) | bd1d763 | ✓ built; 64-sitemap testlauf PENDING |
-| 5 | acquire_pipe.py orchestrator | — | PENDING next session |
+| 4 | p4_loop (concurrent working-set) | bd1d763 | ✓ built + signed off |
+| 5 | acquire_pipe.py orchestrator | 376b229 | ✓ built; sitemap dev-run done (59/64, 44k URLs) |
 
-**Stage 4 note:** The rework from sequential to concurrent (working-set + ThreadPoolExecutor)
-was necessary — sequential 15s timeouts at ~1.5% CF-pass rate → multi-hour cold-start.
-Concurrent model estimated ~2-3min cold-start at concurrency 128. Testlauf at 128 deferred
-to next session together with Stage 5 orchestrator wiring.
+**Sitemap dev-run (concurrency 128, curated pool ~3477):**
+- 59/64 sub-sitemaps fetched; 5 gap (`post_type_post` variants — pool exhausted)
+- Bulk 54 in 475s (6.8/min); total span 1057s
+- 44,041 unique URLs extracted (26,003 `/post/`, 5,456 `/linked/`, 7,023 `/price/`, others)
+- Logger report absent (process killed before `finalize()` — B-per-proxy + fail/success unobserved)
+- See `decisions/OldThemes/news_pipeline_layers/29_sitemap_devrun.md` for full analysis
 
 ## Gotchas
 - Home IP is CF-blocked for direct theblock GETs (403) — p3_target proxy fallback handles this.
