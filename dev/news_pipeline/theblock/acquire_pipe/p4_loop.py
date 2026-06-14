@@ -4,6 +4,7 @@ import sys
 from collections import deque
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from pathlib import Path
+from typing import Callable
 
 sys.path.insert(0, str(Path(__file__).parent))
 from p1_fetch import fetch_url
@@ -21,6 +22,7 @@ def run_loop(
     content_type: str,
     logger: AcquireLogger,
     concurrency: int = DEFAULT_CONCURRENCY,
+    content_handler: Callable[[str, bytes], None] | None = None,
 ) -> tuple[list[str], list[str]]:
     """Concurrent working-set rotation loop. Return (done_urls, gap_urls).
 
@@ -30,6 +32,8 @@ def run_loop(
     candidates. Success keeps the proxy in the working set; failure burns it
     to 60min cooldown and returns the URL to the back of the queue.
     Gap when working set is empty AND no eligible candidates remain.
+    content_handler: optional callback(url, content) fired on each successful
+    fetch before updating done/wset — persist or parse content at the fetch site.
     """
     queue    = deque(target_urls)
     done: list[str]                          = []
@@ -53,12 +57,14 @@ def run_loop(
             }
             for fut in as_completed(futures):
                 proto, hp, url = futures[fut]
-                ok, _content   = fut.result()
+                ok, content    = fut.result()
                 key            = (proto, hp)
 
                 logger.record_attempt(proto, hp, url, ok)
 
                 if ok:
+                    if content_handler is not None:
+                        content_handler(url, content)
                     done.append(url)
                     wset.add(key)
                     psuccess[key] = psuccess.get(key, 0) + 1

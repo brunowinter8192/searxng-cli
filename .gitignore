@@ -88,3 +88,9 @@ dev/news_pipeline/theblock/jhao104/upstream/
 
 # jhao104 venv (probe-local, not vendored)
 dev/news_pipeline/theblock/jhao104/venv/
+
+# acquire_pipe: raw sub-sitemap XML files (regenerable, 13MB) — article URL list is tracked
+dev/news_pipeline/theblock/acquire_pipe/acquire_pipe_output/*.xml
+# acquire_pipe: per-run JSONL event logs and MD reports (ephemeral; numbers lifted to OldThemes 29)
+dev/news_pipeline/theblock/acquire_pipe/acquire_pipe_logs/
+dev/news_pipeline/theblock/acquire_pipe/acquire_pipe_reports/
