@@ -1,6 +1,6 @@
 ---
 name: searxng-cli-capture-and-index
-description: Worker-side skill — discover URLs agentic (worker writes /tmp scripts), select which to scrape, scrape raw/maximal, clean (incl. post-scrape noise drop), and index into RAG. Modes: web-md (Discovery→Select→Scrape→Cleanup→Index), pdf (Acquisition→Cleanup→Index).
+description: Discover URLs agentically (write /tmp scripts), select which to scrape, scrape raw/maximal, clean (incl. post-scrape noise drop), and index into RAG. Modes: web-md (Discovery→Select→Scrape→Cleanup→Index), pdf (Acquisition→Cleanup→Index).
 ---
 
 # Capture-and-Index — Skill
@@ -218,24 +218,32 @@ Pipeline: Acquisition → Cleanup → Index.
 
 #### Phase 0 — Acquisition
 
+**Naming — PDFs carry speaking names, the md inherits them.** A source PDF must have a speaking
+PascalCase name BEFORE conversion (e.g. `NadeauBengio2003InferenceGeneralizationError.pdf`). If a PDF
+has a cryptic name (`6280358.pdf`, `2104.03667v1.pdf`, a libgen / Anna's-Archive string), RENAME it in
+place first — derive the name from the first page / title metadata, sanitize per the char rules below.
+The markdown then simply inherits the PDF's basename: `STEM = basename(PDF without .pdf)`, output =
+`$OUTPUT_DIR/$STEM.md`. PDF name and md name stay identical.
+
 If INPUT is a single PDF file:
 
 ```bash
 mkdir -p $OUTPUT_DIR
-STEM="<derive descriptive PascalCase name from filename or first page>"
+# Ensure $INPUT already carries a speaking name (rename first if cryptic), then:
+STEM="$(basename "$INPUT" .pdf)"
 cd /Users/brunowinter2000/Documents/ai/Mineru && \
 ./venv/bin/python workflow.py convert \
     --input "$INPUT" \
     --output "$OUTPUT_DIR/$STEM.md"
 ```
 
-If INPUT is a directory: loop over `*.pdf`, derive STEM per file (read first page or arxiv abstract if filename is cryptic), run convert per file. Report progress: `[N/M] <STEM>: phase 0 done`.
+If INPUT is a directory: first ensure EVERY `*.pdf` carries a speaking name (rename the cryptic ones — read first page / title), then loop, taking `STEM` from the PDF basename. Report progress: `[N/M] <STEM>: phase 0 done`.
 
 **Concrete loop template — use exactly this shape, including both guards:**
 
 ```bash
 for PDF in "$PDF_DIR"/*.pdf; do
-    STEM="<derive descriptive PascalCase name — see Note below>"
+    STEM="$(basename "$PDF" .pdf)"   # PDF already carries its speaking name
     # GUARD 1 — empty STEM means "$OUTPUT_DIR/.md" which silently overwrites every iteration
     [ -z "$STEM" ] && { echo "BUG: empty STEM for $PDF — abort batch"; exit 1; }
     cd /Users/brunowinter2000/Documents/ai/Mineru && \
@@ -247,14 +255,11 @@ for PDF in "$PDF_DIR"/*.pdf; do
 done
 ```
 
-Note on STEM derivation: do NOT use `basename "$PDF" .pdf` mechanically. Derive a descriptive PascalCase name per file: read the first page header / title metadata, condense to ~30 chars (e.g. `AslamMontague2001MetasearchModels`, `ManningRaghavanSchutze2008IRTextbook`). Filename collisions inside one batch must be avoided — append year or first-author-initial when needed.
+Note on naming a cryptic PDF: when a PDF's filename is not already speaking, derive a descriptive PascalCase name from the first page header / title metadata, condensed to ~30 chars (e.g. `AslamMontague2001MetasearchModels`, `ManningRaghavanSchutze2008IRTextbook`), and RENAME the PDF to it. Once the PDF carries a speaking name, `STEM = basename(PDF)` is correct and the md inherits it. Avoid filename collisions inside one batch — append year or first-author-initial when needed.
 
 **STEM character constraints (hard rules):** alphanumeric + underscore ONLY. NEVER include brackets `[ ]`, parentheses `( )`, dots `.` (other than the trailing `.md` extension), commas, spaces, or any glob metachar. Sanitize the stem at derivation time.
 
-**STEM mapping — do NOT use bash associative arrays in a zsh worker session.** Two patterns:
-
-1. **Python script for any batch >3 files (recommended):** a small `subprocess.run([...])` loop over a `dict[str, str]` of `pdf_basename → stem` mappings.
-2. **Bash-only loop with literal stems (small batches):** write the STEM literally inside the loop body per file, avoid associative arrays entirely.
+`STEM = basename(PDF)` in the loop above — no `pdf → stem` mapping table. Rename cryptic PDFs once, BEFORE the batch runs.
 
 If MinerU fails for any PDF: log + skip + continue. Report failed PDFs at end.
 
