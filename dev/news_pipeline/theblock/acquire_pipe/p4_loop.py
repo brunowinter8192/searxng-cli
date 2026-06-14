@@ -8,51 +8,60 @@ from typing import Callable
 
 sys.path.insert(0, str(Path(__file__).parent))
 from p1_fetch import fetch_url
-from p2_cooldown import CooldownManager
+from p2_cooldown import PersistentCooldownManager
 from p5_logger import AcquireLogger
-
-DEFAULT_CONCURRENCY = 50
+from p6_buffer import refill_buffer, BUFFER_SIZE, DEFAULT_CONCURRENCY
 
 
 # ORCHESTRATOR
 
 def run_loop(
-    candidates: list[tuple[str, str]],
+    pool_22k: list[tuple[str, str]],
+    buf: list[tuple[str, str]],
     target_urls: list[str],
     content_type: str,
     logger: AcquireLogger,
+    cm: PersistentCooldownManager,
     concurrency: int = DEFAULT_CONCURRENCY,
     content_handler: Callable[[str, bytes], None] | None = None,
 ) -> tuple[list[str], list[str]]:
-    """Concurrent working-set rotation loop. Return (done_urls, gap_urls).
+    """Sustained concurrent working-set rotation loop with 2-strikes lifecycle.
 
-    Each round fires up to CONCURRENCY (proxy, URL) pairs concurrently — every
-    request targets a real URL (no wasted proxy-check stage).
-    Working-set proxies (proven) fill slots first; remaining slots pull fresh
-    candidates. Success keeps the proxy in the working set; failure burns it
-    to 60min cooldown and returns the URL to the back of the queue.
-    Gap when working set is empty AND no eligible candidates remain.
-    content_handler: optional callback(url, content) fired on each successful
-    fetch before updating done/wset — persist or parse content at the fetch site.
+    Draws batches from the active buffer (buf); working-set proxies (proven this
+    session) fill Slot 1, fresh buffer candidates fill Slot 2. buf is refilled
+    from pool_22k (eligible, socks4-first) whenever it drops below BUFFER_SIZE.
+
+    2-strikes lifecycle:
+      1st consecutive fail  → URL back to queue; proxy stays eligible (NOT burned).
+      2nd consecutive fail  → burn: cm.mark_burned + remove from buf + wset.
+      Success               → proxy joins wset; consecutive-fail counter reset.
+
+    cm.flush() is called once per batch (after as_completed) — the only I/O path
+    for cooldown writes regardless of how many proxies burned in the batch.
+
+    Returns (done_urls, gap_urls). gap is non-empty when buf + wset are exhausted
+    before target is complete; Stage 4 adds wait-on-exhaustion around this function.
     """
-    queue    = deque(target_urls)
-    done: list[str]                          = []
-    cm       = CooldownManager()
-    wset:    set[tuple[str, str]]            = set()   # (proto, hp) proven working
-    psuccess: dict[tuple[str, str], int]     = {}      # (proto, hp) → ok count this session
+    queue         = deque(target_urls)
+    done:         list[str]                      = []
+    wset:         set[tuple[str, str]]           = set()
+    psuccess:     dict[tuple[str, str], int]     = {}
+    _consec_fail: dict[tuple[str, str], int]     = {}
 
     while queue:
-        batch = _build_batch(queue, wset, cm, candidates, concurrency)
-        if not batch:
-            break   # no eligible candidates, working set empty → gap
+        if len(buf) < BUFFER_SIZE:
+            buf = refill_buffer(buf, pool_22k, cm)
 
-        # Pop exactly the URLs allocated to this batch (failed ones go to queue back)
+        batch = _build_batch(queue, wset, buf, concurrency)
+        if not batch:
+            break   # buf + wset exhausted → caller handles wait / refresh
+
         for _ in batch:
             queue.popleft()
 
-        with ThreadPoolExecutor(max_workers=concurrency) as pool:
+        with ThreadPoolExecutor(max_workers=concurrency) as executor:
             futures = {
-                pool.submit(fetch_url, p, hp, url, content_type): (p, hp, url)
+                executor.submit(fetch_url, p, hp, url, content_type): (p, hp, url)
                 for p, hp, url in batch
             }
             for fut in as_completed(futures):
@@ -68,27 +77,34 @@ def run_loop(
                     done.append(url)
                     wset.add(key)
                     psuccess[key] = psuccess.get(key, 0) + 1
+                    _consec_fail.pop(key, None)              # success resets counter
                 else:
-                    queue.append(url)   # retry later — back of queue
-                    logger.record_burn(proto, hp, b_count=psuccess.get(key, 0))
-                    cm.mark_burned(proto, hp)
-                    wset.discard(key)
-                    psuccess.pop(key, None)
+                    queue.append(url)                        # retry — back of queue
+                    fails = _consec_fail.get(key, 0) + 1
+                    if fails >= 2:
+                        # 2nd consecutive fail → burn
+                        logger.record_burn(proto, hp, b_count=psuccess.get(key, 0))
+                        cm.mark_burned(proto, hp)
+                        wset.discard(key)
+                        buf = [p for p in buf if p != key]  # remove from active buffer
+                        _consec_fail.pop(key, None)          # reset (proxy now cooling)
+                        psuccess.pop(key, None)
+                    else:
+                        _consec_fail[key] = fails            # 1st fail: proxy stays eligible
 
+        cm.flush()                               # one I/O per batch, covers all burns
         logger.record_working_set(len(wset))
 
-    gap = list(queue)
-    return done, gap
+    return done, list(queue)
 
 
 # FUNCTIONS
 
-# Build one batch: working-set proxies first, then fresh eligible candidates
+# Build one batch: working-set proxies first, then fresh candidates from active buffer
 def _build_batch(
     queue:       deque,
     wset:        set[tuple[str, str]],
-    cm:          CooldownManager,
-    candidates:  list[tuple[str, str]],
+    buf:         list[tuple[str, str]],
     concurrency: int,
 ) -> list[tuple[str, str, str]]:
     """Return list of (proto, hp, url) up to concurrency; each proxy appears once."""
@@ -96,7 +112,7 @@ def _build_batch(
     assigned_proxies: set[tuple[str, str]]       = set()
     url_iter = iter(queue)   # front-to-back peek without popping
 
-    # Slot 1: working-set proxies (already proven this session)
+    # Slot 1: working-set proxies (proven this session)
     for proto, hp in wset:
         if len(batch) >= concurrency:
             break
@@ -106,8 +122,8 @@ def _build_batch(
         batch.append((proto, hp, url))
         assigned_proxies.add((proto, hp))
 
-    # Slot 2: fresh eligible candidates (socks4-first from CooldownManager)
-    for proto, hp in cm.eligible_candidates(candidates):
+    # Slot 2: fresh candidates from active buffer (already eligible + socks4-first)
+    for proto, hp in buf:
         if len(batch) >= concurrency:
             break
         if (proto, hp) in assigned_proxies or (proto, hp) in wset:
