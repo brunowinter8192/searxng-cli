@@ -1,1 +1,31 @@
-# placeholder — TheBlockPlatform registered in a later commit
+# INFRASTRUCTURE
+from src.news.platform import ScrapeConfig
+from src.news.registry import register
+from src.news.platforms.theblock.config import PROXY_SCRAPE_CONFIG
+# From theblock/discover.py: discover(timeframe) -> list[dict]
+from src.news.platforms.theblock.discover import discover as _discover
+# From theblock/cleanup.py: cleanup(raw_html, entry) -> str
+from src.news.platforms.theblock.cleanup import cleanup as _cleanup
+
+
+# FUNCTIONS
+
+class TheBlockPlatform:
+    name: str                  = "theblock"
+    collection: str            = "theblock"
+    precondition_url: str      = "https://www.theblock.co"
+    regwall_signals: list[str] = []
+    scrape_engine: str         = "proxy_pool"
+    scrape_config: ScrapeConfig = ScrapeConfig()
+    proxy_scrape_config        = PROXY_SCRAPE_CONFIG
+    timeframe: str             = "48h"    # set by __main__ via --timeframe
+    dedup_mode: str            = "hash_only"
+
+    async def discover(self) -> list[dict]:
+        return await _discover(self.timeframe)
+
+    def cleanup(self, raw_html: str, entry: dict) -> str:
+        return _cleanup(raw_html, entry)
+
+
+register(TheBlockPlatform())
