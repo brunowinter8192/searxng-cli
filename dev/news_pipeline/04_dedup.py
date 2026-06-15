@@ -10,7 +10,7 @@ from pathlib import Path
 
 COLLECTION_DIR = Path(
     "/Users/brunowinter2000/Documents/ai/Meta/ClaudeCode/cli/rag-cli"
-    "/data/documents/searxng_crypto"
+    "/data/documents/coindesk"
 )
 OUTPUT_DIR = Path(__file__).parent / "04_output"
 DATE_RE = re.compile(r"/(\d{4})/(\d{2})/(\d{2})/")

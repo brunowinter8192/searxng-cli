@@ -1,6 +1,6 @@
 # dev/news_pipeline/
 
-Per-domain news scraping pipeline for trading-bot data layer. CoinDesk → RAG collection `searxng_crypto`. End-to-end runnable; single-command daily runner.
+Per-domain news scraping pipeline for trading-bot data layer. CoinDesk → RAG collection `coindesk`. End-to-end runnable; single-command daily runner.
 
 **Status:** End-to-end complete (discover → dedup → scrape → cleanup → publish). Stays in `dev/`; `src/` promotion deferred.
 
@@ -88,9 +88,9 @@ Validated: 0/32 regwall, 32/32 ok, ~32s on 32 CoinDesk URLs. See `decisions/OldT
 
 ### 04_dedup.py
 
-**Purpose:** Dedup gate — drops URLs whose `coindesk__<YYYY-MM-DD>__<hash>.md` already exists in the `searxng_crypto` RAG collection dir. Pure Python, no browser, no network. Filesystem presence of the target filename IS the seen-state; no separate state file.
+**Purpose:** Dedup gate — drops URLs whose `coindesk__<YYYY-MM-DD>__<hash>.md` already exists in the `coindesk` RAG collection dir. Pure Python, no browser, no network. Filesystem presence of the target filename IS the seen-state; no separate state file.
 
-**Input:** `--input <path>` or auto-picks newest `01_output/discover_*.json`. **Collection dir:** `/Users/brunowinter2000/Documents/ai/Meta/ClaudeCode/cli/rag-cli/data/documents/searxng_crypto/`.
+**Input:** `--input <path>` or auto-picks newest `01_output/discover_*.json`. **Collection dir:** `/Users/brunowinter2000/Documents/ai/Meta/ClaudeCode/cli/rag-cli/data/documents/coindesk/`.
 
 **Output:** `04_output/discover_filtered_<UTC-timestamp>.json` — same schema as discover, subset of entries.
 
@@ -101,11 +101,11 @@ Validated: 0/32 regwall, 32/32 ok, ~32s on 32 CoinDesk URLs. See `decisions/OldT
 
 ### 05_publish.py
 
-**Purpose:** Copy cleaned MDs from `03_output/` to the `searxng_crypto` RAG collection dir as `coindesk__<YYYY-MM-DD>__<hash>.md`, then run `rag-cli index --collection searxng_crypto`. Idempotent (safe to re-run; rag-cli hash-skip handles re-index of already-indexed files).
+**Purpose:** Copy cleaned MDs from `03_output/` to the `coindesk` RAG collection dir as `coindesk__<YYYY-MM-DD>__<hash>.md`, then run `rag-cli index --collection coindesk`. Idempotent (safe to re-run; rag-cli hash-skip handles re-index of already-indexed files).
 
 **Input:** `03_output/manifest.json` + `03_output/*.md`. **Collection dir:** same as 04.
 
-**Output:** files copied to `/Users/.../rag-cli/data/documents/searxng_crypto/coindesk__<date>__<hash>.md`. Triggers rag-cli indexing.
+**Output:** files copied to `/Users/.../rag-cli/data/documents/coindesk/coindesk__<date>__<hash>.md`. Triggers rag-cli indexing.
 
 ```bash
 ./venv/bin/python dev/news_pipeline/05_publish.py

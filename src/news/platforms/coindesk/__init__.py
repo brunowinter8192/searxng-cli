@@ -12,7 +12,7 @@ from src.news.platforms.coindesk.cleanup import cleanup as _cleanup
 
 class CoinDeskPlatform:
     name: str = "coindesk"
-    collection: str = "searxng_crypto"
+    collection: str = "coindesk"
     precondition_url: str = "https://www.coindesk.com"
     regwall_signals: list[str] = REGWALL_SIGNALS
     scrape_engine: str = "browser"

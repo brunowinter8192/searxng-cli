@@ -24,7 +24,7 @@ class ScrapeConfig:
 @runtime_checkable
 class Platform(Protocol):
     name: str                   # --source value AND filename prefix f"{name}__"
-    collection: str             # target RAG collection; CoinDesk -> "searxng_crypto"
+    collection: str             # target RAG collection; CoinDesk -> "coindesk"
     precondition_url: str       # internet-check URL; CoinDesk -> "https://www.coindesk.com"
     regwall_signals: list[str]  # precise match strings; [] = guard disabled
     scrape_engine: str          # "browser" | "proxy_pool" — selects engine in pipeline.py
