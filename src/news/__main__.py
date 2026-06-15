@@ -34,9 +34,14 @@ def main() -> None:
     args = parser.parse_args()
 
     platform = get(args.source)
+    skip_index = args.skip_index
     if hasattr(platform, "timeframe"):
         platform.timeframe = args.timeframe
-    asyncio.run(run_pipeline(platform, skip_index=args.skip_index))
+        if args.timeframe != "48h":
+            skip_index = True
+            print(f"Non-48h timeframe ({args.timeframe!r}) — RAG index auto-skipped.")
+            print(f"After review, run: rag-cli index --collection {platform.collection}")
+    asyncio.run(run_pipeline(platform, skip_index=skip_index))
 
 
 if __name__ == "__main__":

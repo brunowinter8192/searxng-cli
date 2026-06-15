@@ -55,6 +55,8 @@ Proxy platforms set `scrape_engine = "proxy_pool"` and provide a `ProxyScrapeCon
   `publication_date` is not available at discover time.
 - `timeframe: str` — discovery window; set by `__main__` from `--timeframe` (default `"48h"`).
   Only meaningful for platforms whose `discover()` reads `self.timeframe` (e.g. The Block).
+  When `--timeframe` is not `"48h"`, `__main__` auto-forces `skip_index=True` and prints
+  `"After review, run: rag-cli index --collection <collection>"` to stdout.
 
 ## Directory Map
 
@@ -63,7 +65,7 @@ Proxy platforms set `scrape_engine = "proxy_pool"` and provide a `ProxyScrapeCon
 | `platform.py` | ScrapeConfig + ProxyScrapeConfig + Platform Protocol | 35 |
 | `registry.py` | name → Platform registry; register() / get() | 19 |
 | `pipeline.py` | Async orchestrator; stages 1–5 in-process; scrape dispatch | 213 |
-| `__main__.py` | argparse entry point; --source + --skip-index + --timeframe | 43 |
+| `__main__.py` | argparse entry point; --source + --skip-index + --timeframe | 48 |
 | `engine/` | Generic scrape engines (browser + proxy_pool) + dedup + publish | — |
 | `platforms/coindesk/` | CoinDesk platform implementation | — |
 | `platforms/theblock/` | The Block platform — proxy_pool, hash-dedup, JSON-LD cleanup | — |
@@ -78,7 +80,7 @@ Proxy platforms set `scrape_engine = "proxy_pool"` and provide a `ProxyScrapeCon
    - `"browser"` → `scrape_entries()` — fresh `AsyncWebCrawler` per URL, Scrapy gate pacing. Writes raw body to `data/news/{name}/scrape/{hash}.md`. Raises `RegwallGuardError` if fraction regwalled ≥ 20%.
    - `"proxy_pool"` → `scrape_entries_proxy()` — sustained proxy rotation via `run_loop`, curl_cffi chrome impersonation. Box-locked (one job at a time). Writes raw body to `data/news/{name}/scrape/{hash}.md`.
 4. **cleanup** — `platform.cleanup(body, entry)` in-process for each status=ok entry. Writes pure content (NO frontmatter) to `data/news/{name}/clean/{hash}.md`. `entry` is the scrape manifest dict; platforms that cannot set `publication_date` at discover time (e.g. The Block) mutate `entry["publication_date"]` here. `_run_cleanup` picks it up as fallback: `discover_entry.get("publication_date") or entry.get("publication_date", "")`.
-5. **publish** — `publish_articles()` copies clean files to RAG collection dir as `{name}__{pubdate}__{hash}.md`; runs `rag-cli index --collection {collection}` unless `--skip-index`.
+5. **publish** — `publish_articles()` copies clean files to RAG collection dir as `{name}__{pubdate}__{hash}.md`; writes/merges `{collection}__index.jsonl` in the collection dir (one JSON line per article: `{hash, url, publication_date, filename}`; deduped by hash; always written, even when `--skip-index`); runs `rag-cli index --collection {collection}` unless `--skip-index`.
 
 ## Documentation Tree
 

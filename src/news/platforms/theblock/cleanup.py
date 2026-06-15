@@ -10,6 +10,12 @@ _LD_RE = re.compile(
     re.DOTALL | re.IGNORECASE,
 )
 
+_LINK_URL_RE       = re.compile(r'\[([^\]]+)\]\(https?://[^)]+\)')
+_DISCLAIMER_RE     = re.compile(r'^Disclaimer: The Block is an independent media outlet.*$', re.MULTILINE)
+_COPYRIGHT_RE      = re.compile(r'^©\s*\d{4}\s+The Block\.\s*All Rights Reserved.*$', re.MULTILINE)
+_NEWSLETTER_CTA_RE = re.compile(r'^_.*subscribe to the .*newsletter.*_\s*$', re.MULTILINE)
+_BLANK_RUN_RE      = re.compile(r'\n{3,}')
+
 
 # FUNCTIONS
 
@@ -30,7 +36,7 @@ def cleanup(raw_html: str, entry: dict) -> str:
     if pub_date:
         entry["publication_date"] = pub_date
 
-    return _html_to_markdown(article_body)
+    return _post_clean(_html_to_markdown(article_body))
 
 
 # Return first JSON-LD block whose @type is or includes "NewsArticle"; None if not found.
@@ -72,6 +78,19 @@ def _is_news_article(data: dict) -> bool:
     if isinstance(t, list):
         return "NewsArticle" in t
     return t == "NewsArticle"
+
+
+# Strip The-Block-specific boilerplate from post-html2text Markdown.
+# Order: inline-URL strip first (exposes plain CTA text), then line-level removals, then normalise.
+def _post_clean(md: str) -> str:
+    md = _LINK_URL_RE.sub(r'\1', md)
+    md = _DISCLAIMER_RE.sub('', md)
+    md = _COPYRIGHT_RE.sub('', md)
+    md = _NEWSLETTER_CTA_RE.sub('', md)
+    lines = [line.rstrip() for line in md.splitlines()]
+    md = '\n'.join(lines)
+    md = _BLANK_RUN_RE.sub('\n\n', md)
+    return md.strip()
 
 
 # Convert HTML fragment to clean Markdown; no line wrapping, images suppressed.

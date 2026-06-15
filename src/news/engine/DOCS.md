@@ -34,11 +34,11 @@ Two modes via `mode` param (default `"pubdate"`):
 - `"hash_only"`: glob `{source}__*__{hash}.md` — for platforms (e.g. The Block) where
   `publication_date` is not available at discover time (comes from fetched content post-scrape).
 
-### publish.py (101 LOC)
+### publish.py (134 LOC)
 
-**Purpose:** Copy cleaned MDs to RAG collection dir; optionally run `rag-cli index`.
-**Reads:** clean_manifest (in-memory), clean_dir (filesystem).
-**Writes:** `{source}__{pubdate}__{hash}.md` to collection_dir.
+**Purpose:** Copy cleaned MDs to RAG collection dir; write/merge URL manifest; optionally run `rag-cli index`.
+**Reads:** clean_manifest (in-memory), clean_dir (filesystem), existing `{collection}__index.jsonl` if present.
+**Writes:** `{source}__{pubdate}__{hash}.md` to collection_dir; `{collection_name}__index.jsonl` in collection_dir (one JSON line per article: `{hash, url, publication_date, filename}`; deduped by hash; written even when `skip_index=True`).
 **Called by:** `pipeline.py:run_pipeline`.
 **Calls out:** `rag-cli` (subprocess).
 

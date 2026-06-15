@@ -1,5 +1,6 @@
 # INFRASTRUCTURE
 import hashlib
+import json
 import re
 import shutil
 import subprocess
@@ -74,6 +75,37 @@ def parse_index_result(output: str) -> tuple[int, int]:
     return files, chunks
 
 
+# Write/merge {collection_name}__index.jsonl in collection_dir; one line per article; dedup by hash.
+# Reads existing JSONL → dict[hash→record], merges new entries, writes all back.
+def _write_index(
+    manifest: list[dict],
+    collection_dir: "Path",
+    collection_name: str,
+    source: str,
+) -> None:
+    index_path = collection_dir / f"{collection_name}__index.jsonl"
+    existing: dict[str, dict] = {}
+    if index_path.exists():
+        for line in index_path.read_text(encoding="utf-8").splitlines():
+            line = line.strip()
+            if line:
+                rec = json.loads(line)
+                existing[rec["hash"]] = rec
+    for entry in manifest:
+        h = entry.get("hash") or url_hash(entry.get("url", ""))
+        pubdate = pub_date_str(entry)
+        existing[h] = {
+            "hash": h,
+            "url": entry.get("url", ""),
+            "publication_date": pubdate,
+            "filename": f"{source}__{pubdate}__{h}.md",
+        }
+    index_path.write_text(
+        "\n".join(json.dumps(rec, ensure_ascii=False) for rec in existing.values()) + "\n",
+        encoding="utf-8",
+    )
+
+
 # Copy articles to collection_dir then optionally run rag-cli index.
 # Manifest passed directly (no disk read). Returns (n_copied, n_chunks).
 def publish_articles(
@@ -90,6 +122,7 @@ def publish_articles(
 
     collection_dir.mkdir(parents=True, exist_ok=True)
     n_copied = copy_articles(manifest, clean_dir, collection_dir, source)
+    _write_index(manifest, collection_dir, collection_name, source)
     print(f"Copied: {n_copied} article(s) → {collection_dir}", file=sys.stderr)
 
     if skip_index:
