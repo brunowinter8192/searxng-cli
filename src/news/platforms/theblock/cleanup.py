@@ -34,15 +34,36 @@ def cleanup(raw_html: str, entry: dict) -> str:
 
 
 # Return first JSON-LD block whose @type is or includes "NewsArticle"; None if not found.
+# Handles all common JSON-LD shapes without crashing:
+#   plain dict           → checked directly
+#   dict with @graph     → container dict + each @graph item checked
+#   top-level list       → each list item checked
+#   non-dict (int/str/…) → skipped silently
 def _find_news_article(html: str) -> dict | None:
     for raw in _LD_RE.findall(html):
         try:
             data = json.loads(raw)
         except (json.JSONDecodeError, ValueError):
             continue
-        if _is_news_article(data):
-            return data
+        for candidate in _iter_candidates(data):
+            if _is_news_article(candidate):
+                return candidate
     return None
+
+
+# Yield all dict candidates from one parsed JSON-LD value (flat 2-level scan).
+def _iter_candidates(data) -> object:
+    if isinstance(data, list):
+        for item in data:
+            if isinstance(item, dict):
+                yield item
+    elif isinstance(data, dict):
+        yield data
+        graph = data.get("@graph")
+        if isinstance(graph, list):
+            for item in graph:
+                if isinstance(item, dict):
+                    yield item
 
 
 # True if data['@type'] is "NewsArticle" or a list containing it.
