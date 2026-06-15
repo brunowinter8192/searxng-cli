@@ -11,7 +11,7 @@ import box_lock
 import p7_janitor as janitor
 from p2_cooldown import PersistentCooldownManager
 from p3_target import build_sitemap_target, _LOC_RE
-from p4_loop import run_loop, DEFAULT_MAX_WALL_S, REFRESH_INTERVAL_S
+from p4_loop import run_loop, REFRESH_INTERVAL_S
 from p5_logger import AcquireLogger
 from p6_buffer import BUFFER_SIZE, DEFAULT_CONCURRENCY
 
@@ -29,7 +29,6 @@ ARTICLE_URLS_FILE = OUTPUT_DIR / "theblock_article_urls.txt"
 def acquire_pipe_workflow(
     concurrency: int,
     buffer_size: int,
-    max_wall_s: float,
     pool_name: str,
 ) -> None:
     """Sustained acquire-pipe: sitemap → 64 sub-sitemaps → ~27k article URLs.
@@ -67,8 +66,7 @@ def acquire_pipe_workflow(
 
             print(
                 f"[acquire_pipe] Starting sustained loop "
-                f"(concurrency={concurrency}, buffer={buffer_size}, "
-                f"max_hours={max_wall_s/3600:.2f}, pool={pool_name})..."
+                f"(concurrency={concurrency}, buffer={buffer_size}, pool={pool_name})..."
             )
             _used = [False]
             def _pool_provider():
@@ -82,7 +80,6 @@ def acquire_pipe_workflow(
                 concurrency=concurrency,
                 buffer_size=buffer_size,
                 content_handler=content_handler,
-                max_wall_s=max_wall_s,
             )
             print(f"[acquire_pipe] Loop done: {len(done)} completed, {len(gap)} remaining")
 
@@ -95,7 +92,7 @@ def acquire_pipe_workflow(
             print(f"[acquire_pipe] Job report: acquire_pipe_jobs/{job_id}/")
 
             if gap:
-                print(f"[acquire_pipe] {len(gap)} sub-sitemaps incomplete (safety cap or exhaustion)")
+                print(f"[acquire_pipe] {len(gap)} sub-sitemaps incomplete")
 
     except box_lock.LockBusyError as e:
         print(e)
@@ -124,10 +121,6 @@ if __name__ == "__main__":
         help=f"Active proxy buffer depth (default: {BUFFER_SIZE})",
     )
     parser.add_argument(
-        "--max_hours", type=float, default=DEFAULT_MAX_WALL_S / 3600,
-        help=f"Hard wall-time safety cap in hours (default: {DEFAULT_MAX_WALL_S/3600:.0f})",
-    )
-    parser.add_argument(
         "--pool", choices=["curated", "backfill"], default="backfill",
         help="Proxy pool: curated (monosans+proxifly ~3.5k) or backfill (top-13 ~22k, default: backfill)",
     )
@@ -135,6 +128,5 @@ if __name__ == "__main__":
     acquire_pipe_workflow(
         concurrency=args.concurrency,
         buffer_size=args.buffer_size,
-        max_wall_s=args.max_hours * 3600,
         pool_name=args.pool,
     )
