@@ -103,29 +103,20 @@ wins. `n_urls_consumed = len({url …})` ensures only the distinct-URL count is 
 
 ---
 
-### p5_logger.py (216 LOC)
-**Purpose:** Streams fetch events to JSONL on every attempt (kill-safe); in-memory only for small
-counters. `close()` closes the stream without writing MD (use before `janitor.end_job`). `finalize()`
-closes and also writes per-run MD (standalone use only, not called in wired flow).
-**Reads:** events fed by `run_loop` via `record_attempt / record_burn / record_working_set / record_pool_refresh`.
+### p5_logger.py (47 LOC)
+**Purpose:** Streams fetch events to JSONL (line-buffered, kill-safe). No in-memory counters.
+`close()` seals the stream; all stats derive from the JSONL inside `p7_janitor.end_job()`.
+**Reads:** events pushed by `run_loop` via `record_attempt` / `record_pool_refresh`.
 **Writes:** `acquire_pipe_logs/acquire_events_<ts>.jsonl` (streamed, line-buffered).
 **Called by:** `p4_loop.run_loop`, `acquire_pipe.py`.
 **Calls out:** `proxy_status_log.proxy_key`.
 
-**Streaming design:** `record_attempt()` writes each event as `json.dumps(event)+"\n"`
-to an open file handle (`buffering=1`, line-buffered). No in-memory event list.
-A kill at any point leaves all recorded events on disk. `record_pool_refresh(size)` writes
-`{"event":"pool_refresh","size":N,"ts":...}` — consumed by `p7_janitor` for job.md pool field.
-`finalize()` reconstructs Surface 6 via `_throughput_buckets(jsonl_path)` — `t0 = min(ts)` across
-all events, so the function works on any partial JSONL without runtime context.
+**Methods (3):**
+- `record_attempt(proto, hp, url, ok)` — writes `{proxy_key, ts, url, result}` per fetch.
+- `record_pool_refresh(size)` — writes `{event:"pool_refresh", size, ts}` (janitor reads `size`).
+- `close()` — closes JSONL file handle. Call before `janitor.end_job(logger._jsonl_path, ...)`.
 
-**6 surfaces:**
-1. Fetch progress — URLs done/total + rate (URLs/min)
-2. B-per-proxy distribution — requests-before-burn histogram
-3. Working-set size over time — eligible candidate count per round
-4. Failed attempts per successful fetch — churn ratio
-5. Per-proxy event JSONL — `proxy_key`, `ts`, `url`, `result`, `proxy_success_count`
-6. Throughput over time — ok fetches per minute (bursty vs linear)
+**JSONL schema per fetch event:** `{proxy_key, ts, url, result}` (`result`: `"ok"` or `"fail"`).
 
 ---
 

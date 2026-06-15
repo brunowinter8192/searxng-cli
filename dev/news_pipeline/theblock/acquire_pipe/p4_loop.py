@@ -54,7 +54,6 @@ def run_loop(
     done:         list[str]                  = []
     dead:         list[str]                  = []
     wset:         set[tuple[str, str]]       = set()
-    psuccess:     dict[tuple[str, str], int] = {}
     _consec_fail: dict[tuple[str, str], int] = {}
 
     pool_22k      = pool_provider()
@@ -109,7 +108,6 @@ def run_loop(
                             content_handler(url, content)
                         done.append(url)
                     wset.add(key)
-                    psuccess[key] = psuccess.get(key, 0) + 1
                     _consec_fail.pop(key, None)
                 elif status == "dead":
                     if url not in batch_done:
@@ -121,20 +119,16 @@ def run_loop(
                     batch_failed.add(url)
                     fails = _consec_fail.get(key, 0) + 1
                     if fails >= 2:
-                        logger.record_burn(proto, hp, b_count=psuccess.get(key, 0))
                         cm.mark_burned(proto, hp)
                         wset.discard(key)
                         buf = [p for p in buf if p != key]
                         _consec_fail.pop(key, None)
-                        psuccess.pop(key, None)
                     else:
                         _consec_fail[key] = fails
 
         for url in batch_failed:
             if url not in batch_done:
                 queue.append(url)
-
-        logger.record_working_set(len(wset))
 
     return done, dead, list(queue)
 
