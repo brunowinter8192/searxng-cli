@@ -66,7 +66,7 @@ of proxies currently in the cooldown window.
 
 ---
 
-### p4_loop.py (219 LOC)
+### p4_loop.py (218 LOC)
 **Purpose:** SUSTAINED concurrent rotation loop. Outer time-loop wraps the inner batch loop:
 calls `pool_provider()` on start + every `refresh_interval_s` (3600) tick → `build_active_buffer`;
 records pool size via `logger.record_pool_refresh(len(pool_22k))` after each call (3 sites: startup,
