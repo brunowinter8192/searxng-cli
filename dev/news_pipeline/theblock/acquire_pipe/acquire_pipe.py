@@ -72,13 +72,14 @@ def acquire_pipe_workflow(
                     return initial_pool
                 return load_backfill_pool()
 
-            done, gap = run_loop(
+            done, dead, gap = run_loop(
                 _pool_provider, target_urls, "xml", logger, cm,
                 concurrency=concurrency,
                 buffer_size=buffer_size,
                 content_handler=content_handler,
             )
             print(f"[acquire_pipe] Loop done: {len(done)} completed, {len(gap)} remaining")
+            print(f"[acquire_pipe] {len(dead)} URLs permanently dead (404/410)")
 
             article_urls = list(dict.fromkeys(loc_urls))
             ARTICLE_URLS_FILE.write_text("\n".join(article_urls) + "\n", encoding="utf-8")

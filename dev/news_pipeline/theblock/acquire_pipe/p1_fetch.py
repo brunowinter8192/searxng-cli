@@ -10,11 +10,14 @@ FETCH_TIMEOUT  = 15
 
 # ORCHESTRATOR
 
-def fetch_url(proto: str, host_port: str, url: str, content_type: str) -> tuple[bool, bytes]:
+def fetch_url(proto: str, host_port: str, url: str, content_type: str) -> tuple[str, bytes]:
     """Fetch url through proto://host_port; validate by content_type.
 
     content_type: "xml" (sitemap gate) | "html" (article gate)
-    Returns (ok, content) — content is raw bytes on success, b"" on failure.
+    Returns (status, content):
+      "ok"   — valid content fetched; content is raw bytes.
+      "dead" — origin returned 404/410 (proxy worked, URL is gone); content is b"".
+      "fail" — connection error, timeout, CF block, or wrong format; content is b"".
     """
     purl = f"{proto}://{host_port}"
     try:
@@ -22,15 +25,17 @@ def fetch_url(proto: str, host_port: str, url: str, content_type: str) -> tuple[
         r = s.get(url, proxies={"http": purl, "https": purl}, timeout=FETCH_TIMEOUT)
         return _validate(r, content_type)
     except Exception:
-        return False, b""
+        return "fail", b""
 
 
 # FUNCTIONS
 
-# Validate response against content_type gate; return (ok, content)
-def _validate(r, content_type: str) -> tuple[bool, bytes]:
+# Classify response: "dead" on 404/410, "fail" on other non-200, "ok"/"fail" on 200 by marker check
+def _validate(r, content_type: str) -> tuple[str, bytes]:
+    if r.status_code in (404, 410):
+        return "dead", b""
     if r.status_code != 200:
-        return False, b""
+        return "fail", b""
     head = r.content[:500]
     if content_type == "xml":
         ok = any(m in head for m in XML_MARKERS)
@@ -38,4 +43,4 @@ def _validate(r, content_type: str) -> tuple[bool, bytes]:
         ok = any(m in head.lower() for m in HTML_MARKERS)
     else:
         ok = False
-    return ok, r.content if ok else b""
+    return ("ok", r.content) if ok else ("fail", b"")
