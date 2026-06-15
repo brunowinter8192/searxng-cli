@@ -225,18 +225,28 @@ place first — derive the name from the first page / title metadata, sanitize p
 The markdown then simply inherits the PDF's basename: `STEM = basename(PDF without .pdf)`, output =
 `$OUTPUT_DIR/$STEM.md`. PDF name and md name stay identical.
 
-The whole convert is ONE job — every PDF in a single `workflow.py convert` call, never a
-per-PDF loop. All PDFs convert in ONE MinerU process: the model loads **once** for the whole job,
-then each PDF is parsed in sequence. Output per PDF: `$OUTPUT_DIR/<stem>.md` (`stem = basename(PDF without .pdf)`).
+**On Apple Silicon (MPS): convert ONE PDF per `workflow.py convert` call, in a loop — NOT all
+PDFs in a single call.** A multi-PDF call loads the model only once, but it is a long-lived MPS
+process that crashes probabilistically (Metal/MPS instability, opendatalab/MinerU#194) and takes
+the entire remaining queue down with it — a 16-PDF batch can never reliably finish, each attempt
+dies mid-tail. One process per PDF isolates a crash to that single PDF: the loop continues, every
+already-completed md is saved. The cost — model reload per PDF (~26 s) — is the price of
+crash-resilience and is worth it. Output per PDF: `$OUTPUT_DIR/<stem>.md`
+(`stem = basename(PDF without .pdf)`).
 
-A directory of PDFs (rename any cryptic ones first — see below):
+`MINERU_PDF_RENDER_THREADS=1` is hard-wired in `workflow.py` (the default 3 spawns multiple
+pypdfium render processes that corrupt the heap on some setups, MinerU#5033) — nothing to export.
+
+A directory of PDFs (rename any cryptic ones first — see below) — loop, ONE call per PDF, with
+continue-on-failure (no `set -e`) so a crashed PDF is skipped and the rest proceed:
 
 ```bash
-mkdir -p $OUTPUT_DIR
-cd /Users/brunowinter2000/Documents/ai/Mineru && \
-./venv/bin/python workflow.py convert \
-    --pdf "$PDF_DIR"/*.pdf \
-    --out-dir "$OUTPUT_DIR"
+mkdir -p "$OUTPUT_DIR"
+cd /Users/brunowinter2000/Documents/ai/Mineru
+for pdf in "$PDF_DIR"/*.pdf; do
+    echo "=== $(basename "$pdf") ($(date +%H:%M:%S)) ==="
+    ./venv/bin/python workflow.py convert --pdf "$pdf" --out-dir "$OUTPUT_DIR"
+done
 ```
 
 A single PDF — pass just that one path:
@@ -255,32 +265,32 @@ Note on naming a cryptic PDF: when a PDF's filename is not already speaking, der
 
 `STEM = basename(PDF)` — no `pdf → stem` mapping table. Rename cryptic PDFs once, BEFORE the job runs.
 
-A PDF that fails to convert surfaces in the job log with `md: null` (no output produced) — it is
-reported to the user there (see Derail Check), not retried.
+A PDF that fails to convert surfaces in the job log with `md: null` (no output produced). Because
+MPS crashes are probabilistic, re-run the failed PDFs (loop again over just those names) — a retry
+usually succeeds. Report any that fail repeatedly.
 
 ##### Background Convert — launch + go idle
 
-The job is GPU-heavy (book PDFs run many minutes). Launch the `workflow.py convert` job as a
-background Bash call (`run_in_background=true`) and go idle. Do NOT `pgrep`/name-poll/`wait`-loop.
-When the console prints `job done`, run the Derail Check.
+The loop is GPU-heavy (book PDFs run many minutes each; the whole queue is hours). Launch the
+entire `for`-loop as a single background Bash call (`run_in_background=true`) and go idle. Do NOT
+`pgrep`/name-poll/`wait`-loop. When the loop has attempted every PDF, run the Derail Check.
 
 ##### Derail Check — read the job log (after `job done`)
 
-workflow writes one JSONL line per PDF plus one `job_summary` line to
-`/Users/brunowinter2000/Documents/ai/Mineru/logs/jobs.jsonl`. You submitted N PDFs, so this job
-appended **N+1** lines. Read only the tail — never the whole growing file (N = number of PDFs you
-submitted):
+Each `workflow.py convert` call is its own job and appends 2 lines to
+`/Users/brunowinter2000/Documents/ai/Mineru/logs/jobs.jsonl`: one per-PDF line plus one
+`job_summary` line. For a loop over N PDFs that is **2N** lines. Read only the tail — never the
+whole growing file:
 
 ```bash
-tail -n $((N+1)) /Users/brunowinter2000/Documents/ai/Mineru/logs/jobs.jsonl
+tail -n $((2*N)) /Users/brunowinter2000/Documents/ai/Mineru/logs/jobs.jsonl
 ```
 
-The last line is the `job_summary`; take its `job_id` and keep only the lines with that `job_id`
-(guards against a missing line pulling in a prior job). Each per-PDF line carries
-`{pdf, md, pages, words, words_per_page}`. Check every line:
+Ignore the `job_summary` lines. Each per-PDF line carries
+`{pdf, md, pages, words, words_per_page}`. Check every per-PDF line:
 
-- **`md: null`** → no output produced for that PDF (convert failed). Do NOT clean. REPORT to the
-  user: the PDF name + that it failed.
+- **`md: null`** → no output produced (convert crashed, probabilistic on MPS). Do NOT clean.
+  Re-run that PDF (loop again over just the failed names); report any that fail repeatedly.
 - **`md` present** → judge `words_per_page` for corruption. A clean academic md runs about
   **550–600 words per page**; a corrupted (derailed) convert is far wordier — roughly **800+ words
   per page** — and carries duplicated or garbled passages. Two steps: (1) scan all PDFs'
