@@ -85,9 +85,9 @@ def run_race(
             if proxy is None:
                 return
             proto, hp = proxy
-            ok, content = fetch_url(proto, hp, url, content_type)
-            logger.record_attempt(proto, hp, url, ok)
-            if ok:
+            status, content = fetch_url(proto, hp, url, content_type)
+            logger.record_attempt(proto, hp, url, status == "ok")
+            if status == "ok":
                 _mark_done(url, content)
 
     with ThreadPoolExecutor(max_workers=concurrency) as ex:

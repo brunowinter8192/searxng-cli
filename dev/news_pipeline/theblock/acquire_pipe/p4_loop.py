@@ -30,7 +30,7 @@ def run_loop(
     buffer_size: int = BUFFER_SIZE,
     content_handler: Callable[[str, bytes], None] | None = None,
     refresh_interval_s: float = REFRESH_INTERVAL_S,
-) -> tuple[list[str], list[str]]:
+) -> tuple[list[str], list[str], list[str]]:
     """Sustained concurrent rotation loop: 60-min pool refresh + wait-on-exhaustion.
 
     pool_provider() is called once on startup and again at each refresh_interval_s
@@ -44,9 +44,15 @@ def run_loop(
 
     refresh_interval_s is a separate parameter to allow small values in tests without
     patching module globals.
+
+    Returns (done, dead, gap):
+      done — URLs successfully fetched with valid content.
+      dead — URLs whose origin returned 404/410 (permanently gone; proxy confirmed working).
+      gap  — URLs remaining in queue (should be empty on clean termination).
     """
     queue         = deque(target_urls)
     done:         list[str]                  = []
+    dead:         list[str]                  = []
     wset:         set[tuple[str, str]]       = set()
     psuccess:     dict[tuple[str, str], int] = {}
     _consec_fail: dict[tuple[str, str], int] = {}
@@ -91,12 +97,12 @@ def run_loop(
             }
             for fut in as_completed(futures):
                 proto, hp, url = futures[fut]
-                ok, content    = fut.result()
-                key            = (proto, hp)
+                status, content = fut.result()
+                key             = (proto, hp)
 
-                logger.record_attempt(proto, hp, url, ok)
+                logger.record_attempt(proto, hp, url, status == "ok")
 
-                if ok:
+                if status == "ok":
                     if url not in batch_done:
                         batch_done.add(url)
                         if content_handler is not None:
@@ -104,6 +110,12 @@ def run_loop(
                         done.append(url)
                     wset.add(key)
                     psuccess[key] = psuccess.get(key, 0) + 1
+                    _consec_fail.pop(key, None)
+                elif status == "dead":
+                    if url not in batch_done:
+                        batch_done.add(url)
+                        dead.append(url)
+                    wset.add(key)
                     _consec_fail.pop(key, None)
                 else:
                     batch_failed.add(url)
@@ -124,7 +136,7 @@ def run_loop(
 
         logger.record_working_set(len(wset))
 
-    return done, list(queue)
+    return done, dead, list(queue)
 
 
 # FUNCTIONS

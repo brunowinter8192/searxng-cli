@@ -45,17 +45,19 @@ def _fetch_index_direct() -> bytes | None:
         return None
 
 
-# Fetch sitemap index through caller-supplied proxy pool (socks4-first); raise on exhaustion
+# Fetch sitemap index through caller-supplied proxy pool; raise on exhaustion
 def _fetch_index_via_proxy(pool: list) -> bytes:
     cm   = PersistentCooldownManager()
     candidates = cm.eligible_candidates(pool)
     print(f"[sitemap] Proxy fallback: {len(candidates)} candidates")
     for proto, hp in candidates:
-        ok, content = fetch_url(proto, hp, THEBLOCK_INDEX, "xml")
-        if ok:
+        status, content = fetch_url(proto, hp, THEBLOCK_INDEX, "xml")
+        if status == "ok":
             print(f"[sitemap] Proxy OK via {proto}://{hp} ({len(content):,} bytes)")
             return content
-        cm.mark_burned(proto, hp)
+        if status == "fail":
+            cm.mark_burned(proto, hp)
+        # "dead": proxy reached origin (404 on index = site anomaly, not proxy fault) — skip, no burn
     raise RuntimeError("sitemap index fetch failed: all proxy candidates exhausted")
 
 
