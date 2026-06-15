@@ -1,7 +1,7 @@
 # INFRASTRUCTURE
 import re
 import sys
-from datetime import datetime, timedelta, timezone
+from datetime import datetime, timezone
 
 import httpx
 
@@ -14,17 +14,15 @@ _URL_BLOCK_RE = re.compile(rb"<url>(.*?)</url>", re.DOTALL)
 _LOC_RE       = re.compile(rb"<loc>(https?://[^<]+)</loc>")
 _MOD_RE       = re.compile(rb"<lastmod>([^<]+)</lastmod>")
 _NUM_RE       = re.compile(r"_(\d+)\.xml$")
-_RANGE_RE     = re.compile(r"^\d{4}-\d{2}-\d{2}:\d{4}-\d{2}-\d{2}$")
 XML_MARKERS   = (b"<?xml", b"<sitemapindex", b"<urlset", b"<sitemap>")
 
 
 # ORCHESTRATOR
 
 # Fetch theblock sitemap index → post_type_post subs → select by timeframe → [{url, lastmod}].
-# timeframe: "48h" (highest sub, lastmod >= now-48h) | "full" (all subs) | "YYYY-MM-DD:YYYY-MM-DD" (range).
+# timeframe: "delta" (top-2 subs, no date filter) | "full" (all subs) | "sub:N" (exact sub index N).
 # publication_date is NOT set here — comes from JSON-LD post-fetch in cleanup.
-async def discover(timeframe: str = "48h") -> list[dict]:
-    cutoff_start, cutoff_end = _parse_timeframe(timeframe)
+async def discover(timeframe: str = "delta") -> list[dict]:
     pool_cache: list = []  # lazy-loaded on first proxy fallback, shared across all fetches
 
     index_content = _fetch_xml(SITEMAP_INDEX, pool_cache)
@@ -35,10 +33,18 @@ async def discover(timeframe: str = "48h") -> list[dict]:
         raise RuntimeError("No post_type_post sub-sitemaps found in theblock sitemap index")
     print(f"[theblock] {len(post_subs)} post_type_post sub-sitemaps", file=sys.stderr)
 
-    if timeframe == "full" or (cutoff_start is not None and cutoff_end is not None):
+    if timeframe == "full":
         target_subs = post_subs
+    elif timeframe == "delta":
+        target_subs = _top_n_subs(post_subs, 2)
+    elif timeframe.startswith("sub:"):
+        try:
+            n = int(timeframe[4:])
+        except ValueError:
+            raise RuntimeError(f"Invalid sub:N timeframe: {timeframe!r} — expected 'sub:<integer>'")
+        target_subs = [_sub_by_index(post_subs, n)]
     else:
-        target_subs = [_pick_highest_numbered(post_subs)]
+        raise RuntimeError(f"Unknown timeframe: {timeframe!r} — expected 'full', 'delta', or 'sub:N'")
     print(f"[theblock] Fetching {len(target_subs)} sub-sitemap(s) …", file=sys.stderr)
 
     entries = []
@@ -48,35 +54,13 @@ async def discover(timeframe: str = "48h") -> list[dict]:
             print(f"[theblock] Sub-sitemap failed, skipping: {sub_url.split('/')[-1]}", file=sys.stderr)
             continue
         for url, lastmod in _parse_url_blocks(content):
-            if _in_window(lastmod, cutoff_start, cutoff_end):
-                entries.append({"url": url, "lastmod": lastmod.isoformat()})
+            entries.append({"url": url, "lastmod": lastmod.isoformat()})
 
     print(f"[theblock] discover → {len(entries)} entries (timeframe={timeframe!r})", file=sys.stderr)
     return entries
 
 
 # FUNCTIONS
-
-# Return (cutoff_start, cutoff_end): both None = no filter; only start = 48h; both set = range.
-def _parse_timeframe(timeframe: str) -> tuple[datetime | None, datetime | None]:
-    if timeframe == "full":
-        return None, None
-    if _RANGE_RE.match(timeframe):
-        a, b = timeframe.split(":")
-        start = datetime.fromisoformat(a).replace(tzinfo=timezone.utc)
-        end   = datetime.fromisoformat(b).replace(hour=23, minute=59, second=59, tzinfo=timezone.utc)
-        return start, end
-    return datetime.now(timezone.utc) - timedelta(hours=48), None
-
-
-# Return True if lastmod falls within (cutoff_start, cutoff_end) window; both None = always True.
-def _in_window(lastmod: datetime, cutoff_start: datetime | None, cutoff_end: datetime | None) -> bool:
-    if cutoff_start is not None and lastmod < cutoff_start:
-        return False
-    if cutoff_end is not None and lastmod > cutoff_end:
-        return False
-    return True
-
 
 # Try direct httpx first; on failure, load pool lazily and iterate proxies; return bytes or None.
 def _fetch_xml(url: str, pool_cache: list) -> bytes | None:
@@ -114,12 +98,21 @@ def _parse_post_sub_urls(content: bytes) -> list[str]:
     ]
 
 
-# Return the sub-sitemap URL with the highest trailing integer (= newest page).
-def _pick_highest_numbered(urls: list[str]) -> str:
+# Return the N highest-numbered sub-sitemap URLs (descending); fewer than N returned if list is shorter.
+def _top_n_subs(urls: list[str], n: int) -> list[str]:
     def _num(u: str) -> int:
         m = _NUM_RE.search(u)
         return int(m.group(1)) if m else -1
-    return max(urls, key=_num)
+    return sorted(urls, key=_num, reverse=True)[:n]
+
+
+# Return the sub-sitemap URL whose trailing index == n; raise RuntimeError if not found.
+def _sub_by_index(urls: list[str], n: int) -> str:
+    for u in urls:
+        m = _NUM_RE.search(u)
+        if m and int(m.group(1)) == n:
+            return u
+    raise RuntimeError(f"sub:{n} not found among {len(urls)} post_type_post sub-sitemaps")
 
 
 # Parse <url> blocks from sub-sitemap XML; return (loc_url, lastmod_datetime) pairs.

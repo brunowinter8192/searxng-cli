@@ -18,7 +18,7 @@ class TheBlockPlatform:
     scrape_engine: str         = "proxy_pool"
     scrape_config: ScrapeConfig = ScrapeConfig()
     proxy_scrape_config        = PROXY_SCRAPE_CONFIG
-    timeframe: str             = "48h"    # set by __main__ via --timeframe
+    timeframe: str             = "delta"  # set by __main__ via --timeframe
     dedup_mode: str            = "hash_only"
 
     async def discover(self) -> list[dict]:

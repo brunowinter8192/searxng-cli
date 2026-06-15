@@ -16,7 +16,7 @@ registry. No other module should import from here directly.
 Auto-registers via `register(TheBlockPlatform())` at module end.
 
 Extra platform attributes (not in Protocol):
-- `timeframe: str` — discovery window; overwritten by `__main__` from `--timeframe`.
+- `timeframe: str` — discovery mode (`"delta"` default); overwritten by `__main__` from `--timeframe`.
 - `dedup_mode: str = "hash_only"` — consumed by `pipeline.py` via `getattr`.
 
 ## Modules
@@ -33,11 +33,11 @@ Extra platform attributes (not in Protocol):
 
 ---
 
-### discover.py (143 LOC)
+### discover.py (136 LOC)
 
 **Purpose:** Sitemap-based article discovery. Fetches theblock sitemap index (direct httpx →
-proxy pool fallback), selects `post_type_post_*` sub-sitemaps by timeframe mode, parses
-`<url>/<loc>/<lastmod>` blocks, applies date filter. Returns `[{url, lastmod}]` — NO
+proxy pool fallback), selects `post_type_post_*` sub-sitemaps by mode (`delta`/`full`/`sub:N`),
+parses `<url>/<loc>/<lastmod>` blocks — no date filtering. Returns `[{url, lastmod}]` — NO
 `publication_date` (comes from JSON-LD post-fetch in cleanup).
 **Reads:** `https://www.theblock.co/sitemap_tbco_index.xml` + selected sub-sitemaps (network).
 **Writes:** nothing.
@@ -45,10 +45,10 @@ proxy pool fallback), selects `post_type_post_*` sub-sitemaps by timeframe mode,
 **Calls out:** `httpx`, `engine/proxy_pool/fetch.py:fetch_url`,
 `engine/proxy_pool/pool_loaders.py:load_backfill_pool`.
 
-Three timeframe modes (read from `self.timeframe`):
-- `"48h"` (default) — highest-numbered `post_type_post_*` sub, `lastmod ≥ now−48h`.
-- `"full"` — all post sub-sitemaps, no date filter.
-- `"YYYY-MM-DD:YYYY-MM-DD"` — all post subs, `lastmod ∈ [A, B]` (B inclusive, end of day).
+Three timeframe modes (read from `self.timeframe`); no `lastmod` date filtering in any mode:
+- `"delta"` (default) — top-2 highest-numbered `post_type_post_*` subs, all URLs. Rollover-safe recurring run.
+- `"full"` — all `post_type_post_*` subs, all URLs. Complete backfill.
+- `"sub:N"` — exactly the sub whose trailing index == N (e.g. `sub:0` → `post_type_post_0.xml`), all URLs. Bounded backfill chunk. Raises `RuntimeError` if N not found.
 
 Proxy pool is lazy-loaded into `pool_cache` on first fallback; shared across all XML fetches
 in the same discover call (index + sub-sitemaps) to avoid loading the pool twice.
@@ -85,6 +85,6 @@ Fallback: if no `NewsArticle` or no `articleBody` → returns `""` + stderr log,
 
 **Purpose:** `TheBlockPlatform` class wrapping config + discover + cleanup; auto-registers on import.
 Fields: `name/collection="theblock"`, `scrape_engine="proxy_pool"`, `regwall_signals=[]`,
-`proxy_scrape_config=PROXY_SCRAPE_CONFIG`, `timeframe="48h"`, `dedup_mode="hash_only"`.
+`proxy_scrape_config=PROXY_SCRAPE_CONFIG`, `timeframe="delta"`, `dedup_mode="hash_only"`.
 `precondition_url="https://www.google.com"` (theblock.co returns 403 on plain urllib).
 **Called by:** `__main__.py` (side-effect import).
