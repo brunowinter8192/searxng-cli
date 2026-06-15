@@ -34,9 +34,24 @@ verbatim (import-fixes only) into `src/news/engine/proxy_pool/`.
 - Validation note: the ported modules are faithful copies of the OT40-validated engine + import-fixes; runtime
   end-to-end is exercised first by Stage B's live run, not yet.
 
-## Stage B — NOT YET BUILT (the The Block platform)
+## Stage B — DONE (merged on dev, end-to-end smoke-validated)
 
-`src/news/platforms/theblock/` implementing the contract:
+Built as `src/news/platforms/theblock/` (config.py, discover.py, cleanup.py, __init__.py) + `--timeframe`
+in `__main__.py` + the additive shared-contract changes (dedup `mode` param, `_run_cleanup` publication_date
+fallback). All design points below were implemented exactly as decided.
+
+**End-to-end smoke (`python -m src.news --source theblock --timeframe 48h --skip-index`):** discover → 27
+post_type_post subs → highest → 17 entries in 48h window; dedup (hash_only, 17 new, collection empty); scrape
+via proxy_pool → 17/17 ok on a 32,189-proxy pool; cleanup → JSON-LD `articleBody`→MD + datePublished mutated
+into entries; publish → 17 files `theblock__{datePublished[:10]}__{hash}.md` copied to
+`rag-cli/data/documents/theblock/` (un-indexed, --skip-index). Clean bodies are pure article text, no chrome.
+The full chain incl. the ported proxy engine is now live-validated on real articles.
+
+Note: the smoke left 17 real un-indexed articles in `data/documents/theblock/`; the next run dedups them
+(hash-only skip). precondition_url set to `https://www.google.com` (theblock.co 403s a direct urllib GET; a
+proxy_pool platform's home-IP reachability of its own domain is irrelevant — a generic internet check is correct).
+
+The contract implemented:
 
 ### Date handling (decided)
 - **datePublished is the day of record** — the filename + allocation. Always, no rechecks. From the article's
@@ -76,7 +91,8 @@ datePublished from the fetched article into cleanup/publish so the filename gets
 path (date in URL at discover) does not apply here.
 
 ## Open
-- Stage B build + the first 48h-delta run (functional proof) + the ~27k full backfill (first at-scale test of
-  the dead-URL + exhaustion paths the 64er did not touch).
+- Stage B build + 48h-delta smoke DONE (above). Remaining: decide whether to index the smoke's 17 articles or
+  wipe+redo cleanly; then the ~27k full backfill (`--timeframe full`) — the first at-scale test of the dead-URL
+  + exhaustion paths the 64er did not touch.
 - `content_handler` writes raw HTML as `{hash}.md` (UTF-8, errors="replace"); The Block cleanup parses HTML, not
   markdown — fine since cleanup is per-platform.
