@@ -21,15 +21,18 @@ collection paths except in `publish.py`'s `rag-cli` invocation).
 
 Key: `RegwallGuardError` is raised (not sys.exit) when regwall fraction ≥ `REGWALL_FAIL_THRESHOLD` (0.20).
 
-### dedup.py (44 LOC)
+### dedup.py (50 LOC)
 
 **Purpose:** Filter discover entries to those not yet in the RAG collection by checking filename existence.
-**Reads:** entries list (in-memory), collection_dir (filesystem), source name.
+**Reads:** entries list (in-memory), collection_dir (filesystem), source name, mode.
 **Writes:** nothing (pure filter).
-**Called by:** `pipeline.py:run_pipeline`.
+**Called by:** `pipeline.py:run_pipeline` (mode sourced via `getattr(platform, "dedup_mode", "pubdate")`).
 **Calls out:** stdlib only.
 
-Filename key: `{source}__{pubdate}__{url_hash}.md` — matches publish convention.
+Two modes via `mode` param (default `"pubdate"`):
+- `"pubdate"`: exact match `{source}__{pubdate}__{hash}.md` — CoinDesk default.
+- `"hash_only"`: glob `{source}__*__{hash}.md` — for platforms (e.g. The Block) where
+  `publication_date` is not available at discover time (comes from fetched content post-scrape).
 
 ### publish.py (101 LOC)
 

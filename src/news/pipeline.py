@@ -60,7 +60,8 @@ async def run_pipeline(platform: Platform, skip_index: bool = False) -> None:
 
     # Stage 2 — dedup
     log.info("STAGE dedup …")
-    new_entries, n_skip = filter_new_entries(entries, collection_dir, platform.name)
+    dedup_mode = getattr(platform, "dedup_mode", "pubdate")
+    new_entries, n_skip = filter_new_entries(entries, collection_dir, platform.name, mode=dedup_mode)
     log.info(f"dedup → {len(entries)} total, {n_skip} already indexed, {len(new_entries)} new")
     if not new_entries:
         log.info("Nothing new to scrape — pipeline complete.")
@@ -171,8 +172,9 @@ def _write_discover_snapshot(entries: list[dict], discover_dir: Path) -> Path:
 
 
 # In-process cleanup: read body from scrape_dir, apply platform.cleanup, write pure content to clean_dir.
-# publication_date is sourced from discover_by_url (discover entries carry it; scrape manifest does not).
-# pub_date_str() in publish.py provides a URL-path fallback as a secondary net.
+# publication_date: primary source is discover_by_url; fallback to entry (scrape manifest) for platforms
+# where cleanup mutates entry["publication_date"] from fetched content (e.g. The Block JSON-LD).
+# pub_date_str() in publish.py provides a URL-path fallback as a tertiary net.
 def _run_cleanup(
     manifest: list[dict],
     scrape_dir: Path,
@@ -198,7 +200,7 @@ def _run_cleanup(
         clean_manifest.append({
             "url": entry["url"],
             "hash": h,
-            "publication_date": discover_entry.get("publication_date", ""),
+            "publication_date": discover_entry.get("publication_date") or entry.get("publication_date", ""),
         })
     return clean_manifest
 
