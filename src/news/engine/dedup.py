@@ -25,19 +25,25 @@ def pub_date_str(entry: dict) -> str:
 
 
 # Return (new_entries, n_skipped): drop entries whose target MD already exists in collection_dir.
-# Filename key: f"{source}__{pubdate}__{hash}.md"
+# mode="pubdate": exact match f"{source}__{pubdate}__{hash}.md" (default, CoinDesk).
+# mode="hash_only": glob f"{source}__*__{hash}.md" — for platforms with no pubdate at discover time.
 def filter_new_entries(
     entries: list[dict],
     collection_dir: Path,
     source: str,
+    mode: str = "pubdate",
 ) -> tuple[list[dict], int]:
     new_entries = []
     n_skipped = 0
     for entry in entries:
         h = url_hash(entry["url"])
-        pubdate = pub_date_str(entry)
-        target = collection_dir / f"{source}__{pubdate}__{h}.md"
-        if target.exists():
+        if mode == "hash_only":
+            already_have = bool(list(collection_dir.glob(f"{source}__*__{h}.md")))
+        else:
+            pubdate = pub_date_str(entry)
+            target = collection_dir / f"{source}__{pubdate}__{h}.md"
+            already_have = target.exists()
+        if already_have:
             n_skipped += 1
         else:
             new_entries.append(entry)
