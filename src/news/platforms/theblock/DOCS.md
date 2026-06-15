@@ -33,11 +33,11 @@ Extra platform attributes (not in Protocol):
 
 ---
 
-### discover.py (143 LOC)
+### discover.py (136 LOC)
 
 **Purpose:** Sitemap-based article discovery. Fetches theblock sitemap index (direct httpx →
-proxy pool fallback), selects `post_type_post_*` sub-sitemaps by timeframe mode, parses
-`<url>/<loc>/<lastmod>` blocks, applies date filter. Returns `[{url, lastmod}]` — NO
+proxy pool fallback), selects `post_type_post_*` sub-sitemaps by mode (`delta`/`full`/`sub:N`),
+parses `<url>/<loc>/<lastmod>` blocks — no date filtering. Returns `[{url, lastmod}]` — NO
 `publication_date` (comes from JSON-LD post-fetch in cleanup).
 **Reads:** `https://www.theblock.co/sitemap_tbco_index.xml` + selected sub-sitemaps (network).
 **Writes:** nothing.
