@@ -1,5 +1,6 @@
 #!/usr/bin/env python3
 # INFRASTRUCTURE
+import argparse
 import asyncio
 import base64 as _base64
 import gzip as _gzip
@@ -17,9 +18,10 @@ REAL_UA = (
     "AppleWebKit/537.36 (KHTML, like Gecko) "
     "Chrome/146.0.7680.154 Safari/537.36"
 )
-MAX_CLICKS = 5
+MAX_CLICKS = 5         # quick mode
+DEPTH_CAP = 150        # depth mode safety cap
 POLL_INTERVAL = 0.5
-POLL_MAX = 40  # 20s max wait per click
+POLL_MAX = 40          # 20s max wait per click
 
 DATE_RE = re.compile(r'/(\d{4})/(\d{2})/(\d{2})/')
 
@@ -429,5 +431,179 @@ def write_report(
     path.write_text("\n".join(lines), encoding="utf-8")
 
 
+async def depth_workflow():
+    """Find the ceiling: click until disabled/gone/plateau/cap. No HAR. Coindesk-only net log."""
+    OUTPUT_DIR.mkdir(parents=True, exist_ok=True)
+    ts = datetime.now(timezone.utc).strftime("%Y%m%dT%H%M%SZ")
+    report_path = OUTPUT_DIR / f"depth_report_{ts}.md"
+    print(f"Report → {report_path}", file=sys.stderr)
+
+    # Lightweight log: only www.coindesk.com non-image, non-static responses
+    coindesk_log: list[dict] = []
+    _SKIP_EXT = (".js", ".css", ".woff", ".woff2", ".otf", ".png", ".jpg", ".jpeg",
+                 ".gif", ".webp", ".svg", ".ico", ".map")
+    _SKIP_PATH = ("/_next/static/", "/_next/image", "/api/cdn-fonts")
+
+    def on_response(response):
+        url = response.url
+        if "www.coindesk.com" not in url and "coindesk.com" not in url:
+            return
+        if any(url.endswith(ext) for ext in _SKIP_EXT):
+            return
+        if any(seg in url for seg in _SKIP_PATH):
+            return
+        coindesk_log.append({
+            "url": url,
+            "method": response.request.method,
+            "status": response.status,
+        })
+
+    async with async_playwright() as p:
+        browser = await p.chromium.launch(channel="chrome", headless=True)
+        context = await browser.new_context(user_agent=REAL_UA)
+        page = await context.new_page()
+        page.on("response", on_response)
+
+        print(f"Navigating to {TARGET_URL} …", file=sys.stderr)
+        await page.goto(TARGET_URL, wait_until="domcontentloaded", timeout=60000)
+        await asyncio.sleep(3.0)
+
+        cookie_result = await page.evaluate(_JS_DISMISS_COOKIE)
+        print(f"Cookie consent: {cookie_result}", file=sys.stderr)
+        await asyncio.sleep(0.5)
+
+        all_urls: set[str] = set(await extract_articles(page))
+        oldest_date = compute_oldest(all_urls)
+        print(f"Batch 0: {len(all_urls)} initial | oldest={oldest_date}", file=sys.stderr)
+
+        stop_reason = f"cap ({DEPTH_CAP} clicks)"
+        milestone_rows: list[str] = []
+        prev_count = len(all_urls)
+
+        for click_n in range(1, DEPTH_CAP + 1):
+            btn_state_pre = await page.evaluate(_JS_BTN_STATE)
+            if not btn_state_pre.get("found"):
+                stop_reason = "button GONE"
+                break
+            if btn_state_pre.get("disabled"):
+                stop_reason = "button DISABLED"
+                break
+
+            clicked = await page.evaluate(_JS_CLICK_BTN)
+            if not clicked:
+                stop_reason = "JS click returned false (button vanished)"
+                break
+            await asyncio.sleep(0.5)
+
+            new_dom_count = await wait_for_new_articles(page, prev_count)
+
+            fresh_urls = set(await extract_articles(page))
+            new_this = fresh_urls - all_urls
+            if not new_this:
+                stop_reason = f"plateau (no new URLs after click {click_n})"
+                break
+
+            all_urls.update(fresh_urls)
+            oldest_date = compute_oldest(all_urls)
+            prev_count = len(all_urls)
+
+            if click_n % 10 == 0 or click_n <= 5:
+                row = f"  click {click_n:>3}: total={len(all_urls):>4} | +{len(new_this):>3} | oldest={oldest_date}"
+                print(row, file=sys.stderr)
+                milestone_rows.append(row.strip())
+
+        # Final button state
+        final_btn_info = await page.evaluate(_JS_BTN_STATE)
+        final_btn_state = (
+            "GONE" if not final_btn_info.get("found")
+            else "DISABLED" if final_btn_info.get("disabled")
+            else "active"
+        )
+
+        await context.close()
+        await browser.close()
+
+    content_fetches = [e for e in coindesk_log if e["url"] != TARGET_URL
+                       and "latest-crypto-news" not in e["url"]
+                       or "_rsc" in e["url"] or "next-action" in e.get("method", "").lower()]
+    any_content_fetch = bool([e for e in coindesk_log
+                               if "_rsc" in e["url"]
+                               or e["method"] == "POST"
+                               or ("coindesk.com" in e["url"]
+                                   and "latest-crypto-news" not in e["url"]
+                                   and "metrics." not in e["url"]
+                                   and "downloads." not in e["url"]
+                                   and e["url"] != TARGET_URL)])
+
+    write_depth_report(report_path, len(all_urls), oldest_date, stop_reason,
+                       final_btn_state, milestone_rows, coindesk_log, any_content_fetch)
+
+    print(f"\n=== DEPTH RESULT ===", file=sys.stderr)
+    print(f"Max unique URLs : {len(all_urls)}", file=sys.stderr)
+    print(f"Oldest date     : {oldest_date}", file=sys.stderr)
+    print(f"Stop reason     : {stop_reason}", file=sys.stderr)
+    print(f"CoinDesk content fetch ever fired: {any_content_fetch}", file=sys.stderr)
+    print(f"Report: {report_path}")
+
+
+# Write depth-mode ceiling report
+def write_depth_report(
+    path: Path,
+    max_unique: int,
+    oldest_date: str,
+    stop_reason: str,
+    final_btn_state: str,
+    milestone_rows: list[str],
+    coindesk_log: list[dict],
+    any_content_fetch: bool,
+) -> None:
+    lines: list[str] = []
+    lines.append("# CoinDesk Pagination Depth Report — Ceiling Probe")
+    lines.append(f"\n**Run:** {datetime.now(timezone.utc).isoformat()}\n")
+
+    lines.append("## Result\n")
+    lines.append(f"| Metric | Value |")
+    lines.append(f"|--------|-------|")
+    lines.append(f"| Max unique feed URLs | **{max_unique}** |")
+    lines.append(f"| Oldest date reached | **{oldest_date}** |")
+    lines.append(f"| Stop reason | **{stop_reason}** |")
+    lines.append(f"| Button end-state | {final_btn_state} |")
+    lines.append(f"| CoinDesk content fetch fired | {'YES — see log below' if any_content_fetch else 'NO — pure client-side'} |\n")
+
+    lines.append("## Milestone Progress (every 10 clicks + first 5)\n")
+    lines.append("```")
+    lines.extend(milestone_rows)
+    lines.append("```\n")
+
+    lines.append("## CoinDesk Network Log (non-static, non-metrics)\n")
+    filtered = [e for e in coindesk_log
+                if "metrics.coindesk.com" not in e["url"]
+                and "downloads.coindesk.com" not in e["url"]]
+    if filtered:
+        lines.append("| Method | URL | Status |")
+        lines.append("|--------|-----|--------|")
+        seen_urls: set[str] = set()
+        for e in filtered:
+            url_short = e["url"][:120] + ("…" if len(e["url"]) > 120 else "")
+            if url_short not in seen_urls:
+                seen_urls.add(url_short)
+                lines.append(f"| {e['method']} | `{url_short}` | {e['status']} |")
+    else:
+        lines.append("_(none — all coindesk.com traffic was metrics or static assets)_")
+
+    path.write_text("\n".join(lines), encoding="utf-8")
+
+
 if __name__ == "__main__":
-    asyncio.run(probe_workflow())
+    parser = argparse.ArgumentParser(
+        description="CoinDesk pagination probe — quick (5 clicks + HAR) or depth (ceiling finder)"
+    )
+    parser.add_argument(
+        "--depth", action="store_true",
+        help="Run ceiling-finder loop (up to 150 clicks, no HAR, coindesk-only net log)"
+    )
+    args = parser.parse_args()
+    if args.depth:
+        asyncio.run(depth_workflow())
+    else:
+        asyncio.run(probe_workflow())
