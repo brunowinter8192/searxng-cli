@@ -93,8 +93,12 @@ def run_loop(
             _last_refresh = time.monotonic()
             continue
 
-        for _ in batch:
+        n_urls_consumed = len({url for _, _, url in batch})
+        for _ in range(n_urls_consumed):
             queue.popleft()
+
+        batch_done:   set[str] = set()
+        batch_failed: set[str] = set()
 
         with ThreadPoolExecutor(max_workers=concurrency) as executor:
             futures = {
@@ -109,14 +113,16 @@ def run_loop(
                 logger.record_attempt(proto, hp, url, ok)
 
                 if ok:
-                    if content_handler is not None:
-                        content_handler(url, content)
-                    done.append(url)
+                    if url not in batch_done:
+                        batch_done.add(url)
+                        if content_handler is not None:
+                            content_handler(url, content)
+                        done.append(url)
                     wset.add(key)
                     psuccess[key] = psuccess.get(key, 0) + 1
                     _consec_fail.pop(key, None)
                 else:
-                    queue.append(url)
+                    batch_failed.add(url)
                     fails = _consec_fail.get(key, 0) + 1
                     if fails >= 2:
                         logger.record_burn(proto, hp, b_count=psuccess.get(key, 0))
@@ -127,6 +133,10 @@ def run_loop(
                         psuccess.pop(key, None)
                     else:
                         _consec_fail[key] = fails
+
+        for url in batch_failed:
+            if url not in batch_done:
+                queue.append(url)
 
         logger.record_working_set(len(wset))
 
@@ -161,7 +171,13 @@ def _build_batch(
     buf:         list[tuple[str, str]],
     concurrency: int,
 ) -> list[tuple[str, str, str]]:
-    """Return list of (proto, hp, url) up to concurrency; each proxy appears once."""
+    """Return list of (proto, hp, url) up to concurrency; each proxy appears once.
+
+    Phase 1 — Normal: wset proxies first, then fresh buf entries; each gets the next
+    distinct URL from queue.
+    Phase 2 — Tail: when pending URLs < available proxy slots, surplus proxies race
+    the same remaining URLs round-robin so multiple proxies contest each leftover URL.
+    """
     batch:            list[tuple[str, str, str]] = []
     assigned_proxies: set[tuple[str, str]]       = set()
     url_iter = iter(queue)
@@ -185,5 +201,18 @@ def _build_batch(
             break
         batch.append((proto, hp, url))
         assigned_proxies.add((proto, hp))
+
+    # Phase 2 — Tail: surplus proxy slots race the same pending URLs round-robin
+    if len(batch) < concurrency and batch:
+        pending_urls = [url for _, _, url in batch]
+        url_idx      = 0
+        for proto, hp in list(wset) + buf:
+            if len(batch) >= concurrency:
+                break
+            if (proto, hp) in assigned_proxies:
+                continue
+            batch.append((proto, hp, pending_urls[url_idx % len(pending_urls)]))
+            assigned_proxies.add((proto, hp))
+            url_idx += 1
 
     return batch
