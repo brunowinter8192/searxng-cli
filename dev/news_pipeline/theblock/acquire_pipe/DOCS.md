@@ -66,7 +66,7 @@ of proxies currently in the cooldown window.
 
 ---
 
-### p4_loop.py (189 LOC)
+### p4_loop.py (219 LOC)
 **Purpose:** SUSTAINED concurrent rotation loop. Outer time-loop wraps the inner batch loop:
 calls `pool_provider()` on start + every `refresh_interval_s` (3600) tick → `build_active_buffer`;
 records pool size via `logger.record_pool_refresh(len(pool_22k))` after each call (3 sites: startup,
@@ -75,12 +75,20 @@ working-set, Slot 2 buffer), 2-strikes lifecycle (2 consecutive fails → `cm.ma
 from buf/wset; success resets counter). On exhaustion → `_compute_sleep` (min of next cooldown
 expiry via `cm.earliest_eligible_at()` and next refresh, clamped to cap) → sleep → refresh →
 continue (no gap). `max_wall_s` safety cap. `_sleep` module attr (mockable in tests).
+**Tail-race (`_build_batch` Phase 2):** when pending URLs < available proxy slots (url_iter exhausted
+before filling all concurrency slots), surplus proxies race the same remaining URLs round-robin
+(wset-first, skipping already-assigned). Multiple proxies contest each leftover URL; first success
+wins. `n_urls_consumed = len({url …})` ensures only the distinct-URL count is popleft'd from queue.
+**First-success-wins / re-queue dedup:** `batch_done: set[str]` guards `content_handler` +
+`done.append` — only the first successful racer per URL records a result. `batch_failed: set[str]`
+(set → at-most-one per URL) collects failures in-loop; post-loop pass re-queues only URLs not in
+`batch_done`, eliminating the fail-before-success ordering hazard of `as_completed`.
 **Reads:** `pool_provider()` (callback) + target URL list.
 **Writes:** delegates all state to `AcquireLogger` + `cm`; returns `(done, gap)`.
 **Called by:** `acquire_pipe.py`.
 **Calls out:** `p1_fetch`, `p2_cooldown`, `p5_logger`, `p6_buffer`.
 **content_handler hook:** optional `content_handler: Callable[[str, bytes], None]` fires at the
-`if ok:` success branch — persist/parse fetched bytes at the fetch site.
+`if ok:` success branch (guarded by `batch_done`) — persist/parse fetched bytes at the fetch site.
 
 ---
 
