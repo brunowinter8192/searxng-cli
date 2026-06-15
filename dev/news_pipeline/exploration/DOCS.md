@@ -1,8 +1,8 @@
 # dev/news_pipeline/exploration/
 
-Manual UI exploration probes for news sites via pydoll headed browser. Goal: learn page structure (button selectors, DOM shape, load-more mechanics) before building production-grade discovery scripts. NOT a production pipeline.
+Manual UI exploration probes for news sites. Goal: learn page structure (button selectors, DOM shape, load-more mechanics, network patterns) before building production-grade discovery scripts. NOT a production pipeline.
 
-**Convention:** all scripts run headed (`headless=False` default). `--headless` for opt-out.
+**Convention:** `01_coindesk_ui_probe.py` runs headed (`headless=False` default). `02_coindesk_pagination_probe.py` runs headless-only (Playwright, HAR capture).
 
 ## Scripts
 
@@ -19,8 +19,21 @@ Manual UI exploration probes for news sites via pydoll headed browser. Goal: lea
 ./venv/bin/python dev/news_pipeline/exploration/01_coindesk_ui_probe.py --headless
 ```
 
+### 02_coindesk_pagination_probe.py
+
+**Purpose:** Playwright probe (system Chrome, headless) of `https://www.coindesk.com/latest-crypto-news`. Captures a full HAR + per-click trajectory to reverse-engineer the "More stories" pagination mechanism. Key finding: the button makes **no network request** to `www.coindesk.com` — article data is pre-embedded in the initial SSR HTML (Next.js RSC payload), and the button reveals them client-side only. No pagination API to replay.
+
+**Output:**
+- `02_output/session.har` — full network session with response bodies (19MB)
+- `02_output/report_<UTC-timestamp>.md` — per-click table, network candidate list, Click-1 vs Click-2 diff
+
+```bash
+./venv/bin/python dev/news_pipeline/exploration/02_coindesk_pagination_probe.py
+```
+
 ## Output Directories
 
 | Directory | Contents | Gitignored |
 |---|---|---|
 | `01_output/` | `probe_<ts>.json` run results | ✅ yes |
+| `02_output/` | `session.har` + `report_<ts>.md` | ✅ yes |
