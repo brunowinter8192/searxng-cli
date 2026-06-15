@@ -69,9 +69,12 @@ async def run_pipeline(platform: Platform, skip_index: bool = False) -> None:
     # Stage 3 — scrape
     log.info(f"STAGE scrape ({len(new_entries)} URLs) …")
     try:
-        manifest = await scrape_entries(
-            new_entries, scrape_dir, platform.regwall_signals, platform.scrape_config
-        )
+        if platform.scrape_engine == "proxy_pool":
+            raise NotImplementedError("proxy_pool engine not yet wired — complete A3")
+        else:
+            manifest = await scrape_entries(
+                new_entries, scrape_dir, platform.regwall_signals, platform.scrape_config
+            )
     except RegwallGuardError as exc:
         log.error(f"STAGE scrape aborted — RegwallGuardError: {exc}")
         _write_marker(platform.name, log)

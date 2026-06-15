@@ -15,7 +15,9 @@ class CoinDeskPlatform:
     collection: str = "searxng_crypto"
     precondition_url: str = "https://www.coindesk.com"
     regwall_signals: list[str] = REGWALL_SIGNALS
+    scrape_engine: str = "browser"
     scrape_config: ScrapeConfig = SCRAPE_CONFIG
+    proxy_scrape_config = None
 
     async def discover(self) -> list[dict]:
         return await _discover()
