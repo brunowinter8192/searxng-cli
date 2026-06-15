@@ -163,7 +163,7 @@ The two numbers stay separate in the report: scrape errors come from the scraper
 
 3. **Forum-Thread-Shape** — markdown-table layout, top-nav row, story/comment rows.
    - Site-specific (HN: anchor on first `vote?id=` link, strip everything before).
-   - Keep story title row + comment threads. Markdown-table syntax stays (embedding handles it).
+   - Keep story title row + comment threads. Markdown-table syntax stays.
 
 4. **Repo-Heavy-Chrome-Shape** — very long pre-content chrome (>100 lines), many h1 chrome lines (search box, feedback, sponsor, repo headers), real title appears late.
    - GitHub issue/PR: extract `#<N>` from URL, find `^# .+ #<N>` line, strip everything before.
@@ -182,7 +182,7 @@ Header (top of file, before first `# ` heading):
 - Strip: everything between `<!-- source:` line and first `# ` heading
 
 Footer (after last content line):
-- Logo image line: `[ ![Logo of ...](...) ](...)` — RELIABLE content-end marker
+- Logo image line: `[ ![Logo of ...](...) ](...)` — content-end marker
 - `### [Table of Contents]`, `### Project Links`, second `### Navigation`, `### Quick search`, `### This Page`, `© Copyright`
 - Strip: everything from `^\[ !\[Logo of ` to EOF
 
@@ -225,20 +225,13 @@ place first — derive the name from the first page / title metadata, sanitize p
 The markdown then simply inherits the PDF's basename: `STEM = basename(PDF without .pdf)`, output =
 `$OUTPUT_DIR/$STEM.md`. PDF name and md name stay identical.
 
-**On Apple Silicon (MPS): convert ONE PDF per `workflow.py convert` call, in a loop — NOT all
-PDFs in a single call.** A multi-PDF call loads the model only once, but it is a long-lived MPS
-process that crashes probabilistically (Metal/MPS instability, opendatalab/MinerU#194) and takes
-the entire remaining queue down with it — a 16-PDF batch can never reliably finish, each attempt
-dies mid-tail. One process per PDF isolates a crash to that single PDF: the loop continues, every
-already-completed md is saved. The cost — model reload per PDF (~26 s) — is the price of
-crash-resilience and is worth it. Output per PDF: `$OUTPUT_DIR/<stem>.md`
-(`stem = basename(PDF without .pdf)`).
+**Convert ONE PDF per `workflow.py convert` call, in a loop — NOT all PDFs in a single call.**
+Output per PDF: `$OUTPUT_DIR/<stem>.md` (`stem = basename(PDF without .pdf)`).
 
-`MINERU_PDF_RENDER_THREADS=1` is hard-wired in `workflow.py` (the default 3 spawns multiple
-pypdfium render processes that corrupt the heap on some setups, MinerU#5033) — nothing to export.
+`MINERU_PDF_RENDER_THREADS=1` is hard-wired in `workflow.py` — nothing to export.
 
-A directory of PDFs (rename any cryptic ones first — see below) — loop, ONE call per PDF, with
-continue-on-failure (no `set -e`) so a crashed PDF is skipped and the rest proceed:
+A directory of PDFs (rename any cryptic ones first — see below) — loop, ONE call per PDF,
+continue-on-failure (no `set -e`):
 
 ```bash
 mkdir -p "$OUTPUT_DIR"
@@ -257,7 +250,7 @@ A single PDF — pass just that one path:
 
 The lock allows at most one job at a time; a second concurrent call fails immediately with
 exit 1. workflow prints only `job done` on success — per-PDF detail (output md, page/word counts)
-goes to the job log, read in the Derail Check below, not to the console.
+goes to the job log, read in the Job-Log Check below, not to the console.
 
 Note on naming a cryptic PDF: when a PDF's filename is not already speaking, derive a descriptive PascalCase name from the first page header / title metadata, condensed to ~30 chars (e.g. `AslamMontague2001MetasearchModels`, `ManningRaghavanSchutze2008IRTextbook`), and RENAME the PDF to it. Once the PDF carries a speaking name, `STEM = basename(PDF)` is correct and the md inherits it. Avoid filename collisions inside one batch — append year or first-author-initial when needed.
 
@@ -265,47 +258,56 @@ Note on naming a cryptic PDF: when a PDF's filename is not already speaking, der
 
 `STEM = basename(PDF)` — no `pdf → stem` mapping table. Rename cryptic PDFs once, BEFORE the job runs.
 
-A PDF that fails to convert surfaces in the job log with `md: null` (no output produced). Because
-MPS crashes are probabilistic, re-run the failed PDFs (loop again over just those names) — a retry
-usually succeeds. Report any that fail repeatedly.
+A PDF that fails to convert surfaces in the job log with `md: null` (no output produced) → report
+it to the user (PDF name). Do NOT auto-retry; the user decides whether to re-run.
 
 ##### Background Convert — launch + go idle
 
-The loop is GPU-heavy (book PDFs run many minutes each; the whole queue is hours). Launch the
-entire `for`-loop as a single background Bash call (`run_in_background=true`) and go idle. Do NOT
-`pgrep`/name-poll/`wait`-loop. When the loop has attempted every PDF, run the Derail Check.
+Launch the entire `for`-loop as a single background Bash call (`run_in_background=true`) and go
+idle. Do NOT `pgrep`/name-poll/`wait`-loop. When the loop has attempted every PDF, run the
+Job-Log Check.
 
-##### Derail Check — read the job log (after `job done`)
+##### Job-Log Check — read after the loop
 
-Each `workflow.py convert` call is its own job and appends 2 lines to
-`/Users/brunowinter2000/Documents/ai/Mineru/logs/jobs.jsonl`: one per-PDF line plus one
-`job_summary` line. For a loop over N PDFs that is **2N** lines. Read only the tail — never the
-whole growing file:
+Each `workflow.py convert` call appends 2 lines to
+`/Users/brunowinter2000/Documents/ai/Mineru/logs/jobs.jsonl` (one per-PDF line + one `job_summary`).
+For a loop over N PDFs that is **2N** lines — read only the tail:
 
 ```bash
 tail -n $((2*N)) /Users/brunowinter2000/Documents/ai/Mineru/logs/jobs.jsonl
 ```
 
-Ignore the `job_summary` lines. Each per-PDF line carries
-`{pdf, md, pages, words, words_per_page}`. Check every per-PDF line:
-
-- **`md: null`** → no output produced (convert crashed, probabilistic on MPS). Do NOT clean.
-  Re-run that PDF (loop again over just the failed names); report any that fail repeatedly.
-- **`md` present** → judge `words_per_page` for corruption. A clean academic md runs about
-  **550–600 words per page**; a corrupted (derailed) convert is far wordier — roughly **800+ words
-  per page** — and carries duplicated or garbled passages. Two steps: (1) scan all PDFs'
-  `words_per_page` and flag any that is a clear outlier versus the rest of the batch; (2) open each
-  flagged md and confirm — duplicated blocks / incoherent runs = corrupt. A genuinely dense paper
-  can sit high without being corrupt, so the open-and-read confirmation decides.
-
-A confirmed-corrupt md → do NOT clean, do NOT index, REPORT to the user (PDF name + evidence).
-Everything that reads clean → proceed to Cleanup.
+Any per-PDF line with `md: null` → no output produced → report it to the user (PDF name). That is
+the only check here. Fidelity of the produced md is judged in Phase 1.
 
 #### Phase 1 — Cleanup
 
-PDFs come from MinerU as Markdown. Cleanup focuses on inline OCR artifacts, not block chrome.
-Clean only the mds that passed the Derail Check — skip any with `md: null` (failed) or confirmed
-corrupt (those were reported to the user, never cleaned or indexed).
+PDFs come from MinerU as Markdown. Phase 1 opens with a per-md fidelity check that both catches bad
+converts AND detects the cleanable artifacts. Cleanup itself focuses on inline OCR artifacts, not
+block chrome. Skip any md with `md: null` (failed convert, already reported).
+
+##### Fidelity Check — per md, BEFORE cleaning
+
+Run on EVERY produced md — every file, not a sample of files. NEVER full-read an md (a book md is
+thousands of lines). Two cheap steps:
+
+1. **grep noise-signature patterns** → counts + line numbers only:
+   - spaced single-char runs: `([A-Za-z] ){3,}[A-Za-z]`
+   - spaced contents inside a LaTeX command: `\\[a-z]+ *\{[^}]*([a-z] ){2,}`
+   - spaced command names: `\\ [a-z]( [a-z])+`
+2. **Read with offset** on the grep hit lines, plus fixed PROSE windows (~30–40 lines each) after the
+   front-matter, at ~25/50/75%, and the tail. Read prose, not only formulas.
+
+Classify each md:
+- **clean** — no/trivial hits, prose coherent → index as-is, no cleanup.
+- **cleanable** — hits collapse into REAL words/formulas (`\mathrm { t h e }` → "the"), prose
+  coherent → fix below, then index.
+- **bad convert** — hits collapse into nonsense / wrong characters (`\ n u m b 9 e r`), OR sampled
+  PROSE is garbled (scan OCR) → EXCLUDE: no cleanup, no index. Report to the USER: PDF name +
+  example line(s); the user must source a better PDF (digitally-typeset preferred; a scan must be
+  reconverted with the hybrid/VLM backend). NOT the same as `md: null`.
+
+Discriminator: does collapsing a spaced run yield a real word? Yes → cleanable. No → bad convert.
 
 ##### Pre-cleanup: Backup + Word Count Baseline
 
@@ -316,7 +318,8 @@ wc -w "$OUTPUT_DIR/$STEM.md"
 
 ##### Artifacts to Detect and Fix
 
-- **LaTeX spaced** — `\ f r a c`, `\ s u m`, `\ m a t h r m` → `\frac`, `\sum`, `\mathrm`
+- **LaTeX spaced command name** — `\ f r a c`, `\ s u m`, `\ m a t h r m` → `\frac`, `\sum`, `\mathrm`
+- **LaTeX spaced command contents** — `\mathrm { t h e \ d e s i g n }` → `\mathrm{the design}`; `\operatorname* { m i n }` → `\operatorname*{min}`
 - **Broken images** — `! [ ] ( ... )` with spaces between chars → `![](...)`
 - **Split words** — "mod els", "alg orithm" — fix conservatively via dictionary check (`/usr/share/dict/words` or in-document vocabulary)
 - **HTML entities** — `&amp;`, `&#39;` → unescape
@@ -397,6 +400,6 @@ Collection:                         <COLLECTION>
 
 Keep the two drop reasons separate: scrape errors **E** come from the scraper, thin/noise **D** comes from the cleanup check.
 
-**pdf:** `convert: M ok, K failed` · `derail-flagged: D (reported, not indexed)` · `cleanup issues: [...]` · `indexed: N chunks across M documents`.
+**pdf:** `convert: M ok, K md:null (reported to user)` · `bad converts excluded (reported to user, need better source/reconvert): B` · `cleaned: C files` · `indexed: N chunks across M documents`.
 
 End with this report. STOP. No commit needed (output is data files, not code).
