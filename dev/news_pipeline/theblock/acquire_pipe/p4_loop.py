@@ -70,14 +70,11 @@ def run_loop(
 
         batch = _build_batch(queue, wset, buf, concurrency)
         if not batch:
-            # buf + wset exhausted — wait until earliest useful wakeup
+            # buf + wset exhausted — sleep until next eligible proxy or scheduled refresh
             sleep_s = _compute_sleep(cm, _last_refresh, refresh_interval_s)
             if sleep_s > 0:
                 _sleep(sleep_s)
-            pool_22k      = pool_provider()
-            logger.record_pool_refresh(len(pool_22k))
-            buf           = build_active_buffer(pool_22k, cm, buffer_size)
-            _last_refresh = time.monotonic()
+            buf = build_active_buffer(pool_22k, cm, buffer_size)
             continue
 
         n_urls_consumed = len({url for _, _, url in batch})
