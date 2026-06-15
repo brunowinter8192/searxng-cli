@@ -12,7 +12,7 @@ Do NOT import from `src/crawler/` or `src/scraper/` — `src/news/` is self-cont
 ## Entry Points
 
 - `python -m src.news --source coindesk [--skip-index]`
-- `python -m src.news --source theblock [--timeframe 48h|full|YYYY-MM-DD:YYYY-MM-DD] [--skip-index]`
+- `python -m src.news --source theblock [--timeframe delta|full|sub:N] [--skip-index]`
 - Direct: `asyncio.run(run_pipeline(platform, skip_index=...))` after importing a platform
 
 ## Platform Contract (Extension Seam)
@@ -53,9 +53,10 @@ Proxy platforms set `scrape_engine = "proxy_pool"` and provide a `ProxyScrapeCon
 - `dedup_mode: str` — `"pubdate"` (default, CoinDesk) | `"hash_only"` (The Block).
   `"hash_only"` globs `{source}__*__{hash}.md` instead of exact pubdate match; needed when
   `publication_date` is not available at discover time.
-- `timeframe: str` — discovery window; set by `__main__` from `--timeframe` (default `"48h"`).
+- `timeframe: str` — discovery mode; set by `__main__` from `--timeframe` (default `"delta"`).
   Only meaningful for platforms whose `discover()` reads `self.timeframe` (e.g. The Block).
-  When `--timeframe` is not `"48h"`, `__main__` auto-forces `skip_index=True` and prints
+  Modes: `"delta"` (top-2 subs), `"full"` (all subs), `"sub:N"` (exact sub by index).
+  When `--timeframe` is not `"delta"`, `__main__` auto-forces `skip_index=True` and prints
   `"After review, run: rag-cli index --collection <collection>"` to stdout.
 
 ## Directory Map
