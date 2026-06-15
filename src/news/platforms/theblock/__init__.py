@@ -13,7 +13,7 @@ from src.news.platforms.theblock.cleanup import cleanup as _cleanup
 class TheBlockPlatform:
     name: str                  = "theblock"
     collection: str            = "theblock"
-    precondition_url: str      = "https://www.theblock.co"
+    precondition_url: str      = "https://www.google.com"   # theblock.co returns 403 on direct urllib
     regwall_signals: list[str] = []
     scrape_engine: str         = "proxy_pool"
     scrape_config: ScrapeConfig = ScrapeConfig()
