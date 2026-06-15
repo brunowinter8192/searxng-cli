@@ -28,28 +28,44 @@ class Platform(Protocol):
     collection: str             # target RAG collection name
     precondition_url: str       # internet-check URL
     regwall_signals: list[str]  # precise strings; [] = guard disabled
-    scrape_config: ScrapeConfig
+    scrape_engine: str          # "browser" | "proxy_pool" — dispatch key in pipeline.py
+    scrape_config: ScrapeConfig # browser engine params; ignored for proxy_pool platforms
+    proxy_scrape_config: ProxyScrapeConfig | None  # None for browser platforms
 
     async def discover(self) -> list[dict]: ...         # [{url,lastmod,publication_date,title,section}]
     def cleanup(self, raw_markdown: str, entry: dict) -> str: ...   # -> pure body
+
+# ProxyScrapeConfig (platform.py) — required when scrape_engine == "proxy_pool"
+@dataclass
+class ProxyScrapeConfig:
+    pool_provider: Callable[[], list[tuple[str, str]]]  # called on startup + 60-min refresh
+    content_type: str = "html"                           # "html" | "xml" — fetch validation gate
+    concurrency: int = 128                               # concurrent (proxy, url) pairs per batch
+    buffer_size: int = 1280                              # active buffer depth (10× concurrency)
 ```
+
+Browser platforms set `scrape_engine = "browser"` and `proxy_scrape_config = None`.
+Proxy platforms set `scrape_engine = "proxy_pool"` and provide a `ProxyScrapeConfig` with a
+`pool_provider` callable (e.g. `load_backfill_pool` from `engine/proxy_pool/pool_loaders.py`).
 
 ## Directory Map
 
 | Path | Role | LOC |
 |---|---|---|
-| `platform.py` | ScrapeConfig dataclass + Platform Protocol | 25 |
+| `platform.py` | ScrapeConfig + ProxyScrapeConfig + Platform Protocol | 35 |
 | `registry.py` | name → Platform registry; register() / get() | 19 |
-| `pipeline.py` | Async orchestrator; stages 1–5 in-process | 205 |
+| `pipeline.py` | Async orchestrator; stages 1–5 in-process; scrape dispatch | 211 |
 | `__main__.py` | argparse entry point; --source + --skip-index | 35 |
-| `engine/` | Generic scrape / dedup / publish modules | — |
+| `engine/` | Generic scrape engines (browser + proxy_pool) + dedup + publish | — |
 | `platforms/coindesk/` | CoinDesk platform implementation | — |
 
 ## Flow
 
 1. **discover** — `platform.discover()` → entry list `[{url, lastmod, publication_date, title, section}]`; JSON snapshot written to `data/news/{name}/discover/`.
 2. **dedup** — `filter_new_entries()` checks the external rag-cli collection dir (`COLLECTION_BASE` in `pipeline.py` — an absolute path into the rag-cli project, joined with `platform.collection`) for `{name}__{date}__{hash}.md`; drops already-indexed URLs.
-3. **scrape** — `scrape_entries()` — fresh `AsyncWebCrawler` per URL, concurrent, Scrapy gate pacing. Writes raw body to `data/news/{name}/scrape/{hash}.md`. Raises `RegwallGuardError` if fraction regwalled ≥ 20%.
+3. **scrape** — dispatch on `platform.scrape_engine`:
+   - `"browser"` → `scrape_entries()` — fresh `AsyncWebCrawler` per URL, Scrapy gate pacing. Writes raw body to `data/news/{name}/scrape/{hash}.md`. Raises `RegwallGuardError` if fraction regwalled ≥ 20%.
+   - `"proxy_pool"` → `scrape_entries_proxy()` — sustained proxy rotation via `run_loop`, curl_cffi chrome impersonation. Box-locked (one job at a time). Writes raw body to `data/news/{name}/scrape/{hash}.md`.
 4. **cleanup** — `platform.cleanup(body, entry)` in-process for each status=ok entry. Writes pure content (NO frontmatter) to `data/news/{name}/clean/{hash}.md`.
 5. **publish** — `publish_articles()` copies clean files to RAG collection dir as `{name}__{pubdate}__{hash}.md`; runs `rag-cli index --collection {collection}` unless `--skip-index`.
 
