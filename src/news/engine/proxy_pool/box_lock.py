@@ -1,0 +1,102 @@
+# INFRASTRUCTURE
+
+import fcntl
+import json
+import os
+import tempfile
+from contextlib import contextmanager
+from datetime import datetime, timezone
+from pathlib import Path
+
+LOCK_DIR = Path.home() / ".searxng-cli-locks"
+_TS_FMT  = "%Y-%m-%dT%H:%M:%SZ"
+
+
+class LockBusyError(RuntimeError):
+    """Raised when the lock is held by another process."""
+
+
+# FUNCTIONS
+
+# Remove stale sidecar if the owning PID is no longer alive
+def cleanup_stale(sidecar: Path) -> None:
+    """Check sidecar PID via os.kill; unlink sidecar if process dead. PermissionError → held."""
+    if not sidecar.exists():
+        return
+    try:
+        data = json.loads(sidecar.read_text(encoding="utf-8"))
+        pid  = data.get("pid")
+    except (json.JSONDecodeError, OSError):
+        return  # unreadable → treat as held
+    if pid is None:
+        sidecar.unlink(missing_ok=True)
+        return
+    try:
+        os.kill(pid, 0)
+    except ProcessLookupError:
+        sidecar.unlink(missing_ok=True)
+    except PermissionError:
+        return  # process alive but not ours → treat as held
+
+
+# Single-job system-wide lock; crash-safe (kernel releases flock on process death)
+@contextmanager
+def acquire(job: str, target: str, lock_name: str = "proxy_pool"):
+    LOCK_DIR.mkdir(parents=True, exist_ok=True)
+    flock_file = LOCK_DIR / f"{lock_name}.flock"
+    sidecar    = LOCK_DIR / f"{lock_name}.lock"
+    cleanup_stale(sidecar)
+
+    fd = flock_file.open("a")
+    try:
+        fcntl.flock(fd, fcntl.LOCK_EX | fcntl.LOCK_NB)
+    except BlockingIOError:
+        fd.close()
+        raise LockBusyError(_busy_message(sidecar))
+
+    _write_sidecar(sidecar, {
+        "pid":        os.getpid(),
+        "job":        job,
+        "target":     target,
+        "started_at": datetime.now(timezone.utc).strftime(_TS_FMT),
+        "status":     "running",
+    })
+    try:
+        yield
+    finally:
+        sidecar.unlink(missing_ok=True)
+        fcntl.flock(fd, fcntl.LOCK_UN)
+        fd.close()
+
+
+# Build human-readable busy message from sidecar JSON
+def _busy_message(sidecar: Path) -> str:
+    try:
+        data       = json.loads(sidecar.read_text(encoding="utf-8"))
+        pid        = data.get("pid", "?")
+        job        = data.get("job", "?")
+        target     = data.get("target", "?")
+        started_at = data.get("started_at", "")
+        elapsed    = ""
+        if started_at:
+            t0      = datetime.strptime(started_at, _TS_FMT).replace(tzinfo=timezone.utc)
+            elapsed = f", running {int((datetime.now(timezone.utc) - t0).total_seconds())}s"
+        return (
+            f"proxy_pool already running: pid={pid}, job={job!r}, "
+            f"target={target!r}{elapsed}"
+        )
+    except Exception:
+        return "proxy_pool already running (lock held, sidecar unreadable)"
+
+
+# Write sidecar JSON atomically via tmp file + os.rename
+def _write_sidecar(sidecar: Path, data: dict) -> None:
+    tmp_fd, tmp_path = tempfile.mkstemp(dir=LOCK_DIR, suffix=".tmp")
+    try:
+        with os.fdopen(tmp_fd, "w", encoding="utf-8") as f:
+            json.dump(data, f, indent=2)
+            f.write("\n")
+        os.rename(tmp_path, str(sidecar))
+    except Exception:
+        Path(tmp_path).unlink(missing_ok=True)
+        raise

@@ -11,6 +11,7 @@ from pathlib import Path
 from src.news.platform import Platform
 from src.news.engine.dedup import filter_new_entries
 from src.news.engine.scrape import scrape_entries, RegwallGuardError
+from src.news.engine.proxy_pool.scrape import scrape_entries_proxy
 from src.news.engine.publish import publish_articles
 
 PROJECT_ROOT = Path(__file__).parent.parent.parent   # searxng-cli/
@@ -69,9 +70,14 @@ async def run_pipeline(platform: Platform, skip_index: bool = False) -> None:
     # Stage 3 — scrape
     log.info(f"STAGE scrape ({len(new_entries)} URLs) …")
     try:
-        manifest = await scrape_entries(
-            new_entries, scrape_dir, platform.regwall_signals, platform.scrape_config
-        )
+        if platform.scrape_engine == "proxy_pool":
+            manifest = scrape_entries_proxy(
+                new_entries, scrape_dir, platform.proxy_scrape_config
+            )
+        else:
+            manifest = await scrape_entries(
+                new_entries, scrape_dir, platform.regwall_signals, platform.scrape_config
+            )
     except RegwallGuardError as exc:
         log.error(f"STAGE scrape aborted — RegwallGuardError: {exc}")
         _write_marker(platform.name, log)
