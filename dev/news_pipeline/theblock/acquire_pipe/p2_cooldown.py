@@ -7,8 +7,7 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).parent.parent))
 from proxy_status_log import proxy_key
 
-COOLDOWN_S   = 3600  # 60 minutes
-_PROTO_ORDER = {"socks4": 0, "socks5": 1, "http": 2}
+COOLDOWN_S = 3600  # 60 minutes
 
 
 # ORCHESTRATOR
@@ -36,9 +35,8 @@ class PersistentCooldownManager:
         return (datetime.now(timezone.utc) - burned_at) >= self._cooldown_td
 
     def eligible_candidates(self, pool: list[tuple[str, str]]) -> list[tuple[str, str]]:
-        """Pool filtered to eligible proxies, socks4-first ordering."""
-        eligible = [(p, hp) for p, hp in pool if self.is_eligible(p, hp)]
-        return sorted(eligible, key=lambda x: _PROTO_ORDER.get(x[0], 99))
+        """Pool filtered to eligible proxies in pool order."""
+        return [(p, hp) for p, hp in pool if self.is_eligible(p, hp)]
 
     def cooldown_count(self) -> int:
         """Count of proxies currently in active cooldown (in-memory)."""

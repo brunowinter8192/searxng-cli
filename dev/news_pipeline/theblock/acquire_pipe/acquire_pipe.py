@@ -11,12 +11,12 @@ import box_lock
 import p7_janitor as janitor
 from p2_cooldown import PersistentCooldownManager
 from p3_target import build_sitemap_target, _LOC_RE
-from p4_loop import run_loop, DEFAULT_MAX_WALL_S, REFRESH_INTERVAL_S
+from p4_loop import run_loop, REFRESH_INTERVAL_S
 from p5_logger import AcquireLogger
 from p6_buffer import BUFFER_SIZE, DEFAULT_CONCURRENCY
 
 sys.path.insert(0, str(Path(__file__).parent.parent))
-from curated_sources import load_curated_proxies, load_backfill_pool
+from curated_sources import load_backfill_pool
 
 ACQUIRE_BASE      = Path(__file__).parent
 OUTPUT_DIR        = ACQUIRE_BASE / "acquire_pipe_output"
@@ -29,8 +29,6 @@ ARTICLE_URLS_FILE = OUTPUT_DIR / "theblock_article_urls.txt"
 def acquire_pipe_workflow(
     concurrency: int,
     buffer_size: int,
-    max_wall_s: float,
-    pool_name: str,
 ) -> None:
     """Sustained acquire-pipe: sitemap → 64 sub-sitemaps → ~27k article URLs.
 
@@ -39,17 +37,15 @@ def acquire_pipe_workflow(
     job.md + cumulative_hits.png and kills the transient JSONL.
     On LockBusyError → print + sys.exit(1).
     """
-    cm      = PersistentCooldownManager()
-    pool_fn = load_backfill_pool if pool_name == "backfill" else load_curated_proxies
-
-    initial_pool = pool_fn()
-    print(f"[acquire_pipe] Loaded {pool_name} pool: {len(initial_pool)} proxies")
+    cm           = PersistentCooldownManager()
+    initial_pool = load_backfill_pool()
+    print(f"[acquire_pipe] Loaded backfill pool: {len(initial_pool)} proxies")
     print(f"[acquire_pipe] Building sitemap target...")
     target_urls = build_sitemap_target(pool=initial_pool)
     print(f"[acquire_pipe] Target: {len(target_urls)} sub-sitemaps")
 
     job_id      = datetime.now(timezone.utc).strftime("%Y%m%dT%H%M%SZ")
-    target_desc = f"theblock-{pool_name}-{len(target_urls)}"
+    target_desc = f"theblock-{len(target_urls)}"
 
     try:
         with box_lock.acquire(job_id, target_desc):
@@ -67,22 +63,20 @@ def acquire_pipe_workflow(
 
             print(
                 f"[acquire_pipe] Starting sustained loop "
-                f"(concurrency={concurrency}, buffer={buffer_size}, "
-                f"max_hours={max_wall_s/3600:.2f}, pool={pool_name})..."
+                f"(concurrency={concurrency}, buffer={buffer_size})..."
             )
             _used = [False]
             def _pool_provider():
                 if not _used[0]:
                     _used[0] = True
                     return initial_pool
-                return pool_fn()
+                return load_backfill_pool()
 
             done, gap = run_loop(
                 _pool_provider, target_urls, "xml", logger, cm,
                 concurrency=concurrency,
                 buffer_size=buffer_size,
                 content_handler=content_handler,
-                max_wall_s=max_wall_s,
             )
             print(f"[acquire_pipe] Loop done: {len(done)} completed, {len(gap)} remaining")
 
@@ -95,7 +89,7 @@ def acquire_pipe_workflow(
             print(f"[acquire_pipe] Job report: acquire_pipe_jobs/{job_id}/")
 
             if gap:
-                print(f"[acquire_pipe] {len(gap)} sub-sitemaps incomplete (safety cap or exhaustion)")
+                print(f"[acquire_pipe] {len(gap)} sub-sitemaps incomplete")
 
     except box_lock.LockBusyError as e:
         print(e)
@@ -123,18 +117,8 @@ if __name__ == "__main__":
         "--buffer_size", type=int, default=BUFFER_SIZE,
         help=f"Active proxy buffer depth (default: {BUFFER_SIZE})",
     )
-    parser.add_argument(
-        "--max_hours", type=float, default=DEFAULT_MAX_WALL_S / 3600,
-        help=f"Hard wall-time safety cap in hours (default: {DEFAULT_MAX_WALL_S/3600:.0f})",
-    )
-    parser.add_argument(
-        "--pool", choices=["curated", "backfill"], default="backfill",
-        help="Proxy pool: curated (monosans+proxifly ~3.5k) or backfill (top-13 ~22k, default: backfill)",
-    )
     args = parser.parse_args()
     acquire_pipe_workflow(
         concurrency=args.concurrency,
         buffer_size=args.buffer_size,
-        max_wall_s=args.max_hours * 3600,
-        pool_name=args.pool,
     )

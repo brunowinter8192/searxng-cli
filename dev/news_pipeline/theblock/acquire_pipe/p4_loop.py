@@ -16,7 +16,6 @@ from p6_buffer import build_active_buffer, refill_buffer, BUFFER_SIZE, DEFAULT_C
 
 _sleep             = time.sleep    # patchable in tests without affecting stdlib time
 REFRESH_INTERVAL_S = 3600          # full pool reload cadence (60 min)
-DEFAULT_MAX_WALL_S = 12 * 3600     # hard safety cap default (12 h)
 
 
 # ORCHESTRATOR
@@ -30,7 +29,6 @@ def run_loop(
     concurrency: int = DEFAULT_CONCURRENCY,
     buffer_size: int = BUFFER_SIZE,
     content_handler: Callable[[str, bytes], None] | None = None,
-    max_wall_s: float = DEFAULT_MAX_WALL_S,
     refresh_interval_s: float = REFRESH_INTERVAL_S,
 ) -> tuple[list[str], list[str]]:
     """Sustained concurrent rotation loop: 60-min pool refresh + wait-on-exhaustion.
@@ -42,14 +40,11 @@ def run_loop(
 
     Exhaustion (buf + wset both empty): sleeps until the earlier of (next cooldown
     expiry, next refresh tick), then calls pool_provider() and rebuilds buf — no gap
-    reported, no early exit. cap_remaining clamps the sleep so the safety cap is
-    never overshot.
+    reported, no early exit.
 
-    Safety cap: after max_wall_s wall-seconds the loop exits cleanly, leaving any
-    unfinished URLs in gap. refresh_interval_s is a separate parameter to allow
-    small values in tests without patching module globals.
+    refresh_interval_s is a separate parameter to allow small values in tests without
+    patching module globals.
     """
-    run_start     = time.monotonic()
     queue         = deque(target_urls)
     done:         list[str]                  = []
     wset:         set[tuple[str, str]]       = set()
@@ -64,9 +59,6 @@ def run_loop(
     while queue:
         now = time.monotonic()
 
-        if now - run_start >= max_wall_s:
-            break   # hard safety cap
-
         if now - _last_refresh >= refresh_interval_s:
             pool_22k      = pool_provider()
             logger.record_pool_refresh(len(pool_22k))
@@ -78,19 +70,11 @@ def run_loop(
 
         batch = _build_batch(queue, wset, buf, concurrency)
         if not batch:
-            # buf + wset exhausted — wait until earliest useful wakeup
-            now_mono      = time.monotonic()
-            cap_remaining = max_wall_s - (now_mono - run_start)
-            if cap_remaining <= 0:
-                break
+            # buf + wset exhausted — sleep until next eligible proxy or scheduled refresh
             sleep_s = _compute_sleep(cm, _last_refresh, refresh_interval_s)
-            sleep_s = min(sleep_s, cap_remaining)
             if sleep_s > 0:
                 _sleep(sleep_s)
-            pool_22k      = pool_provider()
-            logger.record_pool_refresh(len(pool_22k))
-            buf           = build_active_buffer(pool_22k, cm, buffer_size)
-            _last_refresh = time.monotonic()
+            buf = build_active_buffer(pool_22k, cm, buffer_size)
             continue
 
         n_urls_consumed = len({url for _, _, url in batch})
