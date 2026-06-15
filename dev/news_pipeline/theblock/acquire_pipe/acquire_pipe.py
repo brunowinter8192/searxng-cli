@@ -9,10 +9,11 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).parent))
 import box_lock
 import p7_janitor as janitor
+from p2_cooldown import PersistentCooldownManager
 from p3_target import build_sitemap_target, _LOC_RE
-from p4_race import run_race
+from p4_loop import run_loop, DEFAULT_MAX_WALL_S, REFRESH_INTERVAL_S
 from p5_logger import AcquireLogger
-from p6_buffer import DEFAULT_CONCURRENCY
+from p6_buffer import BUFFER_SIZE, DEFAULT_CONCURRENCY
 
 sys.path.insert(0, str(Path(__file__).parent.parent))
 from curated_sources import load_curated_proxies, load_backfill_pool
@@ -27,15 +28,18 @@ ARTICLE_URLS_FILE = OUTPUT_DIR / "theblock_article_urls.txt"
 
 def acquire_pipe_workflow(
     concurrency: int,
+    buffer_size: int,
+    max_wall_s: float,
     pool_name: str,
 ) -> None:
-    """Race acquire-pipe: sitemap → 64 sub-sitemaps → ~27k article URLs.
+    """Sustained acquire-pipe: sitemap → 64 sub-sitemaps → ~27k article URLs.
 
-    One job at a time (box_lock global flock). Each job is a clean slate
-    (start_job wipes transient logs). end_job derives the persistent
+    One job at a time (box_lock global flock). Each job is a clean slate (in-memory
+    cooldown, start_job wipes transient logs). end_job derives the persistent
     job.md + cumulative_hits.png and kills the transient JSONL.
     On LockBusyError → print + sys.exit(1).
     """
+    cm      = PersistentCooldownManager()
     pool_fn = load_backfill_pool if pool_name == "backfill" else load_curated_proxies
 
     initial_pool = pool_fn()
@@ -54,7 +58,6 @@ def acquire_pipe_workflow(
             OUTPUT_DIR.mkdir(parents=True, exist_ok=True)
             loc_urls: list[str] = []
             logger = AcquireLogger(total_urls=len(target_urls), log_dir=LOG_DIR)
-            logger.record_pool_refresh(len(initial_pool))
 
             def content_handler(url: str, content: bytes) -> None:
                 fname = OUTPUT_DIR / _url_to_filename(url)
@@ -62,11 +65,24 @@ def acquire_pipe_workflow(
                 for m in _LOC_RE.finditer(content):
                     loc_urls.append(m.group(1).decode().strip())
 
-            print(f"[acquire_pipe] Starting race loop (concurrency={concurrency}, pool={pool_name})...")
-            done, gap = run_race(
-                initial_pool, target_urls, "xml", logger,
-                content_handler=content_handler,
+            print(
+                f"[acquire_pipe] Starting sustained loop "
+                f"(concurrency={concurrency}, buffer={buffer_size}, "
+                f"max_hours={max_wall_s/3600:.2f}, pool={pool_name})..."
+            )
+            _used = [False]
+            def _pool_provider():
+                if not _used[0]:
+                    _used[0] = True
+                    return initial_pool
+                return pool_fn()
+
+            done, gap = run_loop(
+                _pool_provider, target_urls, "xml", logger, cm,
                 concurrency=concurrency,
+                buffer_size=buffer_size,
+                content_handler=content_handler,
+                max_wall_s=max_wall_s,
             )
             print(f"[acquire_pipe] Loop done: {len(done)} completed, {len(gap)} remaining")
 
@@ -97,11 +113,19 @@ def _url_to_filename(url: str) -> str:
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(
-        description="Acquire-pipe (race): sitemap dev-run → ~27k article URLs"
+        description="Acquire-pipe (sustained): sitemap dev-run → ~27k article URLs"
     )
     parser.add_argument(
         "--concurrency", type=int, default=DEFAULT_CONCURRENCY,
-        help=f"Concurrent worker threads (default: {DEFAULT_CONCURRENCY})",
+        help=f"Concurrent (proxy, URL) pairs per batch (default: {DEFAULT_CONCURRENCY})",
+    )
+    parser.add_argument(
+        "--buffer_size", type=int, default=BUFFER_SIZE,
+        help=f"Active proxy buffer depth (default: {BUFFER_SIZE})",
+    )
+    parser.add_argument(
+        "--max_hours", type=float, default=DEFAULT_MAX_WALL_S / 3600,
+        help=f"Hard wall-time safety cap in hours (default: {DEFAULT_MAX_WALL_S/3600:.0f})",
     )
     parser.add_argument(
         "--pool", choices=["curated", "backfill"], default="backfill",
@@ -110,5 +134,7 @@ if __name__ == "__main__":
     args = parser.parse_args()
     acquire_pipe_workflow(
         concurrency=args.concurrency,
+        buffer_size=args.buffer_size,
+        max_wall_s=args.max_hours * 3600,
         pool_name=args.pool,
     )

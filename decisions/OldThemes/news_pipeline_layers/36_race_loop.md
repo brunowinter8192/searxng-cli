@@ -1,74 +1,56 @@
-# 36 — Race loop: sustained batch → continuous 128-worker dispatch
+# 36 — Tail-race: intended surgical change, over-scoped into a regression
 
-## Problem
+## The intended change (small)
 
-The sustained batch loop (`p4_loop.run_loop`, OT32-33) had a **straggler tail**. Two coupled causes:
+The sustained batch loop (`p4_loop.run_loop`, OT32-33) had a **straggler tail**: batch-synchronous
+(each round waits for its slowest of 128 before the next), and one-proxy-per-URL-per-round. At the
+tail, when 1-2 sub-sitemaps remained, only 1-2 of 128 slots were used — a stubborn sitemap got one
+proxy per ≤15s round, strictly sequential. On the 64er this dragged the total to ~18.6 min.
 
-1. **Batch-synchronous.** Each round built a batch of ≤128 `(proxy, URL)` pairs, fired them via
-   `ThreadPoolExecutor`, then waited (`as_completed`) for **all** of them before the next round. One
-   proxy hitting the 15s timeout held up the whole round.
-2. **One proxy per URL per round.** A failed URL re-queued and got exactly one new proxy in the next
-   round. At the tail, when only 1-2 sub-sitemaps remained, the batch was 1-2 — only 1-2 of 128 slots
-   used, the rest idle. A stubborn sub-sitemap got one proxy per ≤15s round, strictly sequential.
+The agreed fix was **surgical**: *fire the 128 always, distribute over the targets, and at the tail
+let surplus slots race the remaining URLs (multiple proxies per remaining URL).* One behavior. The
+buffer, working-set, 2-strikes, proxy-reuse, cooldown — all of that was working (it got 64/64 on the
+curated pool) and was to STAY.
 
-On the 64er run this manifested as the bulk completing fast (~8 min) and the last few `/post/`
-sitemaps dragging the total to ~18.6 min.
+## What was actually done (the error)
 
-## Decision
+Instead of a delta to `run_loop`, the whole loop was **rewritten**: `run_loop` replaced by `run_race`
+(`p4_race.py`), and the load-bearing machinery dropped — no working-set, no 2-strikes, no reuse, no
+cooldown. **Each proxy used at most once.** A from-scratch new design, where only a surgical patch
+was wanted. Full retrospective: `decisions/OldThemes/news_pipeline_layers/38_session_errors_2026-06-15.md`.
 
-Replace `run_loop` with `run_race` (`p4_race.py`): **continuous 128-worker dispatch.**
+## Result — REGRESSION
 
-- `concurrency` (128) persistent worker threads. Each worker loops: pull the next unfinished URL
-  (round-robin, skip-done) → pull the next proxy (shuffled pool, sequential cursor) → fetch → on
-  success mark the URL done (first-success-per-URL test-and-set).
-- **Tail-race falls out for free.** While many URLs are pending, the round-robin hands each worker a
-  distinct URL (one proxy each). When fewer pending URLs than free workers remain, the round-robin
-  hands the same remaining URL to multiple workers → they race it with different proxies; first
-  success wins, the rest skip it on their next pull.
-- **Each proxy used at most once** (sequential cursor through the shuffled pool). No cooldown, no
-  burn, no working-set. Pool exhausted before all URLs done → those URLs go to `gap`.
+64er race run `20260614T233209Z`: **2 of 64 sub-sitemaps** (vs the old loop's **64/64** on the
+SMALLER curated pool 3396). Pool 20478, exhausted in 20s.
 
-### Why the sustained machinery is gone
+- The 20s + clean return (job.md was written) proves the pool was fully consumed: `run_race` only
+  returns when all workers exit, and with 62 URLs pending that means proxy-cursor exhaustion → all
+  ~20478 tried. 20478 attempts in 20s ⇒ fast failures (~125ms avg: connection-refused / CF-403), NOT
+  15s timeouts — that is exactly why it finished so fast.
+- 20478 attempts → 2 successes = **0.01%**, ~30× below the probe's implied ~0.3%. Unexplained
+  (no-reuse + large `/post/` sitemaps + concurrent CF load are candidates) — and the per-attempt
+  JSONL was wiped by `janitor.end_job` (`jsonl_path.unlink()`), so the run could not be dissected.
+- **Root cause:** dropping proxy-reuse. In the old loop a single good (CF-passing) proxy fetched many
+  sub-sitemaps. With each proxy used once, over 64 targets, the limited good-proxy budget is spent
+  before completion. The smaller curated pool WITH reuse beat the larger backfill pool WITHOUT reuse,
+  decisively. Reuse was load-bearing.
 
-Cooldown / 60-min refresh / wait-on-exhaustion / safety-cap were built for a long sustained drain.
-A 64-target discovery run finishes in minutes against an ~18k pool — none of it is needed. Removed
-from `acquire_pipe.py`: `PersistentCooldownManager`, the `_pool_provider` closure, `--buffer_size`,
-`--max_hours`. The pool is eager-loaded once; `record_pool_refresh(len(pool))` is emitted once.
+## Current state (reverted)
 
-### Origin
+- `acquire_pipe.py` reverted to `run_loop` (sustained, working) — point restored.
+- `p4_race.py` kept on disk as the continuous-dispatch / tail-race REFERENCE (the "128er" idea).
+- Nothing was deleted at any point: `p4_loop` + `p2_cooldown` + `p6_buffer` are byte-for-byte intact;
+  the race commit only changed an import in `acquire_pipe.py` and added `p4_race.py`.
 
-The per-URL parallel race was first proven in the article probe
-(`probe_48h_article_fetch.py._fetch_parallel` — fire N proxies at one URL, first success wins, walk
-the pool in waves). `run_race` generalizes that to multi-URL continuous dispatch.
+## Correct next step
 
-## Thread-safety
-
-All shared mutable state is locked:
-- URL cursor + `done_set` + `done` list → `_lock`.
-- Proxy cursor → `_proxy_lock`.
-- `content_handler` fires OUTSIDE the lock, exactly once per URL (the `newly` test-and-set guard),
-  writing a unique per-URL XML file + GIL-atomic `loc_urls.append`.
-
-**`p5_logger` is untouched, and that is correct.** Two reasons:
-1. `record_attempt` writes `json.dumps(event)+"\n"` to a line-buffered file handle. CPython's
-   `BufferedWriter` holds an internal lock per `write()` — concurrent writes from the 128 workers do
-   not interleave, JSONL lines stay valid.
-2. The in-memory counters (`_attempts`, `_done`, `_proxy_successes`) have benign races but are
-   **never read** in the wired flow: `acquire_pipe` calls `logger.close()` (not `finalize()`), and
-   `p7_janitor.end_job` reads the JSONL file directly, not the counters.
-
-## Supersession
-
-- `p4_loop.run_loop` — DORMANT. No caller after this change. Kept on disk (not deleted) pending a
-  decision on whether the future article-content backfill reuses it or the race model.
-- `p6_buffer` — `build_active_buffer` / `refill_buffer` DORMANT (only `run_loop` used them). The
-  `DEFAULT_CONCURRENCY` / `BUFFER_SIZE` constants stay live (imported by `acquire_pipe` / `p4_race`).
-- `p2_cooldown` — STILL LIVE via `p3_target._fetch_index_via_proxy` (index-fetch proxy fallback).
-- OT32-33 (sustained loop + box/janitor) describe the superseded fetch mechanic; box_lock + janitor
-  + logger are unchanged and still in use.
+Port ONLY the tail-race into `run_loop` as a surgical delta: when pending URLs < free concurrency
+slots, let surplus slots draw the same remaining URLs so several proxies race each leftover; keep the
+buffer, working-set, 2-strikes, reuse, cooldown untouched. Then re-run the 64er and verify 64/64 with
+no tail. `p4_race.py` is the reference for the distribution logic, not a drop-in replacement.
 
 ## Open
 
-- The 27k article-content backfill (the second chained target) is not built. When it is, decide
-  whether it uses `run_race` (likely — same race benefit) or needs the sustained machinery back.
-- Validation: the race run on the 64 sub-sitemaps is built + reviewed, not yet run at scale on dev.
+- Why 0.01% on the race run — only relevant if the race model is ever reconsidered; with the surgical
+  delta on top of reuse, the question is moot (reuse restores the budget).
