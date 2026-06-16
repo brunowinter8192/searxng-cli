@@ -1,12 +1,9 @@
 # INFRASTRUCTURE
 
 import hashlib
-from datetime import datetime, timezone
 from pathlib import Path
 
-from src.news.engine.proxy_pool import box_lock
 from src.news.engine.proxy_pool.cooldown import PersistentCooldownManager
-from src.news.engine.proxy_pool.janitor import Janitor
 from src.news.engine.proxy_pool.logger import AcquireLogger
 from src.news.engine.proxy_pool.loop import run_loop
 from src.news.platform import ProxyScrapeConfig
@@ -19,18 +16,16 @@ def scrape_entries_proxy(
     entries: list[dict],
     output_dir: Path,
     proxy_cfg: ProxyScrapeConfig,
+    logger: AcquireLogger,
 ) -> list[dict]:
     """Proxy-rotation scraper: rotate proxies via run_loop, write fetched bytes to output_dir.
 
     Returns manifest [{url, hash, status, file, char_count, error}] in entries order.
     status values: "ok" (fetched + written), "dead" (404/410 from origin), "failed" (gap).
     Only "ok" entries proceed to _run_cleanup in pipeline.py.
+    Job lifecycle (box_lock, Janitor, AcquireLogger) is owned by pipeline.py:run_pipeline.
     """
     output_dir.mkdir(parents=True, exist_ok=True)
-    platform_dir = output_dir.parent
-    log_dir      = platform_dir / "proxy_pool_logs"
-    report_dir   = platform_dir / "proxy_pool_reports"
-    jobs_dir     = platform_dir / "proxy_pool_jobs"
 
     target_urls = [e["url"] for e in entries]
     url_to_hash = {
@@ -46,29 +41,18 @@ def scrape_entries_proxy(
         file_path.write_text(text, encoding="utf-8")
         fetched[url] = {"file": str(file_path), "char_count": len(text)}
 
-    job_id      = datetime.now(timezone.utc).strftime("%Y%m%dT%H%M%SZ")
-    target_desc = f"{len(target_urls)} URLs"
+    cm = PersistentCooldownManager()
 
-    with box_lock.acquire(job_id, target_desc):
-        j = Janitor(jobs_dir, log_dir, report_dir)
-        j.start_job(job_id)
-
-        cm     = PersistentCooldownManager()
-        logger = AcquireLogger(total_urls=len(target_urls), log_dir=log_dir)
-
-        done, dead, gap = run_loop(
-            proxy_cfg.pool_provider,
-            target_urls,
-            proxy_cfg.content_type,
-            logger,
-            cm,
-            concurrency=proxy_cfg.concurrency,
-            buffer_size=proxy_cfg.buffer_size,
-            content_handler=content_handler,
-        )
-
-        logger.close()
-        j.end_job(job_id, logger._jsonl_path, len(target_urls), len(done))
+    done, dead, gap = run_loop(
+        proxy_cfg.pool_provider,
+        target_urls,
+        proxy_cfg.content_type,
+        logger,
+        cm,
+        concurrency=proxy_cfg.concurrency,
+        buffer_size=proxy_cfg.buffer_size,
+        content_handler=content_handler,
+    )
 
     return _build_manifest(entries, url_to_hash, fetched, set(done), set(dead))
 

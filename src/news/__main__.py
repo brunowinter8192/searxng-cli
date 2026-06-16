@@ -28,8 +28,8 @@ def main() -> None:
     )
     parser.add_argument(
         "--timeframe",
-        default="48h",
-        help="Discovery timeframe: '48h' (default), 'full', or 'YYYY-MM-DD:YYYY-MM-DD'",
+        default="delta",
+        help="Discovery timeframe: 'delta' (default, top-2 subs), 'full' (all subs), or 'sub:N' (exact sub by index N)",
     )
     args = parser.parse_args()
 
@@ -37,9 +37,9 @@ def main() -> None:
     skip_index = args.skip_index
     if hasattr(platform, "timeframe"):
         platform.timeframe = args.timeframe
-        if args.timeframe != "48h":
+        if args.timeframe != "delta":
             skip_index = True
-            print(f"Non-48h timeframe ({args.timeframe!r}) — RAG index auto-skipped.")
+            print(f"Non-delta timeframe ({args.timeframe!r}) — RAG index auto-skipped.")
             print(f"After review, run: rag-cli index --collection {platform.collection}")
     asyncio.run(run_pipeline(platform, skip_index=skip_index))
 

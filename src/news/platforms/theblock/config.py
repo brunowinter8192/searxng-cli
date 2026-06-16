@@ -4,7 +4,7 @@ from src.news.engine.proxy_pool.pool_loaders import load_backfill_pool
 
 SITEMAP_INDEX   = "https://www.theblock.co/sitemap_tbco_index.xml"
 DIRECT_TIMEOUT  = 15.0
-DEFAULT_TIMEFRAME = "48h"
+DEFAULT_TIMEFRAME = "delta"
 
 PROXY_SCRAPE_CONFIG = ProxyScrapeConfig(
     pool_provider=load_backfill_pool,
