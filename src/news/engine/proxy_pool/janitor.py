@@ -118,7 +118,9 @@ def _compute_window_stats(events: list[dict], t0: datetime) -> list[dict]:
 
     Window k spans [t0 + k*3600s, t0 + (k+1)*3600s).
     DISTINCT proxy_key per window: a proxy reused N times counts as 1.
-    pool_size: size from the last pool_refresh event whose ts <= window_k start; None if none.
+    pool_size: size of the last pool_refresh whose window-index <= k; None if none precedes k.
+    Refresh bucketing uses the same int((ts-t0)/3600) formula as attempts, so a refresh at
+    exactly t0+3600s (or t0+3603s) lands in window 1 and serves window 1, not window 0.
     """
     attempt_events = [e for e in events if "proxy_key" in e]
     refresh_events = [e for e in events if e.get("event") == "pool_refresh"]
@@ -129,10 +131,14 @@ def _compute_window_stats(events: list[dict], t0: datetime) -> list[dict]:
     max_ts     = max(_parse_ts(e["ts"]) for e in attempt_events)
     max_window = int((max_ts - t0).total_seconds() / 3600)
 
+    # Pre-compute (window_index, size) for each pool_refresh — same bucketing as attempts
+    refresh_by_win = [
+        (int((_parse_ts(e["ts"]) - t0).total_seconds() / 3600), e["size"])
+        for e in refresh_events
+    ]
+
     windows = []
     for k in range(max_window + 1):
-        window_start = t0 + timedelta(seconds=k * 3600)
-
         win_events = [
             e for e in attempt_events
             if int((_parse_ts(e["ts"]) - t0).total_seconds() / 3600) == k
@@ -142,9 +148,9 @@ def _compute_window_stats(events: list[dict], t0: datetime) -> list[dict]:
         erfolgreich  = len({e["proxy_key"] for e in win_events if e.get("result") == "ok"})
         urls_handled = len(win_events)
 
-        # Last pool_refresh at or before this window's start time
-        prior = [e for e in refresh_events if _parse_ts(e["ts"]) <= window_start]
-        pool_size = prior[-1]["size"] if prior else None
+        # Last refresh whose window-index <= k (most recent pool known going into / during k)
+        prior = [(wi, sz) for wi, sz in refresh_by_win if wi <= k]
+        pool_size = prior[-1][1] if prior else None
 
         windows.append({
             "window":       k,
