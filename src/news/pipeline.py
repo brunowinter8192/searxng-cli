@@ -11,6 +11,9 @@ from pathlib import Path
 from src.news.platform import Platform
 from src.news.engine.dedup import filter_new_entries
 from src.news.engine.scrape import scrape_entries, RegwallGuardError
+from src.news.engine.proxy_pool import box_lock
+from src.news.engine.proxy_pool.janitor import Janitor
+from src.news.engine.proxy_pool.logger import AcquireLogger
 from src.news.engine.proxy_pool.scrape import scrape_entries_proxy
 from src.news.engine.publish import publish_articles
 
@@ -48,58 +51,101 @@ async def run_pipeline(platform: Platform, skip_index: bool = False) -> None:
     scrape_dir.mkdir(parents=True, exist_ok=True)
     clean_dir.mkdir(parents=True, exist_ok=True)
 
-    # Stage 1 — discover
-    log.info("STAGE discover …")
-    entries = await platform.discover()
-    if not entries:
-        log.error("discover returned 0 articles — aborting.")
-        _write_marker(platform.name, log)
-        return
-    discover_snapshot = _write_discover_snapshot(entries, discover_dir)
-    log.info(f"discover → {len(entries)} articles → {discover_snapshot.name}")
+    if platform.scrape_engine == "proxy_pool":
+        # Proxy-pool path: unified job lifecycle spans discover + dedup + scrape.
+        # start_job BEFORE AcquireLogger so Janitor wipes log_dir before the JSONL is opened.
+        log_dir    = platform_dir / "proxy_pool_logs"
+        report_dir = platform_dir / "proxy_pool_reports"
+        jobs_dir   = platform_dir / "proxy_pool_jobs"
+        job_id     = datetime.now(timezone.utc).strftime("%Y%m%dT%H%M%SZ")
 
-    # Stage 2 — dedup
-    log.info("STAGE dedup …")
-    dedup_mode = getattr(platform, "dedup_mode", "pubdate")
-    new_entries, n_skip = filter_new_entries(entries, collection_dir, platform.name, mode=dedup_mode)
-    log.info(f"dedup → {len(entries)} total, {n_skip} already indexed, {len(new_entries)} new")
-    if not new_entries:
-        log.info("Nothing new to scrape — pipeline complete.")
-        _write_marker(platform.name, log)
-        return
+        with box_lock.acquire(job_id, f"{platform.name} discover+scrape"):
+            j      = Janitor(jobs_dir, log_dir, report_dir)
+            j.start_job(job_id)
+            logger = AcquireLogger(total_urls=0, log_dir=log_dir)
+            new_entries: list[dict] = []
+            n_ok = 0
+            try:
+                # Stage 1 — discover (proxy_pool)
+                log.info("STAGE discover …")
+                entries = await platform.discover(logger=logger)
+                if not entries:
+                    log.error("discover returned 0 articles — aborting.")
+                    _write_marker(platform.name, log)
+                    return
+                discover_snapshot = _write_discover_snapshot(entries, discover_dir)
+                log.info(f"discover → {len(entries)} articles → {discover_snapshot.name}")
 
-    # Stage 3 — scrape
-    log.info(f"STAGE scrape ({len(new_entries)} URLs) …")
-    try:
-        if platform.scrape_engine == "proxy_pool":
-            manifest = scrape_entries_proxy(
-                new_entries, scrape_dir, platform.proxy_scrape_config
-            )
-        else:
+                # Stage 2 — dedup (proxy_pool)
+                log.info("STAGE dedup …")
+                dedup_mode = getattr(platform, "dedup_mode", "pubdate")
+                new_entries, n_skip = filter_new_entries(entries, collection_dir, platform.name, mode=dedup_mode)
+                log.info(f"dedup → {len(entries)} total, {n_skip} already indexed, {len(new_entries)} new")
+                if not new_entries:
+                    log.info("Nothing new to scrape — pipeline complete.")
+                    _write_marker(platform.name, log)
+                    return
+
+                # Stage 3 — scrape (proxy_pool)
+                log.info(f"STAGE scrape ({len(new_entries)} URLs) …")
+                manifest = scrape_entries_proxy(new_entries, scrape_dir, platform.proxy_scrape_config, logger)
+                n_ok = sum(1 for e in manifest if e["status"] == "ok")
+                n_failed = sum(1 for e in manifest if e["status"] == "failed")
+                log.info(f"scrape → {n_ok} ok, {n_failed} failed")
+                if n_ok == 0:
+                    log.warning("scrape produced 0 successful pages — skipping cleanup + publish.")
+                    _write_marker(platform.name, log)
+                    return
+
+            finally:
+                logger.close()
+                j.end_job(job_id, logger._jsonl_path, len(new_entries), n_ok)
+
+    else:
+        # Browser path: stages 1-3 unchanged
+        log.info("STAGE discover …")
+        entries = await platform.discover()
+        if not entries:
+            log.error("discover returned 0 articles — aborting.")
+            _write_marker(platform.name, log)
+            return
+        discover_snapshot = _write_discover_snapshot(entries, discover_dir)
+        log.info(f"discover → {len(entries)} articles → {discover_snapshot.name}")
+
+        log.info("STAGE dedup …")
+        dedup_mode = getattr(platform, "dedup_mode", "pubdate")
+        new_entries, n_skip = filter_new_entries(entries, collection_dir, platform.name, mode=dedup_mode)
+        log.info(f"dedup → {len(entries)} total, {n_skip} already indexed, {len(new_entries)} new")
+        if not new_entries:
+            log.info("Nothing new to scrape — pipeline complete.")
+            _write_marker(platform.name, log)
+            return
+
+        log.info(f"STAGE scrape ({len(new_entries)} URLs) …")
+        try:
             manifest = await scrape_entries(
                 new_entries, scrape_dir, platform.regwall_signals, platform.scrape_config
             )
-    except RegwallGuardError as exc:
-        log.error(f"STAGE scrape aborted — RegwallGuardError: {exc}")
-        _write_marker(platform.name, log)
-        return
+        except RegwallGuardError as exc:
+            log.error(f"STAGE scrape aborted — RegwallGuardError: {exc}")
+            _write_marker(platform.name, log)
+            return
 
-    n_ok = sum(1 for e in manifest if e["status"] == "ok")
-    n_failed = sum(1 for e in manifest if e["status"] == "failed")
-    log.info(f"scrape → {n_ok} ok, {n_failed} failed")
+        n_ok = sum(1 for e in manifest if e["status"] == "ok")
+        n_failed = sum(1 for e in manifest if e["status"] == "failed")
+        log.info(f"scrape → {n_ok} ok, {n_failed} failed")
+        if n_ok == 0:
+            log.warning("scrape produced 0 successful pages — skipping cleanup + publish.")
+            _write_marker(platform.name, log)
+            return
 
-    if n_ok == 0:
-        log.warning("scrape produced 0 successful pages — skipping cleanup + publish.")
-        _write_marker(platform.name, log)
-        return
-
-    # Stage 4 — cleanup (in-process)
+    # Stage 4 — cleanup (shared)
     log.info("STAGE cleanup …")
     discover_by_url = {e["url"]: e for e in new_entries}
     clean_manifest = _run_cleanup(manifest, scrape_dir, clean_dir, platform, log, discover_by_url)
     log.info(f"cleanup → {len(clean_manifest)} files cleaned")
 
-    # Stage 5 — publish
+    # Stage 5 — publish (shared)
     log.info("STAGE publish …")
     n_copied, n_chunks = publish_articles(
         clean_manifest, clean_dir, collection_dir,
