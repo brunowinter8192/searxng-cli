@@ -37,9 +37,43 @@ Depth run: 150 clicks → 2414 unique URLs, oldest 2026-01-23 (~5 months), butto
 ./venv/bin/python dev/news_pipeline/exploration/02_coindesk_pagination_probe.py --depth   # ceiling-finder
 ```
 
+### 03_coindesk_backfill_traversal.py
+
+**Purpose:** Uncapped browser-driven backfill of `https://www.coindesk.com/latest-crypto-news`.
+Reuses production `discover.py` Chrome machinery (pydoll headed Chrome via `open -gna`, CDP).
+Clicks "More stories" until button GONE / persistently DISABLED (3 retries, 2s wait + scroll
+nudge each) / plateau (3 consecutive no-growth clicks). Writes a live-tailable progress log
+(flushed per click), crash-safe URL checkpoint every 50 clicks, and final output in production
+`build_entries()` shape `{url, lastmod, publication_date, title, section}`. Live-blog URLs
+(slug starts with `live-`) filtered from output.
+
+**Known issue:** `timeLabel` DOM walk in `_JS_EXTRACT` causes +3.23s/160-click slowdown —
+fix (timeLabel-drop + delta extraction) required before the uncapped Stage B run.
+
+**Output:**
+- `03_output/progress_<ts>.log` — live log, one line per click, flush per write (`tail -f` safe)
+- `03_output/checkpoint_urls.json` — overwritten every 50 clicks + on exit (crash-safe)
+- `03_output/urls_<ts>.json` — final URL set, production entry shape, newest-first
+- `03_output/report_stage_a_<ts>.md` — timing summary, DOM growth assessment, Stage B projection
+
+```bash
+./venv/bin/python dev/news_pipeline/exploration/03_coindesk_backfill_traversal.py           # Stage A cap 400
+./venv/bin/python dev/news_pipeline/exploration/03_coindesk_backfill_traversal.py --cap 160  # custom cap
+./venv/bin/python dev/news_pipeline/exploration/03_coindesk_backfill_traversal.py --full     # Stage B uncapped
+```
+
+**CLI flags:**
+
+| Flag | Effect |
+|------|--------|
+| _(none)_ | Bounded run, cap = `STAGE_A_CAP` (400) |
+| `--cap N` | Override click ceiling to N |
+| `--full` | Uncapped Stage B run |
+
 ## Output Directories
 
 | Directory | Contents | Gitignored |
 |---|---|---|
 | `01_output/` | `probe_<ts>.json` run results | ✅ yes |
 | `02_output/` | `session.har` + `report_<ts>.md` + `depth_report_<ts>.md` | ✅ yes |
+| `03_output/` | `progress_<ts>.log` + `checkpoint_urls.json` + `urls_<ts>.json` + `report_stage_a_<ts>.md` | ✅ yes |
