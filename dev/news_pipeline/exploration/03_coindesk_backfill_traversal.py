@@ -584,4 +584,9 @@ def write_run_report(
 
 
 if __name__ == "__main__":
-    asyncio.run(backfill_workflow())
+    import argparse
+    parser = argparse.ArgumentParser(description="CoinDesk backfill traversal — stage A (capped) or stage B (uncapped)")
+    parser.add_argument("--full", action="store_true", help="Stage B: uncapped run (no click limit)")
+    args = parser.parse_args()
+    cap = None if args.full else STAGE_A_CAP
+    asyncio.run(backfill_workflow(stage_a_cap=cap))
