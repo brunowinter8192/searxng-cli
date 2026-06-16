@@ -86,6 +86,7 @@ def _compute_stats(events: list[dict]) -> dict:
         return {
             "t0": None, "total_s": 0.0, "mean_ih": None,
             "median_ih": None, "pool_sizes": [], "ok_ts": [], "windows": [],
+            "source_batches": [],
         }
 
     t0      = min(all_ts)
@@ -98,26 +99,30 @@ def _compute_stats(events: list[dict]) -> dict:
     mean_ih   = statistics.mean(deltas)   if deltas else None
     median_ih = statistics.median(deltas) if deltas else None
 
-    pool_sizes = [e["size"] for e in events if e.get("event") == "pool_refresh"]
-    windows    = _compute_window_stats(events, t0)
+    pool_sizes     = [e["size"] for e in events if e.get("event") == "pool_refresh"]
+    windows        = _compute_window_stats(events, t0)
+    source_batches = _group_pool_sources(events)
 
     return {
-        "t0":        t0,
-        "total_s":   total_s,
-        "mean_ih":   mean_ih,
-        "median_ih": median_ih,
-        "pool_sizes": pool_sizes,
-        "ok_ts":     ok_ts,
-        "windows":   windows,
+        "t0":            t0,
+        "total_s":       total_s,
+        "mean_ih":       mean_ih,
+        "median_ih":     median_ih,
+        "pool_sizes":    pool_sizes,
+        "ok_ts":         ok_ts,
+        "windows":       windows,
+        "source_batches": source_batches,
     }
 
 
 # Bucket attempt events into 60-min windows from t0; return per-window proxy metrics
 def _compute_window_stats(events: list[dict], t0: datetime) -> list[dict]:
-    """Return one dict per 60-min window with probiert, erfolgreich, urls_handled, pool_size.
+    """Return one dict per 60-min window with probiert, erfolgreich, urls_handled, fetch_attempts, pool_size.
 
     Window k spans [t0 + k*3600s, t0 + (k+1)*3600s).
     DISTINCT proxy_key per window: a proxy reused N times counts as 1.
+    urls_handled: distinct target URLs in the window (not attempt count).
+    fetch_attempts: total attempt events in the window (proxy-economics signal).
     pool_size: size of the last pool_refresh whose window-index <= k; None if none precedes k.
     Refresh bucketing uses the same int((ts-t0)/3600) formula as attempts, so a refresh at
     exactly t0+3600s (or t0+3603s) lands in window 1 and serves window 1, not window 0.
@@ -144,23 +149,47 @@ def _compute_window_stats(events: list[dict], t0: datetime) -> list[dict]:
             if int((_parse_ts(e["ts"]) - t0).total_seconds() / 3600) == k
         ]
 
-        probiert     = len({e["proxy_key"] for e in win_events})
-        erfolgreich  = len({e["proxy_key"] for e in win_events if e.get("result") == "ok"})
-        urls_handled = len(win_events)
+        probiert       = len({e["proxy_key"] for e in win_events})
+        erfolgreich    = len({e["proxy_key"] for e in win_events if e.get("result") == "ok"})
+        urls_handled   = len({e["url"] for e in win_events})
+        fetch_attempts = len(win_events)
 
         # Last refresh whose window-index <= k (most recent pool known going into / during k)
         prior = [(wi, sz) for wi, sz in refresh_by_win if wi <= k]
         pool_size = prior[-1][1] if prior else None
 
         windows.append({
-            "window":       k,
-            "probiert":     probiert,
-            "erfolgreich":  erfolgreich,
-            "urls_handled": urls_handled,
-            "pool_size":    pool_size,
+            "window":         k,
+            "probiert":       probiert,
+            "erfolgreich":    erfolgreich,
+            "urls_handled":   urls_handled,
+            "fetch_attempts": fetch_attempts,
+            "pool_size":      pool_size,
         })
 
     return windows
+
+
+# Group pool_source events into one batch per pool_refresh, in JSONL order
+def _group_pool_sources(events: list[dict]) -> list[list[dict]]:
+    """Return one list of pool_source dicts per pool_refresh event, preserving JSONL order.
+
+    pool_refresh opens a new batch; pool_source events append to the current batch.
+    Attempt events between pool_refresh and pool_source are ignored here.
+    """
+    batches: list[list[dict]] = []
+    current: list[dict] | None = None
+    for e in events:
+        if e.get("event") == "pool_refresh":
+            if current is not None:
+                batches.append(current)
+            current = []
+        elif e.get("event") == "pool_source":
+            if current is not None:
+                current.append(e)
+    if current is not None:
+        batches.append(current)
+    return batches
 
 
 # Plot cumulative ok fetches vs elapsed seconds since t0; save as PNG
@@ -219,15 +248,37 @@ def _write_md(
         lines += [
             "## Proxy usage per 60-min window",
             "",
-            "| Window | Probiert | Erfolgreich | URLs handled | Pool size |",
-            "|---|---|---|---|---|",
+            "| Window | Probiert | Erfolgreich | URLs handled | Fetch-Versuche | Pool size |",
+            "|---|---|---|---|---|---|",
         ]
         for w in stats["windows"]:
             ps = str(w["pool_size"]) if w["pool_size"] is not None else "—"
             lines.append(
                 f"| {w['window']} | {w['probiert']} | {w['erfolgreich']}"
-                f" | {w['urls_handled']} | {ps} |"
+                f" | {w['urls_handled']} | {w['fetch_attempts']} | {ps} |"
             )
         lines.append("")
+
+    non_empty = [b for b in stats["source_batches"] if b]
+    if non_empty:
+        lines += [
+            "## Pool source breakdown",
+            "",
+            "Per-source raw proxy counts are before cross-repo dedup. "
+            "Sum of counts exceeds Pool size — overlap between repos is deduped in `load_backfill_pool()`.",
+            "",
+        ]
+        for i, batch in enumerate(non_empty):
+            label = "Refresh 0 (startup)" if i == 0 else f"Refresh {i}"
+            lines += [
+                f"### {label}",
+                "",
+                "| URL | Result | Count |",
+                "|---|---|---|",
+            ]
+            for src in batch:
+                result = "ok" if src["ok"] else "fail"
+                lines.append(f"| {src['url']} | {result} | {src['count']} |")
+            lines.append("")
 
     (job_dir / "job.md").write_text("\n".join(lines), encoding="utf-8")

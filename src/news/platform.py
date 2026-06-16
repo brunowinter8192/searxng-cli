@@ -7,7 +7,7 @@ from typing import Callable, Protocol, runtime_checkable
 
 @dataclass
 class ProxyScrapeConfig:
-    pool_provider: Callable[[], list[tuple[str, str]]]  # called on startup + 60-min refresh
+    pool_provider: Callable[[], tuple[list[tuple[str, str]], list[dict]]]  # called on startup + 60-min refresh; returns (pool, sources)
     content_type: str = "html"                           # "html" | "xml" — fetch validation gate
     concurrency: int = 128                               # concurrent (proxy, url) pairs per batch
     buffer_size: int = 1280                              # active buffer depth (10× concurrency)

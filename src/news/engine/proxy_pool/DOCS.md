@@ -16,7 +16,7 @@ the job lifecycle (lock, janitor). Do NOT touch when adding a browser-engine pla
 `__init__.py` is empty — callers import modules directly.
 
 - `scrape_entries_proxy(entries, output_dir, proxy_cfg, logger)` in `scrape.py` — sole entry point for `pipeline.py`; `logger` is a caller-supplied `AcquireLogger`.
-- `load_backfill_pool()` in `pool_loaders.py` — used by platform `ProxyScrapeConfig.pool_provider`.
+- `load_backfill_pool()` in `pool_loaders.py` — used by platform `ProxyScrapeConfig.pool_provider`; returns `(pool, sources)` where `sources` is `[{url, ok, count}, …]` per fetched URL.
 
 ## Flow
 
@@ -44,18 +44,34 @@ unified job — discovery proxy fetches + article-scrape proxy fetches in one JS
 
 ### Per-60-min-window proxy table (present when ≥1 attempt event exists)
 
-| Window | Probiert | Erfolgreich | URLs handled | Pool size |
-|---|---|---|---|---|
-| 0 | 412 | 38 | 5000 | — |
-| 1 | 290 | 31 | 3180 | 22400 |
+| Window | Probiert | Erfolgreich | URLs handled | Fetch-Versuche | Pool size |
+|---|---|---|---|---|---|
+| 0 | 412 | 38 | 203 | 5000 | — |
+| 1 | 290 | 31 | 180 | 3180 | 22400 |
 
 **Semantics:**
 - Window k spans `[t0 + k×3600s, t0 + (k+1)×3600s)`. `t0` = earliest event timestamp in the JSONL.
 - **Probiert**: distinct `proxy_key` values across all attempt events in window k.
 - **Erfolgreich**: distinct `proxy_key` values where `result == "ok"` in window k (HTTP 200 + valid content).
 - **Distinct per window**: a proxy used in both window 0 and window 1 counts once in each. Within a window, any number of reuses = 1.
-- **URLs handled**: total fetch calls (attempt events) in the window — discovery + scrape combined.
+- **URLs handled**: distinct target URLs in the window — the real "how many articles did we work on" signal.
+- **Fetch-Versuche**: total attempt events (proxy × URL pairs) in the window — the proxy-economics signal (volume). A URL contested by 5 proxies = 5 Fetch-Versuche, 1 URLs handled.
 - **Pool size**: size of the most-recent `pool_refresh` event whose `floor((ts−t0)/3600) ≤ k`. `—` if no refresh precedes window k. A refresh that fires seconds after the hour boundary lands in window k+1 and serves that window (same bucketing as attempts — no off-by-one on the boundary).
+
+### Pool source breakdown (present when pool_source events exist)
+
+One subsection per pool_refresh (`### Refresh 0 (startup)`, `### Refresh 1`, …):
+
+| URL | Result | Count |
+|---|---|---|
+| https://raw.githubusercontent.com/monosans/.../proxies.json | ok | 4521 |
+| https://raw.githubusercontent.com/TheSpeedX/.../http.txt | fail | 0 |
+
+**Semantics:**
+- **URL**: the individual raw-file URL fetched (one row per URL — `THESPEEDX_SOURCES` has 3 rows, etc.).
+- **Result**: `ok` if the fetch succeeded after retries; `fail` if all retries exhausted.
+- **Count**: raw proxy entries parsed from that source before cross-repo dedup.
+- Sum of counts > Pool size is expected — `load_backfill_pool()` deduplicates across all sources. This note is rendered inline in job.md to prevent misreading the relationship.
 
 ## Modules
 
@@ -69,11 +85,11 @@ unified job — discovery proxy fetches + article-scrape proxy fetches in one JS
 
 ---
 
-### loop.py (201 LOC)
+### loop.py (205 LOC)
 
 **Purpose:** Sustained concurrent rotation loop — 60-min pool refresh, 2-strikes lifecycle, tail-race, wait-on-exhaustion.
-**Reads:** `pool_provider()` callback + target URL list (in-memory).
-**Writes:** delegates state to `AcquireLogger` + `PersistentCooldownManager`; calls `content_handler` per ok fetch. Returns `(done, dead, gap)`.
+**Reads:** `pool_provider()` callback (returns `(pool, sources)`) + target URL list (in-memory).
+**Writes:** delegates state to `AcquireLogger` + `PersistentCooldownManager`; calls `content_handler` per ok fetch. Returns `(done, dead, gap)`. After each `pool_provider()` call: `record_pool_refresh(len(pool))` then `record_pool_source(url, ok, count)` per source.
 **Called by:** `scrape.py:scrape_entries_proxy`.
 **Calls out:** `fetch.py`, `cooldown.py`, `logger.py`, `buffer.py`.
 
@@ -111,19 +127,19 @@ Key: `_sleep = time.sleep` is a module-level alias — patch it in tests, not `t
 
 ---
 
-### logger.py (45 LOC)
+### logger.py (56 LOC)
 
 **Purpose:** Streams per-fetch events to JSONL (line-buffered, kill-safe). Stats derived by `janitor.end_job`.
-**Reads:** events pushed via `record_attempt` / `record_pool_refresh`.
-**Writes:** `{platform_dir}/proxy_pool_logs/acquire_events_{ts}.jsonl` (streamed, line-buffered).
-**Called by:** `pipeline.py:run_pipeline` (instantiates + closes); `loop.py` (`record_attempt` + `record_pool_refresh` per scrape fetch); `theblock/discover.py:_fetch_xml` (`record_attempt` per discovery proxy fetch).
+**Reads:** events pushed via `record_attempt` / `record_pool_refresh` / `record_pool_source`.
+**Writes:** `{platform_dir}/proxy_pool_logs/acquire_events_{ts}.jsonl` (streamed, line-buffered). Event types: `{proxy_key, ts, url, result}` (attempt), `{event:"pool_refresh", size, ts}`, `{event:"pool_source", url, ok, count, ts}`.
+**Called by:** `pipeline.py:run_pipeline` (instantiates + closes); `loop.py` (`record_attempt` + `record_pool_refresh` + `record_pool_source` per pool load); `theblock/discover.py:_fetch_xml` (`record_attempt` per discovery proxy fetch).
 **Calls out:** `proxy_key.py:proxy_key`.
 
 ---
 
-### janitor.py (233 LOC)
+### janitor.py (284 LOC)
 
-**Purpose:** Job lifecycle — `Janitor(jobs_dir, log_dir, report_dir)`; wipes transient dirs at start; reads JSONL → `job.md` + `cumulative_hits.png` at end. `_compute_window_stats` buckets attempt events into 60-min windows from t0 and derives per-window `{probiert, erfolgreich, urls_handled, pool_size}`; rendered as a stacked table in `job.md`.
+**Purpose:** Job lifecycle — `Janitor(jobs_dir, log_dir, report_dir)`; wipes transient dirs at start; reads JSONL → `job.md` + `cumulative_hits.png` at end. `_compute_window_stats` buckets attempt events into 60-min windows from t0 and derives per-window `{probiert, erfolgreich, urls_handled, fetch_attempts, pool_size}` (`urls_handled` = distinct target URLs; `fetch_attempts` = total attempt events). `_group_pool_sources` groups `pool_source` events by preceding `pool_refresh` in JSONL order; rendered as a `## Pool source breakdown` section at the bottom of `job.md` (absent when no pool_source events — backward-compatible with old JSONL).
 **Reads:** JSONL at `jsonl_path` passed to `end_job`.
 **Writes:** `{jobs_dir}/{job_id}/job.md`, `cumulative_hits.png`; wipes `log_dir` + `report_dir` at start and end.
 **Called by:** `pipeline.py:run_pipeline`.
@@ -151,27 +167,41 @@ Key: `_sleep = time.sleep` is a module-level alias — patch it in tests, not `t
 
 ---
 
-### pool_loaders.py (259 LOC)
+### pool_retry.py (22 LOC)
 
-**Purpose:** 13 Top-Repo proxy loaders + `load_backfill_pool()` (combines all → ~22k unique `[(protocol, host:port)]`).
-**Reads:** 13 GitHub raw proxy-list URLs via httpx.
-**Writes:** nothing.
-**Called by:** platform `ProxyScrapeConfig.pool_provider` (Stage B — not yet called from `src/`).
-**Calls out:** `httpx`, `monosans_loader.py:load_monosans_proxies`, `proxy_key.py:proxy_key`.
+**Purpose:** Bounded exponential-backoff retry for httpx fetches — `fetch_with_retry(fn)` calls `fn()` up to 5 times, sleeping 1/2/4/8s between attempts; re-raises last exception on final failure.
+**Reads:** nothing.
+**Writes:** nothing (pure control-flow wrapper).
+**Called by:** `monosans_loader.py:_fetch_json`, `pool_loaders.py:_fetch_bare_txt` / `_fetch_roosterkid` / `_fetch_proxifly`.
+**Calls out:** stdlib only.
+
+Key: `_sleep = time.sleep` is a module-level alias — patch `pool_retry._sleep` in tests, not `time.sleep`.
 
 ---
 
-### monosans_loader.py (36 LOC)
+### pool_loaders.py (293 LOC)
 
-**Purpose:** Fetch monosans/proxy-list JSON; return `[(protocol, host:port)]` in source order.
+**Purpose:** 13 Top-Repo proxy loaders + `load_backfill_pool()` — fetches all sources per-URL with retry and per-source failure isolation; returns `(pool, sources)` where `pool` is deduped `[(protocol, host:port)]` (~22k unique) and `sources` is `[{url, ok, count}, …]` one entry per URL.
+**Reads:** 13 GitHub raw proxy-list URLs via httpx (each wrapped in `fetch_with_retry`).
+**Writes:** nothing.
+**Called by:** `theblock/config.py` (via `ProxyScrapeConfig.pool_provider`); `theblock/discover.py:_fetch_xml` (fallback pool, unpacks `pool, _ = load_backfill_pool()`).
+**Calls out:** `httpx`, `pool_retry.py:fetch_with_retry`, `monosans_loader.py:load_monosans_proxies`, `proxy_key.py:proxy_key`.
+
+Key: `_try_source(url, fn, entries, sources)` is the per-URL isolation helper — catches all exceptions after retries exhaust, records `ok=False`, continues. Never raises from `load_backfill_pool`.
+
+---
+
+### monosans_loader.py (40 LOC)
+
+**Purpose:** Fetch monosans/proxy-list JSON; return `[(protocol, host:port)]` in source order. `_fetch_json` is wrapped with `fetch_with_retry` — transient network errors ride out automatically.
 **Reads:** monosans GitHub raw JSON URL via httpx.
 **Writes:** nothing.
-**Called by:** `pool_loaders.py:load_backfill_pool`.
-**Calls out:** `httpx`.
+**Called by:** `pool_loaders.py:load_backfill_pool` (via `_try_source`).
+**Calls out:** `httpx`, `pool_retry.py:fetch_with_retry`.
 
 ## Gotchas
 
-- `pool_loaders.py` at 259 LOC exceeds the 200-LOC heuristic — no extractable concern exists (flat list of 13 loader functions sharing one `_merge_dedup` utility). Do not split.
+- `pool_loaders.py` at 293 LOC exceeds the 200-LOC heuristic — no extractable concern exists (flat list of 13 loader functions sharing one `_merge_dedup` utility). Do not split.
 - `janitor.end_job` calls `jsonl_path.unlink()` then wipes `log_dir`. Interrupt between these two orphans the JSONL in `log_dir`. Non-critical: `start_job` wipes `log_dir` at the next run.
 - `box_lock`: SIGTERM kills Python before `finally` runs → sidecar stays; kernel releases flock. Next `acquire()` recovers via `cleanup_stale()` (dead-PID detection).
-- `_sleep` in `loop.py` is a module alias (`_sleep = time.sleep`) — patch this alias in tests, not `time.sleep` directly.
+- `_sleep` in `loop.py` AND `pool_retry.py` are both module aliases (`_sleep = time.sleep`) — patch the alias in the target module in tests, not `time.sleep` directly. For retry tests patch `pool_retry._sleep`; for exhaustion-sleep tests patch `loop._sleep`.

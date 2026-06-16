@@ -69,7 +69,8 @@ def _fetch_xml(url: str, pool_cache: list, logger=None) -> bytes | None:
         return content  # direct fetch succeeded — no proxy used, nothing to log
     if not pool_cache:
         print("[theblock] Loading proxy pool for sitemap fallback …", file=sys.stderr)
-        pool_cache.extend(load_backfill_pool())
+        pool, _ = load_backfill_pool()
+        pool_cache.extend(pool)
     for proto, hp in pool_cache:
         status, content = fetch_url(proto, hp, url, "xml")
         if logger is not None:
