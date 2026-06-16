@@ -63,6 +63,10 @@ irrelevant because it is never a gate.
 - **Skip-index:** everything except `delta` auto-skips RAG indexing (inspect first); `delta` (the
   routine run) auto-indexes. Replaces the old `non-48h → skip` rule with `non-delta → skip`.
 
+## Range mode addition (`sub:A-B`)
+
+Added `sub:A-B` as a fourth discover mode to support contiguous multi-sub backfill without resorting to `full`. The user works in chunks (e.g. subs 24-27 of 27), and having to issue a separate `sub:N` call per sub was impractical. The new mode adds `_subs_in_range(urls, a, b)` in `discover.py` — returns all existing subs whose trailing index falls in [A, B] inclusive, sorted descending (newest-first, consistent with `delta`). Validation mirrors the existing `sub:N` pattern: non-int parts and A > B raise `RuntimeError` before any URL lookup; an empty result set (valid range but no matching subs) raises the same way `sub:N` does when not found. The `--skip-index` auto-skip in `__main__.py` already covers all non-delta timeframes, so `sub:A-B` gets that behaviour for free.
+
 ## Open question — update-blindness of hash-dedup (user-flagged, accepted)
 
 `hash_only` dedup keys on URL existence → one snapshot per URL forever. If an already-scraped article

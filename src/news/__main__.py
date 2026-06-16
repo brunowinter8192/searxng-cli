@@ -29,7 +29,7 @@ def main() -> None:
     parser.add_argument(
         "--timeframe",
         default="delta",
-        help="Discovery timeframe: 'delta' (default, top-2 subs), 'full' (all subs), or 'sub:N' (exact sub by index N)",
+        help="Discovery timeframe: 'delta' (default, top-2 subs), 'full' (all subs), 'sub:N' (exact sub by index N), or 'sub:A-B' (all subs with index in [A, B] inclusive, descending)",
     )
     args = parser.parse_args()
 
