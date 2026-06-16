@@ -3,7 +3,7 @@
 import json
 import shutil
 import statistics
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 from pathlib import Path
 
 _TS_FMT = "%Y-%m-%dT%H:%M:%SZ"
@@ -85,7 +85,7 @@ def _compute_stats(events: list[dict]) -> dict:
     if not all_ts:
         return {
             "t0": None, "total_s": 0.0, "mean_ih": None,
-            "median_ih": None, "pool_sizes": [], "ok_ts": [],
+            "median_ih": None, "pool_sizes": [], "ok_ts": [], "windows": [],
         }
 
     t0      = min(all_ts)
@@ -99,6 +99,7 @@ def _compute_stats(events: list[dict]) -> dict:
     median_ih = statistics.median(deltas) if deltas else None
 
     pool_sizes = [e["size"] for e in events if e.get("event") == "pool_refresh"]
+    windows    = _compute_window_stats(events, t0)
 
     return {
         "t0":        t0,
@@ -107,7 +108,53 @@ def _compute_stats(events: list[dict]) -> dict:
         "median_ih": median_ih,
         "pool_sizes": pool_sizes,
         "ok_ts":     ok_ts,
+        "windows":   windows,
     }
+
+
+# Bucket attempt events into 60-min windows from t0; return per-window proxy metrics
+def _compute_window_stats(events: list[dict], t0: datetime) -> list[dict]:
+    """Return one dict per 60-min window with probiert, erfolgreich, urls_handled, pool_size.
+
+    Window k spans [t0 + k*3600s, t0 + (k+1)*3600s).
+    DISTINCT proxy_key per window: a proxy reused N times counts as 1.
+    pool_size: size from the last pool_refresh event whose ts <= window_k start; None if none.
+    """
+    attempt_events = [e for e in events if "proxy_key" in e]
+    refresh_events = [e for e in events if e.get("event") == "pool_refresh"]
+
+    if not attempt_events:
+        return []
+
+    max_ts     = max(_parse_ts(e["ts"]) for e in attempt_events)
+    max_window = int((max_ts - t0).total_seconds() / 3600)
+
+    windows = []
+    for k in range(max_window + 1):
+        window_start = t0 + timedelta(seconds=k * 3600)
+
+        win_events = [
+            e for e in attempt_events
+            if int((_parse_ts(e["ts"]) - t0).total_seconds() / 3600) == k
+        ]
+
+        probiert     = len({e["proxy_key"] for e in win_events})
+        erfolgreich  = len({e["proxy_key"] for e in win_events if e.get("result") == "ok"})
+        urls_handled = len(win_events)
+
+        # Last pool_refresh at or before this window's start time
+        prior = [e for e in refresh_events if _parse_ts(e["ts"]) <= window_start]
+        pool_size = prior[-1]["size"] if prior else None
+
+        windows.append({
+            "window":       k,
+            "probiert":     probiert,
+            "erfolgreich":  erfolgreich,
+            "urls_handled": urls_handled,
+            "pool_size":    pool_size,
+        })
+
+    return windows
 
 
 # Plot cumulative ok fetches vs elapsed seconds since t0; save as PNG
@@ -161,4 +208,20 @@ def _write_md(
         "![Cumulative hits](cumulative_hits.png)",
         "",
     ]
+
+    if stats["windows"]:
+        lines += [
+            "## Proxy usage per 60-min window",
+            "",
+            "| Window | Probiert | Erfolgreich | URLs handled | Pool size |",
+            "|---|---|---|---|---|",
+        ]
+        for w in stats["windows"]:
+            ps = str(w["pool_size"]) if w["pool_size"] is not None else "—"
+            lines.append(
+                f"| {w['window']} | {w['probiert']} | {w['erfolgreich']}"
+                f" | {w['urls_handled']} | {ps} |"
+            )
+        lines.append("")
+
     (job_dir / "job.md").write_text("\n".join(lines), encoding="utf-8")
