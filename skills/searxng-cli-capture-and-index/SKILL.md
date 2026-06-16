@@ -227,19 +227,25 @@ The markdown then simply inherits the PDF's basename: `STEM = basename(PDF witho
 
 ##### Scan Check — BEFORE converting (cheap, do it first)
 
-A scanned PDF (page images, often with a hidden OCR text layer) does not convert cleanly with the
-default pipeline backend. Detect it before the long convert:
+SCAN if EITHER condition is true (OR-logic; pdffonts is primary):
 
 ```bash
 pdffonts "$PDF" | grep -iq "OCR" && echo SCAN   # OCR-layer font (e.g. HiddenHorzOCR) = scanned
-pdftotext -f 5 -l 8 "$PDF" - | wc -w            # near-0 words across content pages = scanned
+pdftotext -f 5 -l 8 "$PDF" - | wc -w            # near-0 words = scanned
 ```
 
-If SCAN → do NOT run the default convert. Flag the user (PDF name + evidence) and have them try to get
-a genuinely digital, text-layer PDF. Then:
-- **Digital PDF obtained** → normal pipeline convert (below).
-- **Only a scan available** → split the PDF into ~100-page parts, run `--backend hybrid-engine` on each
-  part, then re-merge the part-mds into one `$STEM.md`.
+A high `pdftotext` word count does NOT rule out a scan — pdffonts is the decisive check.
+
+If SCAN → run the chunked hybrid convert directly (one call):
+
+```bash
+cd /Users/brunowinter2000/Documents/ai/Mineru
+./venv/bin/python workflow.py convert \
+  --pdf "$PDF" --out-dir "$OUTPUT_DIR" \
+  --backend hybrid-engine --chunk-pages 100
+```
+
+Then proceed to Job-Log Check and Phase 1.
 
 ##### Convert — one PDF per call
 
@@ -287,13 +293,18 @@ Job-Log Check.
 
 ##### Job-Log Check — read after the loop
 
-Each `workflow.py convert` call appends 2 lines to
+Each normal `workflow.py convert` call appends 2 lines to
 `/Users/brunowinter2000/Documents/ai/Mineru/logs/jobs.jsonl` (one per-PDF line + one `job_summary`).
-For a loop over N PDFs that is **2N** lines — read only the tail:
+A chunked convert (`--chunk-pages 100`, scan path) appends `N_parts + 2` lines — one `type:"part"`
+line per 100-page chunk, one per-PDF line, one `job_summary`.
+
+For a loop over N normal PDFs — read **2N** tail lines:
 
 ```bash
 tail -n $((2*N)) /Users/brunowinter2000/Documents/ai/Mineru/logs/jobs.jsonl
 ```
+
+For a single chunked convert — N_parts = ceil(total_pages / 100) — read `N_parts + 2` tail lines.
 
 Any per-PDF line with `md: null` → no output produced → report it to the user (PDF name). That is
 the only check here. Fidelity of the produced md is judged in Phase 1.
@@ -322,8 +333,8 @@ Classify each md:
   coherent → fix below, then index.
 - **bad convert** — hits collapse into nonsense / wrong characters (`\ n u m b 9 e r`), OR sampled
   PROSE is garbled (scan OCR) → EXCLUDE: no cleanup, no index. Report to the USER: PDF name +
-  example line(s); it is a scan that slipped past the Scan Check — handle it there (get a digital PDF,
-  or split into ~100-page parts + hybrid). NOT the same as `md: null`.
+  example line(s); it is a scan that slipped past the Scan Check — re-run with
+  `--backend hybrid-engine --chunk-pages 100` (see Scan Check above). NOT the same as `md: null`.
 
 Discriminator: does collapsing a spaced run yield a real word? Yes → cleanable. No → bad convert.
 
