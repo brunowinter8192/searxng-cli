@@ -22,6 +22,8 @@ OUTPUT_DIR = Path(__file__).parent / "03_output"
 STAGE_A_CAP = 400        # bounded sanity run ceiling; None = uncapped Stage B
 PLATEAU_TOLERANCE = 3    # consecutive no-growth clicks before declaring feed end
 CHECKPOINT_EVERY = 50    # overwrite checkpoint_urls.json every N clicks
+DISABLED_RETRY_MAX = 3   # retries before declaring persistent disabled (real end)
+DISABLED_RETRY_WAIT = 2.0  # seconds between disabled retries
 COINDESK_ORIGIN = date(2013, 9, 1)   # projection anchor
 
 POLL_INTERVAL = 0.5
@@ -173,6 +175,7 @@ async def backfill_workflow(stage_a_cap: int | None = STAGE_A_CAP) -> None:
     stop_reason = "interrupted"
     click_n = 0
     oldest = "(none)"
+    disabled_retry_hits = 0
 
     try:
         port = get_free_port()
@@ -213,10 +216,14 @@ async def backfill_workflow(stage_a_cap: int | None = STAGE_A_CAP) -> None:
                 print(f"Click {click_n}: button GONE — end of feed", file=sys.stderr)
                 break
             if btn["disabled"]:
-                stop_reason = "button DISABLED"
-                write_log_line(log_fh, click_n, len(all_urls), oldest, 0, "DISABLED", 0.0)
-                print(f"Click {click_n}: button DISABLED — end of feed", file=sys.stderr)
-                break
+                recovered = await retry_disabled_check(tab, click_n)
+                if not recovered:
+                    stop_reason = f"button DISABLED (persistent after {DISABLED_RETRY_MAX} retries)"
+                    write_log_line(log_fh, click_n, len(all_urls), oldest, 0, "DISABLED-PERSIST", 0.0)
+                    print(f"Click {click_n}: {stop_reason}", file=sys.stderr)
+                    break
+                disabled_retry_hits += 1
+                print(f"Click {click_n}: disabled recovered — continuing", file=sys.stderr)
 
             prev_count = len(all_urls)
             clicked = await click_button(tab)
@@ -292,7 +299,7 @@ async def backfill_workflow(stage_a_cap: int | None = STAGE_A_CAP) -> None:
     print(f"Final output → {final_path} ({len(entries)} entries)", file=sys.stderr)
 
     run_elapsed = time.monotonic() - run_start
-    write_run_report(report_path, ts, run_elapsed, click_n, len(all_urls), oldest, stop_reason, click_times, stage_a_cap)
+    write_run_report(report_path, ts, run_elapsed, click_n, len(all_urls), oldest, stop_reason, click_times, stage_a_cap, disabled_retry_hits)
     print(f"Report → {report_path}")
 
 
@@ -489,6 +496,21 @@ def write_log_line(
     log_fh.flush()
 
 
+# Retry a seen-disabled button up to DISABLED_RETRY_MAX times with scroll nudge; return True if recovered
+async def retry_disabled_check(tab, click_n: int) -> bool:
+    for attempt in range(1, DISABLED_RETRY_MAX + 1):
+        print(f"  [disabled-retry {attempt}/{DISABLED_RETRY_MAX}] click={click_n} waiting {DISABLED_RETRY_WAIT}s …", file=sys.stderr)
+        await asyncio.sleep(DISABLED_RETRY_WAIT)
+        await tab.execute_script("window.scrollTo({top: document.body.scrollHeight, behavior: 'smooth'});")
+        await asyncio.sleep(0.3)
+        btn = await check_btn_state(tab)
+        if not btn.get("disabled"):
+            print(f"  [disabled-retry {attempt}/{DISABLED_RETRY_MAX}] recovered → active", file=sys.stderr)
+            return True
+        print(f"  [disabled-retry {attempt}/{DISABLED_RETRY_MAX}] still disabled", file=sys.stderr)
+    return False
+
+
 # Write run summary: timing stats, DOM growth trend, Stage B projection
 def write_run_report(
     path: Path,
@@ -500,6 +522,7 @@ def write_run_report(
     stop_reason: str,
     click_times: list[float],
     stage_a_cap: int | None,
+    disabled_retry_hits: int = 0,
 ) -> None:
     cap_label = str(stage_a_cap) if stage_a_cap is not None else "UNCAPPED"
     h, rem = divmod(int(run_elapsed), 3600)
@@ -517,6 +540,7 @@ def write_run_report(
     lines.append(f"| Distinct URLs collected | {total_urls} |")
     lines.append(f"| Oldest date reached | {oldest_date} |")
     lines.append(f"| Stop reason | {stop_reason} |")
+    lines.append(f"| Disabled-retry recoveries | {disabled_retry_hits} |")
     lines.append(f"| Total wall-clock time | {elapsed_str} ({run_elapsed:.0f}s) |\n")
 
     if not click_times:
