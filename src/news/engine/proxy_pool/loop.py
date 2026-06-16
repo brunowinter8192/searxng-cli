@@ -49,7 +49,7 @@ def run_loop(
     wset:         set[tuple[str, str]]       = set()
     _consec_fail: dict[tuple[str, str], int] = {}
 
-    pool          = pool_provider()
+    pool, _       = pool_provider()
     logger.record_pool_refresh(len(pool))
     buf           = build_active_buffer(pool, cm, buffer_size)
     _last_refresh = time.monotonic()
@@ -58,7 +58,7 @@ def run_loop(
         now = time.monotonic()
 
         if now - _last_refresh >= refresh_interval_s:
-            pool          = pool_provider()
+            pool, _       = pool_provider()
             logger.record_pool_refresh(len(pool))
             buf           = build_active_buffer(pool, cm, buffer_size)
             _last_refresh = time.monotonic()

@@ -4,7 +4,8 @@ import re
 
 import httpx
 
-from src.news.engine.proxy_pool.monosans_loader import load_monosans_proxies
+from src.news.engine.proxy_pool.monosans_loader import load_monosans_proxies, MONOSANS_URL
+from src.news.engine.proxy_pool.pool_retry import fetch_with_retry
 from src.news.engine.proxy_pool.proxy_key import proxy_key
 
 PROXIFLY_URL = "https://raw.githubusercontent.com/proxifly/free-proxy-list/main/proxies/all/data.json"
@@ -82,25 +83,50 @@ _IP_PORT_RE = re.compile(r"\d{1,3}(?:\.\d{1,3}){3}:\d+")
 
 # ORCHESTRATOR
 
-# Fetch all 13 Top-Repo sources; merge, dedup; return [(protocol, host:port)]
-def load_backfill_pool() -> list[tuple[str, str]]:
-    """Fetch all 13 Top-Repo sources; merge, dedup; return [(protocol, host:port)].
+# Fetch all 13 Top-Repo sources per-URL with retry + isolation; return (deduped pool, source results)
+def load_backfill_pool() -> tuple[list[tuple[str, str]], list[dict]]:
+    """Fetch all 13 Top-Repo sources; merge, dedup; return (pool, sources).
 
     Top-13 by survey rank: monosans, roosterkid, databay-labs, TheSpeedX,
     themiralay, r00tee, iplocate, sunny9577, ALIILAPRO, dpangestuw, Zaeem20,
     zloi-user, hookzof. proxifly excluded (rank 15, below cutoff).
     Target: ~22k unique.
+
+    Each URL is fetched independently with exponential-backoff retry (pool_retry).
+    A source that still fails after all retries is recorded as ok=False in sources
+    and skipped — never raises. sources: [{url, ok, count}] one entry per URL.
     """
     entries: list[tuple[str, str]] = []
-    entries.extend(load_monosans_proxies())
-    for loader in [
-        load_roosterkid_proxies,  load_databay_proxies,   load_thespeedx_proxies,
-        load_themiralay_proxies,  load_r00tee_proxies,    load_iplocate_proxies,
-        load_sunny9577_proxies,   load_aliilapro_proxies, load_dpangestuw_proxies,
-        load_zaeem20_proxies,     load_zloi_proxies,      load_hookzof_proxies,
-    ]:
-        entries.extend(loader())
-    return _merge_dedup(entries)
+    sources: list[dict]            = []
+
+    _try_source(MONOSANS_URL, load_monosans_proxies, entries, sources)
+
+    for proto, url in ROOSTERKID_SOURCES:
+        _try_source(url, lambda p=proto, u=url: _fetch_roosterkid(p, u), entries, sources)
+    for proto, url in DATABAY_SOURCES:
+        _try_source(url, lambda p=proto, u=url: _fetch_bare_txt(p, u), entries, sources)
+    for proto, url in THESPEEDX_SOURCES:
+        _try_source(url, lambda p=proto, u=url: _fetch_bare_txt(p, u), entries, sources)
+    for proto, url in THEMIRALAY_SOURCES:
+        _try_source(url, lambda p=proto, u=url: _fetch_roosterkid(p, u), entries, sources)
+    for proto, url in R00TEE_SOURCES:
+        _try_source(url, lambda p=proto, u=url: _fetch_roosterkid(p, u), entries, sources)
+    for proto, url in IPLOCATE_SOURCES:
+        _try_source(url, lambda p=proto, u=url: _fetch_roosterkid(p, u), entries, sources)
+    for proto, url in SUNNY9577_SOURCES:
+        _try_source(url, lambda p=proto, u=url: _fetch_roosterkid(p, u), entries, sources)
+    for proto, url in ALIILAPRO_SOURCES:
+        _try_source(url, lambda p=proto, u=url: _fetch_roosterkid(p, u), entries, sources)
+    for proto, url in DPANGESTUW_SOURCES:
+        _try_source(url, lambda p=proto, u=url: _fetch_roosterkid(p, u), entries, sources)
+    for proto, url in ZAEEM20_SOURCES:
+        _try_source(url, lambda p=proto, u=url: _fetch_roosterkid(p, u), entries, sources)
+    for proto, url in ZLOI_SOURCES:
+        _try_source(url, lambda p=proto, u=url: _fetch_roosterkid(p, u), entries, sources)
+    for proto, url in HOOKZOF_SOURCES:
+        _try_source(url, lambda p=proto, u=url: _fetch_roosterkid(p, u), entries, sources)
+
+    return _merge_dedup(entries), sources
 
 
 # FUNCTIONS
@@ -217,34 +243,42 @@ def load_hookzof_proxies() -> list[tuple[str, str]]:
 
 
 def _fetch_proxifly() -> list[tuple[str, str]]:
-    """Fetch proxifly all/data.json; return [(protocol, host:port)]."""
-    resp = httpx.get(PROXIFLY_URL, timeout=FETCH_TIMEOUT)
-    resp.raise_for_status()
-    return [(e["protocol"], f"{e['ip']}:{e['port']}") for e in resp.json()]
+    """Fetch proxifly all/data.json; return [(protocol, host:port)]. Retried on transient failure."""
+    def _do():
+        resp = httpx.get(PROXIFLY_URL, timeout=FETCH_TIMEOUT)
+        resp.raise_for_status()
+        return [(e["protocol"], f"{e['ip']}:{e['port']}") for e in resp.json()]
+    return fetch_with_retry(_do)
 
 
 def _fetch_bare_txt(proto: str, url: str) -> list[tuple[str, str]]:
-    """Fetch one bare host:port txt file (one entry per line); return [(proto, host:port)]."""
-    resp = httpx.get(url, timeout=FETCH_TIMEOUT)
-    resp.raise_for_status()
-    entries: list[tuple[str, str]] = []
-    for line in resp.text.splitlines():
-        line = line.strip()
-        if line:
-            entries.append((proto, line))
-    return entries
+    """Fetch one bare host:port txt file (one entry per line); return [(proto, host:port)]. Retried."""
+    def _do():
+        resp = httpx.get(url, timeout=FETCH_TIMEOUT)
+        resp.raise_for_status()
+        return [(proto, line.strip()) for line in resp.text.splitlines() if line.strip()]
+    return fetch_with_retry(_do)
 
 
 def _fetch_roosterkid(proto: str, url: str) -> list[tuple[str, str]]:
-    """Fetch roosterkid decorated txt; regex-extract IP:PORT; skip header/metadata lines."""
-    resp = httpx.get(url, timeout=FETCH_TIMEOUT)
-    resp.raise_for_status()
-    entries: list[tuple[str, str]] = []
-    for line in resp.text.splitlines():
-        m = _IP_PORT_RE.search(line)
-        if m:
-            entries.append((proto, m.group()))
-    return entries
+    """Fetch roosterkid decorated txt; regex-extract IP:PORT; skip header/metadata lines. Retried."""
+    def _do():
+        resp = httpx.get(url, timeout=FETCH_TIMEOUT)
+        resp.raise_for_status()
+        return [(proto, m.group()) for line in resp.text.splitlines()
+                for m in (_IP_PORT_RE.search(line),) if m]
+    return fetch_with_retry(_do)
+
+
+# Fetch one source URL via fn(); append to entries on success; record {url, ok, count} in sources
+def _try_source(url: str, fn, entries: list, sources: list) -> None:
+    """Call fn() (internally retried); on final failure record ok=False and continue — never raises."""
+    try:
+        result = fn()
+        entries.extend(result)
+        sources.append({"url": url, "ok": True, "count": len(result)})
+    except Exception:
+        sources.append({"url": url, "ok": False, "count": 0})
 
 
 def _merge_dedup(entries: list[tuple[str, str]]) -> list[tuple[str, str]]:
