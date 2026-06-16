@@ -236,13 +236,23 @@ pdftotext -f 5 -l 8 "$PDF" - | wc -w            # near-0 words = scanned
 
 A high `pdftotext` word count does NOT rule out a scan — pdffonts is the decisive check.
 
-If SCAN → run the chunked hybrid convert directly (one call):
+If SCAN:
 
 ```bash
 cd /Users/brunowinter2000/Documents/ai/Mineru
-./venv/bin/python workflow.py convert \
-  --pdf "$PDF" --out-dir "$OUTPUT_DIR" \
-  --backend hybrid-engine --chunk-pages 100
+./venv/bin/python workflow.py convert --pdf "$PDF" --backend hybrid-engine --chunk-pages 100
+```
+
+Work dir: `Mineru/output/<stem>/`. Check all parts present via `Mineru/output/<stem>/parts.json`
+(any `"md": null` = gap). Then:
+
+```bash
+# all parts present
+./venv/bin/python workflow.py merge --stem "$STEM" --out-dir "$OUTPUT_DIR" --clean
+
+# gap — re-run convert (fills only missing parts), then merge
+./venv/bin/python workflow.py convert --pdf "$PDF" --backend hybrid-engine --chunk-pages 100
+./venv/bin/python workflow.py merge --stem "$STEM" --out-dir "$OUTPUT_DIR" --clean
 ```
 
 Then proceed to Job-Log Check and Phase 1.
@@ -295,8 +305,8 @@ Job-Log Check.
 
 Each normal `workflow.py convert` call appends 2 lines to
 `/Users/brunowinter2000/Documents/ai/Mineru/logs/jobs.jsonl` (one per-PDF line + one `job_summary`).
-A chunked convert (`--chunk-pages 100`, scan path) appends `N_parts + 2` lines — one `type:"part"`
-line per 100-page chunk, one per-PDF line, one `job_summary`.
+The two-phase scan path writes to the log in two steps: `convert` appends `N_parts` `type:"part"`
+lines (one per 100-page chunk); `merge` appends 1 per-pdf line. No `job_summary` in the chunked path.
 
 For a loop over N normal PDFs — read **2N** tail lines:
 
@@ -304,7 +314,8 @@ For a loop over N normal PDFs — read **2N** tail lines:
 tail -n $((2*N)) /Users/brunowinter2000/Documents/ai/Mineru/logs/jobs.jsonl
 ```
 
-For a single chunked convert — N_parts = ceil(total_pages / 100) — read `N_parts + 2` tail lines.
+For a single chunked convert — N_parts = ceil(total_pages / 100): after `convert`, tail `N_parts`
+lines; after `merge`, tail 1 line.
 
 Any per-PDF line with `md: null` → no output produced → report it to the user (PDF name). That is
 the only check here. Fidelity of the produced md is judged in Phase 1.
@@ -333,8 +344,8 @@ Classify each md:
   coherent → fix below, then index.
 - **bad convert** — hits collapse into nonsense / wrong characters (`\ n u m b 9 e r`), OR sampled
   PROSE is garbled (scan OCR) → EXCLUDE: no cleanup, no index. Report to the USER: PDF name +
-  example line(s); it is a scan that slipped past the Scan Check — re-run with
-  `--backend hybrid-engine --chunk-pages 100` (see Scan Check above). NOT the same as `md: null`.
+  example line(s); it is a scan that slipped past the Scan Check — re-run via the two-phase
+  Scan path above (convert → check parts.json → merge). NOT the same as `md: null`.
 
 Discriminator: does collapsing a spaced run yield a real word? Yes → cleanable. No → bad convert.
 
