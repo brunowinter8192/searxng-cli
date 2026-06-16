@@ -22,8 +22,9 @@ XML_MARKERS   = (b"<?xml", b"<sitemapindex", b"<urlset", b"<sitemap>")
 # Fetch theblock sitemap index → post_type_post subs → select by timeframe → [{url, lastmod}].
 # timeframe: "delta" (top-2 subs, no date filter) | "full" (all subs) | "sub:N" (exact sub index N).
 # publication_date is NOT set here — comes from JSON-LD post-fetch in cleanup.
-async def discover(timeframe: str = "delta") -> list[dict]:
+async def discover(timeframe: str = "delta", logger=None) -> list[dict]:
     pool_cache: list = []  # lazy-loaded on first proxy fallback, shared across all fetches
+    # logger accepted here; proxy-attempt recording wired in Stage 3
 
     index_content = _fetch_xml(SITEMAP_INDEX, pool_cache)
     if index_content is None:

@@ -21,8 +21,8 @@ class TheBlockPlatform:
     timeframe: str             = "delta"  # set by __main__ via --timeframe
     dedup_mode: str            = "hash_only"
 
-    async def discover(self) -> list[dict]:
-        return await _discover(self.timeframe)
+    async def discover(self, logger=None) -> list[dict]:
+        return await _discover(self.timeframe, logger=logger)
 
     def cleanup(self, raw_html: str, entry: dict) -> str:
         return _cleanup(raw_html, entry)
