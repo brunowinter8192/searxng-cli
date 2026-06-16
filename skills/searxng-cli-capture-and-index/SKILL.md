@@ -298,28 +298,41 @@ thousands of lines). Two cheap steps:
 2. **Read with offset** on the grep hit lines, plus fixed PROSE windows (~30–40 lines each) after the
    front-matter, at ~25/50/75%, and the tail. Read prose, not only formulas.
 
-Classify each md:
-- **clean** — no/trivial hits, prose coherent → index as-is, no cleanup.
-- **cleanable** — hits collapse into REAL words/formulas (`\mathrm { t h e }` → "the"), prose
-  coherent → fix below, then index.
-- **bad convert** — hits collapse into nonsense / wrong characters (`\ n u m b 9 e r`), OR sampled
+**The count IS the signal — read it literally, NOT as an "outlier" test.** Pipeline-backend output on
+formula-dense pages carries this spacing PERVASIVELY: a count of dozens to hundreds is NORMAL and IS
+the artifact. A high count never means "dense paper, leave it" — it means "clean it." Only a count at
+or near 0 means no spacing cleanup is needed.
+
+Classify each md from the count + the sampled lines:
+- **clean** — count at/near 0, prose coherent → index as-is, no cleanup.
+- **cleanable** — non-trivial count AND the spaced runs collapse into REAL words/formulas
+  (`\mathrm { t h e }` → "the", `\mathrm { a r g m i n }` → "argmin"), prose coherent → de-space
+  below (however high the count), then index.
+- **bad convert** — the runs collapse into nonsense / wrong characters (`\ n u m b 9 e r`), OR sampled
   PROSE is garbled (scan OCR) → EXCLUDE: no cleanup, no index. Report to the USER: PDF name +
   example line(s); the user must source a better PDF (digitally-typeset preferred; a scan must be
   reconverted with the hybrid/VLM backend). NOT the same as `md: null`.
 
-Discriminator: does collapsing a spaced run yield a real word? Yes → cleanable. No → bad convert.
+Discriminator: does collapsing a spaced run yield a real word? Yes → cleanable (no matter how many).
+No → bad convert.
 
-##### Pre-cleanup: Backup + Word Count Baseline
+##### Pre-cleanup: Backup + Baselines
 
 ```bash
 cp "$OUTPUT_DIR/$STEM.md" "/tmp/backup_$STEM.md"
-wc -w "$OUTPUT_DIR/$STEM.md"
+wc -w "$OUTPUT_DIR/$STEM.md"                         # word count (for non-spacing fixes)
+tr -cd '[:alnum:]' < "$OUTPUT_DIR/$STEM.md" | wc -c  # alphanumeric count (de-spacing invariant: letters/digits never drop)
 ```
 
 ##### Artifacts to Detect and Fix
 
+- **Intra-token spacing (the pipeline artifact — the big one)** — runs of single chars separated by
+  single spaces, pervasive in math: `\mathrm { a r g m i n }` → `\mathrm{argmin}`,
+  `\mathrm { t h e \ d e s i g n }` → `\mathrm{the design}`, `\operatorname* { m i n }` →
+  `\operatorname*{min}`, `f ( x )` → `f(x)`. **De-space:** collapse a run of single alphanumeric chars
+  joined by single spaces into the joined token; treat `~`, `\,`, `\;` and double-space as a word
+  boundary (→ one space). Iterate the script until the Fidelity-Check grep count drops to ~0.
 - **LaTeX spaced command name** — `\ f r a c`, `\ s u m`, `\ m a t h r m` → `\frac`, `\sum`, `\mathrm`
-- **LaTeX spaced command contents** — `\mathrm { t h e \ d e s i g n }` → `\mathrm{the design}`; `\operatorname* { m i n }` → `\operatorname*{min}`
 - **Broken images** — `! [ ] ( ... )` with spaces between chars → `![](...)`
 - **Split words** — "mod els", "alg orithm" — fix conservatively via dictionary check (`/usr/share/dict/words` or in-document vocabulary)
 - **HTML entities** — `&amp;`, `&#39;` → unescape
@@ -333,16 +346,22 @@ For each issue type, create `/tmp/fix_<issue>_<STEM>.py`. Run, verify count reac
 
 ##### Validation (MANDATORY after each fix)
 
-- Word count must be stable (+/- 1%)
-- Check for run-on words (iscentral, tothe, ofthe) — must remain 0
-- If word count drops >2% OR run-on words appear: ABORT, restore from backup, report
+The invariant depends on the fix:
+- **De-spacing:** word count DROPS by design (collapsed tokens) — do NOT guard on word count. Guard on
+  the **alphanumeric char count** (letters+digits): it must stay EXACTLY stable — de-spacing removes
+  spaces and spacing controls (`~`, `\,`, `\;`), never letters or digits. PLUS run-on words
+  (`iscentral`, `tothe`, `ofthe`) stay 0, and the Fidelity-Check grep count drops toward 0.
+- **Non-spacing fixes** (entities, images, mojibake, hyphen-splits): word count stable (±1%), run-on
+  words 0.
+- On any violation (alphanumerics lost on de-space, word-count drop on a non-spacing fix, new run-on
+  words): ABORT, restore from backup, report.
 
 ##### Stop Criteria — "Good Enough"
 
 Don't over-engineer. Stop when:
-- All known issue categories have 0 remaining matches in the file
-- Word count is stable
-- Spot-check 10-15 lines from the middle reads as natural text
+- The Fidelity-Check grep count is ~0 and all other issue categories have 0 matches
+- The invariant held (alphanumeric char count stable for de-spacing; word count stable for the rest)
+- Spot-check 10-15 lines from the middle reads as natural, joined tokens
 
 ---
 
