@@ -114,10 +114,12 @@ def _compute_stats(events: list[dict]) -> dict:
 
 # Bucket attempt events into 60-min windows from t0; return per-window proxy metrics
 def _compute_window_stats(events: list[dict], t0: datetime) -> list[dict]:
-    """Return one dict per 60-min window with probiert, erfolgreich, urls_handled, pool_size.
+    """Return one dict per 60-min window with probiert, erfolgreich, urls_handled, fetch_attempts, pool_size.
 
     Window k spans [t0 + k*3600s, t0 + (k+1)*3600s).
     DISTINCT proxy_key per window: a proxy reused N times counts as 1.
+    urls_handled: distinct target URLs in the window (not attempt count).
+    fetch_attempts: total attempt events in the window (proxy-economics signal).
     pool_size: size of the last pool_refresh whose window-index <= k; None if none precedes k.
     Refresh bucketing uses the same int((ts-t0)/3600) formula as attempts, so a refresh at
     exactly t0+3600s (or t0+3603s) lands in window 1 and serves window 1, not window 0.
@@ -144,20 +146,22 @@ def _compute_window_stats(events: list[dict], t0: datetime) -> list[dict]:
             if int((_parse_ts(e["ts"]) - t0).total_seconds() / 3600) == k
         ]
 
-        probiert     = len({e["proxy_key"] for e in win_events})
-        erfolgreich  = len({e["proxy_key"] for e in win_events if e.get("result") == "ok"})
-        urls_handled = len(win_events)
+        probiert       = len({e["proxy_key"] for e in win_events})
+        erfolgreich    = len({e["proxy_key"] for e in win_events if e.get("result") == "ok"})
+        urls_handled   = len({e["url"] for e in win_events})
+        fetch_attempts = len(win_events)
 
         # Last refresh whose window-index <= k (most recent pool known going into / during k)
         prior = [(wi, sz) for wi, sz in refresh_by_win if wi <= k]
         pool_size = prior[-1][1] if prior else None
 
         windows.append({
-            "window":       k,
-            "probiert":     probiert,
-            "erfolgreich":  erfolgreich,
-            "urls_handled": urls_handled,
-            "pool_size":    pool_size,
+            "window":         k,
+            "probiert":       probiert,
+            "erfolgreich":    erfolgreich,
+            "urls_handled":   urls_handled,
+            "fetch_attempts": fetch_attempts,
+            "pool_size":      pool_size,
         })
 
     return windows
@@ -219,14 +223,14 @@ def _write_md(
         lines += [
             "## Proxy usage per 60-min window",
             "",
-            "| Window | Probiert | Erfolgreich | URLs handled | Pool size |",
-            "|---|---|---|---|---|",
+            "| Window | Probiert | Erfolgreich | URLs handled | Fetch-Versuche | Pool size |",
+            "|---|---|---|---|---|---|",
         ]
         for w in stats["windows"]:
             ps = str(w["pool_size"]) if w["pool_size"] is not None else "—"
             lines.append(
                 f"| {w['window']} | {w['probiert']} | {w['erfolgreich']}"
-                f" | {w['urls_handled']} | {ps} |"
+                f" | {w['urls_handled']} | {w['fetch_attempts']} | {ps} |"
             )
         lines.append("")
 
