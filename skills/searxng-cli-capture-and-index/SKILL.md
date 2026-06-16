@@ -225,6 +225,21 @@ place first — derive the name from the first page / title metadata, sanitize p
 The markdown then simply inherits the PDF's basename: `STEM = basename(PDF without .pdf)`, output =
 `$OUTPUT_DIR/$STEM.md`. PDF name and md name stay identical.
 
+##### Scan Check — BEFORE converting (cheap, do it first)
+
+A scanned PDF (page images, often with a hidden OCR text layer) does not convert cleanly. Detect it
+before the long convert:
+
+```bash
+pdffonts "$PDF" | grep -iq "OCR" && echo SCAN   # OCR-layer font (e.g. HiddenHorzOCR) = scanned
+pdftotext -f 5 -l 8 "$PDF" - | wc -w            # near-0 words across content pages = scanned
+```
+
+SCAN → do NOT convert. Flag the user: PDF name + evidence (OCR-layer font / no text layer), ask for a
+genuinely digital, text-layer PDF. A scan can't be cleaned after the fact.
+
+##### Convert — one PDF per call
+
 **Convert ONE PDF per `workflow.py convert` call, in a loop — NOT all PDFs in a single call.**
 Output per PDF: `$OUTPUT_DIR/<stem>.md` (`stem = basename(PDF without .pdf)`).
 
@@ -304,8 +319,8 @@ Classify each md:
   coherent → fix below, then index.
 - **bad convert** — hits collapse into nonsense / wrong characters (`\ n u m b 9 e r`), OR sampled
   PROSE is garbled (scan OCR) → EXCLUDE: no cleanup, no index. Report to the USER: PDF name +
-  example line(s); the user must source a better PDF (digitally-typeset preferred; a scan must be
-  reconverted with the hybrid/VLM backend). NOT the same as `md: null`.
+  example line(s); the user must source a genuinely digital, text-layer PDF (a scan can't be cleaned —
+  see the Scan Check before converting). NOT the same as `md: null`.
 
 Discriminator: does collapsing a spaced run yield a real word? Yes → cleanable. No → bad convert.
 
