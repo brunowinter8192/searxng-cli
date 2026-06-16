@@ -227,16 +227,19 @@ The markdown then simply inherits the PDF's basename: `STEM = basename(PDF witho
 
 ##### Scan Check — BEFORE converting (cheap, do it first)
 
-A scanned PDF (page images, often with a hidden OCR text layer) does not convert cleanly. Detect it
-before the long convert:
+A scanned PDF (page images, often with a hidden OCR text layer) does not convert cleanly with the
+default pipeline backend. Detect it before the long convert:
 
 ```bash
 pdffonts "$PDF" | grep -iq "OCR" && echo SCAN   # OCR-layer font (e.g. HiddenHorzOCR) = scanned
 pdftotext -f 5 -l 8 "$PDF" - | wc -w            # near-0 words across content pages = scanned
 ```
 
-SCAN → do NOT convert. Flag the user: PDF name + evidence (OCR-layer font / no text layer), ask for a
-genuinely digital, text-layer PDF. A scan can't be cleaned after the fact.
+If SCAN → do NOT run the default convert. Flag the user (PDF name + evidence) and have them try to get
+a genuinely digital, text-layer PDF. Then:
+- **Digital PDF obtained** → normal pipeline convert (below).
+- **Only a scan available** → split the PDF into ~100-page parts, run `--backend hybrid-engine` on each
+  part, then re-merge the part-mds into one `$STEM.md`.
 
 ##### Convert — one PDF per call
 
@@ -319,8 +322,8 @@ Classify each md:
   coherent → fix below, then index.
 - **bad convert** — hits collapse into nonsense / wrong characters (`\ n u m b 9 e r`), OR sampled
   PROSE is garbled (scan OCR) → EXCLUDE: no cleanup, no index. Report to the USER: PDF name +
-  example line(s); the user must source a genuinely digital, text-layer PDF (a scan can't be cleaned —
-  see the Scan Check before converting). NOT the same as `md: null`.
+  example line(s); it is a scan that slipped past the Scan Check — handle it there (get a digital PDF,
+  or split into ~100-page parts + hybrid). NOT the same as `md: null`.
 
 Discriminator: does collapsing a spaced run yield a real word? Yes → cleanable. No → bad convert.
 
