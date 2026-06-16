@@ -120,3 +120,34 @@ Pool B=[B1,B2], 4 URLs, refresh after iter 1):
 
 State locals confirmed to survive the swap (`queue`, `done`, `dead`, `wset`, `_consec_fail`, `cm`);
 locals confirmed to be replaced (`pool`, `buf`, `_last_refresh`).
+
+---
+
+## Pending final verification — live backfill across the 60-min boundary
+
+Unit tests prove the swap MECHANICS (state continuity, no crash) but cannot prove runtime
+behaviour at scale. The final gate is a real `theblock` backfill over sub-sitemaps 24–27 — sized
+to exceed one hour of scraping so it crosses ≥1 real 60-min refresh. Run from `dev` (carries the
+fix). What only the live run can confirm:
+
+- A real transient blip at the refresh tick is actually ridden out by `fetch_with_retry` at
+  runtime (the unit test mocks the fetch; it does not reproduce a live DNS hiccup).
+- Good-proxy replenishment per refresh sustains throughput across multiple hours (the open
+  economics question below).
+- `job.md` renders the per-refresh `## Pool source breakdown` and the corrected `URLs handled` /
+  `Fetch-Versuche` columns on a real multi-window run.
+
+## One-hour economics baseline (from the crashed run — single clean hour)
+
+The crashed run produced exactly one clean hour before dying at the first refresh — the only
+backfill economics data to date (its window 1 = the crash boundary, ~132 attempts, NOT a signal):
+
+- Pool **33615** proxies; **17731 distinct tried** in hour 1 (~53% of pool grazed), avg ~2.1
+  attempts per distinct proxy.
+- **~37500 fetch attempts → 1486 articles landed** = ~4% success per attempt, ~25 attempts per
+  delivered article (CF-heavy theblock — most proxies 403/dead/timeout).
+- **426 distinct CF-passing proxies** (~2.4% of those tried) carried delivery via reuse (~3.5
+  articles each).
+- Single-hour extrapolation: ~1486 articles/h → the full ~27k backfill ≈ ~18h IF good-proxy
+  supply sustains. NOT verified — depends on per-refresh replenishment, which the pending live run
+  is the first to measure (no prior run survived a refresh).
