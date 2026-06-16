@@ -33,10 +33,10 @@ Extra platform attributes (not in Protocol):
 
 ---
 
-### discover.py (136 LOC)
+### discover.py (170 LOC)
 
 **Purpose:** Sitemap-based article discovery. Fetches theblock sitemap index (direct httpx →
-proxy pool fallback), selects `post_type_post_*` sub-sitemaps by mode (`delta`/`full`/`sub:N`),
+proxy pool fallback), selects `post_type_post_*` sub-sitemaps by mode (`delta`/`full`/`sub:N`/`sub:A-B`),
 parses `<url>/<loc>/<lastmod>` blocks — no date filtering. Returns `[{url, lastmod}]` — NO
 `publication_date` (comes from JSON-LD post-fetch in cleanup).
 **Reads:** `https://www.theblock.co/sitemap_tbco_index.xml` + selected sub-sitemaps (network).
@@ -45,10 +45,11 @@ parses `<url>/<loc>/<lastmod>` blocks — no date filtering. Returns `[{url, las
 **Calls out:** `httpx`, `engine/proxy_pool/fetch.py:fetch_url`,
 `engine/proxy_pool/pool_loaders.py:load_backfill_pool`.
 
-Three timeframe modes (read from `self.timeframe`); no `lastmod` date filtering in any mode:
+Four timeframe modes (read from `self.timeframe`); no `lastmod` date filtering in any mode:
 - `"delta"` (default) — top-2 highest-numbered `post_type_post_*` subs, all URLs. Rollover-safe recurring run.
 - `"full"` — all `post_type_post_*` subs, all URLs. Complete backfill.
 - `"sub:N"` — exactly the sub whose trailing index == N (e.g. `sub:0` → `post_type_post_0.xml`), all URLs. Bounded backfill chunk. Raises `RuntimeError` if N not found.
+- `"sub:A-B"` — all subs with trailing index in [A, B] inclusive, returned descending (newest-first). Contiguous multi-chunk backfill. Raises `RuntimeError` if A > B or no subs match.
 
 Proxy pool is lazy-loaded into `pool_cache` on first fallback; shared across all XML fetches
 in the same discover call (index + sub-sitemaps) to avoid loading the pool twice.

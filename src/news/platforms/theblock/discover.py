@@ -20,7 +20,8 @@ XML_MARKERS   = (b"<?xml", b"<sitemapindex", b"<urlset", b"<sitemap>")
 # ORCHESTRATOR
 
 # Fetch theblock sitemap index → post_type_post subs → select by timeframe → [{url, lastmod}].
-# timeframe: "delta" (top-2 subs, no date filter) | "full" (all subs) | "sub:N" (exact sub index N).
+# timeframe: "delta" (top-2 subs, no date filter) | "full" (all subs) | "sub:N" (exact sub index N)
+#            | "sub:A-B" (all subs with index in [A, B] inclusive, descending).
 # publication_date is NOT set here — comes from JSON-LD post-fetch in cleanup.
 async def discover(timeframe: str = "delta", logger=None) -> list[dict]:
     pool_cache: list = []  # lazy-loaded on first proxy fallback, shared across all fetches
@@ -38,13 +39,30 @@ async def discover(timeframe: str = "delta", logger=None) -> list[dict]:
     elif timeframe == "delta":
         target_subs = _top_n_subs(post_subs, 2)
     elif timeframe.startswith("sub:"):
-        try:
-            n = int(timeframe[4:])
-        except ValueError:
-            raise RuntimeError(f"Invalid sub:N timeframe: {timeframe!r} — expected 'sub:<integer>'")
-        target_subs = [_sub_by_index(post_subs, n)]
+        spec = timeframe[4:]
+        if "-" in spec:
+            parts = spec.split("-", 1)
+            try:
+                a, b = int(parts[0]), int(parts[1])
+            except ValueError:
+                raise RuntimeError(
+                    f"Invalid sub:A-B timeframe: {timeframe!r} — expected two integers, e.g. 'sub:24-27'"
+                )
+            if a > b:
+                raise RuntimeError(
+                    f"Invalid sub:A-B timeframe: {timeframe!r} — A ({a}) must be ≤ B ({b})"
+                )
+            target_subs = _subs_in_range(post_subs, a, b)
+        else:
+            try:
+                n = int(spec)
+            except ValueError:
+                raise RuntimeError(f"Invalid sub:N timeframe: {timeframe!r} — expected 'sub:<integer>'")
+            target_subs = [_sub_by_index(post_subs, n)]
     else:
-        raise RuntimeError(f"Unknown timeframe: {timeframe!r} — expected 'full', 'delta', or 'sub:N'")
+        raise RuntimeError(
+            f"Unknown timeframe: {timeframe!r} — expected 'full', 'delta', 'sub:N', or 'sub:A-B'"
+        )
     print(f"[theblock] Fetching {len(target_subs)} sub-sitemap(s) …", file=sys.stderr)
 
     entries = []
@@ -116,6 +134,19 @@ def _sub_by_index(urls: list[str], n: int) -> str:
         if m and int(m.group(1)) == n:
             return u
     raise RuntimeError(f"sub:{n} not found among {len(urls)} post_type_post sub-sitemaps")
+
+
+# Return all sub-sitemap URLs whose trailing index is in [a, b] inclusive, sorted descending.
+def _subs_in_range(urls: list[str], a: int, b: int) -> list[str]:
+    def _num(u: str) -> int:
+        m = _NUM_RE.search(u)
+        return int(m.group(1)) if m else -1
+    matched = [u for u in urls if a <= _num(u) <= b]
+    if not matched:
+        raise RuntimeError(
+            f"sub:{a}-{b} matched no post_type_post sub-sitemaps (range [{a}, {b}] not found)"
+        )
+    return sorted(matched, key=_num, reverse=True)
 
 
 # Parse <url> blocks from sub-sitemap XML; return (loc_url, lastmod_datetime) pairs.
