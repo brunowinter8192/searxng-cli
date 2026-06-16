@@ -24,9 +24,8 @@ XML_MARKERS   = (b"<?xml", b"<sitemapindex", b"<urlset", b"<sitemap>")
 # publication_date is NOT set here — comes from JSON-LD post-fetch in cleanup.
 async def discover(timeframe: str = "delta", logger=None) -> list[dict]:
     pool_cache: list = []  # lazy-loaded on first proxy fallback, shared across all fetches
-    # logger accepted here; proxy-attempt recording wired in Stage 3
 
-    index_content = _fetch_xml(SITEMAP_INDEX, pool_cache)
+    index_content = _fetch_xml(SITEMAP_INDEX, pool_cache, logger)
     if index_content is None:
         raise RuntimeError("theblock sitemap index fetch failed (direct + proxy exhausted)")
     post_subs = _parse_post_sub_urls(index_content)
@@ -50,7 +49,7 @@ async def discover(timeframe: str = "delta", logger=None) -> list[dict]:
 
     entries = []
     for sub_url in target_subs:
-        content = _fetch_xml(sub_url, pool_cache)
+        content = _fetch_xml(sub_url, pool_cache, logger)
         if content is None:
             print(f"[theblock] Sub-sitemap failed, skipping: {sub_url.split('/')[-1]}", file=sys.stderr)
             continue
@@ -64,15 +63,17 @@ async def discover(timeframe: str = "delta", logger=None) -> list[dict]:
 # FUNCTIONS
 
 # Try direct httpx first; on failure, load pool lazily and iterate proxies; return bytes or None.
-def _fetch_xml(url: str, pool_cache: list) -> bytes | None:
+def _fetch_xml(url: str, pool_cache: list, logger=None) -> bytes | None:
     content = _fetch_direct(url)
     if content is not None:
-        return content
+        return content  # direct fetch succeeded — no proxy used, nothing to log
     if not pool_cache:
         print("[theblock] Loading proxy pool for sitemap fallback …", file=sys.stderr)
         pool_cache.extend(load_backfill_pool())
     for proto, hp in pool_cache:
         status, content = fetch_url(proto, hp, url, "xml")
+        if logger is not None:
+            logger.record_attempt(proto, hp, url, status == "ok")
         if status == "ok":
             return content
     return None
