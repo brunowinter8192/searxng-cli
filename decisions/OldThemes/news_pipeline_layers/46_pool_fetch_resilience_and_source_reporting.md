@@ -76,7 +76,7 @@ efficiency picture.
 
 ## Tests
 
-`tests/test_proxy_pool.py` — 21 tests, all self-contained (synthetic JSONL, mocked httpx, no
+`tests/test_proxy_pool.py` — 21 unit tests, all self-contained (synthetic JSONL, mocked httpx, no
 network). Staged coverage:
 - D3: 6 tests — `_compute_window_stats` distinct-vs-total divergence, two-window split,
   `_write_md` column header + row values.
@@ -84,3 +84,39 @@ network). Staged coverage:
   tuple shape, monosans-fail isolation (pool non-empty), per-source count.
 - D2: 9 tests — `record_pool_source` JSONL event, `_group_pool_sources` (single/two refreshes,
   empty), job.md section present/absent, dedup note, two-refresh subsections, count values.
+
+---
+
+## Swap empirisch verifiziert
+
+The 60-min pool swap in `run_loop` had never been exercised before a full prod run — no prior test
+crossed the refresh boundary. Two integration tests added to `tests/test_proxy_pool.py` (23 total,
+all green) drive `run_loop` over at least one refresh and assert the state-continuity contract:
+
+**Seams controlled:** `pool_provider` (Mock with side_effect Pool A → Pool B), `fetch_url`
+(patched at `loop.fetch_url`, always ok), `time.monotonic` (patched at `loop.time.monotonic` with
+a controlled sequence that fires the refresh exactly once after the first batch), `loop._sleep`
+(patched, safety net — never called since buf always has proxies). `PersistentCooldownManager`,
+`build_active_buffer`, `refill_buffer`, `_build_batch`, `ThreadPoolExecutor` run real.
+
+**What the tests prove (no bugs found — refresh block is correct as written):**
+
+`test_run_loop_refresh_swaps_pool_and_preserves_state` (concurrency=1, Pool A=[A1,A2], Pool B=[B1,B2],
+3 URLs, refresh after iter 1):
+- `pool_provider` called exactly 2× (startup + refresh). ✓
+- All 3 URLs in `done`, `gap=[]` — queue survives the swap intact. ✓
+- `record_pool_refresh` called 2× with `[len(Pool_A), len(Pool_B)]`. ✓
+- `fetch_url` call #2 (url2, first URL dispatched post-refresh) used proxy `A1:80` (Pool A proxy
+  from `wset`) — proves `wset` is untouched by the refresh block (lines 62-68 of loop.py). ✓
+
+`test_run_loop_refresh_fresh_candidates_from_new_pool` (concurrency=3, Pool A=[A1] single proxy,
+Pool B=[B1,B2], 4 URLs, refresh after iter 1):
+- `pool_provider` called 2×. ✓
+- All 4 URLs in `done`. ✓
+- Dispatched proxy set contains both `A1:80` (wset survivor) AND at least one of `{B1:80, B2:80}`
+  (Pool B proxy from rebuilt buf) — proves `buf` is rebuilt from new pool and fresh candidates are
+  immediately active alongside the surviving wset proxy. The iter-2 batch is
+  `[(A1,url2),(B1,url3),(B2,url4)]` — all three dispatched in the same ThreadPoolExecutor call. ✓
+
+State locals confirmed to survive the swap (`queue`, `done`, `dead`, `wset`, `_consec_fail`, `cm`);
+locals confirmed to be replaced (`pool`, `buf`, `_last_refresh`).

@@ -413,3 +413,176 @@ def test_job_md_source_count_values(tmp_path):
     md = _write_and_read_md(tmp_path, events)
     assert "7832" in md
     assert "| fail | 0 |" in md
+
+
+# ---------------------------------------------------------------------------
+# Integration — run_loop over a 60-min refresh boundary
+# ---------------------------------------------------------------------------
+
+def test_run_loop_refresh_swaps_pool_and_preserves_state():
+    """run_loop calls pool_provider twice, preserves queue/done/wset across the swap.
+
+    Proves:
+    - pool_provider called exactly 2× (startup + one refresh).
+    - All 3 target URLs reach done — none dropped at the swap boundary.
+    - Pool A proxy A1:80 enters wset pre-refresh and is still dispatched for url2
+      post-refresh (wset untouched by the refresh block, lines 62-68 of loop.py).
+    - Logger receives 2 record_pool_refresh events with correct pool sizes.
+    """
+    import src.news.engine.proxy_pool.loop as loop_module
+    from src.news.engine.proxy_pool.loop import run_loop
+    from src.news.engine.proxy_pool.logger import AcquireLogger
+    from src.news.engine.proxy_pool.cooldown import PersistentCooldownManager
+
+    POOL_A  = [("http", "A1:80"), ("http", "A2:80")]
+    POOL_B  = [("http", "B1:80"), ("http", "B2:80")]
+    SOURCES = [{"url": "https://src.example", "ok": True, "count": 2}]
+
+    pool_provider = MagicMock(side_effect=[
+        (POOL_A, SOURCES),  # call 1 — startup
+        (POOL_B, SOURCES),  # call 2 — refresh
+    ])
+    target_urls = [
+        "https://target.com/1",
+        "https://target.com/2",
+        "https://target.com/3",
+    ]
+    mock_fetch  = MagicMock(return_value=("ok", b"content"))
+    mock_logger = MagicMock(spec=AcquireLogger)
+    cm          = PersistentCooldownManager()
+
+    # time.monotonic sequence (see design):
+    #   call 1 → line 57 startup _last_refresh = 0.0
+    #   call 2 → line 60 iter 1 now = 0.0  →  0.0 - 0.0 = 0.0 < 10.0  →  no refresh
+    #   [batch 1: A1→url1 ok, A1 enters wset]
+    #   call 3 → line 60 iter 2 now = 15.0 → 15.0 - 0.0 = 15.0 ≥ 10.0 → REFRESH fires
+    #   call 4 → line 68 _last_refresh = 15.0
+    #   [batch 2: A1 (wset) → url2 ok, post-swap]
+    #   call 5 → line 60 iter 3 now = 15.0 → 15.0 - 15.0 = 0.0 < 10.0 → no refresh
+    #   [batch 3: A1 (wset) → url3 ok; queue empty → return]
+    mono_seq = iter([0.0, 0.0, 15.0, 15.0, 15.0] + [15.0] * 10)
+
+    with (
+        patch("src.news.engine.proxy_pool.loop.fetch_url", mock_fetch),
+        patch("src.news.engine.proxy_pool.loop.time") as mock_time,
+        patch.object(loop_module, "_sleep"),
+    ):
+        mock_time.monotonic.side_effect = mono_seq
+        done, dead, gap = run_loop(
+            pool_provider      = pool_provider,
+            target_urls        = target_urls,
+            content_type       = "html",
+            logger             = mock_logger,
+            cm                 = cm,
+            concurrency        = 1,
+            buffer_size        = 2,
+            refresh_interval_s = 10.0,
+        )
+
+    # 1. Pool swap happened exactly once
+    assert pool_provider.call_count == 2, (
+        f"Expected 2 pool_provider calls (startup + refresh), got {pool_provider.call_count}"
+    )
+
+    # 2. State continuity: all URLs processed, none dropped
+    assert set(done) == set(target_urls), f"URLs lost across swap: {set(target_urls) - set(done)}"
+    assert dead == []
+    assert gap  == []
+
+    # 3. Logger received both pool_refresh events with correct sizes
+    assert mock_logger.record_pool_refresh.call_count == 2
+    sizes = [c.args[0] for c in mock_logger.record_pool_refresh.call_args_list]
+    assert sizes == [len(POOL_A), len(POOL_B)]
+
+    # 4. wset survival: Pool A proxy A1:80 dispatched for url2 (the first URL after the refresh)
+    #    fetch_url call order with concurrency=1: [url1, url2, url3]
+    assert mock_fetch.call_count == 3
+    post_swap_call = mock_fetch.call_args_list[1]   # url2 batch (iter 2, post-refresh)
+    assert post_swap_call.args[1] == "A1:80", (
+        f"wset survival failed: expected Pool-A proxy 'A1:80' to be dispatched "
+        f"post-refresh, got {post_swap_call.args[1]!r}"
+    )
+    assert post_swap_call.args[2] == target_urls[1]
+
+
+def test_run_loop_refresh_fresh_candidates_from_new_pool():
+    """After swap, Pool B proxies enter via rebuilt buf and are dispatched alongside wset proxy.
+
+    Proves:
+    - With Pool A having only 1 proxy (A1:80) and concurrency=3, iter 1 builds
+      wset={A1:80} via a single-proxy batch.
+    - On the refresh, buf is rebuilt from Pool B=[B1:80, B2:80].
+    - Iter 2 batch: A1:80 (wset) + B1:80 + B2:80 (buf) race 3 URLs in one batch —
+      the new pool's proxies are immediately active alongside the surviving wset proxy.
+    - All 4 URLs reach done; gap empty.
+    """
+    import src.news.engine.proxy_pool.loop as loop_module
+    from src.news.engine.proxy_pool.loop import run_loop
+    from src.news.engine.proxy_pool.logger import AcquireLogger
+    from src.news.engine.proxy_pool.cooldown import PersistentCooldownManager
+
+    POOL_A  = [("http", "A1:80")]                          # single proxy
+    POOL_B  = [("http", "B1:80"), ("http", "B2:80")]       # two fresh proxies
+    SOURCES = [{"url": "https://src.example", "ok": True, "count": 1}]
+
+    pool_provider = MagicMock(side_effect=[
+        (POOL_A, SOURCES),
+        (POOL_B, SOURCES),
+    ])
+    target_urls = [
+        "https://target.com/1",
+        "https://target.com/2",
+        "https://target.com/3",
+        "https://target.com/4",
+    ]
+    mock_fetch  = MagicMock(return_value=("ok", b"content"))
+    mock_logger = MagicMock(spec=AcquireLogger)
+    cm          = PersistentCooldownManager()
+
+    # time.monotonic sequence:
+    #   call 1 → startup _last_refresh = 0.0
+    #   call 2 → iter 1 now = 0.0 → no refresh
+    #   [batch 1: only A1 in pool → A1→url1 ok; wset={A1}]
+    #   call 3 → iter 2 now = 15.0 → REFRESH
+    #   call 4 → _last_refresh = 15.0
+    #   [batch 2: concurrency=3; A1(wset)→url2, B1(buf)→url3, B2(buf)→url4; all ok]
+    #   queue empty after n_urls_consumed=3 → return
+    mono_seq = iter([0.0, 0.0, 15.0, 15.0] + [15.0] * 10)
+
+    with (
+        patch("src.news.engine.proxy_pool.loop.fetch_url", mock_fetch),
+        patch("src.news.engine.proxy_pool.loop.time") as mock_time,
+        patch.object(loop_module, "_sleep"),
+    ):
+        mock_time.monotonic.side_effect = mono_seq
+        done, dead, gap = run_loop(
+            pool_provider      = pool_provider,
+            target_urls        = target_urls,
+            content_type       = "html",
+            logger             = mock_logger,
+            cm                 = cm,
+            concurrency        = 3,
+            buffer_size        = 2,
+            refresh_interval_s = 10.0,
+        )
+
+    # 1. Swap happened exactly once
+    assert pool_provider.call_count == 2
+
+    # 2. All URLs processed, none dropped
+    assert set(done) == set(target_urls), f"URLs lost: {set(target_urls) - set(done)}"
+    assert dead == []
+    assert gap  == []
+
+    # 3. Pool B proxies dispatched post-refresh (via rebuilt buf)
+    dispatched_hps  = {c.args[1] for c in mock_fetch.call_args_list}
+    pool_b_hps      = {"B1:80", "B2:80"}
+    assert dispatched_hps & pool_b_hps, (
+        f"No Pool B proxy dispatched after refresh — "
+        f"buf rebuild not working. Dispatched: {dispatched_hps}"
+    )
+
+    # 4. wset proxy also present post-refresh (A1:80 from Pool A survived in wset)
+    assert "A1:80" in dispatched_hps, (
+        f"Pool A proxy A1:80 missing from dispatched set — wset cleared unexpectedly"
+    )
