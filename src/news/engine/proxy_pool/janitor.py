@@ -86,6 +86,7 @@ def _compute_stats(events: list[dict]) -> dict:
         return {
             "t0": None, "total_s": 0.0, "mean_ih": None,
             "median_ih": None, "pool_sizes": [], "ok_ts": [], "windows": [],
+            "source_batches": [],
         }
 
     t0      = min(all_ts)
@@ -98,17 +99,19 @@ def _compute_stats(events: list[dict]) -> dict:
     mean_ih   = statistics.mean(deltas)   if deltas else None
     median_ih = statistics.median(deltas) if deltas else None
 
-    pool_sizes = [e["size"] for e in events if e.get("event") == "pool_refresh"]
-    windows    = _compute_window_stats(events, t0)
+    pool_sizes     = [e["size"] for e in events if e.get("event") == "pool_refresh"]
+    windows        = _compute_window_stats(events, t0)
+    source_batches = _group_pool_sources(events)
 
     return {
-        "t0":        t0,
-        "total_s":   total_s,
-        "mean_ih":   mean_ih,
-        "median_ih": median_ih,
-        "pool_sizes": pool_sizes,
-        "ok_ts":     ok_ts,
-        "windows":   windows,
+        "t0":            t0,
+        "total_s":       total_s,
+        "mean_ih":       mean_ih,
+        "median_ih":     median_ih,
+        "pool_sizes":    pool_sizes,
+        "ok_ts":         ok_ts,
+        "windows":       windows,
+        "source_batches": source_batches,
     }
 
 
@@ -165,6 +168,28 @@ def _compute_window_stats(events: list[dict], t0: datetime) -> list[dict]:
         })
 
     return windows
+
+
+# Group pool_source events into one batch per pool_refresh, in JSONL order
+def _group_pool_sources(events: list[dict]) -> list[list[dict]]:
+    """Return one list of pool_source dicts per pool_refresh event, preserving JSONL order.
+
+    pool_refresh opens a new batch; pool_source events append to the current batch.
+    Attempt events between pool_refresh and pool_source are ignored here.
+    """
+    batches: list[list[dict]] = []
+    current: list[dict] | None = None
+    for e in events:
+        if e.get("event") == "pool_refresh":
+            if current is not None:
+                batches.append(current)
+            current = []
+        elif e.get("event") == "pool_source":
+            if current is not None:
+                current.append(e)
+    if current is not None:
+        batches.append(current)
+    return batches
 
 
 # Plot cumulative ok fetches vs elapsed seconds since t0; save as PNG
@@ -233,5 +258,27 @@ def _write_md(
                 f" | {w['urls_handled']} | {w['fetch_attempts']} | {ps} |"
             )
         lines.append("")
+
+    non_empty = [b for b in stats["source_batches"] if b]
+    if non_empty:
+        lines += [
+            "## Pool source breakdown",
+            "",
+            "Per-source raw proxy counts are before cross-repo dedup. "
+            "Sum of counts exceeds Pool size — overlap between repos is deduped in `load_backfill_pool()`.",
+            "",
+        ]
+        for i, batch in enumerate(non_empty):
+            label = "Refresh 0 (startup)" if i == 0 else f"Refresh {i}"
+            lines += [
+                f"### {label}",
+                "",
+                "| URL | Result | Count |",
+                "|---|---|---|",
+            ]
+            for src in batch:
+                result = "ok" if src["ok"] else "fail"
+                lines.append(f"| {src['url']} | {result} | {src['count']} |")
+            lines.append("")
 
     (job_dir / "job.md").write_text("\n".join(lines), encoding="utf-8")

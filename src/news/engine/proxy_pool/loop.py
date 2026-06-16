@@ -18,7 +18,7 @@ REFRESH_INTERVAL_S = 3600          # full pool reload cadence (60 min)
 # ORCHESTRATOR
 
 def run_loop(
-    pool_provider: Callable[[], list[tuple[str, str]]],
+    pool_provider: Callable[[], tuple[list[tuple[str, str]], list[dict]]],
     target_urls: list[str],
     content_type: str,
     logger: AcquireLogger,
@@ -49,8 +49,10 @@ def run_loop(
     wset:         set[tuple[str, str]]       = set()
     _consec_fail: dict[tuple[str, str], int] = {}
 
-    pool, _       = pool_provider()
+    pool, sources = pool_provider()
     logger.record_pool_refresh(len(pool))
+    for s in sources:
+        logger.record_pool_source(s["url"], s["ok"], s["count"])
     buf           = build_active_buffer(pool, cm, buffer_size)
     _last_refresh = time.monotonic()
 
@@ -58,8 +60,10 @@ def run_loop(
         now = time.monotonic()
 
         if now - _last_refresh >= refresh_interval_s:
-            pool, _       = pool_provider()
+            pool, sources = pool_provider()
             logger.record_pool_refresh(len(pool))
+            for s in sources:
+                logger.record_pool_source(s["url"], s["ok"], s["count"])
             buf           = build_active_buffer(pool, cm, buffer_size)
             _last_refresh = time.monotonic()
 

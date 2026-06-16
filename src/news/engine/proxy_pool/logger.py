@@ -40,6 +40,17 @@ class AcquireLogger:
         }
         self._jsonl_fh.write(json.dumps(event) + "\n")
 
+    def record_pool_source(self, url: str, ok: bool, count: int) -> None:
+        """Record one per-source fetch result → JSONL pool_source event (read by janitor)."""
+        event = {
+            "event": "pool_source",
+            "url":   url,
+            "ok":    ok,
+            "count": count,
+            "ts":    datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ"),
+        }
+        self._jsonl_fh.write(json.dumps(event) + "\n")
+
     def close(self) -> None:
         """Close the JSONL stream. Call before janitor.end_job()."""
         self._jsonl_fh.close()
