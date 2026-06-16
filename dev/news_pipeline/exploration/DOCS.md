@@ -70,6 +70,68 @@ fix (timeLabel-drop + delta extraction) required before the uncapped Stage B run
 | `--cap N` | Override click ceiling to N |
 | `--full` | Uncapped Stage B run |
 
+### 04_coindesk_timeline_replay_probe.py
+
+**Purpose:** Captures CoinDesk timeline API requests via background Chrome + pydoll HAR recorder (full wire headers incl. `sec-ch-ua*`), replays via `httpx` + `curl_cffi`, and chains cursor-based calls. Establishes the minimum header set for replay (Referer, User-Agent, `sec-ch-ua*` — no cookie/auth required).
+
+**Key finding:** HTTP replay works: a cursor loop of 7 calls returns 200 at ~0.27s each. Endpoint:
+`GET https://www.coindesk.com/api/v1/articles/timeline?size=16&lastId=<UUID>&lastDisplayDate=<ISO>&lang=en`
+Cursor = last article's `_id` (lastId) + `articleDates.displayDate` (lastDisplayDate).
+
+**Output:** `04_output/report_<ts>.md`
+
+```bash
+./venv/bin/python dev/news_pipeline/exploration/04_coindesk_timeline_replay_probe.py
+./venv/bin/python dev/news_pipeline/exploration/04_coindesk_timeline_replay_probe.py --loop 20 --delay 0.3
+./venv/bin/python dev/news_pipeline/exploration/04_coindesk_timeline_replay_probe.py --rate-test
+```
+
+| Flag | Effect |
+|------|--------|
+| `--loop N` | cursor-loop calls after initial capture (default: 3) |
+| `--delay S` | seconds between cursor calls (default: 0.3) |
+| `--rate-test` | rerun loop with 2s delay to probe time-vs-count limit |
+
+### 05_coindesk_cursor_probe.py
+
+**Purpose:** Investigates cursor validity and storyType distribution across paginated timeline calls. Walk mode: pages through N calls logging ALL article `_id`, `storyType`, `pathname`, `displayDate` per response, producing a storyType distribution and flagging the target article. Fixed mode: chains cursor calls with optional storyType filtering (now used as retry-fallback: on 403, falls back to N-1/N-2 cursor article).
+
+**Key findings:**
+- StoryType distribution (128 articles): `News` 91.4%, `live_news` 5.5%, `Opinion` 3.1%.
+- `cc8f264d` (the predecessor's deterministic 403 cursor) is a **standard "News" article** — storyType hypothesis disproved.
+- The 403 at `cc8f264d` was **transient article unavailability** (backend rejected that specific article ID at that point in time), NOT a storyType rule. Confirmed: after the walk, `cc8f264d` returned 200 from a fresh session.
+- Valid anchor rule: **any article can be a cursor anchor**. On 403, fall back to N-1 article in the same batch.
+
+**Output:** `05_output/walk_<ts>.md`, `05_output/walk_<ts>_articles.json`, `05_output/fixed_<ts>.md`, `05_output/deep_<ts>.md`
+
+```bash
+./venv/bin/python dev/news_pipeline/exploration/05_coindesk_cursor_probe.py --mode walk --n 25
+./venv/bin/python dev/news_pipeline/exploration/05_coindesk_cursor_probe.py --mode fixed --n 300 --invalid-types "sponsored,video"
+```
+
+| Flag | Effect |
+|------|--------|
+| `--mode walk\|fixed` | walk: log all storyTypes; fixed: skip invalid anchor types |
+| `--n N` | number of paginated calls (default: 25) |
+| `--invalid-types T1,T2` | comma-separated storyTypes to skip as cursor anchor (fixed mode) |
+| `--delay S` | seconds between cursor calls (default: 0.3) |
+
+### 05b_coindesk_warmth_probe.py
+
+**Purpose:** Measures IP warmth duration after a browser session closes. Captures the first timeline API URL + headers via Chrome (same mechanism as 04), saves to `state.json`, closes Chrome, then replays the SAME URL at cumulative intervals (T=0, 10, 20, 30, 60, 120, 180, 300s). At first 403: tests httpx feedpage GET re-warm + subprocess cold call. Since no 403 was observed in 300s, Phase C was not triggered in the first run.
+
+**Key findings:**
+- Warmth lasts ≥300s (5 min) for repeated-URL replays after browser close.
+- Warmth is **IP-level**: a fresh subprocess (no prior coindesk connection in that process) returns 200 when the IP is warm.
+- Phase C (feedpage rewarm + cold path): not triggered — warmth outlasted the 300s ladder.
+- Deep loop of 350 cursor advances (~4-5 min) also fully succeeded, consistent with ≥5 min warmth window.
+
+**Output:** `05b_output/warmth_<ts>.md`, `05b_output/state.json`
+
+```bash
+./venv/bin/python dev/news_pipeline/exploration/05b_coindesk_warmth_probe.py
+```
+
 ## Output Directories
 
 | Directory | Contents | Gitignored |
@@ -77,3 +139,6 @@ fix (timeLabel-drop + delta extraction) required before the uncapped Stage B run
 | `01_output/` | `probe_<ts>.json` run results | ✅ yes |
 | `02_output/` | `session.har` + `report_<ts>.md` + `depth_report_<ts>.md` | ✅ yes |
 | `03_output/` | `progress_<ts>.log` + `checkpoint_urls.json` + `urls_<ts>.json` + `report_stage_a_<ts>.md` | ✅ yes |
+| `04_output/` | `report_<ts>.md` | ✅ yes |
+| `05_output/` | `walk_<ts>.md` + `walk_<ts>_articles.json` + `fixed_<ts>.md` + `deep_<ts>.md` | ✅ yes |
+| `05b_output/` | `warmth_<ts>.md` + `state.json` | ✅ yes |
