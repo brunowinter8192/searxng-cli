@@ -11,9 +11,10 @@ Do NOT import from `src/crawler/` or `src/scraper/` — `src/news/` is self-cont
 
 ## Entry Points
 
-- `python -m src.news --source coindesk [--skip-index]`
+- `python -m src.news --source coindesk [--skip-index]` — full pipeline (discover → scrape → publish)
+- `python -m src.news --source coindesk --discover-only [--timeframe 30|full]` — discover + inventory update only; no scrape/clean/publish
 - `python -m src.news --source theblock [--timeframe delta|full|sub:N] [--skip-index]`
-- Direct: `asyncio.run(run_pipeline(platform, skip_index=...))` after importing a platform
+- Direct: `asyncio.run(run_pipeline(platform, skip_index=...))` or `asyncio.run(run_discover_only(platform))` after importing a platform
 
 ## Platform Contract (Extension Seam)
 
@@ -53,11 +54,11 @@ Proxy platforms set `scrape_engine = "proxy_pool"` and provide a `ProxyScrapeCon
 - `dedup_mode: str` — `"pubdate"` (default, CoinDesk) | `"hash_only"` (The Block).
   `"hash_only"` globs `{source}__*__{hash}.md` instead of exact pubdate match; needed when
   `publication_date` is not available at discover time.
-- `timeframe: str` — discovery mode; set by `__main__` from `--timeframe` (default `"delta"`).
-  Only meaningful for platforms whose `discover()` reads `self.timeframe` (e.g. The Block).
-  Modes: `"delta"` (top-2 subs), `"full"` (all subs), `"sub:N"` (exact sub by index).
-  When `--timeframe` is not `"delta"`, `__main__` auto-forces `skip_index=True` and prints
-  `"After review, run: rag-cli index --collection <collection>"` to stdout.
+- `timeframe: str` — discovery mode; set by `__main__` from `--timeframe`.
+  CoinDesk: `"full"` (cursor to 2018-01-01) | integer string N (last N days) | `"delta"` = 30 days.
+  TheBlock: `"delta"` (default, top-2 subs) | `"full"` (all subs) | `"sub:N"` | `"sub:A-B"`.
+  When `--timeframe` is not `"delta"` AND `--discover-only` is not set, `__main__` auto-forces
+  `skip_index=True` and prints `"After review, run: rag-cli index --collection <collection>"`.
 
 ## Directory Map
 
@@ -65,8 +66,8 @@ Proxy platforms set `scrape_engine = "proxy_pool"` and provide a `ProxyScrapeCon
 |---|---|---|
 | `platform.py` | ScrapeConfig + ProxyScrapeConfig + Platform Protocol | 35 |
 | `registry.py` | name → Platform registry; register() / get() | 19 |
-| `pipeline.py` | Async orchestrator; stages 1–5 in-process; scrape dispatch | 213 |
-| `__main__.py` | argparse entry point; --source + --skip-index + --timeframe | 48 |
+| `pipeline.py` | Async orchestrator; stages 1–5 in-process; scrape dispatch; run_discover_only() | 281 |
+| `__main__.py` | argparse entry point; --source + --skip-index + --timeframe + --discover-only | 62 |
 | `engine/` | Generic scrape engines (browser + proxy_pool) + dedup + publish | — |
 | `platforms/coindesk/` | CoinDesk platform implementation | — |
 | `platforms/theblock/` | The Block platform — proxy_pool, hash-dedup, JSON-LD cleanup | — |
