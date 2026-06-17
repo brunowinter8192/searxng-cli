@@ -2,7 +2,7 @@
 from src.news.platform import ScrapeConfig
 from src.news.registry import register
 from src.news.platforms.coindesk.config import REGWALL_SIGNALS, SCRAPE_CONFIG
-# From coindesk/discover.py: discover() -> list[dict]
+# From coindesk/discover.py: discover(timeframe) -> list[dict]
 from src.news.platforms.coindesk.discover import discover as _discover
 # From coindesk/cleanup.py: cleanup(raw_markdown, entry) -> str
 from src.news.platforms.coindesk.cleanup import cleanup as _cleanup
@@ -18,9 +18,10 @@ class CoinDeskPlatform:
     scrape_engine: str = "browser"
     scrape_config: ScrapeConfig = SCRAPE_CONFIG
     proxy_scrape_config = None
+    timeframe: str = "30"   # set by __main__ via --timeframe; "full" or int-string N-days
 
     async def discover(self) -> list[dict]:
-        return await _discover()
+        return await _discover(self.timeframe)
 
     def cleanup(self, raw_markdown: str, entry: dict) -> str:
         return _cleanup(raw_markdown, entry)

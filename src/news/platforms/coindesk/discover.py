@@ -1,339 +1,337 @@
 # INFRASTRUCTURE
-import asyncio
-import json
-import re
-import shutil
-import socket
-import subprocess
 import sys
-import tempfile
 import time
-import urllib.request
 from datetime import datetime, timedelta, timezone
+from pathlib import Path
 from urllib.parse import urlparse
 
-from pydoll.browser import Chrome
+import httpx
 
 from src.news.platforms.coindesk.config import (
+    TIMELINE_BASE,
+    COINDESK_BASE,
     TARGET_URL,
-    MAX_CLICK_ROUNDS,
-    POLL_INTERVAL,
-    POLL_MAX,
-    PRE_48H_THRESHOLD,
-    CUTOFF_DAYS,
+    CALL_DELAY,
+    REWARM_EVERY,
+    CLICKS_WARMUP,
+    CLICKS_REWARM,
+    MAX_CURSOR_FALLBACKS,
+    CHECKPOINT_EVERY,
+    DEFAULT_DELTA_DAYS,
+    FULL_MODE_FLOOR,
+    INVENTORY_DIR,
 )
-
-REAL_UA = (
-    "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) "
-    "AppleWebKit/537.36 (KHTML, like Gecko) "
-    "Chrome/146.0.7680.154 Safari/537.36"
-)
-DATE_RE = re.compile(r'/(\d{4})/(\d{2})/(\d{2})/')
-
-# Extract feed article URLs + title + nearest time label — excludes aside/nav/footer/sidebar noise
-_JS_EXTRACT = """
-(function() {
-    var dateRe = /\\/\\d{4}\\/\\d{2}\\/\\d{2}\\//;
-    var skipTags = {ASIDE: 1, NAV: 1, FOOTER: 1, HEADER: 1};
-    var skipCls = /related|recommendation|popular|trending|sidebar/i;
-    var links = document.querySelectorAll('a[href]');
-    var results = [];
-    var seen = {};
-    for (var i = 0; i < links.length; i++) {
-        var a = links[i];
-        var href = a.href;
-        if (!dateRe.test(href) || seen[href]) continue;
-        var skip = false;
-        var node = a.parentElement;
-        while (node && node !== document.body) {
-            if (skipTags[node.tagName]) { skip = true; break; }
-            if (node.className && skipCls.test(node.className)) { skip = true; break; }
-            node = node.parentElement;
-        }
-        if (skip) continue;
-        seen[href] = true;
-        var timeLabel = '';
-        node = a;
-        for (var d = 0; d < 10; d++) {
-            node = node.parentElement;
-            if (!node) break;
-            var te = node.querySelector('time');
-            if (te) { timeLabel = te.getAttribute('datetime') || te.textContent.trim(); break; }
-            var kids = node.querySelectorAll('span, p, div');
-            for (var j = 0; j < kids.length; j++) {
-                var t = kids[j].textContent.trim();
-                if (t.length < 40 && /\\d+\\s*(min|hour|hr|day|h|m)\\s*(ago|s)?|just now/i.test(t)) {
-                    timeLabel = t; break;
-                }
-            }
-            if (timeLabel) break;
-        }
-        results.push({url: href, timeLabel: timeLabel, title: a.textContent.trim()});
-    }
-    return JSON.stringify(results);
-})();
-"""
-
-# Count feed-scoped article URLs (same exclusions as _JS_EXTRACT, fast poll)
-_JS_COUNT = """
-(function() {
-    var dateRe = /\\/\\d{4}\\/\\d{2}\\/\\d{2}\\//;
-    var skipTags = {ASIDE: 1, NAV: 1, FOOTER: 1, HEADER: 1};
-    var skipCls = /related|recommendation|popular|trending|sidebar/i;
-    var seen = {};
-    var count = 0;
-    document.querySelectorAll('a[href]').forEach(function(a) {
-        if (!dateRe.test(a.href) || seen[a.href]) return;
-        var skip = false;
-        var node = a.parentElement;
-        while (node && node !== document.body) {
-            if (skipTags[node.tagName]) { skip = true; break; }
-            if (node.className && skipCls.test(node.className)) { skip = true; break; }
-            node = node.parentElement;
-        }
-        if (!skip) { seen[a.href] = true; count++; }
-    });
-    return count;
-})();
-"""
-
-# Scroll "More stories" button into view and click it; return true if found
-_JS_CLICK_BTN = """
-(function() {
-    var candidates = Array.from(document.querySelectorAll('button, a[role="button"], [role="button"]'));
-    for (var i = 0; i < candidates.length; i++) {
-        var t = candidates[i].textContent.trim();
-        if (/more\\s+stories|load\\s+more|show\\s+more/i.test(t)) {
-            candidates[i].scrollIntoView({block: 'center', behavior: 'smooth'});
-            candidates[i].click();
-            return true;
-        }
-    }
-    return false;
-})();
-"""
+# From browser.py: browser_load_feed(n_clicks) -> (headers, api_url, body)
+from src.news.platforms.coindesk.browser import browser_load_feed
 
 
 # ORCHESTRATOR
 
-# Paginate CoinDesk latest-news feed via Chrome; return list of entry dicts.
-async def discover() -> list[dict]:
-    session_dir = tempfile.mkdtemp(prefix="coindesk_discover_")
-    today = datetime.now(timezone.utc).date()
-    cutoff = compute_cutoff(today)
-    port = get_free_port()
+# Browser warmup → httpx cursor loop → incremental inventory write → entry list.
+# timeframe: "full" (→ FULL_MODE_FLOOR floor), int-string N (→ N days back), else DEFAULT_DELTA_DAYS.
+async def discover(timeframe: str = "30") -> list[dict]:
+    stop_date = _parse_stop_date(timeframe)
+    print(f"[coindesk] discover timeframe={timeframe!r} stop_date={stop_date}", file=sys.stderr)
 
-    print(f"Launching background Chrome on port {port} …", file=sys.stderr)
-    launch_background_chrome(port, session_dir)
-    ws_url = wait_for_ws_url(port)
-    print(f"Connected: {ws_url}", file=sys.stderr)
+    print("[coindesk] Browser warmup …", file=sys.stderr)
+    headers, start_url, first_body = await browser_load_feed(CLICKS_WARMUP)
+    if first_body is None:
+        raise RuntimeError("CoinDesk browser warmup failed — could not capture timeline API response")
 
-    chrome = Chrome()
-    tab = await chrome.connect(ws_url)
-    try:
-        print(f"Navigating to {TARGET_URL} …", file=sys.stderr)
-        await tab.go_to(TARGET_URL, timeout=60)
-        await asyncio.sleep(3.0)
+    print(f"[coindesk] Warmup done. First URL: {start_url}", file=sys.stderr)
 
-        initial = await extract_articles(tab)
-        all_urls: dict[str, dict] = {a["url"]: a for a in initial}
-        print(f"Batch 0: {len(initial)} initial articles", file=sys.stderr)
+    INVENTORY_DIR.mkdir(parents=True, exist_ok=True)
+    seen_urls = load_inventory(INVENTORY_DIR)
+    print(f"[coindesk] Inventory loaded: {len(seen_urls)} existing URLs", file=sys.stderr)
 
-        for click_n in range(1, MAX_CLICK_ROUNDS + 1):
-            pre = count_older_than_cutoff(list(all_urls.values()), cutoff)
-            if pre >= PRE_48H_THRESHOLD:
-                print(f"Coverage reached: {pre} articles older than 48h (before click {click_n}).", file=sys.stderr)
-                break
+    entries = await cursor_loop(headers, start_url, first_body, stop_date, seen_urls, INVENTORY_DIR)
 
-            prev_count = len(all_urls)
-            clicked = await click_button(tab)
-            if not clicked:
-                print(f"Button gone at click {click_n} — end of feed.", file=sys.stderr)
-                break
-
-            await asyncio.sleep(2.0)
-            await wait_for_new_articles(tab, prev_count)
-            fresh = await extract_articles(tab)
-            added = {a["url"]: a for a in fresh if a["url"] not in all_urls}
-            all_urls.update(added)
-            pre = count_older_than_cutoff(list(all_urls.values()), cutoff)
-            print(f"Batch {click_n}: +{len(added)} | total={len(all_urls)} | older-than-48h={pre}", file=sys.stderr)
-
-            if pre >= PRE_48H_THRESHOLD:
-                print(f"Coverage reached: {pre} articles older than 48h after {click_n} click(s).", file=sys.stderr)
-                break
-        else:
-            print(
-                "WARNING: MAX_CLICK_ROUNDS reached without termination — coverage may be incomplete",
-                file=sys.stderr,
-            )
-
-    finally:
-        await tab.close()
-        try:
-            await chrome.close()
-        except Exception as e:
-            print(f"Chrome WS close (non-fatal): {e}", file=sys.stderr)
-        kill_chrome_on_port(port)
-        shutil.rmtree(session_dir, ignore_errors=True)
-        print(f"Chrome on port {port} killed, session dir removed.", file=sys.stderr)
-
-    entries = build_entries(all_urls)
-    entries, n_filtered = filter_live_blogs(entries)
-    if n_filtered:
-        print(f"Filtered {n_filtered} live-blog URLs (skipped)", file=sys.stderr)
-    return entries
+    new_count = sum(1 for e in entries if e.get("_new"))
+    print(
+        f"[coindesk] discover → {len(entries)} entries total, {new_count} new to inventory",
+        file=sys.stderr,
+    )
+    return [{k: v for k, v in e.items() if k != "_new"} for e in entries]
 
 
 # FUNCTIONS
 
-# Bind to port 0 to get a free OS-assigned port
-def get_free_port() -> int:
-    with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
-        s.bind(("127.0.0.1", 0))
-        return s.getsockname()[1]
-
-
-# Launch Chrome in background via open -gna (new instance, no foreground)
-def launch_background_chrome(port: int, session_dir: str) -> None:
-    subprocess.run(
-        [
-            "open", "-gna", "Google Chrome", "--args",
-            f"--remote-debugging-port={port}",
-            f"--user-data-dir={session_dir}",
-            f"--user-agent={REAL_UA}",
-            "--window-size=1920,1080",
-            "--disable-blink-features=AutomationControlled",
-            "--no-first-run",
-            "--no-default-browser-check",
-        ],
-        check=True,
-    )
-
-
-# Poll /json/version until Chrome responds; return webSocketDebuggerUrl
-def wait_for_ws_url(port: int, timeout: float = 30.0) -> str:
-    url = f"http://localhost:{port}/json/version"
-    deadline = time.monotonic() + timeout
-    while time.monotonic() < deadline:
-        try:
-            with urllib.request.urlopen(url, timeout=2) as resp:
-                data = json.loads(resp.read())
-                return data["webSocketDebuggerUrl"]
-        except Exception:
-            time.sleep(0.5)
-    raise TimeoutError(f"Chrome did not start on port {port} within {timeout}s")
-
-
-# Kill the Chrome process bound to this debug port
-def kill_chrome_on_port(port: int) -> None:
+# Compute stop-date string from timeframe specifier
+def _parse_stop_date(timeframe: str) -> str:
+    if timeframe == "full":
+        return FULL_MODE_FLOOR
     try:
-        subprocess.run(
-            ["pkill", "-f", f"remote-debugging-port={port}"],
-            check=False,
-        )
-    except Exception as e:
-        print(f"pkill (non-fatal): {e}", file=sys.stderr)
-
-
-# Return cutoff date: articles strictly before this date are outside the 48h window
-def compute_cutoff(today) -> object:
-    return today - timedelta(days=CUTOFF_DAYS - 1)
-
-
-# Unpack CDP execute_script result dict
-def _extract_value(raw):
-    try:
-        return raw["result"]["result"]["value"]
-    except (KeyError, TypeError):
-        return None
-
-
-# Run extract JS + decode JSON response into list of article dicts
-async def extract_articles(tab) -> list[dict]:
-    raw = await tab.execute_script(_JS_EXTRACT)
-    val = _extract_value(raw)
-    if not val:
-        return []
-    try:
-        return json.loads(val)
-    except (json.JSONDecodeError, TypeError):
-        return []
-
-
-# Click "More stories" button via JS; return True if clicked
-async def click_button(tab) -> bool:
-    raw = await tab.execute_script(_JS_CLICK_BTN)
-    return bool(_extract_value(raw))
-
-
-# Poll feed-scoped count up to POLL_MAX × POLL_INTERVAL; return when it grows
-async def wait_for_new_articles(tab, prev_count: int) -> int:
-    for _ in range(POLL_MAX):
-        await asyncio.sleep(POLL_INTERVAL)
-        raw = await tab.execute_script(_JS_COUNT)
-        count = _extract_value(raw)
-        if count is not None and int(count) > prev_count:
-            return int(count)
-    return prev_count
-
-
-# Parse date from CoinDesk URL path (/YYYY/MM/DD/) → UTC midnight datetime
-def parse_url_date(url: str) -> datetime | None:
-    m = DATE_RE.search(url)
-    if not m:
-        return None
-    try:
-        return datetime(int(m.group(1)), int(m.group(2)), int(m.group(3)), tzinfo=timezone.utc)
+        n = int(timeframe)
     except ValueError:
-        return None
+        n = DEFAULT_DELTA_DAYS
+    floor = datetime.now(timezone.utc).date() - timedelta(days=n)
+    return floor.isoformat()
 
 
-# Count articles whose URL date is before cutoff_date (i.e., older than 48h window)
-def count_older_than_cutoff(articles: list[dict], cutoff_date) -> int:
-    return sum(1 for a in articles if (d := parse_url_date(a["url"])) and d.date() < cutoff_date)
-
-
-# Convert URL date to ISO-8601 string (UTC midnight); empty string if no date in URL
-def _url_to_iso(url: str) -> str:
-    dt = parse_url_date(url)
-    if dt is None:
-        return ""
-    return dt.strftime("%Y-%m-%dT%H:%M:%S+00:00")
-
-
-# Extract first path segment as section (e.g. /markets/2026/... → markets)
-def _extract_section(url: str) -> str:
+# Parse all articles from response body; extract _id, storyType, pathname, displayDate, title
+def parse_articles(body: bytes) -> list[dict]:
     try:
-        path = url.split("coindesk.com", 1)[1]
-        return path.strip("/").split("/")[0]
-    except (IndexError, ValueError):
-        return "unknown"
-
-
-# Build sorted output entry list from all_urls dict
-def build_entries(all_urls: dict) -> list[dict]:
-    entries = []
-    for url, article in all_urls.items():
-        iso = _url_to_iso(url)
-        entries.append({
-            "url": url,
-            "lastmod": iso,
-            "publication_date": iso,
-            "title": article.get("title", ""),
-            "section": _extract_section(url),
+        import json
+        data = json.loads(body)
+    except Exception:
+        return []
+    articles = data if isinstance(data, list) else None
+    if isinstance(data, dict):
+        for v in data.values():
+            if isinstance(v, list) and v and isinstance(v[0], dict):
+                articles = v
+                break
+    if not articles:
+        return []
+    result = []
+    for a in articles:
+        ad = a.get("articleDates") or {}
+        result.append({
+            "_id":        a.get("_id") or a.get("id"),
+            "storyType":  a.get("storyType"),
+            "pathname":   a.get("pathname"),
+            "displayDate": (
+                ad.get("displayDate") or ad.get("publishedAt")
+                or a.get("displayDate") or a.get("publishedAt") or a.get("date")
+            ),
+            "title": a.get("title") or "",
         })
-    entries.sort(key=lambda e: e["lastmod"], reverse=True)
-    return entries
+    return result
 
 
-# Return True if URL is a CoinDesk live-blog: slug (last path segment) starts with "live-".
+# Build pagination cursor URL from lastId + lastDisplayDate
+def build_cursor_url(last_id: str, last_date: str) -> str:
+    return f"{TIMELINE_BASE}?size=16&lastId={last_id}&lastDisplayDate={last_date}&lang=en"
+
+
+# Fetch feed HTML page via plain httpx; return HTTP status code
+def fetch_feedpage(headers: dict) -> int:
+    feed_hdrs = {k: v for k, v in headers.items() if k.lower() in {"user-agent", "accept-language", "accept"}}
+    try:
+        resp = httpx.get(TARGET_URL, headers=feed_hdrs, follow_redirects=True, timeout=30)
+        return resp.status_code
+    except OSError as e:
+        print(f"[coindesk] fetch_feedpage error: {e}", file=sys.stderr)
+        return -1
+
+
+# Attempt re-warm: httpx feedpage first (cheap), then browser re-warm as fallback
+async def try_rewarm(failing_url: str, headers: dict) -> tuple[dict, bytes | None, str]:
+    print("[coindesk] [rewarm] Attempting httpx feedpage re-warm …", file=sys.stderr)
+    fp_status = fetch_feedpage(headers)
+    print(f"[coindesk] [rewarm] httpx feedpage GET → {fp_status}", file=sys.stderr)
+    time.sleep(1.0)
+
+    resp = httpx.get(failing_url, headers=headers, follow_redirects=True, timeout=30)
+    if resp.status_code == 200:
+        print("[coindesk] [rewarm] httpx feedpage re-warm SUCCESS", file=sys.stderr)
+        return headers, resp.content, "httpx"
+
+    print(f"[coindesk] [rewarm] httpx failed ({resp.status_code}) → browser re-warm …", file=sys.stderr)
+    new_headers, _, _ = await browser_load_feed(CLICKS_REWARM)
+    if not new_headers:
+        print("[coindesk] [rewarm] browser re-warm produced no headers — fatal", file=sys.stderr)
+        return headers, None, "fatal"
+
+    resp2 = httpx.get(failing_url, headers=new_headers, follow_redirects=True, timeout=30)
+    if resp2.status_code == 200:
+        print("[coindesk] [rewarm] browser re-warm SUCCESS (httpx feedpage insufficient)", file=sys.stderr)
+        return new_headers, resp2.content, "browser"
+
+    print(f"[coindesk] [rewarm] browser re-warm also failed ({resp2.status_code}) — fatal", file=sys.stderr)
+    return headers, None, "fatal"
+
+
+# Cursor loop: pages backward to stop_date; writes new URLs incrementally to inventory shards.
+# Returns entry list [{url, lastmod, publication_date, title, section, _new}, ...].
+async def cursor_loop(
+    headers: dict,
+    start_url: str,
+    first_body: bytes,
+    stop_date: str,
+    seen_urls: set,
+    inventory_dir: Path,
+) -> list[dict]:
+    year_files: dict[str, object] = {}
+    all_entries: list[dict] = []
+    ok_calls = 0
+    fallback_count = 0
+    rewarm_count = 0
+    httpx_rewarm_confirmed: bool | None = None
+    oldest_date: str | None = None
+    last_rewarm_t = time.monotonic()
+    t_start = time.monotonic()
+    body = first_body
+    last_id = last_date = ""
+
+    try:
+        while True:
+            articles = parse_articles(body)
+            if not articles:
+                print("[coindesk] Empty response — reached API bottom or parse failure. Stopping.", file=sys.stderr)
+                break
+
+            # Process and incrementally write this batch
+            for a in articles:
+                entry = _build_entry(a)
+                if entry is None:
+                    continue
+                if _is_live_blog(entry["url"]):
+                    continue
+                is_new = entry["url"] not in seen_urls
+                if is_new:
+                    seen_urls.add(entry["url"])
+                    _append_to_shard(entry, year_files, inventory_dir)
+                all_entries.append({**entry, "_new": is_new})
+                d = entry["publication_date"][:10] if entry["publication_date"] else ""
+                if d and (oldest_date is None or d < oldest_date):
+                    oldest_date = d
+
+            # Termination: oldest article in batch is before stop_date floor
+            oldest_in_batch = (articles[-1].get("displayDate") or "")[:10]
+            if oldest_in_batch and oldest_in_batch < stop_date:
+                print(f"[coindesk] Reached stop_date floor at {oldest_in_batch}. Stopping.", file=sys.stderr)
+                break
+
+            # Proactive re-warm every REWARM_EVERY seconds (only after httpx method confirmed)
+            if httpx_rewarm_confirmed and time.monotonic() - last_rewarm_t >= REWARM_EVERY:
+                fp = fetch_feedpage(headers)
+                print(f"[coindesk] [proactive rewarm] httpx feedpage → {fp}", file=sys.stderr)
+                last_rewarm_t = time.monotonic()
+                rewarm_count += 1
+
+            # Build next cursor; fall back to N-1, N-2 articles on 403
+            next_body = None
+            next_url = ""
+            for fb in range(min(MAX_CURSOR_FALLBACKS, len(articles))):
+                anchor = articles[-(1 + fb)]
+                last_id = anchor.get("_id") or ""
+                last_date = anchor.get("displayDate") or ""
+                if not last_id or not last_date:
+                    continue
+                next_url = build_cursor_url(last_id, last_date)
+
+                time.sleep(CALL_DELAY)
+                resp = httpx.get(next_url, headers=headers, follow_redirects=True, timeout=30)
+
+                if resp.status_code == 200:
+                    if fb > 0:
+                        fallback_count += 1
+                        print(
+                            f"[coindesk]   call {ok_calls + 1}: 200 FALLBACK-{fb} "
+                            f"anchor={last_id[:8]} pivot={last_date[:10]}",
+                            file=sys.stderr,
+                        )
+                    next_body = resp.content
+                    ok_calls += 1
+                    break
+
+                snippet = resp.content[:80].decode("utf-8", errors="replace")
+                print(
+                    f"[coindesk]   call {ok_calls + 1}: {resp.status_code} fb={fb} "
+                    f"pivot={last_date[:10]} {snippet}",
+                    file=sys.stderr,
+                )
+
+            if next_body is None and next_url:
+                # All cursor fallbacks exhausted → try re-warm
+                new_headers, rewarm_body, method = await try_rewarm(next_url, headers)
+                if method == "fatal" or rewarm_body is None:
+                    print("[coindesk] FATAL: re-warm failed. Stopping.", file=sys.stderr)
+                    break
+                headers = new_headers
+                next_body = rewarm_body
+                rewarm_count += 1
+                last_rewarm_t = time.monotonic()
+                ok_calls += 1
+                if method == "httpx" and httpx_rewarm_confirmed is None:
+                    httpx_rewarm_confirmed = True
+                elif method == "browser" and httpx_rewarm_confirmed is None:
+                    httpx_rewarm_confirmed = False
+
+            if next_body is None:
+                print("[coindesk] Cursor exhausted with no body. Stopping.", file=sys.stderr)
+                break
+
+            body = next_body
+
+            # Checkpoint log every CHECKPOINT_EVERY successful calls
+            if ok_calls % CHECKPOINT_EVERY == 0:
+                wall = int(time.monotonic() - t_start)
+                new_in_run = sum(1 for e in all_entries if e.get("_new"))
+                print(
+                    f"[coindesk] checkpoint call={ok_calls} total={len(all_entries)} "
+                    f"new={new_in_run} oldest={oldest_date} pivot={last_date[:10]} "
+                    f"wall={wall}s rewarms={rewarm_count} fallbacks={fallback_count}",
+                    file=sys.stderr,
+                )
+
+    finally:
+        for fh in year_files.values():
+            try:
+                fh.close()
+            except OSError as e:
+                print(f"[coindesk] year shard close error (non-fatal): {e}", file=sys.stderr)
+
+    wall = int(time.monotonic() - t_start)
+    new_total = sum(1 for e in all_entries if e.get("_new"))
+    print(
+        f"[coindesk] cursor_loop done: calls={ok_calls} total={len(all_entries)} "
+        f"new={new_total} oldest={oldest_date} wall={wall}s "
+        f"rewarms={rewarm_count} fallbacks={fallback_count}",
+        file=sys.stderr,
+    )
+    return all_entries
+
+
+# Build output entry dict from raw article dict; return None if pathname or date missing
+def _build_entry(a: dict) -> dict | None:
+    pathname = a.get("pathname") or ""
+    display_date = (a.get("displayDate") or "")[:10]
+    if not pathname or len(display_date) < 10:
+        return None
+    url = COINDESK_BASE + pathname
+    iso = f"{display_date}T00:00:00+00:00"
+    return {
+        "url":              url,
+        "lastmod":          iso,
+        "publication_date": iso,
+        "title":            a.get("title") or "",
+        "section":          _extract_section(pathname),
+    }
+
+
+# Extract first path segment as section (e.g. /markets/2024/... → markets)
+def _extract_section(pathname: str) -> str:
+    parts = pathname.strip("/").split("/")
+    return parts[0] if parts else "unknown"
+
+
+# Return True if URL is a CoinDesk live-blog: slug starts with "live-"
 def _is_live_blog(url: str) -> bool:
     slug = urlparse(url).path.rstrip("/").split("/")[-1]
     return slug.startswith("live-")
 
 
-# Remove CoinDesk live-blog URLs (slug starts with "live-"); return (filtered_list, count_removed).
-def filter_live_blogs(entries: list[dict]) -> tuple[list[dict], int]:
-    kept = [e for e in entries if not _is_live_blog(e["url"])]
-    return kept, len(entries) - len(kept)
+# Append one entry line to the appropriate per-year inventory shard (streaming, line-buffered)
+def _append_to_shard(entry: dict, year_files: dict, inventory_dir: Path) -> None:
+    date_str = entry["publication_date"][:10]
+    year = date_str[:4]
+    if year not in year_files:
+        p = inventory_dir / f"coindesk_{year}.txt"
+        year_files[year] = open(p, "a", encoding="utf-8", buffering=1)
+    year_files[year].write(f"{date_str}\t{entry['url']}\n")
+
+
+# Read all per-year inventory shards; return set of known URLs
+def load_inventory(inventory_dir: Path) -> set[str]:
+    seen: set[str] = set()
+    if not inventory_dir.exists():
+        return seen
+    for shard in inventory_dir.glob("coindesk_*.txt"):
+        with open(shard, encoding="utf-8") as fh:
+            for line in fh:
+                line = line.strip()
+                if "\t" in line:
+                    seen.add(line.split("\t", 1)[1])
+    return seen

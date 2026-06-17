@@ -18,6 +18,7 @@ from src.news.engine.proxy_pool.scrape import scrape_entries_proxy
 from src.news.engine.publish import publish_articles
 
 PROJECT_ROOT = Path(__file__).parent.parent.parent   # searxng-cli/
+
 LOG_DIR = PROJECT_ROOT / "src" / "logs"
 DATA_ROOT = PROJECT_ROOT / "data" / "news"
 
@@ -29,6 +30,20 @@ PRECONDITION_TIMEOUT = 10
 
 
 # ORCHESTRATOR
+
+# Discover + inventory-update only — no dedup/scrape/clean/publish. CoinDesk standalone job.
+async def run_discover_only(platform: Platform) -> None:
+    LOG_DIR.mkdir(parents=True, exist_ok=True)
+    log = _setup_logging(platform.name)
+    log.info(f"=== {platform.name} discover-only started ===")
+    if not _check_internet(platform, log):
+        log.error("Internet check failed — aborting.")
+        sys.exit(1)
+    entries = await platform.discover()
+    log.info(f"discover → {len(entries)} entries")
+    _write_marker(platform.name, log)
+    log.info(f"=== {platform.name} discover-only complete ===")
+
 
 # Run the full news pipeline for the given platform in-process.
 async def run_pipeline(platform: Platform, skip_index: bool = False) -> None:
@@ -179,14 +194,21 @@ def _setup_logging(name: str) -> logging.Logger:
     return log
 
 
-# Check (a) internet reachable via platform.precondition_url, (b) rag-cli callable
-def _check_preconditions(platform: Platform, log: logging.Logger) -> bool:
-    log.info("Checking preconditions …")
+# Check internet reachability via platform.precondition_url
+def _check_internet(platform: Platform, log: logging.Logger) -> bool:
     try:
         with urllib.request.urlopen(platform.precondition_url, timeout=PRECONDITION_TIMEOUT):
             log.info(f"  [OK] Internet reachable ({platform.precondition_url})")
+            return True
     except Exception as e:
         log.error(f"  [FAIL] Internet unreachable: {e}")
+        return False
+
+
+# Check (a) internet reachable via platform.precondition_url, (b) rag-cli callable
+def _check_preconditions(platform: Platform, log: logging.Logger) -> bool:
+    log.info("Checking preconditions …")
+    if not _check_internet(platform, log):
         return False
 
     result = subprocess.run(
