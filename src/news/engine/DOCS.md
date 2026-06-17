@@ -42,6 +42,28 @@ Two modes via `mode` param (default `"pubdate"`):
 **Called by:** `pipeline.py:run_pipeline`.
 **Calls out:** `rag-cli` (subprocess).
 
+### scrape_job.py (107 LOC)
+
+**Purpose:** Chunked scrape orchestration for `run_scrape_only()` — scrape→clean→publish per chunk with per-chunk wipe for crash-safety. Returns `(totals, job_records, regwall_abort)`.
+**Reads:** chunks (list of entry lists), platform config, collection_dir.
+**Writes:** ephemeral chunk dirs under `data/news/{name}/scrape/{job_id}/chunk_*` and `clean/{job_id}/chunk_*` (wiped after each chunk); durable publishes to collection_dir.
+**Called by:** `pipeline.py:run_scrape_only`.
+**Calls out:** `scrape.py:scrape_entries`, `publish.py:publish_articles`.
+
+`job_records`: `[{t_chunk_start: datetime, url, hash, file, char_count, status, error, wait_strategy, elapsed_s}]` — one entry per scraped URL, consumed by `browser_reporter.py`.
+`regwall_abort`: True when `RegwallGuardError` terminates the chunk loop early.
+
+### browser_reporter.py (179 LOC)
+
+**Purpose:** Per-job report writer for browser-engine scrape jobs. Produces `job.md` + `cumulative.png` from `job_records`.
+**Reads:** `job_records` (in-memory list from `scrape_chunks`), `t_job_start`.
+**Writes:** `{job_dir}/job.md` (counts, regwall rate, throughput, backfill projection, char-count percentiles p10–p95, failure table); `{job_dir}/cumulative.png` (step-plot of cumulative ok count vs elapsed seconds).
+**Called by:** `pipeline.py:run_scrape_only`.
+**Calls out:** `matplotlib` (lazy import inside `_write_plot`), `statistics` (stdlib).
+
+Key metric: `completion_s ≈ (t_chunk_start − t_job_start).total_seconds() + elapsed_s` per ok record — used as x-axis of the cumulative plot.
+Backfill projection extrapolates from URLs/min → hours to scrape `_BACKFILL_TOTAL` (61 k) articles.
+
 ### proxy_pool/ (11 modules — see DOCS.md)
 
 Generic proxy-rotation scrape engine. Active when `platform.scrape_engine == "proxy_pool"`.

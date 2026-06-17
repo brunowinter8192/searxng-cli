@@ -17,6 +17,7 @@ from src.news.engine.proxy_pool.logger import AcquireLogger
 from src.news.engine.proxy_pool.scrape import scrape_entries_proxy
 from src.news.engine.publish import publish_articles
 from src.news.engine.scrape_job import scrape_chunks, run_cleanup
+from src.news.engine.browser_reporter import write_scrape_report
 
 PROJECT_ROOT = Path(__file__).parent.parent.parent   # searxng-cli/
 
@@ -112,7 +113,9 @@ async def run_scrape_only(
         f"empty={totals['empty']} failed={totals['failed']} wall={wall_s:.0f}s"
         + (" [REGWALL ABORT]" if regwall_abort else "") + " ==="
     )
-    # Stage-2b hook: write_scrape_report(job_dir, job_records, t_job_start, len(new_entries), filter_desc, skip_index)
+    job_dir = DATA_ROOT / platform.name / "scrape_jobs" / job_id
+    write_scrape_report(job_dir, job_records, t_job_start, len(new_entries), filter_desc, regwall_abort)
+    log.info(f"Job report written to {job_dir}")
     _write_marker(platform.name, log)
     log.info(f"=== {platform.name} scrape-only complete job_id={job_id} ===")
 
