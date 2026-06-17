@@ -4,8 +4,9 @@
 
 The Block platform implementation. Uses the `proxy_pool` scrape engine (curl_cffi rotation,
 no browser) and its own RAG collection `"theblock"`. Discovery is sitemap-based (not feed-scroll).
-`dedup_mode = "hash_only"` because no publication_date is available at discover time — the date
-comes from JSON-LD post-fetch and is mutated into `entry["publication_date"]` by cleanup.
+`dedup_mode` attribute is not used by `run_pipeline` (which always uses `mode="raw"` against
+`data/news/theblock/raw/`). The Block has no `publication_date` at discover time — the date
+comes from JSON-LD post-fetch and is mutated into `entry["publication_date"]` by `cleanup.py`.
 
 Imported for side-effects by `__main__.py` — the import registers `TheBlockPlatform()` into the
 registry. No other module should import from here directly.
@@ -17,7 +18,7 @@ Auto-registers via `register(TheBlockPlatform())` at module end.
 
 Extra platform attributes (not in Protocol):
 - `timeframe: str` — discovery mode (`"delta"` default); overwritten by `__main__` from `--timeframe`.
-- `dedup_mode: str = "hash_only"` — consumed by `pipeline.py` via `getattr`.
+- `dedup_mode: str = "hash_only"` — legacy attribute, not consumed by `run_pipeline` (which uses `mode="raw"`).
 
 ## Modules
 
@@ -48,11 +49,16 @@ parses `<url>/<loc>/<lastmod>` blocks — no date filtering. Returns `[{url, las
 Four timeframe modes (read from `self.timeframe`); no `lastmod` date filtering in any mode:
 - `"delta"` (default) — top-2 highest-numbered `post_type_post_*` subs, all URLs. Rollover-safe recurring run.
 - `"full"` — all `post_type_post_*` subs, all URLs. Complete backfill.
-- `"sub:N"` — exactly the sub whose trailing index == N (e.g. `sub:0` → `post_type_post_0.xml`), all URLs. Bounded backfill chunk. Raises `RuntimeError` if N not found.
-- `"sub:A-B"` — all subs with trailing index in [A, B] inclusive, returned descending (newest-first). Contiguous multi-chunk backfill. Raises `RuntimeError` if A > B or no subs match.
+- `"sub:N"` — exactly the sub whose trailing index == N (e.g. `sub:0` → `post_type_post_0.xml`), all URLs.
+- `"sub:A-B"` — all subs with trailing index in [A, B] inclusive, returned descending (newest-first).
 
 Proxy pool is lazy-loaded into `pool_cache` on first fallback; shared across all XML fetches
 in the same discover call (index + sub-sitemaps) to avoid loading the pool twice.
+
+After `discover()`, `run_pipeline` calls `_persist_inventory(entries, inventory_dir, "theblock")` →
+writes `data/news/theblock/inventory/theblock_{year}.txt` (format `YYYY-MM-DD\t{url}`, deduped per
+shard). Mirrors CoinDesk's per-year inventory. Persistence is in `pipeline.py:_persist_inventory`,
+not in discover.py.
 
 ---
 
@@ -60,22 +66,21 @@ in the same discover call (index + sub-sitemaps) to avoid loading the pool twice
 
 **Purpose:** Parse JSON-LD `NewsArticle` block from raw HTML fetched by proxy engine →
 extract `articleBody` (HTML) → convert to Markdown via `crawl4ai.html2text.HTML2Text` →
-apply `_post_clean()` regex pass → mutate `entry["publication_date"] = datePublished`
-(ISO string) so `_run_cleanup` in `pipeline.py` can produce the correct
-`theblock__YYYY-MM-DD__{hash}.md` filename.
+apply `_post_clean()` regex pass → mutate `entry["publication_date"] = datePublished`.
+Not called by `run_pipeline` — reserved for future cleanup skill against raw corpus.
 **Reads:** raw HTML string (proxy engine output), entry dict (scrape manifest).
 **Writes:** mutates `entry["publication_date"]` in place.
-**Called by:** `__init__.py:TheBlockPlatform.cleanup`.
+**Called by:** NOT called by any active pipeline path. Available to future cleanup skill.
 **Calls out:** `crawl4ai.html2text` (bundled, no new dep).
 
 JSON-LD shape hardening — `_iter_candidates()` handles all common shapes without crashing:
 plain dict, dict with `@graph`, top-level array, non-dict values (int/str) silently skipped.
 
 `_post_clean()` regex pass (applied after html2text, in this order):
-1. Inline-URL strip: `[text](url)` → `text` (removes SendGrid/tracking URLs embedded in body).
+1. Inline-URL strip: `[text](url)` → `text`.
 2. Disclaimer line: `^Disclaimer: The Block is an independent media outlet.*$` removed.
-3. Copyright line: `^©\s*\d{4}\s+The Block\.\s*All Rights Reserved.*$` removed (year-agnostic).
-4. Newsletter CTA: `^_.*subscribe to the .*newsletter.*_\s*$` removed (italic-line anchor).
+3. Copyright line: `^©\s*\d{4}\s+The Block\.\s*All Rights Reserved.*$` removed.
+4. Newsletter CTA: `^_.*subscribe to the .*newsletter.*_\s*$` removed.
 5. Trailing whitespace per line; blank-run collapse to single blank; final strip.
 
 Fallback: if no `NewsArticle` or no `articleBody` → returns `""` + stderr log, no crash.

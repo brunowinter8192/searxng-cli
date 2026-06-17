@@ -1,8 +1,6 @@
 # INFRASTRUCTURE
 import json
 import logging
-import shutil
-import subprocess
 import sys
 import urllib.request
 from datetime import datetime, timezone
@@ -15,8 +13,7 @@ from src.news.engine.proxy_pool import box_lock
 from src.news.engine.proxy_pool.janitor import Janitor
 from src.news.engine.proxy_pool.logger import AcquireLogger
 from src.news.engine.proxy_pool.scrape import scrape_entries_proxy
-from src.news.engine.publish import publish_articles
-from src.news.engine.scrape_job import scrape_chunks_raw, run_cleanup
+from src.news.engine.scrape_job import scrape_chunks_raw, _append_to_raw_manifest, _update_blocked_urls
 from src.news.engine.browser_reporter import write_scrape_report
 
 PROJECT_ROOT = Path(__file__).parent.parent.parent   # searxng-cli/
@@ -24,12 +21,8 @@ PROJECT_ROOT = Path(__file__).parent.parent.parent   # searxng-cli/
 LOG_DIR = PROJECT_ROOT / "src" / "logs"
 DATA_ROOT = PROJECT_ROOT / "data" / "news"
 
-COLLECTION_BASE = Path(
-    "/Users/brunowinter2000/Documents/ai/Meta/ClaudeCode/cli/rag-cli"
-    "/data/documents"
-)
 PRECONDITION_TIMEOUT = 10
-SCRAPE_CHUNK_SIZE = 200   # URLs per scrape→clean→publish chunk; controls crash-loss window
+SCRAPE_CHUNK_SIZE = 200   # URLs per scrape chunk; controls crash-loss window
 
 
 # ORCHESTRATOR
@@ -116,25 +109,26 @@ async def run_scrape_only(
 
 
 # Run the full news pipeline for the given platform in-process.
+# Both proxy_pool and browser paths are raw-only: scrape → raw_dir; no cleanup, no publish.
+# dedup: mode="raw" (file existence check in data/news/{name}/raw/).
+# proxy_pool: persist dead/failed to dead_urls.txt/failed_urls.txt; browser: regwall/empty_urls.txt.
+# Janitor lifecycle preserved for proxy_pool (box_lock, start_job, end_job, AcquireLogger).
+# skip_index kept for CLI compat — no-op (no indexing in this path).
 async def run_pipeline(platform: Platform, skip_index: bool = False) -> None:
     LOG_DIR.mkdir(parents=True, exist_ok=True)
     log = _setup_logging(platform.name)
     log.info(f"=== {platform.name} pipeline started ===")
 
-    if not _check_preconditions(platform, log):
-        log.error("Precondition check failed — aborting.")
+    if not _check_internet(platform, log):
+        log.error("Internet check failed — aborting.")
         sys.exit(1)
 
     platform_dir = DATA_ROOT / platform.name
     discover_dir = platform_dir / "discover"
-    scrape_dir   = platform_dir / "scrape"
-    clean_dir    = platform_dir / "clean"
-    collection_dir = COLLECTION_BASE / platform.collection
+    raw_dir      = platform_dir / "raw"
 
-    _clear_working_dirs(scrape_dir, clean_dir, log)
     discover_dir.mkdir(parents=True, exist_ok=True)
-    scrape_dir.mkdir(parents=True, exist_ok=True)
-    clean_dir.mkdir(parents=True, exist_ok=True)
+    raw_dir.mkdir(parents=True, exist_ok=True)
 
     if platform.scrape_engine == "proxy_pool":
         # Proxy-pool path: unified job lifecycle spans discover + dedup + scrape.
@@ -144,12 +138,14 @@ async def run_pipeline(platform: Platform, skip_index: bool = False) -> None:
         jobs_dir   = platform_dir / "proxy_pool_jobs"
         job_id     = datetime.now(timezone.utc).strftime("%Y%m%dT%H%M%SZ")
 
+        manifest: list[dict] = []
+        new_entries: list[dict] = []
+        n_ok = 0
+
         with box_lock.acquire(job_id, f"{platform.name} discover+scrape"):
             j      = Janitor(jobs_dir, log_dir, report_dir)
             j.start_job(job_id)
             logger = AcquireLogger(total_urls=0, log_dir=log_dir)
-            new_entries: list[dict] = []
-            n_ok = 0
             try:
                 # Stage 1 — discover (proxy_pool)
                 log.info("STAGE discover …")
@@ -161,33 +157,47 @@ async def run_pipeline(platform: Platform, skip_index: bool = False) -> None:
                 discover_snapshot = _write_discover_snapshot(entries, discover_dir)
                 log.info(f"discover → {len(entries)} articles → {discover_snapshot.name}")
 
-                # Stage 2 — dedup (proxy_pool)
+                # Persist master URL inventory (lastmod-based year shards)
+                inventory_dir = platform_dir / "inventory"
+                _persist_inventory(entries, inventory_dir, platform.name)
+                log.info(f"inventory updated → {inventory_dir}")
+
+                # Stage 2 — dedup against raw
                 log.info("STAGE dedup …")
-                dedup_mode = getattr(platform, "dedup_mode", "pubdate")
-                new_entries, n_skip = filter_new_entries(entries, collection_dir, platform.name, mode=dedup_mode)
-                log.info(f"dedup → {len(entries)} total, {n_skip} already indexed, {len(new_entries)} new")
+                new_entries, n_skip = filter_new_entries(entries, raw_dir, platform.name, mode="raw")
+                log.info(f"dedup → {len(entries)} total, {n_skip} already in raw, {len(new_entries)} new")
                 if not new_entries:
                     log.info("Nothing new to scrape — pipeline complete.")
                     _write_marker(platform.name, log)
                     return
 
-                # Stage 3 — scrape (proxy_pool)
+                # Stage 3 — scrape (proxy_pool) into raw_dir
                 log.info(f"STAGE scrape ({len(new_entries)} URLs) …")
-                manifest = scrape_entries_proxy(new_entries, scrape_dir, platform.proxy_scrape_config, logger)
+                manifest = scrape_entries_proxy(new_entries, raw_dir, platform.proxy_scrape_config, logger)
                 n_ok = sum(1 for e in manifest if e["status"] == "ok")
+                n_dead = sum(1 for e in manifest if e["status"] == "dead")
                 n_failed = sum(1 for e in manifest if e["status"] == "failed")
-                log.info(f"scrape → {n_ok} ok, {n_failed} failed")
-                if n_ok == 0:
-                    log.warning("scrape produced 0 successful pages — skipping cleanup + publish.")
-                    _write_marker(platform.name, log)
-                    return
+                log.info(f"scrape → {n_ok} ok, {n_dead} dead, {n_failed} failed")
 
             finally:
                 logger.close()
                 j.end_job(job_id, logger._jsonl_path, len(new_entries), n_ok)
 
+        # Persist raw manifest + blocked-URL lists (after Janitor lifecycle closes)
+        entries_by_url = {e["url"]: e for e in new_entries}
+        ok_manifest_entries = [
+            {
+                "hash": e["hash"],
+                "url": e["url"],
+                "publication_date": entries_by_url.get(e["url"], {}).get("publication_date", ""),
+            }
+            for e in manifest if e.get("status") == "ok"
+        ]
+        _append_to_raw_manifest(raw_dir, ok_manifest_entries)
+        _update_blocked_urls(raw_dir, manifest, {"dead": "dead_urls.txt", "failed": "failed_urls.txt"})
+
     else:
-        # Browser path: stages 1-3 unchanged
+        # Browser path: discover → dedup(raw) → scrape(raw) → persist
         log.info("STAGE discover …")
         entries = await platform.discover()
         if not entries:
@@ -198,45 +208,37 @@ async def run_pipeline(platform: Platform, skip_index: bool = False) -> None:
         log.info(f"discover → {len(entries)} articles → {discover_snapshot.name}")
 
         log.info("STAGE dedup …")
-        dedup_mode = getattr(platform, "dedup_mode", "pubdate")
-        new_entries, n_skip = filter_new_entries(entries, collection_dir, platform.name, mode=dedup_mode)
-        log.info(f"dedup → {len(entries)} total, {n_skip} already indexed, {len(new_entries)} new")
+        new_entries, n_skip = filter_new_entries(entries, raw_dir, platform.name, mode="raw")
+        log.info(f"dedup → {len(entries)} total, {n_skip} already in raw, {len(new_entries)} new")
         if not new_entries:
             log.info("Nothing new to scrape — pipeline complete.")
             _write_marker(platform.name, log)
             return
 
         log.info(f"STAGE scrape ({len(new_entries)} URLs) …")
+        manifest: list[dict] = []
         try:
             manifest = await scrape_entries(
-                new_entries, scrape_dir, platform.regwall_signals, platform.scrape_config
+                new_entries, raw_dir, platform.regwall_signals, platform.scrape_config
             )
         except RegwallGuardError as exc:
+            manifest = exc.manifest
             log.error(f"STAGE scrape aborted — RegwallGuardError: {exc}")
-            _write_marker(platform.name, log)
-            return
 
-        n_ok = sum(1 for e in manifest if e["status"] == "ok")
-        n_failed = sum(1 for e in manifest if e["status"] == "failed")
-        log.info(f"scrape → {n_ok} ok, {n_failed} failed")
-        if n_ok == 0:
-            log.warning("scrape produced 0 successful pages — skipping cleanup + publish.")
-            _write_marker(platform.name, log)
-            return
-
-    # Stage 4 — cleanup (shared)
-    log.info("STAGE cleanup …")
-    discover_by_url = {e["url"]: e for e in new_entries}
-    clean_manifest = run_cleanup(manifest, scrape_dir, clean_dir, platform, log, discover_by_url)
-    log.info(f"cleanup → {len(clean_manifest)} files cleaned")
-
-    # Stage 5 — publish (shared)
-    log.info("STAGE publish …")
-    n_copied, n_chunks = publish_articles(
-        clean_manifest, clean_dir, collection_dir,
-        platform.name, platform.collection, skip_index,
-    )
-    log.info(f"publish → {n_copied} copied, {n_chunks} chunks indexed")
+        # Persist raw manifest + blocked-URL lists
+        entries_by_url = {e["url"]: e for e in new_entries}
+        ok_manifest_entries = [
+            {
+                "hash": e["hash"],
+                "url": e["url"],
+                "publication_date": entries_by_url.get(e["url"], {}).get("publication_date", ""),
+            }
+            for e in manifest if e.get("status") == "ok"
+        ]
+        _append_to_raw_manifest(raw_dir, ok_manifest_entries)
+        _update_blocked_urls(raw_dir, manifest, {"regwall": "regwall_urls.txt", "empty": "empty_urls.txt"})
+        n_ok = sum(1 for e in manifest if e.get("status") == "ok")
+        log.info(f"scrape → {n_ok} ok, raw files persisted")
 
     log.info(f"=== {platform.name} pipeline complete ===")
     _write_marker(platform.name, log)
@@ -275,30 +277,33 @@ def _check_internet(platform: Platform, log: logging.Logger) -> bool:
         return False
 
 
-# Check (a) internet reachable via platform.precondition_url, (b) rag-cli callable
-def _check_preconditions(platform: Platform, log: logging.Logger) -> bool:
-    log.info("Checking preconditions …")
-    if not _check_internet(platform, log):
-        return False
-
-    result = subprocess.run(
-        ["rag-cli", "list_collections"],
-        capture_output=True,
-        text=True,
-    )
-    if result.returncode != 0:
-        log.error(f"  [FAIL] rag-cli not callable: {result.stderr.strip()}")
-        return False
-    log.info("  [OK] rag-cli callable")
-    return True
-
-
-# Remove stale scrape + clean files so publish only indexes current-run articles
-def _clear_working_dirs(scrape_dir: Path, clean_dir: Path, log: logging.Logger) -> None:
-    for d in (scrape_dir, clean_dir):
-        if d.exists():
-            shutil.rmtree(d)
-            log.info(f"Cleared: {d.relative_to(d.parent.parent.parent)}")
+# Persist discovered entries to per-year inventory shards (YYYY-MM-DD\t<url>), deduped.
+# Reads lastmod[:10] for date + year; entries without lastmod are skipped.
+# Mirrors CoinDesk's per-year inventory format for The Block.
+def _persist_inventory(entries: list[dict], inventory_dir: Path, platform_name: str) -> None:
+    inventory_dir.mkdir(parents=True, exist_ok=True)
+    by_year: dict[str, set[str]] = {}
+    for e in entries:
+        lastmod = e.get("lastmod", "")
+        if not lastmod or len(lastmod) < 10:
+            continue
+        date_str = lastmod[:10]
+        year = date_str[:4]
+        url = e.get("url", "")
+        if not url:
+            continue
+        if year not in by_year:
+            by_year[year] = set()
+        by_year[year].add(f"{date_str}\t{url}")
+    for year, new_lines in by_year.items():
+        shard = inventory_dir / f"{platform_name}_{year}.txt"
+        existing: set[str] = set()
+        if shard.exists():
+            for line in shard.read_text(encoding="utf-8").splitlines():
+                if line:
+                    existing.add(line)
+        merged = existing | new_lines
+        shard.write_text("\n".join(sorted(merged)) + "\n", encoding="utf-8")
 
 
 # Write discover snapshot JSON; return path

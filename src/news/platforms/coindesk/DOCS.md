@@ -54,10 +54,15 @@ integer string N → today − N days; anything else (incl. `"delta"`) → DEFAU
 **Purpose:** Strip CoinDesk page chrome from raw crawl4ai markdown → pure article body.
 Logic: H1 start-anchor → first end-anchor (_END_ANCHORS: MORE_FOR_YOU, PRIVACY, TAG_FOOTER) →
 clean_body (tag-footer strip, image strip, byline/date strip, inline-link substitution, paragraph normalization).
-**Called by:** `__init__.py:CoinDeskPlatform.cleanup`.
+Not called by `run_pipeline` or `run_scrape_only` — reserved for future cleanup skill against raw corpus.
+**Called by:** NOT called by any active pipeline path. Available to future cleanup skill.
 **Calls out:** stdlib re only.
 
 No H1 found → returns `raw_markdown.strip()` (fallback, logged upstream).
+
+Gotcha: at 60 k+ article scale, a fixed cleaner is fragile — CoinDesk articles occasionally retain the
+full site footer even after cleanup (observed during scrape-job runs). Per-shape diagnosis against the
+full raw corpus is the recommended approach before cleanup at scale.
 
 ### __init__.py (42 LOC)
 
