@@ -225,16 +225,36 @@ place first — derive the name from the first page / title metadata, sanitize p
 The markdown then simply inherits the PDF's basename: `STEM = basename(PDF without .pdf)`, output =
 `$OUTPUT_DIR/$STEM.md`. PDF name and md name stay identical.
 
-##### Scan Check — BEFORE converting (cheap, do it first)
+##### Category Check — BEFORE converting (pdfimages + pdfinfo)
 
-SCAN if EITHER condition is true (OR-logic; pdffonts is primary):
+Three categories, decided by whether each page carries a full-page raster image:
+- **born-digital** — no page-image, vector text → normal convert.
+- **OCR'd scan** — full-page image on every page + an OCR text layer → SCAN path.
+- **pure scan** — full-page image, no text layer → SCAN path.
+
+Decisive test = `pdfimages` (a full-page image across the SAMPLED pages = scan), corroborated by
+`pdfinfo` (Creator/Producer naming a scanner/OCR tool). Do NOT use pdffonts or pdftotext: an OCR text
+layer that uses a normal font name passes both as "digital" (false negative — e.g. Silverman, EfronMorris).
 
 ```bash
-pdffonts "$PDF" | grep -iq "OCR" && echo SCAN   # OCR-layer font (e.g. HiddenHorzOCR) = scanned
-pdftotext -f 5 -l 8 "$PDF" - | wc -w            # near-0 words = scanned
+# corroboration — scanner/OCR tool in metadata = SCAN
+pdfinfo "$PDF" | grep -iE 'Creator|Producer'
+#   SCAN markers: "Scan Plug-in", "Paper Capture", "ABBYY", "FineReader", "ScanSnap", "Scanner"
+
+# decisive — full-page image (width > 1000 px) across a spread of sampled pages
+N=$(pdfinfo "$PDF" | awk '/^Pages:/{print $2}')
+hits=0; tot=0
+for p in $((N/6)) $((N/3)) $((N/2)) $((2*N/3)) $((5*N/6)); do
+  [ "$p" -lt 1 ] && p=1
+  big=$(pdfimages -list -f "$p" -l "$p" "$PDF" 2>/dev/null | awk 'NR>2 && $4>1000{c++} END{print c+0}')
+  tot=$((tot+1)); [ "$big" -ge 1 ] && hits=$((hits+1))
+done
+echo "full-page image on $hits/$tot sampled pages"
 ```
 
-A high `pdftotext` word count does NOT rule out a scan — pdffonts is the decisive check.
+Decision:
+- image on (nearly) ALL sampled pages, OR a scanner/OCR tool in `pdfinfo` → **SCAN** (use the hybrid path below).
+- image on 0 sampled pages — or only 1, which is just an isolated figure, not a scan → **born-digital** (normal convert).
 
 If SCAN:
 
@@ -256,6 +276,76 @@ Work dir: `Mineru/output/<stem>/`. Check all parts present via `Mineru/output/<s
 ```
 
 Then proceed to Job-Log Check and Phase 1.
+
+##### A part repeatedly fails (crash at VLM `Predict`) → find dense pages, flag, remove
+
+Apply this when the part stays `"md": null` after a re-run AND its `Mineru/logs/mineru_*.log` dies at
+`Predict: 0/N` (the VLM step), right after `Layout Predict` and `Table orientation` completed. Do NOT
+finer-split the part, and do NOT re-chunk the whole PDF (changing `--chunk-pages` errors on the existing
+parts.json and re-converts the parts that already succeeded).
+
+Read the failing part's index K and page range S (`pages_start`)–E (`pages_end`) from
+`Mineru/output/<stem>/parts.json`, then scan that range — flag a page on digit-share > 10 % (table of
+contents / index / reference-number lists), a repeat-run ≥ 8, or a `Contents`/`Index`/`Bibliography`/`References`
+marker at the page head:
+
+```bash
+/Users/brunowinter2000/Documents/ai/Mineru/venv/bin/python -c "
+import sys
+from pypdf import PdfReader
+r = PdfReader('$PDF')
+def maxrun(t):
+    b = c = 1
+    for i in range(1, len(t)):
+        if t[i] == t[i-1] and not t[i].isspace(): c += 1; b = max(b, c)
+        else: c = 1
+    return b
+for p in range($S-1, $E):
+    t = r.pages[p].extract_text() or ''
+    n = len(t); d = sum(c.isdigit() for c in t); run = maxrun(t)
+    dense = (n and d/n > 0.10) or run >= 8 or any(m in t[:90].lower() for m in ('contents','index','bibliography','references'))
+    print(p+1, 'chars', n, 'dig%', round(d/n*100 if n else 0), 'run', run, 'DENSE' if dense else '')
+"
+```
+
+Render the flagged pages and confirm what they are:
+
+```bash
+pdftoppm -png -r 90 -f <pg> -l <pg> "$PDF" /tmp/chk    # inspect /tmp/chk-*.png
+```
+
+Report to the user: the flagged page range and what it is (e.g. "Table of Contents pp.14–24"), and
+propose removing it. STOP — wait for the user's OK.
+
+On OK, cut a sub-PDF of S–E WITHOUT the flagged pages (DROP = the flagged 1-based page numbers),
+convert it at the same `--chunk-pages`, and merge:
+
+```bash
+DROP="14 15 16 17 18 19 20 21 22 23 24"   # the flagged pages, space-separated
+/Users/brunowinter2000/Documents/ai/Mineru/venv/bin/python -c "
+from pypdf import PdfReader, PdfWriter
+r = PdfReader('$PDF'); w = PdfWriter()
+drop = {int(x) for x in '$DROP'.split()}
+for i in range($S-1, $E):
+    if (i+1) not in drop: w.add_page(r.pages[i])
+w.write('/tmp/sub.pdf')
+"
+cd /Users/brunowinter2000/Documents/ai/Mineru
+./venv/bin/python workflow.py convert --pdf /tmp/sub.pdf --backend hybrid-engine --chunk-pages 100
+./venv/bin/python workflow.py merge --stem sub --out-dir /tmp        # -> /tmp/sub.md (+ /tmp/images)
+```
+
+Slot it back as the failed part, then merge the whole stem:
+
+```bash
+cp /tmp/sub.md Mineru/output/<stem>/part_00K.md
+[ -d /tmp/images ] && cp -r /tmp/images/. Mineru/output/<stem>/images/
+# in parts.json: set parts[K]["md"] = "part_00K.md"
+./venv/bin/python workflow.py merge --stem <stem> --out-dir "$OUTPUT_DIR" --clean
+```
+
+The merge concatenates part mds in order, so the trimmed sub-range md drops cleanly into place; the
+already-converted parts are never re-run.
 
 ##### Convert — one PDF per call
 
@@ -326,34 +416,138 @@ PDFs come from MinerU as Markdown. Phase 1 opens with a per-md fidelity check th
 converts AND detects the cleanable artifacts. Cleanup itself focuses on inline OCR artifacts, not
 block chrome. Skip any md with `md: null` (failed convert, already reported).
 
-##### Fidelity Check — per md, BEFORE cleaning
+##### Audit — systematic fidelity scan (EVERY md, BEFORE cleaning)
 
-Run on EVERY produced md — every file, not a sample of files. NEVER full-read an md (a book md is
-thousands of lines). Two cheap steps:
+Run on EVERY produced md, not a sample. NEVER full-read a book md. Build one `/tmp` scan script that
+tabulates the five classes below per file (count) — then SAMPLE the hit lines with offset-reads. A
+count is a signal, not a verdict: read the actual hits to classify. **Word count is NOT a fidelity
+signal** — a fully garbled scan sits at a normal words-per-page (a 366p scan OCR'd to garbage measured
+530 w/p). The class counts and the samples decide, never the word count.
 
-1. **grep noise-signature patterns** → counts + line numbers only:
-   - spaced single-char runs: `([A-Za-z] ){3,}[A-Za-z]`
-   - spaced contents inside a LaTeX command: `\\[a-z]+ *\{[^}]*([a-z] ){2,}`
-   - spaced command names: `\\ [a-z]( [a-z])+`
-2. **Read with offset** on the grep hit lines, plus fixed PROSE windows (~30–40 lines each) after the
-   front-matter, at ~25/50/75%, and the tail. Read prose, not only formulas.
+**Class A — Lost formula content (UNRECOVERABLE → reconvert, do NOT clean):**
+- `??` — failed-OCR symbol(s): `grep -c '??' "$MD"`. Example of the damage: `compute the vector
+  <sup>??</sup>` — a vector symbol gone.
+- `` (U+FFFD) replacement char.
+- garbled `<sub>`/`<sup>` — empty or `?`-containing:
+  `grep -coE '<su[bp]>[[:space:]]*</su[bp]>|<su[bp]>[^<]*\?[^<]*</su[bp]>' "$MD"`.
+  (Plain `<sup>1,*</sup>` author/footnote markers are legitimate — not this.)
+- genuinely empty display math — detect by SPLITTING on `$$` and testing odd segments for
+  whitespace-only (single-quote the `-c` so bash leaves `$$` alone):
+  `python3 -c 'import sys;p=open(sys.argv[1]).read().split("$$");print(sum(1 for i in range(1,len(p),2) if not p[i].strip()))' "$MD"`.
+  Do NOT use a `$$\s*$$` regex — it false-matches the blank gap between two consecutive formula blocks
+  and reports phantom empties.
+- Any Class-A hit = source content is gone, no regex recovers it. Flag the file for a hybrid reconvert
+  (two-phase Scan path above). List which symbol/formula to the user.
 
-Classify each md:
-- **clean** — no/trivial hits, prose coherent → index as-is, no cleanup.
-- **cleanable** — hits collapse into REAL words/formulas (`\mathrm { t h e }` → "the"), prose
-  coherent → fix below, then index.
-- **bad convert** — hits collapse into nonsense / wrong characters (`\ n u m b 9 e r`), OR sampled
-  PROSE is garbled (scan OCR) → EXCLUDE: no cleanup, no index. Report to the USER: PDF name +
-  example line(s); it is a scan that slipped past the Scan Check — re-run via the two-phase
-  Scan path above (convert → check parts.json → merge). NOT the same as `md: null`.
+**Class B — Spaced math (RECOVERABLE → de-space):**
+- spaced sub-/superscripts: `_ {` , `^ {`
+- spaced single-char runs: `([A-Za-z] ){3,}[A-Za-z]` — WARNING: this ALSO matches legitimate math
+  single-letters in running prose ("a K class outcome", "K-medoids is far more"). A high count flags a
+  file for de-spacing; the small residual AFTER de-spacing is mostly these false positives. Sample
+  before calling a residual a defect.
+- spaced command names: `\ [a-z]( [a-z])+`
+- Discriminator: collapsing a run yields a real token (`\mathrm { a r g m i n }` → `\mathrm{argmin}`).
 
-Discriminator: does collapsing a spaced run yield a real word? Yes → cleanable. No → bad convert.
+**Class C — Encoding (RECOVERABLE → unescape / re-encode):**
+- HTML entities: `&(amp|lt|gt|quot|apos|nbsp|#[0-9]+|#x[0-9a-fA-F]+);`
+- UTF-8 mojibake: `Ã.` , `â€`
 
-##### Pre-cleanup: Backup + Word Count Baseline
+**Class D — Prose char-typos (low-impact, not auto-fixable):**
+- single-char OCR errors ("diferent", "emai1", "BIUE"). No reliable grep — needs a dictionary pass.
+  Negligible for retrieval; do not chase. If a file is PERVASIVELY garbled in prose it is Class A → reconvert.
+
+**Class E — Backmatter (MANDATORY STRIP — every md except web-scraped API docs):**
+
+WHAT goes out — from the first backmatter heading (or, when headingless, the first backmatter entry) through EOF:
+- **References / Bibliography** sections.
+- **Symbols and Abbreviations / Nomenclature / Notation** glossaries.
+- **Index / Author Index / Subject Index / Stichwortverzeichnis** (term + page-number lists).
+
+HOW to find the cut line:
+1. Heading scan — markdown heading lines (`^#{1,6}\s`) whose text matches
+   `references|bibliography|index|symbols|abbreviations|nomenclature`, in the last ~40% of the file.
+2. Headingless backmatter (no heading on the reference list / index) — detect by line-pattern density in 100-line buckets:
+   - reference run = most non-blank lines match `\(\d{4}[a-z]?\)` (year in parens) or `^Surname, Init.`,
+   - index run = most non-blank lines match `,\s*\d+([–-]\d+)?` (term + page number).
+   Cut line = first line of the first sustained reference/index run after the last real-content section.
+
+HOW to cut:
+- Read 3 lines above the cut line (must be real content) + the heading/first-entry line to confirm the boundary.
+- Back up the file; truncate from the cut line through EOF; rstrip trailing blanks.
+- Re-scan: no backmatter heading in the last ~40%, and the new last line is real content.
+
+Do NOT cut these (they are CONTENT, NOT backmatter):
+- **Numbered content subsections** with a keyword in the title (`6.3.4 Discussion and further references`,
+  `3.2.3. Rand index`, `2.11 Discussion and bibliography`) — filter any heading whose text starts with a digit.
+- **Per-chapter "Bibliographic Notes"** (prose, not a list).
+- **Exercises with inline citations** above the reference list (`(Author, year)` + `$$` formulas). The reference LIST
+  starts where entries are alphabetical `Surname, Init. (year). Title…` with no `$$`/`Ex.`/`(a)`. Anchor there.
+
+Owner-decision sections (default: strip as backmatter; ask the corpus owner before keeping):
+- Mid-document per-part **Nomenclature / Notation** boxes (symbol glossaries) — these can sit anywhere, not only at EOF.
+- Front matter **List of Tables / List of Figures**.
+- Resource / software **appendices** (web-site lists, software guides).
+- Inline image refs `![](images/...)`.
+These are not always at EOF — scan the WHOLE file for them, strip each section from its heading to the next real-content heading.
+
+**Class F — Table markup noise (RECOVERABLE → strip to pipe-text):**
+MinerU emits tables as HTML `<table>` blocks; table-dense / OCR'd PDFs carry ~65–80% pure markup
+(`<td>`/`<tr>`/`rowspan`/`colspan`) around the data. ONE treatment for ALL tables, regardless of PDF
+category: strip the HTML to flat pipe-text, cells AS-IS — do NOT fix structure.
+
+- Detect (per `<table>`): markup ratio = chars-in-`<…>` / total table chars, flag at >50% (typical 65–80%);
+  `rowspan`/`colspan` count; secondary signal = merged-value cells (several whitespace-separated values in
+  one `<td>`: `KLIEP KLR KMM OSVM`, `0.919 0.934`).
+- Fix (ad-hoc script, same pattern as Class B/C): per `<table>`, drop every tag + attribute, one row per
+  `</tr>`, cells `|`-separated, content unchanged, full table (no `…` truncation). Header separator after row 0.
+- Validate: cell-text token set unchanged (only tags removed); table-char count drops by the markup fraction.
+  Spot-check 1–2 tables render as readable pipe rows.
+- Limit: strips NOISE, not CONTENT errors. OCR-corrupted cells stay as-is — no strip recovers source content.
+  Source re-extraction (camelot/gmft/pdfplumber, see `dev/table_extraction`) was tested and judged not worth
+  the matching/splice complexity for the marginal gain. Leave such tables de-noised; an LLM consumer can read
+  a flat pipe table even with imperfect structure.
+
+**Prose window — one real prose paragraph per md (MANDATORY, every convert):**
+The class greps catch detectable defects only; wordlike garble passes every one of them — a region OCR'd
+to plausible-but-wrong words ("Ed Formet Yiew Compuurtonel" from a screenshot, "to replaced the data
+samples"). So for EVERY convert, also pull a genuine body prose line and READ it. Extract candidates
+programmatically — a body line with length > 70, starting alphabetic, > 10 spaces, and alpha-ratio
+> 0.78 (this skips formula/table/header lines) — and read 1–2 from the middle third of the file:
+
+```python
+import glob, os
+from pathlib import Path
+for f in sorted(glob.glob(f"{OUTPUT_DIR}/*.md")):
+    lines = Path(f).read_text(errors="replace").splitlines()
+    n = len(lines); hits = []
+    for s in (l.strip() for l in lines[n//3:2*n//3]):
+        if len(s) > 70 and s[:1].isalpha() and s.count(" ") > 10 \
+           and sum(c.isalpha() or c.isspace() for c in s)/len(s) > 0.78:
+            hits.append(s)
+        if len(hits) >= 2: break
+    print(os.path.basename(f), "->", (hits[0][:140] if hits else "NO PROSE WINDOW (formula/table-heavy — inspect manually)"))
+```
+
+Coherent academic prose → pass. Garbled prose → escalate; pervasive prose garble = Class A → reconvert.
+A file that yields no prose window is formula/table-heavy — inspect it by hand.
+
+**Verdict per file:**
+- Class A > 0 → reconvert (hybrid). Do NOT clean a lossy file.
+- Class B / C only → clean (de-space, unescape), then re-scan that class to 0.
+- Class D → policy decision, not a blocker.
+- Class E (backmatter) → MANDATORY strip (see Class E above) for every md except web-scraped API docs.
+- Class F (table markup) → strip to pipe-text (ad-hoc script), all PDFs.
+
+**Limit of this audit:** it catches DETECTABLE losses (`??`, ``, broken markup). A formula that OCR'd
+to valid-but-wrong LaTeX looks clean and is only catchable against the source PDF — no grep finds it.
+A zero Class-A count means "no detectable loss", not "guaranteed perfect".
+
+##### Pre-cleanup: Backup + Baseline
 
 ```bash
 cp "$OUTPUT_DIR/$STEM.md" "/tmp/backup_$STEM.md"
-wc -w "$OUTPUT_DIR/$STEM.md"
+# de-spacing invariant baseline: alphanumeric-char count (NOT word count)
+python3 -c "import sys;print(sum(c.isalnum() for c in open(sys.argv[1]).read()))" "$OUTPUT_DIR/$STEM.md"
 ```
 
 ##### Artifacts to Detect and Fix
@@ -373,9 +567,12 @@ For each issue type, create `/tmp/fix_<issue>_<STEM>.py`. Run, verify count reac
 
 ##### Validation (MANDATORY after each fix)
 
-- Word count must be stable (+/- 1%)
-- Check for run-on words (iscentral, tothe, ofthe) — must remain 0
-- If word count drops >2% OR run-on words appear: ABORT, restore from backup, report
+- **De-spacing:** alphanumeric-character count must be EXACTLY stable (de-spacing removes only spaces).
+  The word count DROPS — that is intended; NEVER validate de-spacing on word count.
+- **Entity unescape:** entity count must reach 0; each entity collapses to exactly one char.
+- Re-scan the fixed class → must reach 0 (minus the Class-B spaced-run false positives in prose).
+- Spot-check 10-15 prose lines from the middle — natural text, no merged run-ons ("cambridgeuniversitypress").
+- On any anomaly (alnum changed, run-ons appear, class not cleared): ABORT, restore from backup, report.
 
 ##### Stop Criteria — "Good Enough"
 
