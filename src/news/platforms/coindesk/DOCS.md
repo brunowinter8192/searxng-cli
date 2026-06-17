@@ -47,6 +47,8 @@ per-article; re-run skips already-present URLs via load_inventory() diff.
 Timeframe parsing: `"full"` → FULL_MODE_FLOOR (`"2018-01-01"`);
 integer string N → today − N days; anything else (incl. `"delta"`) → DEFAULT_DELTA_DAYS (30).
 
+`load_inventory_filtered(inventory_dir, year, from_date, to_date, limit)` — standalone function (not part of `discover()`). Reads per-year shards `coindesk_{year}.txt`; applies optional date-range filter (`from_date`/`to_date` as `YYYY-MM-DD`); caps result at `limit`. Returns `[{url, publication_date}]`. Called by `__init__.py:load_scrape_entries` for the `--scrape-only` flow.
+
 ### cleanup.py (123 LOC)
 
 **Purpose:** Strip CoinDesk page chrome from raw crawl4ai markdown → pure article body.
@@ -57,8 +59,9 @@ clean_body (tag-footer strip, image strip, byline/date strip, inline-link substi
 
 No H1 found → returns `raw_markdown.strip()` (fallback, logged upstream).
 
-### __init__.py (30 LOC)
+### __init__.py (42 LOC)
 
-**Purpose:** `CoinDeskPlatform` class wrapping config + discover + cleanup; auto-registers on import.
+**Purpose:** `CoinDeskPlatform` class wrapping config + discover + cleanup + scrape-entry loading; auto-registers on import.
 Attribute `timeframe: str = "30"` set by `__main__` via `--timeframe`.
-**Called by:** `__main__.py` (side-effect import).
+`load_scrape_entries(year, from_date, to_date, limit)` delegates to `discover.py:load_inventory_filtered` — exposes the `--scrape-only` interface required by `run_scrape_only()` in `pipeline.py`.
+**Called by:** `__main__.py` (side-effect import); `pipeline.py:run_scrape_only` (via `platform.load_scrape_entries`).
