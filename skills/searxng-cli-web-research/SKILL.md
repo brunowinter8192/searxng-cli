@@ -111,6 +111,10 @@ Mode flags: `--books` / `--pdf` / `--docs` restrict to google/duckduckgo/mojeek,
 
 When the user wants to permanently capture a whole domain (or a set of PDFs) into RAG — "crawl X and index it", "RAG-fähig machen". A worker drives the capture; this is the Opus-side setup.
 
+**How the capture handles content (informative):** the worker scrapes each page RAW/maximal — no content filter, full fidelity (unlike the in-chat `scrape_url`, which returns pre-filtered 15k markdown). It then cleans the content AD-HOC per page-shape (diagnose shapes → per-shape strip scripts → block/thin-page drop) before indexing, via the `searxng-cli-capture-and-index` skill. Raw in, worker cleans.
+
+**Worker placement (hard rule):** the worker is ALWAYS spawned into a worktree IN THE CURRENT PROJECT — the project the session is running in. Pass `<current_project_root>` explicitly to `worker-cli spawn` (never a bare or parent path); the worktree must land at `<current_project_root>/.claude/worktrees/<name>`. Verify after spawn (step 3).
+
 **1.** Identify the source: a seed domain URL (web-md), or PDF paths/URLs (pdf — download first via `download_pdf` if they are URLs).
 
 **2.** Confirm the target collection with the user (MANDATORY ASK — never pick it yourself):
