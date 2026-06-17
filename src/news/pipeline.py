@@ -16,6 +16,7 @@ from src.news.engine.proxy_pool.janitor import Janitor
 from src.news.engine.proxy_pool.logger import AcquireLogger
 from src.news.engine.proxy_pool.scrape import scrape_entries_proxy
 from src.news.engine.publish import publish_articles
+from src.news.engine.scrape_job import scrape_chunks, run_cleanup
 
 PROJECT_ROOT = Path(__file__).parent.parent.parent   # searxng-cli/
 
@@ -27,6 +28,7 @@ COLLECTION_BASE = Path(
     "/data/documents"
 )
 PRECONDITION_TIMEOUT = 10
+SCRAPE_CHUNK_SIZE = 200   # URLs per scrape→clean→publish chunk; controls crash-loss window
 
 
 # ORCHESTRATOR
@@ -43,6 +45,76 @@ async def run_discover_only(platform: Platform) -> None:
     log.info(f"discover → {len(entries)} entries")
     _write_marker(platform.name, log)
     log.info(f"=== {platform.name} discover-only complete ===")
+
+
+# Date-filtered scrape job: inventory → MD-diff → chunked scrape→clean→publish.
+# No _clear_working_dirs — published chunks are durable; re-run MD-diff resumes from last chunk.
+# RegwallGuardError per chunk: log loudly, stop loop (already-published chunks stay durable).
+# Accumulates job_records [{t_chunk_start, ...manifest_entry}] for Stage-2b reporter.
+async def run_scrape_only(
+    platform: Platform,
+    year: str | None = None,
+    from_date: str | None = None,
+    to_date: str | None = None,
+    limit: int | None = None,
+    skip_index: bool = False,
+) -> None:
+    LOG_DIR.mkdir(parents=True, exist_ok=True)
+    log = _setup_logging(platform.name)
+    job_id = datetime.now(timezone.utc).strftime("%Y%m%dT%H%M%SZ")
+    filter_desc = (
+        f"year={year}" if year
+        else f"from={from_date} to={to_date}" if (from_date or to_date)
+        else "all"
+    )
+    log.info(f"=== {platform.name} scrape-only started job_id={job_id} filter={filter_desc} ===")
+    if not _check_preconditions(platform, log):
+        log.error("Precondition check failed — aborting.")
+        sys.exit(1)
+    if not hasattr(platform, "load_scrape_entries"):
+        log.error(f"--scrape-only not supported for {platform.name} (no load_scrape_entries)")
+        sys.exit(1)
+
+    entries = platform.load_scrape_entries(year=year, from_date=from_date, to_date=to_date, limit=limit)
+    log.info(f"inventory → {len(entries)} candidate URL(s) after filter")
+    if not entries:
+        log.info("No entries in date range — done.")
+        _write_marker(platform.name, log)
+        return
+
+    collection_dir = COLLECTION_BASE / platform.collection
+    new_entries, n_skip = filter_new_entries(entries, collection_dir, platform.name, mode="pubdate")
+    log.info(f"dedup → {len(entries)} total, {n_skip} already scraped, {len(new_entries)} new")
+    if not new_entries:
+        log.info("All already scraped — done.")
+        _write_marker(platform.name, log)
+        return
+
+    platform_dir = DATA_ROOT / platform.name
+    job_scrape_base = platform_dir / "scrape" / job_id
+    job_clean_base  = platform_dir / "clean"  / job_id
+    collection_dir.mkdir(parents=True, exist_ok=True)
+    chunks = [new_entries[i:i + SCRAPE_CHUNK_SIZE] for i in range(0, len(new_entries), SCRAPE_CHUNK_SIZE)]
+    log.info(f"chunked plan: {len(new_entries)} URLs → {len(chunks)} chunk(s) of {SCRAPE_CHUNK_SIZE}")
+
+    t_job_start = datetime.now(timezone.utc)
+    totals, job_records, regwall_abort = await scrape_chunks(
+        chunks, job_scrape_base, job_clean_base, platform, collection_dir, log, skip_index
+    )
+    for d in (job_scrape_base, job_clean_base):
+        if d.exists() and not any(d.iterdir()):
+            d.rmdir()
+
+    wall_s = (datetime.now(timezone.utc) - t_job_start).total_seconds()
+    rw_rate = totals["regwall"] / max(sum(totals.values()), 1)
+    log.info(
+        f"=== scrape-only done: ok={totals['ok']} regwall={totals['regwall']}({rw_rate:.1%}) "
+        f"empty={totals['empty']} failed={totals['failed']} wall={wall_s:.0f}s"
+        + (" [REGWALL ABORT]" if regwall_abort else "") + " ==="
+    )
+    # Stage-2b hook: write_scrape_report(job_dir, job_records, t_job_start, len(new_entries), filter_desc, skip_index)
+    _write_marker(platform.name, log)
+    log.info(f"=== {platform.name} scrape-only complete job_id={job_id} ===")
 
 
 # Run the full news pipeline for the given platform in-process.
@@ -157,7 +229,7 @@ async def run_pipeline(platform: Platform, skip_index: bool = False) -> None:
     # Stage 4 — cleanup (shared)
     log.info("STAGE cleanup …")
     discover_by_url = {e["url"]: e for e in new_entries}
-    clean_manifest = _run_cleanup(manifest, scrape_dir, clean_dir, platform, log, discover_by_url)
+    clean_manifest = run_cleanup(manifest, scrape_dir, clean_dir, platform, log, discover_by_url)
     log.info(f"cleanup → {len(clean_manifest)} files cleaned")
 
     # Stage 5 — publish (shared)
@@ -237,40 +309,6 @@ def _write_discover_snapshot(entries: list[dict], discover_dir: Path) -> Path:
     path = discover_dir / f"discover_{ts}.json"
     path.write_text(json.dumps(entries, indent=2, ensure_ascii=False), encoding="utf-8")
     return path
-
-
-# In-process cleanup: read body from scrape_dir, apply platform.cleanup, write pure content to clean_dir.
-# publication_date: primary source is discover_by_url; fallback to entry (scrape manifest) for platforms
-# where cleanup mutates entry["publication_date"] from fetched content (e.g. The Block JSON-LD).
-# pub_date_str() in publish.py provides a URL-path fallback as a tertiary net.
-def _run_cleanup(
-    manifest: list[dict],
-    scrape_dir: Path,
-    clean_dir: Path,
-    platform: Platform,
-    log: logging.Logger,
-    discover_by_url: dict[str, dict],
-) -> list[dict]:
-    clean_manifest = []
-    for entry in manifest:
-        if entry.get("status") != "ok":
-            continue
-        h = entry["hash"]
-        src_file = scrape_dir / f"{h}.md"
-        if not src_file.exists():
-            log.warning(f"cleanup: source not found: {src_file.name}")
-            continue
-        raw_body = src_file.read_text(encoding="utf-8")
-        cleaned = platform.cleanup(raw_body, entry)
-        dest = clean_dir / f"{h}.md"
-        dest.write_text(cleaned, encoding="utf-8")
-        discover_entry = discover_by_url.get(entry["url"], {})
-        clean_manifest.append({
-            "url": entry["url"],
-            "hash": h,
-            "publication_date": discover_entry.get("publication_date") or entry.get("publication_date", ""),
-        })
-    return clean_manifest
 
 
 # Write timestamp to last-run marker file

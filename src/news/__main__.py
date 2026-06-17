@@ -6,7 +6,7 @@ import src.news.platforms.coindesk   # side-effect: registers CoinDeskPlatform
 import src.news.platforms.theblock   # side-effect: registers TheBlockPlatform
 
 from src.news.registry import get
-from src.news.pipeline import run_pipeline, run_discover_only
+from src.news.pipeline import run_pipeline, run_discover_only, run_scrape_only
 
 
 # ORCHESTRATOR
@@ -41,18 +41,58 @@ def main() -> None:
         default=False,
         help="Run discover + inventory-update only — skip dedup/scrape/clean/publish (CoinDesk).",
     )
+    parser.add_argument(
+        "--scrape-only",
+        action="store_true",
+        default=False,
+        help="Read inventory, MD-diff, scrape → clean → publish. No discover. (CoinDesk).",
+    )
+    parser.add_argument(
+        "--year",
+        default=None,
+        help="Scrape URLs from inventory for one year, e.g. 2018. Mutually exclusive with --from/--to.",
+    )
+    parser.add_argument(
+        "--from",
+        dest="from_date",
+        default=None,
+        help="Start date YYYY-MM-DD for inventory date range (use with --to).",
+    )
+    parser.add_argument(
+        "--to",
+        dest="to_date",
+        default=None,
+        help="End date YYYY-MM-DD for inventory date range (use with --from).",
+    )
+    parser.add_argument(
+        "--limit",
+        type=int,
+        default=None,
+        help="Cap URL count after date filter (quick probe, e.g. --limit 5).",
+    )
     args = parser.parse_args()
 
     platform = get(args.source)
     skip_index = args.skip_index
     if hasattr(platform, "timeframe"):
         platform.timeframe = args.timeframe
-        if args.timeframe != "delta" and not args.discover_only:
+        if args.timeframe != "delta" and not args.discover_only and not args.scrape_only:
             skip_index = True
             print(f"Non-delta timeframe ({args.timeframe!r}) — RAG index auto-skipped.")
             print(f"After review, run: rag-cli index --collection {platform.collection}")
 
-    if args.discover_only:
+    if args.scrape_only:
+        if args.year and (args.from_date or args.to_date):
+            parser.error("--year and --from/--to are mutually exclusive")
+        asyncio.run(run_scrape_only(
+            platform,
+            year=args.year,
+            from_date=args.from_date,
+            to_date=args.to_date,
+            limit=args.limit,
+            skip_index=skip_index,
+        ))
+    elif args.discover_only:
         asyncio.run(run_discover_only(platform))
     else:
         asyncio.run(run_pipeline(platform, skip_index=skip_index))

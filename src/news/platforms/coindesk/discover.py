@@ -335,3 +335,42 @@ def load_inventory(inventory_dir: Path) -> set[str]:
                 if "\t" in line:
                     seen.add(line.split("\t", 1)[1])
     return seen
+
+
+# Read inventory shards filtered by year or date range; return [{url, publication_date}].
+# year:      only reads coindesk_{year}.txt — fast single-shard load.
+# from_date / to_date: YYYY-MM-DD strings; both optional (open-ended range if one is omitted).
+# limit:     cap result count after filtering.
+def load_inventory_filtered(
+    inventory_dir: Path,
+    year: str | None = None,
+    from_date: str | None = None,
+    to_date: str | None = None,
+    limit: int | None = None,
+) -> list[dict]:
+    if not inventory_dir.exists():
+        return []
+    if year is not None:
+        shards = [inventory_dir / f"coindesk_{year}.txt"]
+        shards = [s for s in shards if s.exists()]
+    else:
+        shards = sorted(inventory_dir.glob("coindesk_*.txt"))
+    entries: list[dict] = []
+    for shard in shards:
+        with open(shard, encoding="utf-8") as fh:
+            for line in fh:
+                line = line.strip()
+                if "\t" not in line:
+                    continue
+                date_col, url = line.split("\t", 1)
+                if from_date and date_col < from_date:
+                    continue
+                if to_date and date_col > to_date:
+                    continue
+                entries.append({
+                    "url": url,
+                    "publication_date": f"{date_col}T00:00:00+00:00",
+                })
+                if limit is not None and len(entries) >= limit:
+                    return entries
+    return entries
