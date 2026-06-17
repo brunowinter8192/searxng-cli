@@ -171,8 +171,11 @@ def _collect_manifest(entries: list[dict], raw_results: tuple) -> list[dict]:
 
 
 # Regwall guard: WARN per-page (caller handles skip); raise RegwallGuardError if fraction >= threshold.
+# manifest is carried on the exception so callers can recover blocked-URL data from the abort path.
 class RegwallGuardError(Exception):
-    pass
+    def __init__(self, msg: str, manifest: list[dict] | None = None):
+        super().__init__(msg)
+        self.manifest: list[dict] = manifest or []
 
 
 def _check_regwall_guard(manifest: list[dict], regwall_signals: list[str]) -> None:
@@ -191,4 +194,4 @@ def _check_regwall_guard(manifest: list[dict], regwall_signals: list[str]) -> No
             f" (>= {REGWALL_FAIL_THRESHOLD:.0%} threshold)"
         )
         print(f"ERROR: {msg}", file=sys.stderr)
-        raise RegwallGuardError(msg)
+        raise RegwallGuardError(msg, manifest=manifest)

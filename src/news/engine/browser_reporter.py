@@ -174,6 +174,24 @@ def _write_md(
             lines.append(f"| … ({len(failures) - 20} more) | |")
         lines.append("")
 
+    regwall_entries = [r for r in job_records if r.get("status") == "regwall"]
+    if regwall_entries:
+        lines += ["## Regwall URLs", "", "| URL |", "|---|"]
+        for r in regwall_entries[:50]:
+            lines.append(f"| {(r.get('url') or '')[:100]} |")
+        if len(regwall_entries) > 50:
+            lines.append(f"| … ({len(regwall_entries) - 50} more) |")
+        lines.append("")
+
+    empty_entries = [r for r in job_records if r.get("status") == "empty"]
+    if empty_entries:
+        lines += ["## Empty URLs", "", "| URL |", "|---|"]
+        for r in empty_entries[:50]:
+            lines.append(f"| {(r.get('url') or '')[:100]} |")
+        if len(empty_entries) > 50:
+            lines.append(f"| … ({len(empty_entries) - 50} more) |")
+        lines.append("")
+
     lines += ["![Cumulative OK](cumulative.png)", ""]
 
     (job_dir / "job.md").write_text("\n".join(lines), encoding="utf-8")

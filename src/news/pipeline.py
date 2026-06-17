@@ -16,7 +16,7 @@ from src.news.engine.proxy_pool.janitor import Janitor
 from src.news.engine.proxy_pool.logger import AcquireLogger
 from src.news.engine.proxy_pool.scrape import scrape_entries_proxy
 from src.news.engine.publish import publish_articles
-from src.news.engine.scrape_job import scrape_chunks, run_cleanup
+from src.news.engine.scrape_job import scrape_chunks_raw, run_cleanup
 from src.news.engine.browser_reporter import write_scrape_report
 
 PROJECT_ROOT = Path(__file__).parent.parent.parent   # searxng-cli/
@@ -48,10 +48,11 @@ async def run_discover_only(platform: Platform) -> None:
     log.info(f"=== {platform.name} discover-only complete ===")
 
 
-# Date-filtered scrape job: inventory → MD-diff → chunked scrape→clean→publish.
-# No _clear_working_dirs — published chunks are durable; re-run MD-diff resumes from last chunk.
-# RegwallGuardError per chunk: log loudly, stop loop (already-published chunks stay durable).
-# Accumulates job_records [{t_chunk_start, ...manifest_entry}] for Stage-2b reporter.
+# Date-filtered scrape job: inventory → raw-diff → chunked scrape → raw persist.
+# No cleanup, no publish — raw bodies land in data/news/{name}/raw/{hash}.md.
+# manifest.jsonl + regwall_urls.txt/empty_urls.txt updated per chunk.
+# RegwallGuardError: ok files recovered via raw_dir scan; regwall_abort set, loop stops.
+# skip_index param kept for CLI compat but is a no-op (no indexing in this path).
 async def run_scrape_only(
     platform: Platform,
     year: str | None = None,
@@ -69,8 +70,8 @@ async def run_scrape_only(
         else "all"
     )
     log.info(f"=== {platform.name} scrape-only started job_id={job_id} filter={filter_desc} ===")
-    if not _check_preconditions(platform, log):
-        log.error("Precondition check failed — aborting.")
+    if not _check_internet(platform, log):
+        log.error("Internet check failed — aborting.")
         sys.exit(1)
     if not hasattr(platform, "load_scrape_entries"):
         log.error(f"--scrape-only not supported for {platform.name} (no load_scrape_entries)")
@@ -83,28 +84,22 @@ async def run_scrape_only(
         _write_marker(platform.name, log)
         return
 
-    collection_dir = COLLECTION_BASE / platform.collection
-    new_entries, n_skip = filter_new_entries(entries, collection_dir, platform.name, mode="pubdate")
-    log.info(f"dedup → {len(entries)} total, {n_skip} already scraped, {len(new_entries)} new")
+    raw_dir = DATA_ROOT / platform.name / "raw"
+    raw_dir.mkdir(parents=True, exist_ok=True)
+    new_entries, n_skip = filter_new_entries(entries, raw_dir, platform.name, mode="raw")
+    log.info(f"dedup → {len(entries)} total, {n_skip} already in raw, {len(new_entries)} new")
     if not new_entries:
-        log.info("All already scraped — done.")
+        log.info("All already in raw — done.")
         _write_marker(platform.name, log)
         return
 
-    platform_dir = DATA_ROOT / platform.name
-    job_scrape_base = platform_dir / "scrape" / job_id
-    job_clean_base  = platform_dir / "clean"  / job_id
-    collection_dir.mkdir(parents=True, exist_ok=True)
     chunks = [new_entries[i:i + SCRAPE_CHUNK_SIZE] for i in range(0, len(new_entries), SCRAPE_CHUNK_SIZE)]
     log.info(f"chunked plan: {len(new_entries)} URLs → {len(chunks)} chunk(s) of {SCRAPE_CHUNK_SIZE}")
 
     t_job_start = datetime.now(timezone.utc)
-    totals, job_records, regwall_abort = await scrape_chunks(
-        chunks, job_scrape_base, job_clean_base, platform, collection_dir, log, skip_index
+    totals, job_records, regwall_abort = await scrape_chunks_raw(
+        chunks, raw_dir, platform, log
     )
-    for d in (job_scrape_base, job_clean_base):
-        if d.exists() and not any(d.iterdir()):
-            d.rmdir()
 
     wall_s = (datetime.now(timezone.utc) - t_job_start).total_seconds()
     rw_rate = totals["regwall"] / max(sum(totals.values()), 1)

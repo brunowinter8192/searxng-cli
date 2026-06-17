@@ -39,6 +39,8 @@ def filter_new_entries(
         h = url_hash(entry["url"])
         if mode == "hash_only":
             already_have = bool(list(collection_dir.glob(f"{source}__*__{h}.md")))
+        elif mode == "raw":
+            already_have = (collection_dir / f"{h}.md").exists()
         else:
             pubdate = pub_date_str(entry)
             target = collection_dir / f"{source}__{pubdate}__{h}.md"
