@@ -4,6 +4,11 @@ Builds on OT44 (timeline API confirmed as the right pagination surface). This en
 first implementation of the uncapped browser-driven backfill traversal, the premature termination
 bug encountered in Stage A, the fix, and the open performance problem before a full run.
 
+**NOT the chosen method — superseded by OT47.** The browser DOM-scrape traversal works but is O(n)-bound
+by the growing DOM (the perf problem below was never fully beaten). The chosen discovery method calls the
+SAME timeline API directly over plain HTTP (no browser, no DOM, no O(n)) — see OT47. This entry is kept for
+the false-DISABLED-race finding and the DOM-growth measurement.
+
 ## Script
 
 `dev/news_pipeline/exploration/03_coindesk_backfill_traversal.py` — pydoll headed Chrome
