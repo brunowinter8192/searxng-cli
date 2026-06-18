@@ -33,11 +33,9 @@ _NEWSLETTER_PROMO_RE = re.compile(
     r'^\*\*The Block Newsletters[^\n]*\n[^\n]*theblock\.co/newsletters[^\n]*',
     re.MULTILINE,
 )
-# Campus trial CTA line (44 files); matches with or without trailing period
-_CAMPUS_CTA_RE      = re.compile(
-    r'^Sign up for a trial today:[^\n]*theblock\.co/campus[^\n]*$',
-    re.MULTILINE,
-)
+# Campus trial CTA — any line containing theblock.co/campus (56 files).
+# URL is a pure product-CTA; never appears in editorial prose.
+_CAMPUS_CTA_RE      = re.compile(r'^.*theblock\.co/campus.*$', re.MULTILINE)
 
 
 # FUNCTIONS
