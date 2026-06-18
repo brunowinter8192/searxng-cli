@@ -15,6 +15,8 @@ from p2_browser_rider import run_riding_pool
 from p3_url_sampler import sample_urls
 from p4_reporter import write_riding_report
 
+BROWSER_ELIGIBLE_PROTOS = frozenset({"http", "socks5"})
+
 
 # ORCHESTRATOR
 
@@ -43,8 +45,12 @@ async def _run(args: argparse.Namespace) -> None:
     )
 
     print("[main] loading proxy pool ...", file=sys.stderr)
-    proxy_pool, _ = await asyncio.get_running_loop().run_in_executor(None, load_backfill_pool)
-    print(f"[main] pool: {len(proxy_pool)} raw proxies", file=sys.stderr)
+    raw_pool, _ = await asyncio.get_running_loop().run_in_executor(None, load_backfill_pool)
+    proxy_pool  = [(p, hp) for p, hp in raw_pool if p in BROWSER_ELIGIBLE_PROTOS]
+    print(
+        f"[main] pool: {len(raw_pool)} total, {len(proxy_pool)} browser-eligible (http+socks5)",
+        file=sys.stderr,
+    )
 
     cm          = PersistentCooldownManager()
     t_job_start = datetime.now(timezone.utc)
