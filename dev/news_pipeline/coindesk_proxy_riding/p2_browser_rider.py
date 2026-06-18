@@ -29,7 +29,6 @@ REGWALL_SIGNALS: list[str] = [
 PAGE_TIMEOUT_MS   = 8_000    # default; overridden per-call via page_timeout_ms param
 DELAY_BEFORE_HTML = 0.5      # s wait after domcontentloaded
 STALL_TIMEOUT_S   = 3_600.0  # 60 min no progress → terminate
-MAX_URL_RETRIES   = 3        # max requeues per URL before giving up
 
 # Playwright error substrings that indicate a proxy-side failure (not CoinDesk)
 _PROXY_ERR = ("timeout", "proxy", "err_proxy", "tunnel", "socks",
@@ -77,14 +76,12 @@ class RiderState:
     burn_threshold:  int
     page_timeout_ms: int
     total_urls:      int
-    max_url_retries: int   = MAX_URL_RETRIES
 
     n_ok:            int   = 0
     n_regwall:       int   = 0
     n_failed:        int   = 0
     n_connect_fail:  int   = 0
     in_flight:       int   = 0
-    url_retries:     dict  = field(default_factory=dict)
     job_records:     list  = field(default_factory=list)
     ride_records:    list  = field(default_factory=list)
     last_progress_mono: float      = field(default_factory=time.monotonic)
@@ -206,13 +203,7 @@ async def _run_slot(slot_id: int, crawler: AsyncWebCrawler, state: RiderState) -
                 elif status == "regwall":
                     burn_count      += 1
                     state.n_regwall += 1
-                    retries = state.url_retries.get(url, 0)
-                    if retries < state.max_url_retries:
-                        state.url_retries[url] = retries + 1
-                        state.url_queue.put_nowait(url)
-                    else:
-                        state.n_failed += 1
-                        state.last_progress_mono = time.monotonic()
+                    state.url_queue.put_nowait(url)
                     print(
                         f"[slot {slot_id}] RW  burn={burn_count}/{state.burn_threshold}"
                         f" r={ride_pos}", file=sys.stderr,
@@ -226,9 +217,8 @@ async def _run_slot(slot_id: int, crawler: AsyncWebCrawler, state: RiderState) -
                     break
 
                 else:  # failed | empty
-                    state.n_failed += 1
-                    state.last_progress_mono = time.monotonic()
-                    print(f"[slot {slot_id}] {status} r={ride_pos}", file=sys.stderr)
+                    state.url_queue.put_nowait(url)
+                    print(f"[slot {slot_id}] {status} r={ride_pos} → requeue", file=sys.stderr)
 
                 state.job_records.append(job)
 
