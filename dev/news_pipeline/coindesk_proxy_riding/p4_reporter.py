@@ -35,7 +35,8 @@ def _compute_stats(state: RiderState, t_job_start: datetime) -> dict:
     n_ok              = sum(1 for j in jobs if j.status == "ok")
     n_regwall_fetches = sum(1 for j in jobs if j.status == "regwall")
     n_failed          = sum(1 for j in jobs if j.status in ("failed", "empty"))
-    n_connect_fail    = sum(1 for j in jobs if j.status == "connect_fail")
+    # connect_fail breaks before job_records.append() → use authoritative state counter
+    n_connect_fail    = state.n_connect_fail
 
     elapsed_values = [j.elapsed_s for j in jobs if j.elapsed_s is not None]
     mean_s   = statistics.mean(elapsed_values)   if elapsed_values else None
@@ -123,8 +124,8 @@ def _percentiles(sorted_values: list) -> dict | None:
         return {k: sorted_values[0] for k in ("p10", "p25", "p50", "p75", "p90", "p95")}
     qs = statistics.quantiles(sorted_values, n=100, method="inclusive")
     return {
-        "p10": qs[9], "p25": qs[24], "p50": qs[49],
-        "p75": qs[74], "p90": qs[89], "p95": qs[94],
+        "p10": int(round(qs[9])),  "p25": int(round(qs[24])), "p50": int(round(qs[49])),
+        "p75": int(round(qs[74])), "p90": int(round(qs[89])), "p95": int(round(qs[94])),
     }
 
 
