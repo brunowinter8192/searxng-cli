@@ -15,6 +15,7 @@ from src.news.engine.proxy_pool.logger import AcquireLogger
 from src.news.engine.proxy_pool.scrape import scrape_entries_proxy
 from src.news.engine.scrape_job import scrape_chunks_raw, _append_to_raw_manifest, _update_blocked_urls
 from src.news.engine.browser_reporter import write_scrape_report
+from src.news.engine.publish import pub_date_str
 
 PROJECT_ROOT = Path(__file__).parent.parent.parent   # searxng-cli/
 
@@ -112,7 +113,8 @@ async def run_scrape_only(
 
 
 # Run the full news pipeline for the given platform in-process.
-# Both proxy_pool and browser paths are raw-only: scrape → raw_dir; no cleanup, no publish.
+# proxy_pool path (TheBlock): discover → dedup → scrape(raw) → clean-pass → collection_dir. Indexing decoupled.
+# browser path (CoinDesk): raw-only — scrape → raw_dir; no cleanup, no publish.
 # dedup: mode="raw" (file existence check in data/news/{name}/raw/).
 # proxy_pool: persist dead/failed to dead_urls.txt/failed_urls.txt; browser: regwall/empty_urls.txt.
 # Janitor lifecycle preserved for proxy_pool (box_lock, start_job, end_job, AcquireLogger).
@@ -197,6 +199,16 @@ async def run_pipeline(platform: Platform, skip_index: bool = False) -> None:
         ]
         _append_to_raw_manifest(raw_dir, ok_manifest_entries)
         _update_blocked_urls(raw_dir, manifest, {"dead": "dead_urls.txt", "failed": "failed_urls.txt"})
+
+        # Stage 4 — clean-pass (proxy_pool / TheBlock only): raw → clean MD in collection_dir
+        if n_ok > 0:
+            log.info(f"STAGE clean ({n_ok} ok entries) …")
+            collection_dir = PROJECT_ROOT.parent / "rag-cli" / "data" / "documents" / platform.collection
+            stats = _run_clean_pass(platform, ok_manifest_entries, raw_dir, collection_dir, log)
+            log.info(
+                f"clean → {stats['n_cleaned']} cleaned, {stats['n_bodyless']} body-less, "
+                f"{stats['total']} total → {collection_dir}"
+            )
 
     else:
         # Browser path: discover → dedup(raw) → scrape(raw) → persist
@@ -311,6 +323,51 @@ def _write_discover_snapshot(entries: list[dict], discover_dir: Path) -> Path:
     path = discover_dir / f"discover_{ts}.json"
     path.write_text(json.dumps(entries, indent=2, ensure_ascii=False), encoding="utf-8")
     return path
+
+
+# Clean ok entries: read raw/{hash}.md → platform.cleanup() → write theblock__{pubdate}__{hash}.md
+# to collection_dir. body-less (cleanup → ""): log + append URL to raw_dir.parent/bodyless_urls.txt
+# (set-union, sorted). Read-only on raw/. collection_dir created if absent.
+# Progress logged every 200 entries. Returns {"n_cleaned", "n_bodyless", "total"}.
+def _run_clean_pass(
+    platform: Platform,
+    ok_entries: list[dict],
+    raw_dir: Path,
+    collection_dir: Path,
+    log: logging.Logger,
+) -> dict:
+    if not ok_entries:
+        return {"n_cleaned": 0, "n_bodyless": 0, "total": 0}
+    collection_dir.mkdir(parents=True, exist_ok=True)
+    bodyless_path = raw_dir.parent / "bodyless_urls.txt"
+    bodyless_urls: list[str] = []
+    n_cleaned = 0
+    total = len(ok_entries)
+    for i, entry in enumerate(ok_entries, start=1):
+        h = entry["hash"]
+        raw_path = raw_dir / f"{h}.md"
+        if not raw_path.exists():
+            log.warning(f"clean_pass: raw file missing — {raw_path}")
+        else:
+            raw_html = raw_path.read_text(encoding="utf-8")
+            clean_md = platform.cleanup(raw_html, entry)
+            if not clean_md:
+                log.info(f"clean_pass: body-less — {entry['url']}")
+                bodyless_urls.append(entry["url"])
+            else:
+                pubdate = pub_date_str(entry)
+                out_path = collection_dir / f"theblock__{pubdate}__{h}.md"
+                out_path.write_text(clean_md, encoding="utf-8")
+                n_cleaned += 1
+        if i % 200 == 0:
+            log.info(f"clean progress {i}/{total} — {n_cleaned} cleaned, {len(bodyless_urls)} body-less")
+    n_bodyless = len(bodyless_urls)
+    if bodyless_urls:
+        existing = set(bodyless_path.read_text(encoding="utf-8").splitlines()) if bodyless_path.exists() else set()
+        merged = (existing | set(bodyless_urls)) - {""}
+        bodyless_path.write_text("\n".join(sorted(merged)) + "\n", encoding="utf-8")
+    log.info(f"clean_pass: {n_cleaned} cleaned / {n_bodyless} body-less / {total} total")
+    return {"n_cleaned": n_cleaned, "n_bodyless": n_bodyless, "total": total}
 
 
 # Write timestamp to last-run marker file

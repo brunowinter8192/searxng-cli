@@ -70,10 +70,9 @@ no per-year shards. Persistence is in `pipeline.py:_persist_master_list`, not in
 **Purpose:** Parse JSON-LD `NewsArticle` block from raw HTML fetched by proxy engine →
 extract `articleBody` (HTML) → convert to Markdown via `crawl4ai.html2text.HTML2Text` →
 apply `_post_clean()` regex pass → mutate `entry["publication_date"] = datePublished`.
-Not called by `run_pipeline` — reserved for future cleanup skill against raw corpus.
 **Reads:** raw HTML string (proxy engine output), entry dict (scrape manifest).
 **Writes:** mutates `entry["publication_date"]` in place.
-**Called by:** NOT called by any active pipeline path. Available to future cleanup skill.
+**Called by:** `pipeline.py:_run_clean_pass` (proxy_pool branch of `run_pipeline`).
 **Calls out:** `crawl4ai.html2text` (bundled, no new dep).
 
 JSON-LD shape hardening — `_iter_candidates()` handles all common shapes without crashing:
