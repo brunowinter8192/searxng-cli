@@ -85,13 +85,22 @@ One subsection per pool_refresh (`### Refresh 0 (startup)`, `### Refresh 1`, …
 
 ---
 
-### loop.py (205 LOC)
+### loop.py (218 LOC)
 
-**Purpose:** Sustained concurrent rotation loop — 60-min pool refresh, 2-strikes lifecycle, tail-race, wait-on-exhaustion.
+**Purpose:** Sustained concurrent rotation loop — 60-min pool refresh, 2-strikes lifecycle, tail-race, wait-on-exhaustion, stall-terminate.
 **Reads:** `pool_provider()` callback (returns `(pool, sources)`) + target URL list (in-memory).
 **Writes:** delegates state to `AcquireLogger` + `PersistentCooldownManager`; calls `content_handler` per ok fetch. Returns `(done, dead, gap)`. After each `pool_provider()` call: `record_pool_refresh(len(pool))` then `record_pool_source(url, ok, count)` per source.
 **Called by:** `scrape.py:scrape_entries_proxy`.
 **Calls out:** `fetch.py`, `cooldown.py`, `logger.py`, `buffer.py`.
+
+Stall-terminate (`STALL_TIMEOUT_S = 3600`): `_last_progress` tracks the last time a URL resolved
+to `done` or `dead` (queue shrinks). If `now - _last_progress >= STALL_TIMEOUT_S` at the top of
+the `while queue:` loop, the loop breaks and returns `gap = list(queue)` — the remaining unresolved
+URLs. These flow through `_build_manifest` as `status="failed"` and land in
+`data/news/{name}/raw/failed_urls.txt` via `_update_blocked_urls`. Only done/dead events advance
+`_last_progress` — a batch of pure proxy-failures does not reset the clock. Stall fires when
+poison URLs (neither 200 nor 404 from origin) consume all proxies for a full pool-cycle with
+no terminal resolution.
 
 Key: `_sleep = time.sleep` is a module-level alias — patch it in tests, not `time.sleep`.
 
