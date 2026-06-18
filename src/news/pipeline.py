@@ -37,6 +37,9 @@ async def run_discover_only(platform: Platform) -> None:
         sys.exit(1)
     entries = await platform.discover()
     log.info(f"discover → {len(entries)} entries")
+    if getattr(platform, "uses_master_list", False):
+        master_path = DATA_ROOT / platform.name / "master_urls.txt"
+        _persist_master_list(entries, master_path, log)
     _write_marker(platform.name, log)
     log.info(f"=== {platform.name} discover-only complete ===")
 
@@ -154,13 +157,12 @@ async def run_pipeline(platform: Platform, skip_index: bool = False) -> None:
                     log.error("discover returned 0 articles — aborting.")
                     _write_marker(platform.name, log)
                     return
-                discover_snapshot = _write_discover_snapshot(entries, discover_dir)
-                log.info(f"discover → {len(entries)} articles → {discover_snapshot.name}")
-
-                # Persist master URL inventory (lastmod-based year shards)
-                inventory_dir = platform_dir / "inventory"
-                _persist_inventory(entries, inventory_dir, platform.name)
-                log.info(f"inventory updated → {inventory_dir}")
+                if getattr(platform, "uses_master_list", False):
+                    master_path = DATA_ROOT / platform.name / "master_urls.txt"
+                    _persist_master_list(entries, master_path, log)
+                else:
+                    discover_snapshot = _write_discover_snapshot(entries, discover_dir)
+                    log.info(f"discover → {len(entries)} articles → {discover_snapshot.name}")
 
                 # Stage 2 — dedup against raw
                 log.info("STAGE dedup …")
@@ -277,33 +279,30 @@ def _check_internet(platform: Platform, log: logging.Logger) -> bool:
         return False
 
 
-# Persist discovered entries to per-year inventory shards (YYYY-MM-DD\t<url>), deduped.
-# Reads lastmod[:10] for date + year; entries without lastmod are skipped.
-# Mirrors CoinDesk's per-year inventory format for The Block.
-def _persist_inventory(entries: list[dict], inventory_dir: Path, platform_name: str) -> None:
-    inventory_dir.mkdir(parents=True, exist_ok=True)
-    by_year: dict[str, set[str]] = {}
+# Persist single master URL list (YYYY-MM-DD\t<url>), set-union append, sorted+deduped.
+# Uses lastmod[:10] for date; skips entries without lastmod or url.
+# TheBlock-specific: called when platform.uses_master_list is True.
+def _persist_master_list(entries: list[dict], master_path: Path, log: logging.Logger) -> None:
+    master_path.parent.mkdir(parents=True, exist_ok=True)
+    new_lines: set[str] = set()
     for e in entries:
         lastmod = e.get("lastmod", "")
         if not lastmod or len(lastmod) < 10:
             continue
-        date_str = lastmod[:10]
-        year = date_str[:4]
         url = e.get("url", "")
         if not url:
             continue
-        if year not in by_year:
-            by_year[year] = set()
-        by_year[year].add(f"{date_str}\t{url}")
-    for year, new_lines in by_year.items():
-        shard = inventory_dir / f"{platform_name}_{year}.txt"
-        existing: set[str] = set()
-        if shard.exists():
-            for line in shard.read_text(encoding="utf-8").splitlines():
-                if line:
-                    existing.add(line)
-        merged = existing | new_lines
-        shard.write_text("\n".join(sorted(merged)) + "\n", encoding="utf-8")
+        new_lines.add(f"{lastmod[:10]}\t{url}")
+    existing: set[str] = set()
+    if master_path.exists():
+        for line in master_path.read_text(encoding="utf-8").splitlines():
+            if line:
+                existing.add(line)
+    merged = existing | new_lines
+    master_path.write_text("\n".join(sorted(merged)) + "\n", encoding="utf-8")
+    log.info(
+        f"master_urls.txt → {len(merged)} lines ({len(new_lines - existing)} new) → {master_path}"
+    )
 
 
 # Write discover snapshot JSON; return path

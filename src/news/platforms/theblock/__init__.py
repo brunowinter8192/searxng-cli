@@ -20,6 +20,7 @@ class TheBlockPlatform:
     proxy_scrape_config        = PROXY_SCRAPE_CONFIG
     timeframe: str             = "delta"  # set by __main__ via --timeframe
     dedup_mode: str            = "hash_only"
+    uses_master_list: bool     = True     # pipeline writes single master_urls.txt instead of per-year shards
 
     async def discover(self, logger=None) -> list[dict]:
         return await _discover(self.timeframe, logger=logger)

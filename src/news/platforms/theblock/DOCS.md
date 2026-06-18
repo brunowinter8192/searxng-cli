@@ -19,6 +19,9 @@ Auto-registers via `register(TheBlockPlatform())` at module end.
 Extra platform attributes (not in Protocol):
 - `timeframe: str` — discovery mode (`"delta"` default); overwritten by `__main__` from `--timeframe`.
 - `dedup_mode: str = "hash_only"` — legacy attribute, not consumed by `run_pipeline` (which uses `mode="raw"`).
+- `uses_master_list: bool = True` — signals `pipeline.py` to write a single `data/news/theblock/master_urls.txt`
+  instead of per-year shards. Consumed via `getattr(platform, "uses_master_list", False)` in both
+  `run_discover_only()` and `run_pipeline()` proxy_pool path.
 
 ## Modules
 
@@ -55,10 +58,10 @@ Four timeframe modes (read from `self.timeframe`); no `lastmod` date filtering i
 Proxy pool is lazy-loaded into `pool_cache` on first fallback; shared across all XML fetches
 in the same discover call (index + sub-sitemaps) to avoid loading the pool twice.
 
-After `discover()`, `run_pipeline` calls `_persist_inventory(entries, inventory_dir, "theblock")` →
-writes `data/news/theblock/inventory/theblock_{year}.txt` (format `YYYY-MM-DD\t{url}`, deduped per
-shard). Mirrors CoinDesk's per-year inventory. Persistence is in `pipeline.py:_persist_inventory`,
-not in discover.py.
+After `discover()`, both `run_discover_only()` and `run_pipeline()` call
+`_persist_master_list(entries, master_path, log)` → `data/news/theblock/master_urls.txt`
+(format `YYYY-MM-DD\t{url}`, sorted+deduped, set-union append). No timestamped snapshot JSON,
+no per-year shards. Persistence is in `pipeline.py:_persist_master_list`, not in discover.py.
 
 ---
 
@@ -94,10 +97,11 @@ Fallback: if no `NewsArticle` or no `articleBody` → returns `""` + stderr log,
 
 ---
 
-### __init__.py (31 LOC)
+### __init__.py (32 LOC)
 
 **Purpose:** `TheBlockPlatform` class wrapping config + discover + cleanup; auto-registers on import.
 Fields: `name/collection="theblock"`, `scrape_engine="proxy_pool"`, `regwall_signals=[]`,
-`proxy_scrape_config=PROXY_SCRAPE_CONFIG`, `timeframe="delta"`, `dedup_mode="hash_only"`.
+`proxy_scrape_config=PROXY_SCRAPE_CONFIG`, `timeframe="delta"`, `dedup_mode="hash_only"`,
+`uses_master_list=True`.
 `precondition_url="https://www.google.com"` (theblock.co returns 403 on plain urllib).
 **Called by:** `__main__.py` (side-effect import).
