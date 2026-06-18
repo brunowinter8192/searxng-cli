@@ -2,6 +2,7 @@
 
 import argparse
 import asyncio
+import resource
 import sys
 import time
 from datetime import datetime, timezone
@@ -19,6 +20,7 @@ from p4_reporter import write_riding_report
 # ORCHESTRATOR
 
 async def _run(args: argparse.Namespace) -> None:
+    _raise_fd_limit()
     output_dir = Path(args.output_dir)
     output_dir.mkdir(parents=True, exist_ok=True)
 
@@ -76,6 +78,22 @@ async def _run(args: argparse.Namespace) -> None:
 
 
 # FUNCTIONS
+
+# Raise RLIMIT_NOFILE soft limit to target; warn if it fails (do not abort).
+def _raise_fd_limit(target: int = 16_384) -> None:
+    try:
+        soft, hard = resource.getrlimit(resource.RLIMIT_NOFILE)
+        new_soft   = target if hard == resource.RLIM_INFINITY else min(target, hard)
+        resource.setrlimit(resource.RLIMIT_NOFILE, (new_soft, hard))
+        soft2, hard2 = resource.getrlimit(resource.RLIMIT_NOFILE)
+        print(f"[main] RLIMIT_NOFILE soft={soft2} hard={hard2}", file=sys.stderr)
+    except Exception as exc:
+        print(
+            f"[main] WARNING: could not raise RLIMIT_NOFILE: {exc}\n"
+            f"  Manually run: ulimit -n 16384",
+            file=sys.stderr,
+        )
+
 
 # Parse CLI arguments.
 def _parse_args() -> argparse.Namespace:
