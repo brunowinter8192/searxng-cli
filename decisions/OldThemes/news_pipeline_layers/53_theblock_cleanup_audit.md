@@ -115,19 +115,25 @@ Output to `/tmp/theblock_raw_scratch_full/`. Zero harness exceptions.
 
 ### Zero-byte rate: 66 / 22,995 (0.29%)
 
-**G4 FALSIFIED.** All 66 zero-byte outputs share the same pattern: `@type: "NewsArticle"` ✓,
-`articleBody` field present ✓, but `articleBody` value is empty string. The
-`@type:"Article"` mismatch hypothesis was wrong — The Block's JSON-LD schema is
-`NewsArticle` throughout. Root cause: gated/paywalled articles where the site embeds an
-empty `articleBody` in JSON-LD. `cleanup.py` correctly logs `"empty articleBody"` and
-returns `""`. No schema fix needed.
+**G4 FALSIFIED** (worker), and the worker's follow-up "gated/paywalled" reading is ALSO
+wrong (Opus cross-check on the raw, articleBody + fallback `<div>` both inspected for all 66).
+Schema is `NewsArticle` throughout (not `@type:"Article"`). True root cause: these are
+**body-less posts** — there is NO article prose anywhere in the raw. Verified breakdown of the 66:
 
-**G4 update for the 3952-corpus zero-bytes:** same mechanism. The 2019-09-23 cluster
-was not `@type:"Article"` — it is the same empty-articleBody pattern from early paywalled content.
-`_is_news_article()` does not need extension.
+- **8 video-only** — `articleBody` is a YouTube/Twitter/Scribd `<iframe>` embed (+ copyright footer). The content IS the video; no text.
+- **43 boilerplate-only** — `articleBody` contains ONLY the `© … The Block` copyright/disclaimer footer, no prose.
+- **15 no-body** — `NewsArticle` present but no usable `articleBody`, and no `fallback-content` div either.
+- **0 / 66 recoverable** — the `fallback-content` SSR div carries no prose for ANY of them (51 empty/boilerplate div, 15 no div).
 
-**OPEN:** whether the article text is recoverable from a fallback `<div>` in the raw HTML
-(not yet probed). If yes, a fallback extraction path could recover these 66 URLs.
+`cleanup.py` is CORRECT to emit `""` here — there is nothing to index. These are NOT content
+loss: no retrievable text exists. Implication for C2 (issue #11): 0-byte = a legitimate
+body-less post, must be LOGGED/LISTED (not silently dropped), but is not a failure needing recovery.
+
+**G4 update for the 3952-corpus zero-bytes:** same class (body-less posts), not `@type`, not gated.
+The 2019-09-23 cluster is the same pattern. `_is_news_article()` does not need extension.
+
+**OPEN RESOLVED:** fallback `<div>` probed for all 66 → 0 recoverable prose. No fallback
+extraction path would recover any of them.
 
 ### Noise signature table (22,995 raw → cleaned)
 
