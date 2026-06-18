@@ -1,5 +1,6 @@
 # INFRASTRUCTURE
 
+import sys
 import time
 from collections import deque
 from concurrent.futures import ThreadPoolExecutor, as_completed
@@ -13,6 +14,7 @@ from src.news.engine.proxy_pool.buffer import build_active_buffer, refill_buffer
 
 _sleep             = time.sleep    # patchable in tests without affecting stdlib time
 REFRESH_INTERVAL_S = 3600          # full pool reload cadence (60 min)
+STALL_TIMEOUT_S    = 3600          # stall: no done/dead progress for one full pool cycle → terminate
 
 
 # ORCHESTRATOR
@@ -53,11 +55,20 @@ def run_loop(
     logger.record_pool_refresh(len(pool))
     for s in sources:
         logger.record_pool_source(s["url"], s["ok"], s["count"])
-    buf           = build_active_buffer(pool, cm, buffer_size)
-    _last_refresh = time.monotonic()
+    buf            = build_active_buffer(pool, cm, buffer_size)
+    _last_refresh  = time.monotonic()
+    _last_progress = time.monotonic()  # stall detection: last time a URL resolved to done or dead
 
     while queue:
         now = time.monotonic()
+
+        if now - _last_progress >= STALL_TIMEOUT_S:
+            print(
+                f"[proxy_pool] stall: no progress for {STALL_TIMEOUT_S}s, "
+                f"terminating with {len(queue)} urls unresolved → failed",
+                file=sys.stderr,
+            )
+            break
 
         if now - _last_refresh >= refresh_interval_s:
             pool, sources = pool_provider()
@@ -104,12 +115,14 @@ def run_loop(
                         if content_handler is not None:
                             content_handler(url, content)
                         done.append(url)
+                        _last_progress = time.monotonic()
                     wset.add(key)
                     _consec_fail.pop(key, None)
                 elif status == "dead":
                     if url not in batch_done:
                         batch_done.add(url)
                         dead.append(url)
+                        _last_progress = time.monotonic()
                     wset.add(key)
                     _consec_fail.pop(key, None)
                 else:
