@@ -22,7 +22,7 @@ def scrape_entries_proxy(
 
     Returns manifest [{url, hash, status, file, char_count, error}] in entries order.
     status values: "ok" (fetched + written), "dead" (404/410 from origin), "failed" (gap).
-    Only "ok" entries proceed to _run_cleanup in pipeline.py.
+    Only "ok" entries proceed to _run_clean_pass in pipeline.py.
     Job lifecycle (box_lock, Janitor, AcquireLogger) is owned by pipeline.py:run_pipeline.
     """
     output_dir.mkdir(parents=True, exist_ok=True)

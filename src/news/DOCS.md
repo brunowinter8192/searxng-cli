@@ -3,10 +3,11 @@
 ## Role
 
 Multi-platform news ingestion pipeline. Runs as `python -m src.news --source <platform>`.
-Discovers articles, deduplicates against the raw corpus, scrapes raw markdown, and persists to
-`data/news/{name}/raw/`. **Cleanup and publish are fully decoupled** — neither `cleanup.py` nor
-`publish.py` is called by any pipe path. The raw corpus is the durable asset; cleanup+index runs
-as a separate ad-hoc skill against the full corpus when ready.
+Discovers articles, deduplicates against the raw corpus, scrapes raw markdown into
+`data/news/{name}/raw/`. For The Block (proxy_pool engine), the pipeline also runs an in-pipe
+clean-pass that writes cleaned articles directly to the RAG collection dir
+(`rag-cli/data/documents/theblock/`). Indexing remains fully decoupled — no `rag-cli index`
+call in any pipe path.
 
 Touch this package when adding a new news source or changing pipeline orchestration.
 Do NOT import from `src/crawler/` or `src/scraper/` — `src/news/` is self-contained.
@@ -16,7 +17,7 @@ Do NOT import from `src/crawler/` or `src/scraper/` — `src/news/` is self-cont
 - `python -m src.news --source coindesk --discover-only [--timeframe 30|full]` — discover + inventory update only; no scrape
 - `python -m src.news --source coindesk --scrape-only --year YYYY [--from YYYY-MM-DD] [--to YYYY-MM-DD] [--limit N]` — date-filtered backfill: inventory → dedup(raw) → chunked scrape → raw persist → job report
 - `python -m src.news --source coindesk` — full pipeline: discover → dedup(raw) → scrape → raw persist
-- `python -m src.news --source theblock --discover-only [--timeframe full|sub:N|sub:A-B]` — discover → persist master list `data/news/theblock/master_urls.txt`; no scrape
+- `python -m src.news --source theblock --discover-only [--timeframe full|sub:N|sub:A-B]` — discover → persist master list `data/news/theblock/discover/master_urls.txt`; no scrape
 - `python -m src.news --source theblock [--timeframe delta|full|sub:N]` — full pipeline (proxy_pool engine); also updates master list
 - Direct: `asyncio.run(run_pipeline(platform))` or `asyncio.run(run_discover_only(platform))` or `asyncio.run(run_scrape_only(platform, year=..., limit=...))`
 
@@ -41,7 +42,7 @@ class Platform(Protocol):
     proxy_scrape_config: ProxyScrapeConfig | None  # None for browser platforms
 
     async def discover(self) -> list[dict]: ...         # [{url,lastmod,publication_date,title,section}]
-    def cleanup(self, raw_markdown: str, entry: dict) -> str: ...   # -> pure body (not called by pipe)
+    def cleanup(self, raw_html: str, entry: dict) -> str: ...   # -> clean Markdown; called by proxy_pool clean-pass (TheBlock only)
 
 # ProxyScrapeConfig (platform.py) — required when scrape_engine == "proxy_pool"
 @dataclass
@@ -62,7 +63,7 @@ Proxy platforms set `scrape_engine = "proxy_pool"` and provide a `ProxyScrapeCon
   TheBlock: `"delta"` (default, top-2 subs) | `"full"` (all subs) | `"sub:N"` | `"sub:A-B"`.
   When `--timeframe` is not `"delta"` AND `--discover-only` is not set, `__main__` auto-forces
   `skip_index=True` and prints `"After review, run: rag-cli index --collection <collection>"`.
-- `uses_master_list: bool` — if `True`, `pipeline.py` writes a single `data/news/{name}/master_urls.txt`
+- `uses_master_list: bool` — if `True`, `pipeline.py` writes a single `data/news/{name}/discover/master_urls.txt`
   (format `YYYY-MM-DD\t<url>`, sorted+deduped, set-union append) instead of timestamped JSON snapshots
   or per-year inventory shards. Both `run_discover_only()` and `run_pipeline()` proxy_pool path honour it.
   Currently `True` only for TheBlock. CoinDesk: attribute absent (defaults `False`) → unchanged behaviour.
@@ -73,26 +74,28 @@ Proxy platforms set `scrape_engine = "proxy_pool"` and provide a `ProxyScrapeCon
 |---|---|---|
 | `platform.py` | ScrapeConfig + ProxyScrapeConfig + Platform Protocol | 35 |
 | `registry.py` | name → Platform registry; register() / get() | 19 |
-| `pipeline.py` | Async orchestrator; raw-only stages 1–3; run_discover_only(); run_scrape_only(); _persist_master_list() | 321 |
+| `pipeline.py` | Async orchestrator; stages 1–4 for proxy_pool (TheBlock); raw-only 1–3 for browser; run_discover_only(); run_scrape_only(); _persist_master_list(); _run_clean_pass() | 367 |
 | `__main__.py` | argparse entry point; --source + --skip-index + --timeframe + --discover-only | 102 |
 | `engine/` | Generic scrape engines (browser + proxy_pool) + dedup | — |
 | `platforms/coindesk/` | CoinDesk platform implementation | — |
 | `platforms/theblock/` | The Block platform — proxy_pool, hash-dedup, JSON-LD cleanup | — |
 
-## Flow (run_pipeline — both engines)
+## Flow (run_pipeline — proxy_pool / TheBlock)
 
-1. **discover** — `platform.discover()` → entry list.
-   - TheBlock (`uses_master_list=True`): `_persist_master_list()` → `data/news/theblock/master_urls.txt` (YYYY-MM-DD\t{url}, sorted+deduped, set-union append). No snapshot JSON.
-   - Other platforms (browser/CoinDesk path): JSON snapshot written to `data/news/{name}/discover/`.
-2. **dedup** — `filter_new_entries(entries, raw_dir, name, mode="raw")` against `data/news/{name}/raw/` (existence of `{hash}.md`). Always `mode="raw"` — no collection check.
-3. **scrape** — dispatch on `platform.scrape_engine`:
-   - `"browser"` → `scrape_entries()` — fresh `AsyncWebCrawler` per URL, Scrapy gate pacing. Writes raw body to `raw/{hash}.md`. On `RegwallGuardError`: `exc.manifest` recovered, ok files preserved, persist continues.
-   - `"proxy_pool"` → `scrape_entries_proxy()` — sustained proxy rotation via `run_loop`. Writes raw body to `raw/{hash}.md`. Janitor lifecycle (box_lock, start_job/end_job, AcquireLogger) preserved.
-4. **raw persist** — `_append_to_raw_manifest(raw_dir, ok_entries)` writes `raw/manifest.jsonl` ({hash,url,publication_date}). `_update_blocked_urls()` updates:
-   - browser: `regwall_urls.txt` + `empty_urls.txt`
-   - proxy_pool: `dead_urls.txt` + `failed_urls.txt`
+1. **discover** — `platform.discover()` → entry list. `_persist_master_list()` → `data/news/theblock/discover/master_urls.txt` (YYYY-MM-DD\t{url}, sorted+deduped, set-union append). No snapshot JSON written alongside it.
+2. **dedup** — `filter_new_entries(entries, raw_dir, name, mode="raw")` against `data/news/{name}/raw/` (existence of `{hash}.md`). Always `mode="raw"`.
+3. **scrape** — `scrape_entries_proxy()` — sustained proxy rotation via `run_loop`. Writes raw body to `raw/{hash}.md`. Janitor lifecycle (box_lock, start_job/end_job, AcquireLogger) preserved.
+4. **raw persist** — `_append_to_raw_manifest(raw_dir, ok_entries)` → `raw/manifest.jsonl`. `_update_blocked_urls()` → `dead_urls.txt` + `failed_urls.txt`.
+5. **clean-pass** — `_run_clean_pass()`: for each ok entry, reads `raw/{hash}.md`, calls `platform.cleanup()` (JSON-LD parse + Markdown + `_post_clean()`), writes `theblock__{pubdate}__{hash}.md` to `rag-cli/data/documents/theblock/`. Body-less articles (empty `articleBody` or no `NewsArticle` JSON-LD) → URL appended to `data/news/theblock/bodyless_urls.txt` (set-union, sorted). Raw files never modified. Progress logged every 200 entries. Indexing NOT triggered — `rag-cli index` remains a separate manual step.
 
-No Stage 4 (cleanup) or Stage 5 (publish). `cleanup.py` and `publish.py` remain on disk but are not called.
+## Flow (run_pipeline — browser / CoinDesk)
+
+1. **discover** — `platform.discover()` → entry list. JSON snapshot written to `data/news/{name}/discover/`.
+2. **dedup** — same as proxy_pool path.
+3. **scrape** — `scrape_entries()` — fresh `AsyncWebCrawler` per URL, Scrapy gate pacing. Writes raw body to `raw/{hash}.md`. On `RegwallGuardError`: `exc.manifest` recovered, ok files preserved.
+4. **raw persist** — `_append_to_raw_manifest()` + `_update_blocked_urls()` → `regwall_urls.txt` + `empty_urls.txt`.
+
+No clean-pass or publish in the browser path. `publish.py` remains on disk but is not called.
 
 ## Scrape-Job Flow (run_scrape_only — CoinDesk `--scrape-only`)
 
