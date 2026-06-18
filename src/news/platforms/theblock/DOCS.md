@@ -62,7 +62,7 @@ not in discover.py.
 
 ---
 
-### cleanup.py (101 LOC)
+### cleanup.py (140 LOC)
 
 **Purpose:** Parse JSON-LD `NewsArticle` block from raw HTML fetched by proxy engine →
 extract `articleBody` (HTML) → convert to Markdown via `crawl4ai.html2text.HTML2Text` →
@@ -78,11 +78,18 @@ plain dict, dict with `@graph`, top-level array, non-dict values (int/str) silen
 
 `_post_clean()` regex pass (applied after html2text, in this order):
 1. Inline-URL strip: `[text](url)` → `text`.
-2. Disclaimer line: `^Disclaimer: The Block is an independent media outlet.*$` removed.
-3. Copyright line: `^©\s*\d{4}\s+The Block\.\s*All Rights Reserved.*$` removed.
-4. Newsletter CTA: `^_.*subscribe to the .*newsletter.*_\s*$` removed.
-5. Trailing whitespace per line; blank-run collapse to single blank; final strip.
+2. TinyMCE bookmark spans (`_MCE_SPAN_RE`): `<span[^>]*data-mce-type[^>]*>.*?</span>` removed (DOTALL).
+3. Disclaimer line (`_DISCLAIMER_RE`): `^Disclaimer: The Block is an independent media outlet.*$` removed.
+4. Copyright line (`_COPYRIGHT_RE`): covers both `The Block.` and old brand `The Block Crypto, Inc.`.
+5. Newsletter CTA (`_NEWSLETTER_CTA_RE`): `^_.*subscribe to the .*newsletter.*$` (trailing `_` not required).
+6. Commissioned disclaimer (`_COMMISSIONED_RE`): `^_?This post is commissioned\b.*$`.
+7. Podcast subscribe CTA (`_PODCAST_SUB_CTA_RE`): `^[*_]*Listen below[,.]?\s+and subscribe to\b.*$`.
+8. Newsletter promo block (`_NEWSLETTER_PROMO_RE`): `**The Block Newsletters` header + subscribe line.
+9. Campus CTA (`_CAMPUS_CTA_RE`): any line containing `theblock.co/campus`.
+10. Podcast sponsor block (`_SPONSOR_BLOCK_RE`): `\n\*{0,2}This episode is brought to you by\b.*` to EOS (DOTALL).
+11. Trailing whitespace per line; blank-run collapse to single blank; final strip.
 
+Rules validated against full 22,995 raw corpus. See `decisions/OldThemes/news_pipeline_layers/54_theblock_cleaner_extension.md`.
 Fallback: if no `NewsArticle` or no `articleBody` → returns `""` + stderr log, no crash.
 
 ---
