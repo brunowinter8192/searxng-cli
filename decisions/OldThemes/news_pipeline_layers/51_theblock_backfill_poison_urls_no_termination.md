@@ -68,5 +68,11 @@ session.
 
 ## Status
 
-Run killed (PID 26470, confirmed DEAD). Resolution — manual URL inspection (A), then skip-mechanism +
-salvage (B) — deferred to a separate The Block session.
+Run killed (PID 26470, confirmed DEAD).
+
+**Resolved (2026-06-18) — see OT56 (`56_proxy_pool_stall_termination.md`).** The skip-mechanism (B)
+is implemented as a global stall-detector in `loop.py`: no done/dead progress for one full pool cycle
+(3600s) → terminate, open queue → `failed_urls.txt`. Chosen over a per-URL attempt-cap (bulk-safe by
+construction, preserves a slow-but-progressing tail). Salvage of the 22,995 raw was done separately
+(cleaner extension + production run — OT54). The per-URL manual inspection (A) of the 8 poison URLs
+remains optional; they now terminate cleanly into `failed_urls.txt` regardless.
