@@ -6,14 +6,21 @@ from pathlib import Path
 
 
 def _repo_root() -> Path:
-    """Return main repo root — works from worktrees (git-common-dir → parent)."""
+    """Return main repo root — works from both worktrees and main checkout.
+
+    git rev-parse --git-common-dir returns a path relative to the subprocess CWD
+    (not the Python process CWD) when the repo is a main checkout.  Resolving
+    relative to Path(__file__).parent (= the subprocess CWD) is correct in both
+    cases; when git returns an absolute path, Path(dir / absolute) == absolute.
+    """
     result = subprocess.run(
         ["git", "rev-parse", "--git-common-dir"],
         capture_output=True, text=True,
         cwd=Path(__file__).parent,
         check=True,
     )
-    return Path(result.stdout.strip()).resolve().parent
+    git_common_dir = (Path(__file__).parent / result.stdout.strip()).resolve()
+    return git_common_dir.parent
 
 
 INVENTORY_DIR = _repo_root() / "data" / "news" / "coindesk" / "inventory"

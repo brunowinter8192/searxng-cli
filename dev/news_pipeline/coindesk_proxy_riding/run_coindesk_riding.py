@@ -22,7 +22,16 @@ async def _run(args: argparse.Namespace) -> None:
     output_dir = Path(args.output_dir)
     output_dir.mkdir(parents=True, exist_ok=True)
 
-    urls      = sample_urls(args.n_urls)
+    urls = sample_urls(args.n_urls)
+    if not urls:
+        print(
+            f"[main] FATAL: sample_urls({args.n_urls}) returned 0 URLs.\n"
+            f"  INVENTORY_DIR resolution failed — check p3_url_sampler._repo_root().\n"
+            f"  Expected: data/news/coindesk/inventory/ under repo root.",
+            file=sys.stderr,
+        )
+        sys.exit(1)
+
     url_queue = asyncio.Queue()
     for u in urls:
         url_queue.put_nowait(u)
