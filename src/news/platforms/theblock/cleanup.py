@@ -37,6 +37,17 @@ _NEWSLETTER_PROMO_RE = re.compile(
 # URL is a pure product-CTA; never appears in editorial prose.
 _CAMPUS_CTA_RE      = re.compile(r'^.*theblock\.co/campus.*$', re.MULTILINE)
 
+# Stage 2 — Podcast sponsor block (252 files).
+# Strips from the sponsor-block header to end of string.
+# EOS anchor proven safe: 252/252 files checked — zero editorial content follows
+# the header; only sponsor descriptions, The Block Community promos, and
+# copyright/disclaimer lines (already stripped by Stage 1) appear after it.
+# \*{0,2} covers the 2 files whose header lacks the ** bold prefix.
+_SPONSOR_BLOCK_RE   = re.compile(
+    r'\n\*{0,2}This episode is brought to you by\b.*',
+    re.DOTALL | re.IGNORECASE,
+)
+
 
 # FUNCTIONS
 
@@ -102,7 +113,8 @@ def _is_news_article(data: dict) -> bool:
 
 
 # Strip The-Block-specific boilerplate from post-html2text Markdown.
-# Order: inline-URL strip first (exposes plain CTA text), MCE spans, then line-level removals, then normalise.
+# Order: inline-URL strip first (exposes plain CTA text), MCE spans, then line-level removals,
+# sponsor block (EOS anchor, always last), then normalise.
 def _post_clean(md: str) -> str:
     md = _LINK_URL_RE.sub(r'\1', md)
     md = _MCE_SPAN_RE.sub('', md)
@@ -113,6 +125,7 @@ def _post_clean(md: str) -> str:
     md = _PODCAST_SUB_CTA_RE.sub('', md)
     md = _NEWSLETTER_PROMO_RE.sub('', md)
     md = _CAMPUS_CTA_RE.sub('', md)
+    md = _SPONSOR_BLOCK_RE.sub('', md)
     lines = [line.rstrip() for line in md.splitlines()]
     md = '\n'.join(lines)
     md = _BLANK_RUN_RE.sub('\n\n', md)
