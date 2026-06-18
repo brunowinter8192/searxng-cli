@@ -3,7 +3,7 @@
 ## Role
 
 Standalone dev suite for scraping CoinDesk article HTML at scale via rotating proxies.
-Architecture: 128-wide `curl_cffi` alive-feeder continuously validates proxies against CoinDesk → feeds browser-eligible ones (http/socks5) to a pool of up to 20 Playwright browser slots. Each slot binds one proxy and rides the URL queue; a fresh Playwright BrowserContext is forced per URL via `session_id` + `kill_session()` (proxy and browser process stay alive). Regwall detection runs on `result.markdown.raw_markdown` (not raw HTML — REGWALL_SIGNALS are hidden React components always present in HTML). A proxy is burned and rotated when cumulative regwall hits reach the burn threshold.
+Architecture: ONE shared Playwright browser process; N concurrent rider tasks (default 20) each pull raw proxies directly from the pool (no pre-validation). Each URL fetch uses `CrawlerRunConfig(proxy_config=ProxyConfig(server=...))` → fresh Playwright BrowserContext per proxy via crawl4ai's config-signature mechanism + `session_id` + `kill_session()` (fresh cookies per URL, browser stays alive). Regwall detection on `result.markdown.raw_markdown` (not raw HTML — REGWALL_SIGNALS are hidden React components always present in HTML). A proxy is burned and rotated when cumulative regwall hits reach the burn threshold.
 
 Self-contained: no imports from `src/`. `p0_pool.py` is a local copy of the proxy pool machinery.
 
@@ -29,6 +29,7 @@ Self-contained: no imports from `src/`. `p0_pool.py` is a local copy of the prox
 | `--concurrency` | 20 | Parallel browser slots |
 | `--burn-threshold` | 2 | Cumulative regwall hits per proxy before rotation |
 | `--output-dir` | `output` | Directory for raw HTML and report |
+| `--page-timeout` | 8000 | Playwright page timeout ms (dead proxies hit this before rotating) |
 
 ## Expected Output
 
@@ -50,21 +51,9 @@ Self-contained: no imports from `src/`. `p0_pool.py` is a local copy of the prox
 **Exports:** `load_backfill_pool()`, `PersistentCooldownManager`, `proxy_key()`, `fetch_with_retry()`
 **Why local:** hookify blocks `from src.` imports in dev/ scripts.
 
----
+### p2_browser_rider.py (399 LOC)
 
-### p1_alive_feeder.py (283 LOC)
-
-**Purpose:** Background asyncio task: validates proxies 128-wide via `curl_cffi` HTTP-200 check against rotating CoinDesk test URLs; feeds browser-eligible (http/socks5) proxies into an `asyncio.Queue`.
-**Key constants:** `ALIVE_CONCURRENCY=128`, `FEEDER_QUEUE_MAXSIZE=40`, `BROWSER_ELIGIBLE_PROTOS={"http","socks5"}` (socks4 excluded — Playwright unreliable).
-**Alive-check note:** HTTP 200 only; no regwall check — REGWALL_SIGNALS fire on ALL CoinDesk pages in raw HTML.
-**Exports:** `AliveFeeder`, `FEEDER_QUEUE_MAXSIZE`, `FeederStats`
-
----
-
-### p2_browser_rider.py (395 LOC)
-
-**Purpose:** Core riding pool — `n_slots` asyncio tasks each bind one proxy, fetch URLs via crawl4ai/Playwright, detect regwall on rendered markdown, write raw HTML to disk.
-**Key:** `session_id` + `kill_session()` per URL → fresh BrowserContext (cookies reset) while browser process and proxy stay alive. `page_timeout=12_000ms` is the dead-proxy timeout lever.
+**Purpose:** Core riding pool — ONE shared `AsyncWebCrawler` (no browser-level proxy); N rider tasks each pull raw proxies via `_next_proxy()` (atomic cursor over `eligible_candidates()`). Per-URL: `CrawlerRunConfig(proxy_config=ProxyConfig(server=pstr))` → fresh context per config-signature; `kill_session()` closes context after each fetch (fresh cookies). `page_timeout_ms` (CLI-configurable, default 8s) is the dead-proxy timeout lever.
 **Status routing:** ok → write HTML; regwall → requeue URL (up to `MAX_URL_RETRIES=3`), increment burn_count; connect_fail → requeue URL, rotate proxy immediately; failed/empty → drop.
 **Exports:** `run_riding_pool()`, `RiderState`, `RideRecord`, `JobRecord`
 
@@ -85,7 +74,7 @@ Self-contained: no imports from `src/`. `p0_pool.py` is a local copy of the prox
 
 ---
 
-### run_coindesk_riding.py (82 LOC)
+### run_coindesk_riding.py (101 LOC)
 
-**Purpose:** CLI orchestrator — wires `AliveFeeder` + `run_riding_pool` + `write_riding_report` end-to-end; handles feeder teardown on completion.
+**Purpose:** CLI orchestrator — loads pool via `load_backfill_pool()`, wires `run_riding_pool` + `write_riding_report` end-to-end; raises `RLIMIT_NOFILE` at startup.
 **Entry point:** `__main__` via `asyncio.run(_run(_parse_args()))`.
