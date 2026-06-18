@@ -39,7 +39,7 @@ async def run_discover_only(platform: Platform) -> None:
     entries = await platform.discover()
     log.info(f"discover → {len(entries)} entries")
     if getattr(platform, "uses_master_list", False):
-        master_path = DATA_ROOT / platform.name / "master_urls.txt"
+        master_path = DATA_ROOT / platform.name / "discover" / "master_urls.txt"
         _persist_master_list(entries, master_path, log)
     _write_marker(platform.name, log)
     log.info(f"=== {platform.name} discover-only complete ===")
@@ -160,7 +160,7 @@ async def run_pipeline(platform: Platform, skip_index: bool = False) -> None:
                     _write_marker(platform.name, log)
                     return
                 if getattr(platform, "uses_master_list", False):
-                    master_path = DATA_ROOT / platform.name / "master_urls.txt"
+                    master_path = DATA_ROOT / platform.name / "discover" / "master_urls.txt"
                     _persist_master_list(entries, master_path, log)
                 else:
                     discover_snapshot = _write_discover_snapshot(entries, discover_dir)

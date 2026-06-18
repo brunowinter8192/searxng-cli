@@ -19,7 +19,7 @@ Auto-registers via `register(TheBlockPlatform())` at module end.
 Extra platform attributes (not in Protocol):
 - `timeframe: str` — discovery mode (`"delta"` default); overwritten by `__main__` from `--timeframe`.
 - `dedup_mode: str = "hash_only"` — legacy attribute, not consumed by `run_pipeline` (which uses `mode="raw"`).
-- `uses_master_list: bool = True` — signals `pipeline.py` to write a single `data/news/theblock/master_urls.txt`
+- `uses_master_list: bool = True` — signals `pipeline.py` to write a single `data/news/theblock/discover/master_urls.txt`
   instead of per-year shards. Consumed via `getattr(platform, "uses_master_list", False)` in both
   `run_discover_only()` and `run_pipeline()` proxy_pool path.
 
@@ -59,7 +59,7 @@ Proxy pool is lazy-loaded into `pool_cache` on first fallback; shared across all
 in the same discover call (index + sub-sitemaps) to avoid loading the pool twice.
 
 After `discover()`, both `run_discover_only()` and `run_pipeline()` call
-`_persist_master_list(entries, master_path, log)` → `data/news/theblock/master_urls.txt`
+`_persist_master_list(entries, master_path, log)` → `data/news/theblock/discover/master_urls.txt`
 (format `YYYY-MM-DD\t{url}`, sorted+deduped, set-union append). No timestamped snapshot JSON,
 no per-year shards. Persistence is in `pipeline.py:_persist_master_list`, not in discover.py.
 

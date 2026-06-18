@@ -17,7 +17,7 @@ Do NOT import from `src/crawler/` or `src/scraper/` — `src/news/` is self-cont
 - `python -m src.news --source coindesk --discover-only [--timeframe 30|full]` — discover + inventory update only; no scrape
 - `python -m src.news --source coindesk --scrape-only --year YYYY [--from YYYY-MM-DD] [--to YYYY-MM-DD] [--limit N]` — date-filtered backfill: inventory → dedup(raw) → chunked scrape → raw persist → job report
 - `python -m src.news --source coindesk` — full pipeline: discover → dedup(raw) → scrape → raw persist
-- `python -m src.news --source theblock --discover-only [--timeframe full|sub:N|sub:A-B]` — discover → persist master list `data/news/theblock/master_urls.txt`; no scrape
+- `python -m src.news --source theblock --discover-only [--timeframe full|sub:N|sub:A-B]` — discover → persist master list `data/news/theblock/discover/master_urls.txt`; no scrape
 - `python -m src.news --source theblock [--timeframe delta|full|sub:N]` — full pipeline (proxy_pool engine); also updates master list
 - Direct: `asyncio.run(run_pipeline(platform))` or `asyncio.run(run_discover_only(platform))` or `asyncio.run(run_scrape_only(platform, year=..., limit=...))`
 
@@ -63,7 +63,7 @@ Proxy platforms set `scrape_engine = "proxy_pool"` and provide a `ProxyScrapeCon
   TheBlock: `"delta"` (default, top-2 subs) | `"full"` (all subs) | `"sub:N"` | `"sub:A-B"`.
   When `--timeframe` is not `"delta"` AND `--discover-only` is not set, `__main__` auto-forces
   `skip_index=True` and prints `"After review, run: rag-cli index --collection <collection>"`.
-- `uses_master_list: bool` — if `True`, `pipeline.py` writes a single `data/news/{name}/master_urls.txt`
+- `uses_master_list: bool` — if `True`, `pipeline.py` writes a single `data/news/{name}/discover/master_urls.txt`
   (format `YYYY-MM-DD\t<url>`, sorted+deduped, set-union append) instead of timestamped JSON snapshots
   or per-year inventory shards. Both `run_discover_only()` and `run_pipeline()` proxy_pool path honour it.
   Currently `True` only for TheBlock. CoinDesk: attribute absent (defaults `False`) → unchanged behaviour.
@@ -82,7 +82,7 @@ Proxy platforms set `scrape_engine = "proxy_pool"` and provide a `ProxyScrapeCon
 
 ## Flow (run_pipeline — proxy_pool / TheBlock)
 
-1. **discover** — `platform.discover()` → entry list. `_persist_master_list()` → `data/news/theblock/master_urls.txt` (YYYY-MM-DD\t{url}, sorted+deduped, set-union append). No snapshot JSON.
+1. **discover** — `platform.discover()` → entry list. `_persist_master_list()` → `data/news/theblock/discover/master_urls.txt` (YYYY-MM-DD\t{url}, sorted+deduped, set-union append). No snapshot JSON written alongside it.
 2. **dedup** — `filter_new_entries(entries, raw_dir, name, mode="raw")` against `data/news/{name}/raw/` (existence of `{hash}.md`). Always `mode="raw"`.
 3. **scrape** — `scrape_entries_proxy()` — sustained proxy rotation via `run_loop`. Writes raw body to `raw/{hash}.md`. Janitor lifecycle (box_lock, start_job/end_job, AcquireLogger) preserved.
 4. **raw persist** — `_append_to_raw_manifest(raw_dir, ok_entries)` → `raw/manifest.jsonl`. `_update_blocked_urls()` → `dead_urls.txt` + `failed_urls.txt`.
