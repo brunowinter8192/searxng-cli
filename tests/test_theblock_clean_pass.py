@@ -87,8 +87,8 @@ def test_bodyless_no_clean_file_url_recorded(dirs):
     # No clean file for the body-less article
     bodyless_clean = list(collection_dir.glob(f"*{BODYLESS_HASH}*")) if collection_dir.exists() else []
     assert not bodyless_clean, f"body-less article must not produce a clean file: {bodyless_clean}"
-    # URL recorded in bodyless_urls.txt (sibling of raw_dir)
-    bodyless_path = raw_dir.parent / "bodyless_urls.txt"
+    # URL recorded in clean/bodyless_urls.txt
+    bodyless_path = raw_dir.parent / "clean" / "bodyless_urls.txt"
     assert bodyless_path.exists(), "bodyless_urls.txt must be created"
     assert BODYLESS_URL in bodyless_path.read_text(encoding="utf-8")
 
@@ -131,7 +131,7 @@ def test_bodyless_urls_union_merged(dirs):
     extra_entries = [{"url": extra_url, "hash": extra_hash, "publication_date": ""}]
     _run_clean_pass(_PLATFORM, extra_entries, raw_dir, collection_dir, _LOG)
 
-    bodyless_path = raw_dir.parent / "bodyless_urls.txt"
+    bodyless_path = raw_dir.parent / "clean" / "bodyless_urls.txt"
     lines = [l for l in bodyless_path.read_text(encoding="utf-8").splitlines() if l]
     assert BODYLESS_URL in lines
     assert extra_url in lines

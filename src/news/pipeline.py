@@ -337,7 +337,7 @@ def _write_discover_snapshot(entries: list[dict], discover_dir: Path) -> Path:
 
 
 # Clean ok entries: read raw/{hash}.md → platform.cleanup() → write theblock__{pubdate}__{hash}.md
-# to collection_dir. body-less (cleanup → ""): log + append URL to raw_dir.parent/bodyless_urls.txt
+# to collection_dir. body-less (cleanup → ""): log + append URL to raw_dir.parent/clean/bodyless_urls.txt
 # (set-union, sorted). Read-only on raw/. collection_dir created if absent.
 # Progress logged every 200 entries. Returns {"n_cleaned", "n_bodyless", "total"}.
 def _run_clean_pass(
@@ -350,7 +350,7 @@ def _run_clean_pass(
     if not ok_entries:
         return {"n_cleaned": 0, "n_bodyless": 0, "total": 0}
     collection_dir.mkdir(parents=True, exist_ok=True)
-    bodyless_path = raw_dir.parent / "bodyless_urls.txt"
+    bodyless_path = raw_dir.parent / "clean" / "bodyless_urls.txt"
     bodyless_urls: list[str] = []
     n_cleaned = 0
     total = len(ok_entries)
@@ -374,6 +374,7 @@ def _run_clean_pass(
             log.info(f"clean progress {i}/{total} — {n_cleaned} cleaned, {len(bodyless_urls)} body-less")
     n_bodyless = len(bodyless_urls)
     if bodyless_urls:
+        bodyless_path.parent.mkdir(parents=True, exist_ok=True)
         existing = set(bodyless_path.read_text(encoding="utf-8").splitlines()) if bodyless_path.exists() else set()
         merged = (existing | set(bodyless_urls)) - {""}
         bodyless_path.write_text("\n".join(sorted(merged)) + "\n", encoding="utf-8")
