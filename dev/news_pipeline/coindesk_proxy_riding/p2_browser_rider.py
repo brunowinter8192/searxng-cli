@@ -26,7 +26,7 @@ REGWALL_SIGNALS: list[str] = [
     "You've reached your monthly limit",
 ]
 
-PAGE_TIMEOUT_MS   = 12_000   # 12 s — dead proxy hits this before burning a slot
+PAGE_TIMEOUT_MS   = 8_000    # default; overridden per-call via page_timeout_ms param
 DELAY_BEFORE_HTML = 0.5      # s wait after domcontentloaded
 STALL_TIMEOUT_S   = 3_600.0  # 60 min no progress → terminate
 MAX_URL_RETRIES   = 3        # max requeues per URL before giving up
@@ -38,11 +38,8 @@ _PROXY_ERR = ("timeout", "proxy", "err_proxy", "tunnel", "socks",
 RAW_SUBDIR = "raw"
 
 
-# DATA CLASSES
-
 @dataclass
 class RideRecord:
-    """Per-proxy ride statistics."""
     proxy_str:        str
     proto:            str
     host_port:        str
@@ -53,13 +50,11 @@ class RideRecord:
     burned_threshold: bool
     burned_connect:   bool
     ride_s:           float
-    # (url, status, elapsed_s) in ride order — for regwall-position curve
-    positions:        list = field(default_factory=list)
+    positions:        list = field(default_factory=list)  # (url, status, elapsed_s)
 
 
 @dataclass
 class JobRecord:
-    """Per-URL outcome record."""
     url:           str
     url_hash:      str
     status:        str        # ok | regwall | connect_fail | failed | empty
@@ -75,12 +70,12 @@ class JobRecord:
 
 @dataclass
 class RiderState:
-    """Shared mutable state across all browser slots."""
     url_queue:       asyncio.Queue
-    proxy_queue:     asyncio.Queue
+    proxy_pool:      list               # raw (proto, hp) tuples from load_backfill_pool()
     cooldown_mgr:    PersistentCooldownManager
     output_dir:      Path
     burn_threshold:  int
+    page_timeout_ms: int
     total_urls:      int
     max_url_retries: int   = MAX_URL_RETRIES
 
@@ -92,9 +87,11 @@ class RiderState:
     url_retries:     dict  = field(default_factory=dict)
     job_records:     list  = field(default_factory=list)
     ride_records:    list  = field(default_factory=list)
-    last_progress_mono: float = field(default_factory=time.monotonic)
-    stall_timeout_s:    float = STALL_TIMEOUT_S
-    termination:        str   = "running"   # all-done | stall | pool-exhausted
+    last_progress_mono: float      = field(default_factory=time.monotonic)
+    stall_timeout_s:    float      = STALL_TIMEOUT_S
+    termination:        str        = "running"   # all-done | stall | pool-exhausted
+    proxy_cursor:       int        = 0
+    proxy_lock:         asyncio.Lock = field(default_factory=asyncio.Lock)
 
     @property
     def all_resolved(self) -> bool:
@@ -103,26 +100,36 @@ class RiderState:
 
 # ORCHESTRATOR
 
-# Launch n_slots concurrent browser-riding tasks; return shared state when done.
+# Launch n_slots concurrent rider tasks on one shared browser; return shared state when done.
 async def run_riding_pool(
-    url_queue:      asyncio.Queue,
-    proxy_queue:    asyncio.Queue,
-    cooldown_mgr:   PersistentCooldownManager,
-    output_dir:     Path,
-    burn_threshold: int,
-    n_slots:        int,
+    url_queue:       asyncio.Queue,
+    proxy_pool:      list,
+    cooldown_mgr:    PersistentCooldownManager,
+    output_dir:      Path,
+    burn_threshold:  int,
+    n_slots:         int,
+    page_timeout_ms: int = PAGE_TIMEOUT_MS,
 ) -> RiderState:
     (output_dir / RAW_SUBDIR).mkdir(parents=True, exist_ok=True)
     state = RiderState(
         url_queue=url_queue,
-        proxy_queue=proxy_queue,
+        proxy_pool=proxy_pool,
         cooldown_mgr=cooldown_mgr,
         output_dir=output_dir,
         burn_threshold=burn_threshold,
+        page_timeout_ms=page_timeout_ms,
         total_urls=url_queue.qsize(),
     )
-    tasks = [asyncio.create_task(_run_slot(i, state)) for i in range(n_slots)]
-    await asyncio.gather(*tasks)
+    crawler = AsyncWebCrawler(config=BrowserConfig(headless=True, verbose=False))
+    await crawler.start()
+    try:
+        tasks = [asyncio.create_task(_run_slot(i, crawler, state)) for i in range(n_slots)]
+        await asyncio.gather(*tasks)
+    finally:
+        try:
+            await crawler.close()
+        except Exception as exc:
+            print(f"[rider] crawler.close warn: {exc}", file=sys.stderr)
     if state.termination == "running":
         state.termination = "all-done"
     return state
@@ -130,8 +137,8 @@ async def run_riding_pool(
 
 # FUNCTIONS
 
-# One browser slot: bind proxy → ride URL queue → burn/rotate → repeat
-async def _run_slot(slot_id: int, state: RiderState) -> None:
+# One rider task: pull proxy → ride URL queue → burn/rotate → repeat.
+async def _run_slot(slot_id: int, crawler: AsyncWebCrawler, state: RiderState) -> None:
     print(f"[slot {slot_id}] started", file=sys.stderr)
 
     while not state.all_resolved:
@@ -140,27 +147,17 @@ async def _run_slot(slot_id: int, state: RiderState) -> None:
             state.termination = "stall"
             break
 
-        try:
-            proto, hp = await asyncio.wait_for(state.proxy_queue.get(), timeout=30.0)
-        except asyncio.TimeoutError:
+        entry = await _next_proxy(state)
+        if entry is None:
             if state.all_resolved:
                 break
-            continue
+            print(f"[slot {slot_id}] pool exhausted", file=sys.stderr)
+            state.termination = "pool-exhausted"
+            break
 
-        pstr   = f"{proto}://{hp}"
-        t_bind = time.monotonic()
-
-        try:
-            cfg     = BrowserConfig(headless=True, verbose=False,
-                                    proxy_config=ProxyConfig(server=pstr))
-            crawler = AsyncWebCrawler(config=cfg)
-            await crawler.start()
-        except Exception as exc:
-            print(f"[slot {slot_id}] browser launch fail ({exc})", file=sys.stderr)
-            state.n_connect_fail += 1
-            state.cooldown_mgr.mark_burned(proto, hp)
-            continue
-
+        proto, hp = entry
+        pstr      = f"{proto}://{hp}"
+        t_bind    = time.monotonic()
         burn_count = 0
         ride_ok    = 0
         positions: list = []
@@ -185,7 +182,9 @@ async def _run_slot(slot_id: int, state: RiderState) -> None:
                 ride_pos  = len(positions) + 1
                 t_url_abs = datetime.now(timezone.utc)
 
-                status, char_count, markdown_len, elapsed, html, err = await _fetch_one_url(crawler, url)
+                status, char_count, markdown_len, elapsed, html, err = await _fetch_one_url(
+                    crawler, url, pstr, state.page_timeout_ms,
+                )
                 state.in_flight -= 1
 
                 positions.append((url, status, round(elapsed, 2)))
@@ -246,8 +245,6 @@ async def _run_slot(slot_id: int, state: RiderState) -> None:
             )
             state.ride_records.append(ride)
             state.cooldown_mgr.mark_burned(proto, hp)
-            try: await crawler.close()
-            except Exception as exc: print(f"[slot {slot_id}] close warn: {exc}", file=sys.stderr)
             print(
                 f"[slot {slot_id}] proxy done ok={ride_ok} rw={burn_count}"
                 f" cf={int(cf_broke)} n={len(positions)} {pstr}",
@@ -257,15 +254,30 @@ async def _run_slot(slot_id: int, state: RiderState) -> None:
     print(f"[slot {slot_id}] exit", file=sys.stderr)
 
 
-# Fetch one URL on an existing crawler; return (status, char_count, markdown_len, elapsed, html, err)
+# Atomically advance pool cursor; return (proto, hp) or None if pool is empty.
+async def _next_proxy(state: RiderState) -> tuple[str, str] | None:
+    async with state.proxy_lock:
+        eligible = state.cooldown_mgr.eligible_candidates(state.proxy_pool)
+        if not eligible:
+            return None
+        idx              = state.proxy_cursor % len(eligible)
+        state.proxy_cursor += 1
+        return eligible[idx]
+
+
+# Fetch one URL via per-context proxy; return (status, char_count, markdown_len, elapsed, html, err).
 async def _fetch_one_url(
-    crawler: AsyncWebCrawler, url: str,
+    crawler:         AsyncWebCrawler,
+    url:             str,
+    proxy_str:       str,
+    page_timeout_ms: int,
 ) -> tuple[str, int | None, int | None, float, str, str | None]:
-    sid = str(uuid.uuid4())
+    sid     = str(uuid.uuid4())
     run_cfg = CrawlerRunConfig(
         session_id=sid,
+        proxy_config=ProxyConfig(server=proxy_str),
         cache_mode=CacheMode.BYPASS,
-        page_timeout=PAGE_TIMEOUT_MS,
+        page_timeout=page_timeout_ms,
         wait_until="domcontentloaded",
         delay_before_return_html=DELAY_BEFORE_HTML,
         markdown_generator=DefaultMarkdownGenerator(),
@@ -303,7 +315,6 @@ async def _fetch_one_url(
         err     = str(exc)
 
     finally:
-        # Await context kill directly — fresh cookies on next arun(); log on failure
         try:
             await crawler.crawler_strategy.browser_manager.kill_session(sid)
         except Exception as exc:
@@ -312,40 +323,39 @@ async def _fetch_one_url(
     return status, len(html) if html else None, markdown_len, elapsed, html, err
 
 
-# Return True if markdown contains any REGWALL_SIGNALS
+# Return True if markdown contains any REGWALL_SIGNALS.
 def _is_regwall(markdown: str) -> bool:
     return any(sig in markdown for sig in REGWALL_SIGNALS)
 
 
-# Write raw HTML to output_dir/raw/{url_hash}.html; return path
+# Write raw HTML to output_dir/raw/{url_hash}.html; return path.
 def _write_raw(url_hash: str, html: str, output_dir: Path) -> Path:
     path = output_dir / RAW_SUBDIR / f"{url_hash}.html"
     path.write_text(html, encoding="utf-8")
     return path
 
 
-# SHA-256 URL hash (12 hex chars) — matches scrape.py convention
+# SHA-256 URL hash (12 hex chars) — matches scrape.py convention.
 def _url_hash(url: str) -> str:
     return hashlib.sha256(url.encode()).hexdigest()[:12]
 
 
-# Mini smoke: 5 URLs, 2 slots, 4-min cap
+# Mini smoke: 5 URLs, 4 slots, raw pool (no feeder), 5-min cap.
 if __name__ == "__main__":
     import json
-
-    from p1_alive_feeder import AliveFeeder, FEEDER_QUEUE_MAXSIZE
+    from p0_pool import load_backfill_pool
     from p3_url_sampler import sample_urls
 
     N_URLS    = 5
-    N_SLOTS   = 2
+    N_SLOTS   = 4
     TIMEOUT_S = 300
 
     async def smoke() -> None:
-        cm          = PersistentCooldownManager()
-        proxy_queue = asyncio.Queue(maxsize=FEEDER_QUEUE_MAXSIZE)
-        feeder      = AliveFeeder(proxy_queue=proxy_queue, cm=cm)
-        feeder_task = asyncio.create_task(feeder.run())
+        print("[smoke] loading proxy pool ...", file=sys.stderr)
+        pool, _ = await asyncio.get_running_loop().run_in_executor(None, load_backfill_pool)
+        print(f"[smoke] pool: {len(pool)} raw proxies", file=sys.stderr)
 
+        cm        = PersistentCooldownManager()
         urls      = sample_urls(500)[:N_URLS]
         url_queue = asyncio.Queue()
         [url_queue.put_nowait(u) for u in urls]
@@ -357,8 +367,8 @@ if __name__ == "__main__":
 
         try:
             state = await asyncio.wait_for(
-                run_riding_pool(url_queue, proxy_queue, cm, out_dir,
-                                burn_threshold=2, n_slots=N_SLOTS),
+                run_riding_pool(url_queue, pool, cm, out_dir,
+                                burn_threshold=2, n_slots=N_SLOTS, page_timeout_ms=8000),
                 timeout=TIMEOUT_S,
             )
             state_timeout = False
@@ -367,26 +377,20 @@ if __name__ == "__main__":
             state_timeout = True
             state = None
 
-        elapsed = time.monotonic() - t0
-        feeder.stop(); feeder_task.cancel()
-        try: await feeder_task
-        except asyncio.CancelledError: pass
-
+        elapsed   = time.monotonic() - t0
         raw_dir   = out_dir / "raw"
         raw_files = sorted(raw_dir.glob("*.html")) if raw_dir.exists() else []
 
         report = {
             "elapsed_s":      round(elapsed, 1),
             "timeout":        state_timeout,
-            "n_ok":           state.n_ok if state else "?",
-            "n_regwall":      state.n_regwall if state else "?",
-            "n_failed":       state.n_failed if state else "?",
-            "n_connect_fail": state.n_connect_fail if state else "?",
-            "termination":    state.termination if state else "timeout",
+            "n_ok":           state.n_ok           if state else "?",
+            "n_regwall":      state.n_regwall       if state else "?",
+            "n_failed":       state.n_failed        if state else "?",
+            "n_connect_fail": state.n_connect_fail  if state else "?",
+            "termination":    state.termination     if state else "timeout",
             "proxies_used":   len(state.ride_records) if state else "?",
             "raw_files":      len(raw_files),
-            "feeder_checked": feeder.stats.checked,
-            "feeder_alive":   feeder.stats.alive_total,
         }
         print(json.dumps(report, indent=2))
         for f in raw_files[:3]:
