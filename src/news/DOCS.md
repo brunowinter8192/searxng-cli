@@ -83,10 +83,10 @@ Proxy platforms set `scrape_engine = "proxy_pool"` and provide a `ProxyScrapeCon
 ## Flow (run_pipeline — proxy_pool / TheBlock)
 
 1. **discover** — `platform.discover()` → entry list. `_persist_master_list()` → `data/news/theblock/discover/master_urls.txt` (YYYY-MM-DD\t{url}, sorted+deduped, set-union append). No snapshot JSON written alongside it.
-2. **dedup** — `filter_new_entries(entries, raw_dir, name, mode="raw")` against `data/news/{name}/raw/` (existence of `{hash}.md`). Always `mode="raw"`.
+2. **dedup** — `filter_new_entries(entries, raw_dir, name, mode="raw", exclude_urls=failure_urls)` against `data/news/{name}/raw/`. Subtracts two disjoint sets: `{hash}.md` already exists in raw (n_skip_raw), and URL in `dead_urls.txt` + `failed_urls.txt` (n_excluded — known-dead/failed, permanently excluded, no retry). Both files loaded from `raw_dir/` before the call; absent on first run = empty exclusion. Log: `dedup → {total} total, {n_skip_raw} already in raw, {n_excluded} known-failures excluded, {n_new} new`.
 3. **scrape** — `scrape_entries_proxy()` — sustained proxy rotation via `run_loop`. Writes raw body to `raw/{hash}.md`. Janitor lifecycle (box_lock, start_job/end_job, AcquireLogger) preserved.
 4. **raw persist** — `_append_to_raw_manifest(raw_dir, ok_entries)` → `raw/manifest.jsonl`. `_update_blocked_urls()` → `dead_urls.txt` + `failed_urls.txt`.
-5. **clean-pass** — `_run_clean_pass()`: for each ok entry, reads `raw/{hash}.md`, calls `platform.cleanup()` (JSON-LD parse + Markdown + `_post_clean()`), writes `theblock__{pubdate}__{hash}.md` to `rag-cli/data/documents/theblock/`. Body-less articles (empty `articleBody` or no `NewsArticle` JSON-LD) → URL appended to `data/news/theblock/bodyless_urls.txt` (set-union, sorted). Raw files never modified. Progress logged every 200 entries. Indexing NOT triggered — `rag-cli index` remains a separate manual step.
+5. **clean-pass** — `_run_clean_pass()`: for each ok entry, reads `raw/{hash}.md`, calls `platform.cleanup()` (JSON-LD parse + Markdown + `_post_clean()`), writes `theblock__{pubdate}__{hash}.md` to `rag-cli/data/documents/theblock/`. Body-less articles (empty `articleBody` or no `NewsArticle` JSON-LD) → URL appended to `data/news/theblock/clean/bodyless_urls.txt` (set-union, sorted; `clean/` created on first write). Raw files never modified. Progress logged every 200 entries. Indexing NOT triggered — `rag-cli index` remains a separate manual step.
 
 ## Flow (run_pipeline — browser / CoinDesk)
 

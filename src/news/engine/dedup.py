@@ -24,7 +24,10 @@ def pub_date_str(entry: dict) -> str:
     return ""
 
 
-# Return (new_entries, n_skipped): drop entries whose target MD already exists in collection_dir.
+# Return (new_entries, n_skip_raw, n_excluded): drop entries already in collection_dir OR in
+# exclude_urls. exclude_urls: optional pre-loaded set of permanently-excluded URLs (e.g. known-dead
+# + known-failed); excluded entries are counted separately from raw-exist skips. Default None = no
+# exclusion (unchanged behaviour for all existing callers). Exclusion is checked before raw test.
 # mode="pubdate": exact match f"{source}__{pubdate}__{hash}.md" (default, CoinDesk).
 # mode="hash_only": glob f"{source}__*__{hash}.md" — for platforms with no pubdate at discover time.
 def filter_new_entries(
@@ -32,11 +35,17 @@ def filter_new_entries(
     collection_dir: Path,
     source: str,
     mode: str = "pubdate",
-) -> tuple[list[dict], int]:
+    exclude_urls: set[str] | None = None,
+) -> tuple[list[dict], int, int]:
     new_entries = []
-    n_skipped = 0
+    n_skip_raw = 0
+    n_excluded = 0
     for entry in entries:
-        h = url_hash(entry["url"])
+        url = entry["url"]
+        if exclude_urls is not None and url in exclude_urls:
+            n_excluded += 1
+            continue
+        h = url_hash(url)
         if mode == "hash_only":
             already_have = bool(list(collection_dir.glob(f"{source}__*__{h}.md")))
         elif mode == "raw":
@@ -46,7 +55,7 @@ def filter_new_entries(
             target = collection_dir / f"{source}__{pubdate}__{h}.md"
             already_have = target.exists()
         if already_have:
-            n_skipped += 1
+            n_skip_raw += 1
         else:
             new_entries.append(entry)
-    return new_entries, n_skipped
+    return new_entries, n_skip_raw, n_excluded

@@ -64,7 +64,7 @@ post-fetch (set from JSON-LD) — it is not present in the discover entry.
 
 ## Body-less URL list
 
-Path: `raw_dir.parent / "bodyless_urls.txt"` = `data/news/theblock/bodyless_urls.txt`.
+Path: `raw_dir.parent / "clean" / "bodyless_urls.txt"` = `data/news/theblock/clean/bodyless_urls.txt`.
 Convention: same as `_update_blocked_urls` — read existing, set-union, strip empty, write sorted +
 trailing newline. Persisted once at end of the pass (not per-entry write).
 

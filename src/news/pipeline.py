@@ -83,7 +83,7 @@ async def run_scrape_only(
 
     raw_dir = DATA_ROOT / platform.name / "raw"
     raw_dir.mkdir(parents=True, exist_ok=True)
-    new_entries, n_skip = filter_new_entries(entries, raw_dir, platform.name, mode="raw")
+    new_entries, n_skip, _ = filter_new_entries(entries, raw_dir, platform.name, mode="raw")
     log.info(f"dedup → {len(entries)} total, {n_skip} already in raw, {len(new_entries)} new")
     if not new_entries:
         log.info("All already in raw — done.")
@@ -166,10 +166,21 @@ async def run_pipeline(platform: Platform, skip_index: bool = False) -> None:
                     discover_snapshot = _write_discover_snapshot(entries, discover_dir)
                     log.info(f"discover → {len(entries)} articles → {discover_snapshot.name}")
 
-                # Stage 2 — dedup against raw
+                # Stage 2 — dedup against raw (exclude known-dead + known-failed URLs permanently)
                 log.info("STAGE dedup …")
-                new_entries, n_skip = filter_new_entries(entries, raw_dir, platform.name, mode="raw")
-                log.info(f"dedup → {len(entries)} total, {n_skip} already in raw, {len(new_entries)} new")
+                failure_urls: set[str] = set()
+                for _fname in ("dead_urls.txt", "failed_urls.txt"):
+                    _p = raw_dir / _fname
+                    if _p.exists():
+                        failure_urls |= {u for u in _p.read_text(encoding="utf-8").splitlines() if u}
+                new_entries, n_skip_raw, n_excluded = filter_new_entries(
+                    entries, raw_dir, platform.name, mode="raw",
+                    exclude_urls=failure_urls if failure_urls else None,
+                )
+                log.info(
+                    f"dedup → {len(entries)} total, {n_skip_raw} already in raw, "
+                    f"{n_excluded} known-failures excluded, {len(new_entries)} new"
+                )
                 if not new_entries:
                     log.info("Nothing new to scrape — pipeline complete.")
                     _write_marker(platform.name, log)
@@ -222,7 +233,7 @@ async def run_pipeline(platform: Platform, skip_index: bool = False) -> None:
         log.info(f"discover → {len(entries)} articles → {discover_snapshot.name}")
 
         log.info("STAGE dedup …")
-        new_entries, n_skip = filter_new_entries(entries, raw_dir, platform.name, mode="raw")
+        new_entries, n_skip, _ = filter_new_entries(entries, raw_dir, platform.name, mode="raw")
         log.info(f"dedup → {len(entries)} total, {n_skip} already in raw, {len(new_entries)} new")
         if not new_entries:
             log.info("Nothing new to scrape — pipeline complete.")
@@ -326,7 +337,7 @@ def _write_discover_snapshot(entries: list[dict], discover_dir: Path) -> Path:
 
 
 # Clean ok entries: read raw/{hash}.md → platform.cleanup() → write theblock__{pubdate}__{hash}.md
-# to collection_dir. body-less (cleanup → ""): log + append URL to raw_dir.parent/bodyless_urls.txt
+# to collection_dir. body-less (cleanup → ""): log + append URL to raw_dir.parent/clean/bodyless_urls.txt
 # (set-union, sorted). Read-only on raw/. collection_dir created if absent.
 # Progress logged every 200 entries. Returns {"n_cleaned", "n_bodyless", "total"}.
 def _run_clean_pass(
@@ -339,7 +350,7 @@ def _run_clean_pass(
     if not ok_entries:
         return {"n_cleaned": 0, "n_bodyless": 0, "total": 0}
     collection_dir.mkdir(parents=True, exist_ok=True)
-    bodyless_path = raw_dir.parent / "bodyless_urls.txt"
+    bodyless_path = raw_dir.parent / "clean" / "bodyless_urls.txt"
     bodyless_urls: list[str] = []
     n_cleaned = 0
     total = len(ok_entries)
@@ -363,6 +374,7 @@ def _run_clean_pass(
             log.info(f"clean progress {i}/{total} — {n_cleaned} cleaned, {len(bodyless_urls)} body-less")
     n_bodyless = len(bodyless_urls)
     if bodyless_urls:
+        bodyless_path.parent.mkdir(parents=True, exist_ok=True)
         existing = set(bodyless_path.read_text(encoding="utf-8").splitlines()) if bodyless_path.exists() else set()
         merged = (existing | set(bodyless_urls)) - {""}
         bodyless_path.write_text("\n".join(sorted(merged)) + "\n", encoding="utf-8")
