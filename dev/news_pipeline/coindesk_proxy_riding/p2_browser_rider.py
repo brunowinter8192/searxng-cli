@@ -64,6 +64,7 @@ class JobRecord:
     url_hash:      str
     status:        str        # ok | regwall | connect_fail | failed | empty
     char_count:    int | None
+    markdown_len:  int | None
     elapsed_s:     float | None
     error:         str | None
     file:          str | None
@@ -184,13 +185,13 @@ async def _run_slot(slot_id: int, state: RiderState) -> None:
                 ride_pos  = len(positions) + 1
                 t_url_abs = datetime.now(timezone.utc)
 
-                status, char_count, elapsed, html, err = await _fetch_one_url(crawler, url)
+                status, char_count, markdown_len, elapsed, html, err = await _fetch_one_url(crawler, url)
                 state.in_flight -= 1
 
                 positions.append((url, status, round(elapsed, 2)))
                 job = JobRecord(
                     url=url, url_hash=_url_hash(url),
-                    status=status, char_count=char_count,
+                    status=status, char_count=char_count, markdown_len=markdown_len,
                     elapsed_s=round(elapsed, 2), error=err, file=None,
                     t_start=t_url_abs, ride_position=ride_pos, proxy_str=pstr,
                 )
@@ -256,10 +257,10 @@ async def _run_slot(slot_id: int, state: RiderState) -> None:
     print(f"[slot {slot_id}] exit", file=sys.stderr)
 
 
-# Fetch one URL on an existing crawler; return (status, char_count, elapsed, html, err)
+# Fetch one URL on an existing crawler; return (status, char_count, markdown_len, elapsed, html, err)
 async def _fetch_one_url(
     crawler: AsyncWebCrawler, url: str,
-) -> tuple[str, int | None, float, str, str | None]:
+) -> tuple[str, int | None, int | None, float, str, str | None]:
     sid = str(uuid.uuid4())
     run_cfg = CrawlerRunConfig(
         session_id=sid,
@@ -271,10 +272,11 @@ async def _fetch_one_url(
         verbose=False,
     )
 
-    t0     = time.perf_counter()
-    status = "failed"
-    html   = ""
-    err    = None
+    t0           = time.perf_counter()
+    status       = "failed"
+    html         = ""
+    err          = None
+    markdown_len = None
 
     try:
         result  = await crawler.arun(url=url, config=run_cfg)
@@ -291,8 +293,9 @@ async def _fetch_one_url(
             if _is_regwall(raw_md):
                 status = "regwall"
             else:
-                status = "ok"
-                html   = result.html
+                status       = "ok"
+                html         = result.html
+                markdown_len = len(raw_md)
 
     except Exception as exc:
         elapsed = time.perf_counter() - t0
@@ -306,7 +309,7 @@ async def _fetch_one_url(
         except Exception as exc:
             print(f"[rider] kill_session warn: {exc}", file=sys.stderr)
 
-    return status, len(html) if html else None, elapsed, html, err
+    return status, len(html) if html else None, markdown_len, elapsed, html, err
 
 
 # Return True if markdown contains any REGWALL_SIGNALS
