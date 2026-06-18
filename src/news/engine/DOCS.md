@@ -25,13 +25,16 @@ to a future ad-hoc skill.
 `.manifest` attribute on the exception carries the full per-entry manifest (including ok entries
 written before abort) so callers can persist raw data from aborted runs.
 
-### dedup.py (52 LOC)
+### dedup.py (61 LOC)
 
-**Purpose:** Filter discover entries to those not yet in the raw corpus by checking file existence.
-**Reads:** entries list (in-memory), dir (filesystem), source name, mode.
+**Purpose:** Filter discover entries to those not yet in the raw corpus by checking file existence; optionally exclude known-failure URLs permanently.
+**Reads:** entries list (in-memory), dir (filesystem), source name, mode, optional exclusion set.
 **Writes:** nothing (pure filter).
 **Called by:** `pipeline.py:run_pipeline` (mode=`"raw"`), `pipeline.py:run_scrape_only` (mode=`"raw"`).
 **Calls out:** stdlib only.
+
+`filter_new_entries(entries, collection_dir, source, mode="pubdate", exclude_urls=None) → (new_entries, n_skip_raw, n_excluded)`:
+- `exclude_urls: set[str] | None` — when provided, URLs in the set are permanently excluded (counted as `n_excluded`) before the raw-file existence check. Default `None` = no exclusions (unchanged behaviour for browser path + `run_scrape_only`). Only the proxy_pool branch of `run_pipeline` passes this param (loaded from `dead_urls.txt` + `failed_urls.txt`).
 
 Three modes via `mode` param:
 - `"raw"` (all pipe paths): exact match `{hash}.md` in raw_dir — dedup on raw corpus.

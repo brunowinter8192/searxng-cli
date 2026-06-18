@@ -83,7 +83,7 @@ async def run_scrape_only(
 
     raw_dir = DATA_ROOT / platform.name / "raw"
     raw_dir.mkdir(parents=True, exist_ok=True)
-    new_entries, n_skip = filter_new_entries(entries, raw_dir, platform.name, mode="raw")
+    new_entries, n_skip, _ = filter_new_entries(entries, raw_dir, platform.name, mode="raw")
     log.info(f"dedup → {len(entries)} total, {n_skip} already in raw, {len(new_entries)} new")
     if not new_entries:
         log.info("All already in raw — done.")
@@ -166,10 +166,21 @@ async def run_pipeline(platform: Platform, skip_index: bool = False) -> None:
                     discover_snapshot = _write_discover_snapshot(entries, discover_dir)
                     log.info(f"discover → {len(entries)} articles → {discover_snapshot.name}")
 
-                # Stage 2 — dedup against raw
+                # Stage 2 — dedup against raw (exclude known-dead + known-failed URLs permanently)
                 log.info("STAGE dedup …")
-                new_entries, n_skip = filter_new_entries(entries, raw_dir, platform.name, mode="raw")
-                log.info(f"dedup → {len(entries)} total, {n_skip} already in raw, {len(new_entries)} new")
+                failure_urls: set[str] = set()
+                for _fname in ("dead_urls.txt", "failed_urls.txt"):
+                    _p = raw_dir / _fname
+                    if _p.exists():
+                        failure_urls |= {u for u in _p.read_text(encoding="utf-8").splitlines() if u}
+                new_entries, n_skip_raw, n_excluded = filter_new_entries(
+                    entries, raw_dir, platform.name, mode="raw",
+                    exclude_urls=failure_urls if failure_urls else None,
+                )
+                log.info(
+                    f"dedup → {len(entries)} total, {n_skip_raw} already in raw, "
+                    f"{n_excluded} known-failures excluded, {len(new_entries)} new"
+                )
                 if not new_entries:
                     log.info("Nothing new to scrape — pipeline complete.")
                     _write_marker(platform.name, log)
@@ -222,7 +233,7 @@ async def run_pipeline(platform: Platform, skip_index: bool = False) -> None:
         log.info(f"discover → {len(entries)} articles → {discover_snapshot.name}")
 
         log.info("STAGE dedup …")
-        new_entries, n_skip = filter_new_entries(entries, raw_dir, platform.name, mode="raw")
+        new_entries, n_skip, _ = filter_new_entries(entries, raw_dir, platform.name, mode="raw")
         log.info(f"dedup → {len(entries)} total, {n_skip} already in raw, {len(new_entries)} new")
         if not new_entries:
             log.info("Nothing new to scrape — pipeline complete.")
