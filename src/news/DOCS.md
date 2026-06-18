@@ -16,7 +16,8 @@ Do NOT import from `src/crawler/` or `src/scraper/` — `src/news/` is self-cont
 - `python -m src.news --source coindesk --discover-only [--timeframe 30|full]` — discover + inventory update only; no scrape
 - `python -m src.news --source coindesk --scrape-only --year YYYY [--from YYYY-MM-DD] [--to YYYY-MM-DD] [--limit N]` — date-filtered backfill: inventory → dedup(raw) → chunked scrape → raw persist → job report
 - `python -m src.news --source coindesk` — full pipeline: discover → dedup(raw) → scrape → raw persist
-- `python -m src.news --source theblock [--timeframe delta|full|sub:N]` — full pipeline (proxy_pool engine)
+- `python -m src.news --source theblock --discover-only [--timeframe full|sub:N|sub:A-B]` — discover → persist master list `data/news/theblock/master_urls.txt`; no scrape
+- `python -m src.news --source theblock [--timeframe delta|full|sub:N]` — full pipeline (proxy_pool engine); also updates master list
 - Direct: `asyncio.run(run_pipeline(platform))` or `asyncio.run(run_discover_only(platform))` or `asyncio.run(run_scrape_only(platform, year=..., limit=...))`
 
 `--skip-index` is accepted for CLI compat but is a no-op — no indexing runs in any path.
@@ -61,6 +62,10 @@ Proxy platforms set `scrape_engine = "proxy_pool"` and provide a `ProxyScrapeCon
   TheBlock: `"delta"` (default, top-2 subs) | `"full"` (all subs) | `"sub:N"` | `"sub:A-B"`.
   When `--timeframe` is not `"delta"` AND `--discover-only` is not set, `__main__` auto-forces
   `skip_index=True` and prints `"After review, run: rag-cli index --collection <collection>"`.
+- `uses_master_list: bool` — if `True`, `pipeline.py` writes a single `data/news/{name}/master_urls.txt`
+  (format `YYYY-MM-DD\t<url>`, sorted+deduped, set-union append) instead of timestamped JSON snapshots
+  or per-year inventory shards. Both `run_discover_only()` and `run_pipeline()` proxy_pool path honour it.
+  Currently `True` only for TheBlock. CoinDesk: attribute absent (defaults `False`) → unchanged behaviour.
 
 ## Directory Map
 
@@ -68,7 +73,7 @@ Proxy platforms set `scrape_engine = "proxy_pool"` and provide a `ProxyScrapeCon
 |---|---|---|
 | `platform.py` | ScrapeConfig + ProxyScrapeConfig + Platform Protocol | 35 |
 | `registry.py` | name → Platform registry; register() / get() | 19 |
-| `pipeline.py` | Async orchestrator; raw-only stages 1–3; run_discover_only(); run_scrape_only(); _persist_inventory() | 322 |
+| `pipeline.py` | Async orchestrator; raw-only stages 1–3; run_discover_only(); run_scrape_only(); _persist_master_list() | 321 |
 | `__main__.py` | argparse entry point; --source + --skip-index + --timeframe + --discover-only | 102 |
 | `engine/` | Generic scrape engines (browser + proxy_pool) + dedup | — |
 | `platforms/coindesk/` | CoinDesk platform implementation | — |
@@ -76,8 +81,9 @@ Proxy platforms set `scrape_engine = "proxy_pool"` and provide a `ProxyScrapeCon
 
 ## Flow (run_pipeline — both engines)
 
-1. **discover** — `platform.discover()` → entry list; JSON snapshot written to `data/news/{name}/discover/`.
-   proxy_pool path also runs `_persist_inventory(entries, inventory_dir, name)` → `data/news/{name}/inventory/{name}_{year}.txt` (YYYY-MM-DD\t{url}, deduped per shard, mirrors CoinDesk format).
+1. **discover** — `platform.discover()` → entry list.
+   - TheBlock (`uses_master_list=True`): `_persist_master_list()` → `data/news/theblock/master_urls.txt` (YYYY-MM-DD\t{url}, sorted+deduped, set-union append). No snapshot JSON.
+   - Other platforms (browser/CoinDesk path): JSON snapshot written to `data/news/{name}/discover/`.
 2. **dedup** — `filter_new_entries(entries, raw_dir, name, mode="raw")` against `data/news/{name}/raw/` (existence of `{hash}.md`). Always `mode="raw"` — no collection check.
 3. **scrape** — dispatch on `platform.scrape_engine`:
    - `"browser"` → `scrape_entries()` — fresh `AsyncWebCrawler` per URL, Scrapy gate pacing. Writes raw body to `raw/{hash}.md`. On `RegwallGuardError`: `exc.manifest` recovered, ok files preserved, persist continues.
