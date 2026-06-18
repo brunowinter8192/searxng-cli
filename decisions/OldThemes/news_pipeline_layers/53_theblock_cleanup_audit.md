@@ -102,3 +102,80 @@ No-content-loss is the top priority — empty files resolved before re-index.
 G1 (re-clean 17) and G2 (new regex + re-clean 38) are the highest-value quick wins.
 G4 (9 zero-bytes) requires raw backfill before verification.
 G3 (19 TinyMCE) is a code fix with negligible content impact.
+
+---
+
+## Stage 2 — full 22,995 raw fold-in
+
+**Date:** 2026-06-18. **Script:** `/tmp/theblock_raw_stage2.py`. **Report:** `/tmp/theblock_22995_audit.md`.
+
+All 22,995 raw HTMLs from `data/news/theblock/scrape/` run through current `cleanup.py` logic
+(same `_find_news_article → _html_to_markdown → _post_clean` path, entry dict mocked minimal).
+Output to `/tmp/theblock_raw_scratch_full/`. Zero harness exceptions.
+
+### Zero-byte rate: 66 / 22,995 (0.29%)
+
+**G4 FALSIFIED.** All 66 zero-byte outputs share the same pattern: `@type: "NewsArticle"` ✓,
+`articleBody` field present ✓, but `articleBody` value is empty string. The
+`@type:"Article"` mismatch hypothesis was wrong — The Block's JSON-LD schema is
+`NewsArticle` throughout. Root cause: gated/paywalled articles where the site embeds an
+empty `articleBody` in JSON-LD. `cleanup.py` correctly logs `"empty articleBody"` and
+returns `""`. No schema fix needed.
+
+**G4 update for the 3952-corpus zero-bytes:** same mechanism. The 2019-09-23 cluster
+was not `@type:"Article"` — it is the same empty-articleBody pattern from early paywalled content.
+`_is_news_article()` does not need extension.
+
+**OPEN:** whether the article text is recoverable from a fallback `<div>` in the raw HTML
+(not yet probed). If yes, a fallback extraction path could recover these 66 URLs.
+
+### Noise signature table (22,995 raw → cleaned)
+
+| Sig | Files | Verdict |
+|---|---|---|
+| `A1_inline_url` | **0** | CLEAN — `_LINK_URL_RE` grips correctly on fresh raw |
+| `A2_disclaimer` | **0** | CLEAN — Foresight disclaimer stripped correctly |
+| `A3_copyright` | **2** | GAP — `© 2022 The Block Crypto, Inc.` (old brand name) not matched by `_COPYRIGHT_RE` which requires literal `The Block.` |
+| `A4_newsletter_cta` | **64** | GAP — `_NEWSLETTER_CTA_RE` too narrow: requires leading AND trailing `_`; many CTA variants close with `here.` not `_` |
+| `A5_campus_cta` | **56** | GAP — G2 confirmed at scale (2025-11 → 2026-06) |
+| `B1_sendgrid` | **0** | CLEAN |
+| `B2_bare_url` | **17** | MINOR — YouTube/GitHub/whitepaper links as bare line-start URLs |
+| `B3_html_tags` | **17** | MCE-spans — same rate as 3952 corpus |
+| `B4_html_entity` | **1** | MINOR — `&amp;` in one file |
+| `C1_footer_chrome` | **168** | MIXED — 56 are campus CTA (noise); remainder are "sign up for" in editorial prose (false positives) |
+| `D1_regwall` | **2** | FALSE POSITIVES — "Create a free account with Tenderly" + "private members only collective" in body text |
+| `N1_podcast_sub_cta` | **371 (1.6%)** | **NEW NOISE** — `_Listen below, and subscribe to The Scoop on_ _Apple_...` — podcast articles, fully unhandled |
+| `N2_podcast_sponsor` | **252 (1.1%)** | **NEW NOISE** — `**This episode is brought to you by our sponsors...` + multi-paragraph sponsor ad copy |
+| `N3_newsletter_block` | **87** | **NEW NOISE** — `**The Block Newsletters` promo block in podcast articles |
+| `N4_commissioned` | **527 (2.3%)** | **LARGEST NEW GAP** — `_This post is commissioned by [Sponsor]...` sponsored-content footer disclaimer; appears on Quick Takes and paid-partnership articles |
+
+Content tracked (not noise — no strip): Quick Take headers (6), Editor's note / Correction (59).
+
+### Shape clusters (22,995 files)
+
+| Shape | Count | % | Criterion |
+|---|---|---|---|
+| EMPTY | 66 | 0.3% | 0 bytes |
+| MICRO | 1,032 | **4.5%** | 0 < size < 1 KB — much higher ratio than 3952 corpus (0.35%) |
+| PODCAST | 358 | 1.6% | `N1_podcast_sub_cta` OR `N2_podcast_sponsor` present |
+| SPONSORED | 527 | 2.3% | `N4_commissioned` present |
+| NEWSLETTER | 1 | 0.0% | SendGrid URL OR link_ratio > 35% |
+| HTML_CONTAMINATED | 15 | 0.1% | Raw `<span>` tag present |
+| RESEARCH_REPORT | 12 | 0.1% | size ≥ 15 KB AND H2 ≥ 3 |
+| STANDARD_NEWS | 20,984 | **91.3%** | all others |
+
+Date range: 2018-08-17 → 2026-06-16 (full overlap with 3952 corpus; raw store is not "2023-2024 only").
+
+### Cleaner gap priority list (for next cleanup.py update)
+
+| Priority | Gap | Files | Regex anchor | Risk note |
+|---|---|---|---|---|
+| 1 | `N4_commissioned` | 527 | `^_?This post is commissioned by` MULTILINE | Low strip-risk: always trailing, one paragraph |
+| 2 | `N1_podcast_sub_cta` | 371 | `^_Listen below[^_]*subscribe to` MULTILINE | Low: always line 3, self-contained |
+| 3 | `N2_podcast_sponsor` | 252 | start: `^\*\*This episode is brought to you by` — **multi-paragraph block**, end anchor TBD | **HIGH RISK** — sponsor copy spans variable # of paras; strip requires clear end-anchor (next `* * *` rule / next `**` section header) to avoid content loss |
+| 4 | `A4_newsletter_cta` fix | 64 | Drop trailing-`_` requirement: `^_.*subscribe to the .*newsletter` MULTILINE | Low |
+| 5 | `N3_newsletter_block` | 87 | `^\*\*The Block Newsletters` + following 1-2 lines | Low |
+| 6 | `A5_campus_cta` | 56 | `^Sign up for a trial today:.*theblock\.co/campus` MULTILINE | Low |
+| 7 | `A3_copyright` (old brand) | 2 | Extend `_COPYRIGHT_RE` to also match `The Block Crypto` | Low |
+| 8 | `B3_MCE_spans` | 17 | `<span[^>]*data-mce-type[^>]*>.*?</span>` in `_html_to_markdown()` | Low |
+| 9 | `B2_bare_url` | 17 | `^https?://\S+\s*$` MULTILINE | Low; may strip intentional URL citations |
