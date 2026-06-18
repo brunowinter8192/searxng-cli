@@ -89,6 +89,8 @@ class RiderState:
     termination:        str        = "running"   # all-done | stall | pool-exhausted
     proxy_cursor:       int        = 0
     proxy_lock:         asyncio.Lock = field(default_factory=asyncio.Lock)
+    n_browsers:         int        = 1
+    n_slots:            int        = 0
 
     @property
     def all_resolved(self) -> bool:
@@ -97,7 +99,7 @@ class RiderState:
 
 # ORCHESTRATOR
 
-# Launch n_slots concurrent rider tasks on one shared browser; return shared state when done.
+# Launch n_slots concurrent rider tasks across n_browsers browser instances; return shared state when done.
 async def run_riding_pool(
     url_queue:       asyncio.Queue,
     proxy_pool:      list,
@@ -106,6 +108,7 @@ async def run_riding_pool(
     burn_threshold:  int,
     n_slots:         int,
     page_timeout_ms: int = PAGE_TIMEOUT_MS,
+    n_browsers:      int = 1,
 ) -> RiderState:
     (output_dir / RAW_SUBDIR).mkdir(parents=True, exist_ok=True)
     state = RiderState(
@@ -117,16 +120,18 @@ async def run_riding_pool(
         page_timeout_ms=page_timeout_ms,
         total_urls=url_queue.qsize(),
     )
-    crawler = AsyncWebCrawler(config=BrowserConfig(headless=True, verbose=False))
-    await crawler.start()
+    state.n_browsers = n_browsers
+    state.n_slots    = n_slots
+    crawlers = [AsyncWebCrawler(config=BrowserConfig(headless=True, verbose=False)) for _ in range(n_browsers)]
+    await asyncio.gather(*[c.start() for c in crawlers])
     try:
-        tasks = [asyncio.create_task(_run_slot(i, crawler, state)) for i in range(n_slots)]
+        tasks = [asyncio.create_task(_run_slot(i, crawlers[i % n_browsers], state)) for i in range(n_slots)]
         await asyncio.gather(*tasks)
     finally:
-        try:
-            await crawler.close()
-        except Exception as exc:
-            print(f"[rider] crawler.close warn: {exc}", file=sys.stderr)
+        results = await asyncio.gather(*[c.close() for c in crawlers], return_exceptions=True)
+        for idx, r in enumerate(results):
+            if isinstance(r, Exception):
+                print(f"[rider] crawler[{idx}].close warn: {r}", file=sys.stderr)
     if state.termination == "running":
         state.termination = "all-done"
     return state

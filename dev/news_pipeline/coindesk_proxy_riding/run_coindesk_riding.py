@@ -40,7 +40,7 @@ async def _run(args: argparse.Namespace) -> None:
         url_queue.put_nowait(u)
     print(
         f"[main] {len(urls)} URLs queued, concurrency={args.concurrency}, "
-        f"burn-threshold={args.burn_threshold}, page-timeout={args.page_timeout}ms",
+        f"browsers={args.browsers}, burn-threshold={args.burn_threshold}, page-timeout={args.page_timeout}ms",
         file=sys.stderr,
     )
 
@@ -64,6 +64,7 @@ async def _run(args: argparse.Namespace) -> None:
         burn_threshold=args.burn_threshold,
         n_slots=args.concurrency,
         page_timeout_ms=args.page_timeout,
+        n_browsers=args.browsers,
     )
 
     elapsed = time.monotonic() - t0
@@ -104,6 +105,7 @@ def _parse_args() -> argparse.Namespace:
     ap.add_argument("--n-urls",         type=int, default=500,   help="URLs to scrape (default 500)")
     ap.add_argument("--output-dir",     default="output",        help="Output directory for raw HTML + report")
     ap.add_argument("--page-timeout",   type=int, default=8_000, help="Playwright page timeout ms (default 8000)")
+    ap.add_argument("--browsers",       type=int, default=1,     help="Browser pool size (default 1)")
     return ap.parse_args()
 
 
