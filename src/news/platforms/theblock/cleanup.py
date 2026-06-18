@@ -12,9 +12,32 @@ _LD_RE = re.compile(
 
 _LINK_URL_RE       = re.compile(r'\[([^\]]+)\]\(https?://[^)]+\)')
 _DISCLAIMER_RE     = re.compile(r'^Disclaimer: The Block is an independent media outlet.*$', re.MULTILINE)
-_COPYRIGHT_RE      = re.compile(r'^©\s*\d{4}\s+The Block\.\s*All Rights Reserved.*$', re.MULTILINE)
-_NEWSLETTER_CTA_RE = re.compile(r'^_.*subscribe to the .*newsletter.*_\s*$', re.MULTILINE)
+# Extended to also match old brand name "The Block Crypto, Inc." (2 files in corpus)
+_COPYRIGHT_RE      = re.compile(
+    r'^©\s*\d{4}\s+(?:The Block Crypto,\s*Inc\.|The Block)\.?\s*All Rights Reserved.*$',
+    re.MULTILINE,
+)
+# Broadened: drop trailing-_ requirement (many CTAs close with "here." not "_")
+_NEWSLETTER_CTA_RE = re.compile(r'^_.*subscribe to the .*newsletter.*$', re.MULTILINE)
 _BLANK_RUN_RE      = re.compile(r'\n{3,}')
+
+# Stage 1 additions — corpus-verified boilerplate shapes
+# TinyMCE bookmark spans that html2text passes through as literal HTML (19 files in corpus)
+_MCE_SPAN_RE        = re.compile(r'<span[^>]*data-mce-type[^>]*>.*?</span>', re.DOTALL)
+# Commissioned-content disclaimer footer (534 files); optional italic wrapper
+_COMMISSIONED_RE    = re.compile(r'^_?This post is commissioned\b.*$', re.MULTILINE)
+# Podcast subscribe-CTA line; handles _/*/__ markdown prefix variants (371 files)
+_PODCAST_SUB_CTA_RE = re.compile(r'^[*_]*Listen below[,.]?\s+and subscribe to\b.*$', re.MULTILINE)
+# Newsletter promo 2-line block: header + subscribe line (99 files)
+_NEWSLETTER_PROMO_RE = re.compile(
+    r'^\*\*The Block Newsletters[^\n]*\n[^\n]*theblock\.co/newsletters[^\n]*',
+    re.MULTILINE,
+)
+# Campus trial CTA line (44 files); matches with or without trailing period
+_CAMPUS_CTA_RE      = re.compile(
+    r'^Sign up for a trial today:[^\n]*theblock\.co/campus[^\n]*$',
+    re.MULTILINE,
+)
 
 
 # FUNCTIONS
@@ -81,12 +104,17 @@ def _is_news_article(data: dict) -> bool:
 
 
 # Strip The-Block-specific boilerplate from post-html2text Markdown.
-# Order: inline-URL strip first (exposes plain CTA text), then line-level removals, then normalise.
+# Order: inline-URL strip first (exposes plain CTA text), MCE spans, then line-level removals, then normalise.
 def _post_clean(md: str) -> str:
     md = _LINK_URL_RE.sub(r'\1', md)
+    md = _MCE_SPAN_RE.sub('', md)
     md = _DISCLAIMER_RE.sub('', md)
     md = _COPYRIGHT_RE.sub('', md)
     md = _NEWSLETTER_CTA_RE.sub('', md)
+    md = _COMMISSIONED_RE.sub('', md)
+    md = _PODCAST_SUB_CTA_RE.sub('', md)
+    md = _NEWSLETTER_PROMO_RE.sub('', md)
+    md = _CAMPUS_CTA_RE.sub('', md)
     lines = [line.rstrip() for line in md.splitlines()]
     md = '\n'.join(lines)
     md = _BLANK_RUN_RE.sub('\n\n', md)
