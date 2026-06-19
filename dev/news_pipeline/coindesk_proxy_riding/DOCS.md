@@ -3,7 +3,7 @@
 ## Role
 
 Standalone dev suite for scraping CoinDesk article HTML at scale via rotating proxies.
-Architecture: ONE shared Playwright browser process; N concurrent rider tasks (default 20) each pull raw proxies directly from the pool (no pre-validation). Each URL fetch uses `CrawlerRunConfig(proxy_config=ProxyConfig(server=...))` → fresh Playwright BrowserContext per proxy via crawl4ai's config-signature mechanism + `session_id` + `kill_session()` (fresh cookies per URL, browser stays alive). Regwall detection on `result.markdown.raw_markdown` (not raw HTML — REGWALL_SIGNALS are hidden React components always present in HTML). A proxy is burned and rotated when cumulative regwall hits reach the burn threshold.
+Architecture: B Playwright browser processes (pool, default B=1); N concurrent rider tasks (default 20) distributed round-robin across the B browsers (slot i → browsers[i % B]). Each task pulls raw proxies directly from the pool (no pre-validation). Each URL fetch uses `CrawlerRunConfig(proxy_config=ProxyConfig(server=...))` → fresh Playwright BrowserContext per proxy via crawl4ai's config-signature mechanism + `session_id` + `kill_session()` (fresh cookies per URL, browser stays alive). Regwall detection on `result.markdown.raw_markdown` (not raw HTML — REGWALL_SIGNALS are hidden React components always present in HTML). A proxy is burned and rotated when cumulative regwall hits reach the burn threshold.
 
 Self-contained: no imports from `src/`. `p0_pool.py` is a local copy of the proxy pool machinery.
 
@@ -30,6 +30,7 @@ Self-contained: no imports from `src/`. `p0_pool.py` is a local copy of the prox
 | `--burn-threshold` | 2 | Cumulative regwall hits per proxy before rotation |
 | `--output-dir` | `output` | Directory for raw HTML and report |
 | `--page-timeout` | 8000 | Playwright page timeout ms (dead proxies hit this before rotating) |
+| `--browsers` | 1 | Browser pool size — B separate Chromium processes, N slots spread across them (slot i → browsers[i % B]) |
 
 ## Expected Output
 
@@ -51,11 +52,11 @@ Self-contained: no imports from `src/`. `p0_pool.py` is a local copy of the prox
 **Exports:** `load_backfill_pool()`, `PersistentCooldownManager`, `proxy_key()`, `fetch_with_retry()`
 **Why local:** hookify blocks `from src.` imports in dev/ scripts.
 
-### p2_browser_rider.py (399 LOC)
+### p2_browser_rider.py (394 LOC)
 
-**Purpose:** Core riding pool — ONE shared `AsyncWebCrawler` (no browser-level proxy); N rider tasks each pull raw proxies via `_next_proxy()` (atomic cursor over `eligible_candidates()`). Per-URL: `CrawlerRunConfig(proxy_config=ProxyConfig(server=pstr))` → fresh context per config-signature; `kill_session()` closes context after each fetch (fresh cookies). `page_timeout_ms` (CLI-configurable, default 8s) is the dead-proxy timeout lever.
-**Status routing:** ok → write HTML; regwall → requeue URL (up to `MAX_URL_RETRIES=3`), increment burn_count; connect_fail → requeue URL, rotate proxy immediately; failed/empty → drop.
-**Exports:** `run_riding_pool()`, `RiderState`, `RideRecord`, `JobRecord`
+**Purpose:** Core riding pool — B `AsyncWebCrawler` instances (browser pool, default B=1); N rider tasks distributed round-robin across browsers. Each task pulls raw proxies via `_next_proxy()` (atomic cursor over `eligible_candidates()`). Per-URL: `CrawlerRunConfig(proxy_config=ProxyConfig(server=pstr))` → fresh context per config-signature; `kill_session()` closes context after each fetch (fresh cookies). `page_timeout_ms` (CLI-configurable, default 8s) is the dead-proxy timeout lever.
+**Status routing:** ok → write HTML; regwall → requeue URL, increment burn_count; connect_fail → requeue URL, rotate proxy immediately; failed/empty → drop.
+**Exports:** `run_riding_pool(n_browsers=1)`, `RiderState`, `RideRecord`, `JobRecord`
 
 ---
 
@@ -66,15 +67,15 @@ Self-contained: no imports from `src/`. `p0_pool.py` is a local copy of the prox
 
 ---
 
-### p4_reporter.py (339 LOC)
+### p4_reporter.py (341 LOC)
 
 **Purpose:** Generates `job.md` + 3 plots from a completed `RiderState`.
-**Metrics:** counts/throughput/61k-backfill projection; HTML size percentiles (`char_count = len(result.html)`); markdown length percentiles (`markdown_len` — body-level truncation signal); proxy churn + 61k estimate; ride-length distribution; regwall-position curve; retry outcomes; wasted-fetch ratio.
+**Metrics:** counts/throughput/61k-backfill projection; HTML size percentiles (`char_count = len(result.html)`); markdown length percentiles (`markdown_len` — body-level truncation signal); proxy churn + 61k estimate; ride-length distribution; regwall-position curve; retry outcomes; wasted-fetch ratio. Counts table includes `Browsers` and `Contexts/browser` (`n_slots // n_browsers`) for self-documenting runs.
 **Exports:** `write_riding_report(state, job_dir, t_job_start)`
 
 ---
 
-### run_coindesk_riding.py (101 LOC)
+### run_coindesk_riding.py (113 LOC)
 
 **Purpose:** CLI orchestrator — loads pool via `load_backfill_pool()`, wires `run_riding_pool` + `write_riding_report` end-to-end; raises `RLIMIT_NOFILE` at startup.
 **Entry point:** `__main__` via `asyncio.run(_run(_parse_args()))`.
