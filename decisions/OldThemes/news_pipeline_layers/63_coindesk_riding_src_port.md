@@ -128,6 +128,103 @@ These are explicit design holes, not bugs. The proxy_riding engine's output is H
 engines output markdown. Stage 2 must choose: convert in-engine (write `.md` from crawl4ai markdown
 alongside `.html`) or extend the pipeline to handle `.html` natively.
 
+## Stage 2 — pipeline wiring
+
+Commit `3f95417` on branch `riding-wire`. Five files changed.
+
+### Config pattern: getattr, not Protocol
+
+`riding_scrape_config` is NOT added to the `Platform` Protocol. Adding it would require all platform
+classes (TheBlock) to define the attr. Instead: `pipeline.py:run_scrape_only` consumes it via
+`getattr(platform, "riding_scrape_config", None) or RidingScrapeConfig()`. Only CoinDesk defines the
+attr. TheBlock is untouched. This differs from `proxy_scrape_config` (which IS in the Protocol) — the
+tradeoff is fewer files changed vs type-checker visibility; the pattern is analogous to `timeframe`
+and `uses_master_list` (also consumed via getattr).
+
+### scrape.py signature tweak
+
+`scrape_entries_riding` now returns `tuple[list[dict], RiderState]` (was `list[dict]`). Change: last
+line becomes `return _build_manifest(entries, url_to_hash, state), state`. Required because
+`pipeline.py` needs `RiderState` to call `write_riding_report` — without state, the only alternative
+was `browser_reporter.write_scrape_report`, which crashes on riding manifests (see below).
+
+### browser_reporter crash finding
+
+`write_scrape_report` (`browser_reporter.py`) is incompatible with riding manifests. Its
+`_compute_stats` builds `ok_completion_s` via `(r["t_chunk_start"] − t_job_start).total_seconds() +
+r["elapsed_s"]` — riding manifest entries have neither `t_chunk_start` nor `elapsed_s`, so this
+raises `TypeError`. The riding path routes to `write_riding_report(state, job_dir, t_job_start)`
+from `proxy_riding/reporter.py` instead (full riding stats: browsers, contexts, ride-lengths,
+regwall-by-position). The browser path retains `write_scrape_report` unchanged.
+
+### run_scrape_only proxy_riding branch
+
+In `pipeline.py:run_scrape_only`, after dedup:
+
+```
+if platform.scrape_engine == "proxy_riding":
+    riding_cfg = getattr(platform, "riding_scrape_config", None) or RidingScrapeConfig()
+    manifest, state = await scrape_entries_riding(new_entries, platform_dir, riding_cfg)
+    _append_to_raw_manifest(raw_dir, ok_manifest_entries)
+    write_riding_report(state, job_dir, t_job_start)
+else:
+    # browser path — byte-identical, indentation only
+    chunks = scrape_chunks_raw(...)
+    write_scrape_report(...)
+```
+
+Key design decisions:
+- **Chunk bypass:** `scrape_chunks_raw` is NOT called. The riding engine manages its own concurrency,
+  watchdog, and requeue loop. The full entry set is passed directly to `scrape_entries_riding`.
+- **`platform_dir` vs `raw_dir` as output_dir:** `rider.py:_write_raw` writes to
+  `output_dir / "raw" / f"{hash}.html"`. Pipeline passes `platform_dir = DATA_ROOT / platform.name`
+  (not `raw_dir`) so HTML lands at `data/news/coindesk/raw/{hash}.html` — same path dedup checks.
+  (During smoke, `raw_dir` was incorrectly passed first; files landed at `raw/raw/`; corrected before
+  re-run.)
+- **Manifest JSONL:** `_append_to_raw_manifest(raw_dir, ok_manifest_entries)` appends
+  `{hash,url,publication_date}` for ok entries to `raw/manifest.jsonl` — same as browser path.
+
+### CoinDesk wiring
+
+`coindesk/__init__.py`:
+- `scrape_engine = "proxy_riding"` (was `"browser"`)
+- `riding_scrape_config = RidingScrapeConfig()` — production defaults (C=64, 4 browsers, 300s stall,
+  burn=2, 8s page timeout) validated in OT61 Iterations 3+4. No custom values needed.
+
+### Dedup raw_ext mechanism
+
+`filter_new_entries` in `dedup.py` gains `raw_ext: str = ".md"` parameter. The `mode="raw"` branch:
+`(collection_dir / f"{h}{raw_ext}").exists()`. All existing callers (both `run_pipeline` arms) pass
+no `raw_ext` → default `.md` → byte-identical. `run_scrape_only` sets
+`raw_ext = ".html" if platform.scrape_engine == "proxy_riding" else ".md"` before the dedup call.
+This ensures the dedup correctly skips already-scraped CoinDesk `.html` files on re-run while leaving
+browser `.md` dedup unchanged.
+
+### _run_clean_pass scope
+
+`_run_clean_pass` is called ONLY from `run_pipeline`'s `proxy_pool` branch (line 218). CoinDesk uses
+`run_scrape_only` exclusively — `_run_clean_pass` is never reached in CoinDesk's prod path. OT63
+(Stage 1) flagged it as a reconciliation item; confirmed out of scope for Stage 2. It would only
+matter if CoinDesk gained a clean-pass step (not planned).
+
+### Prod-path smoke result
+
+Run: `python -m src.news --source coindesk --scrape-only --year 2024 --limit 5`
+
+| Check | Result |
+|---|---|
+| Riding branch dispatched | `=== scrape-only done (proxy_riding): ok=5 failed=0 wall=311s ===` — no "chunked plan" line |
+| Raw `.html` written | 5 files at `data/news/coindesk/raw/{hash}.html` |
+| Riding job.md written | `scrape_jobs/20260619T200059Z/job.md` — Termination: `all-done`, OK: 5 |
+| Re-run dedup-skips | `dedup → 5 total, 5 already in raw, 0 new` → `All already in raw — done.` |
+
+Resumability confirmed: the `.html` dedup extension check skips already-scraped URLs on re-run.
+
+### Port status
+
+**COMPLETE.** Stage 1 (engine package) + Stage 2 (pipeline wiring) done.
+Stage 3 = operator prod 500-run validation with full proxy pool.
+
 ## Stage-1 Smoke Result
 
 Script: `dev/news_pipeline/coindesk_proxy_riding/smoke_stage1.py`

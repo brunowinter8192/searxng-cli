@@ -9,9 +9,9 @@ and a new one is picked from the shuffled pool. A timer-based asyncio watchdog (
 independently of the slot tasks and hard-aborts via `os._exit(1)` if no progress occurs for
 `stall_timeout_s` seconds — immune to wedged Playwright I/O.
 
-**NOT yet dispatched by `pipeline.py`.** Stage 2 wiring pending: `platform.scrape_engine ==
-"proxy_riding"` dispatch arm in `pipeline.py`, `RidingScrapeConfig` promotion to `platform.py`,
-and `.html` vs `.md` reconciliation in `filter_new_entries` (dedup) and `_run_clean_pass`.
+**Active as CoinDesk's `run_scrape_only` path.** `platform.scrape_engine == "proxy_riding"` dispatched
+in `pipeline.py:run_scrape_only`; `RidingScrapeConfig` consumed via `getattr` (not in Protocol);
+`filter_new_entries` raw_ext reconciliation done (`.html` for riding path).
 
 Touch this package when changing proxy-riding engine behaviour. Do NOT touch `engine/scrape.py` or
 `engine/proxy_pool/` — those engines are strictly independent.
@@ -21,11 +21,12 @@ Touch this package when changing proxy-riding engine behaviour. Do NOT touch `en
 `__init__.py` is empty. Entry paths:
 
 - `scrape_entries_riding(entries, output_dir, riding_cfg)` in `scrape.py` — async; called by
-  pipeline (Stage 2). Returns `list[{url, hash, status, file, char_count, error}]`.
+  `pipeline.py:run_scrape_only`. Returns `tuple[list[dict], RiderState]`: manifest
+  `[{url, hash, status, file, char_count, error}]` + full rider state (for `write_riding_report`).
 - `RidingScrapeConfig` in `scrape.py` — dataclass with production defaults
   (`n_browsers=4, n_slots=64, stall_timeout_s=300.0, burn_threshold=2, page_timeout_ms=8_000`).
-- `write_riding_report(state, job_dir, t_job_start)` in `reporter.py` — called by `scrape.py` and
-  by `_abort_stall` (late import to avoid circular).
+- `write_riding_report(state, job_dir, t_job_start)` in `reporter.py` — called by
+  `pipeline.py:run_scrape_only` (normal completion) and by `_abort_stall` (late import, stall abort).
 - `run_riding_pool(url_queue, proxy_pool, cooldown_mgr, output_dir, …)` in `rider.py` — async;
   called by `scrape_entries_riding`.
 
@@ -63,8 +64,8 @@ table) + three matplotlib plots (cumulative ok, ride-length histogram, regwall-r
 **Reads:** `RiderState` (in-memory), `t_job_start` (datetime).
 **Writes:** `{job_dir}/job.md`; `{job_dir}/cumulative.png`; `{job_dir}/ride_lengths.png`;
 `{job_dir}/regwall_position.png`.
-**Called by:** `scrape.py:scrape_entries_riding` (normal completion); `rider._abort_stall`
-(late import, stall abort path).
+**Called by:** `pipeline.py:run_scrape_only` (normal completion, via `write_riding_report`);
+`rider._abort_stall` (late import, stall abort path).
 **Calls out:** `matplotlib` (lazy import inside each `_write_*_plot`); `statistics` (stdlib);
 `src.news.engine.proxy_riding.rider` (RiderState, FAIL_THRESHOLD).
 
@@ -73,11 +74,16 @@ table) + three matplotlib plots (cumulative ok, ride-length histogram, regwall-r
 **Purpose:** Pipeline entry point + manifest adapter. Loads pool, shuffles, calls `run_riding_pool`,
 maps `RiderState.job_records` → pipeline manifest.
 **Reads:** entries list (in-memory), `RidingScrapeConfig`, proxy pool (network via `load_backfill_pool`).
-**Writes:** delegates to `rider.py` (raw HTML writes); writes nothing directly.
-**Called by:** `pipeline.py` (Stage 2, not yet wired).
+**Writes:** delegates to `rider.py` (raw HTML writes to `output_dir/raw/{hash}.html`); writes nothing directly.
+**Called by:** `pipeline.py:run_scrape_only` (proxy_riding dispatch arm).
 **Calls out:** `src.news.engine.proxy_pool.pool_loaders.load_backfill_pool`;
 `src.news.engine.proxy_pool.cooldown.PersistentCooldownManager`;
 `src.news.engine.proxy_riding.rider.run_riding_pool`.
+
+Returns `tuple[list[dict], RiderState]` — manifest + state. State is consumed by caller
+(`pipeline.py`) to call `write_riding_report`; manifest is consumed to build `ok_manifest_entries`
+for `_append_to_raw_manifest`. `output_dir` must be `platform_dir` (`data/news/{name}/`) so the
+engine writes to `platform_dir/raw/{hash}.html` = the path dedup checks.
 
 Status mapping in `_build_manifest`: if any `job_record` for a URL has `status == "ok"` (and a
 written file) → manifest `"ok"`; all other outcomes (regwall, connect_fail, failed, empty, never
@@ -93,9 +99,13 @@ are safe without explicit locking. `proxy_lock` (asyncio.Lock) guards `proxy_cur
 
 ## Gotchas
 
-- `file` field in manifest points to `.html` (not `.md`). `pipeline.py:_run_clean_pass` hardcodes
-  `raw_dir / f"{h}.md"`; `dedup.py:filter_new_entries` mode `"raw"` checks `{hash}.md`. Both need
-  Stage 2 updates before this engine can run through the full pipeline.
+- `file` field in manifest points to `.html` (not `.md`). `dedup.py:filter_new_entries` mode `"raw"`
+  now accepts `raw_ext` param — pass `".html"` for riding path (done in `pipeline.py:run_scrape_only`).
+  `pipeline.py:_run_clean_pass` still hardcodes `{h}.md` but is NOT on CoinDesk's path (proxy_pool /
+  TheBlock only) — out of scope unless CoinDesk gains a clean-pass step.
+- `output_dir` passed to `scrape_entries_riding` must be `platform_dir` (`data/news/{name}/`), NOT
+  `raw_dir`. The rider writes to `output_dir/raw/{hash}.html`; passing `raw_dir` puts files at
+  `raw/raw/` (wrong), breaking dedup.
 - `_abort_stall` calls `os._exit(1)` — no Python teardown, no atexit, no `browser.close()`. Raw
   files flushed before the call are durable; in-flight writes at the moment of abort are lost.
 - Late import of `reporter.write_riding_report` inside `_abort_stall` is intentional: `reporter.py`
