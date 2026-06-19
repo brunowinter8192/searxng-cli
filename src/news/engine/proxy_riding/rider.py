@@ -132,7 +132,7 @@ async def run_riding_pool(
     state.n_slots    = n_slots
     crawlers = [AsyncWebCrawler(config=BrowserConfig(headless=True, verbose=False)) for _ in range(n_browsers)]
     await asyncio.gather(*[c.start() for c in crawlers])
-    watchdog = asyncio.create_task(_watchdog(state, output_dir))
+    watchdog = asyncio.create_task(_watchdog(state))
     try:
         tasks = [asyncio.create_task(_run_slot(i, crawlers[i % n_browsers], state)) for i in range(n_slots)]
         await asyncio.gather(*tasks)
@@ -361,7 +361,6 @@ def _url_hash(url: str) -> str:
 # min(30, stall_timeout_s / 4) so a short smoke timeout still gets fast detection.
 async def _watchdog(
     state:         RiderState,
-    output_dir:    Path,
     poll_interval: float | None = None,
 ) -> None:
     interval = poll_interval if poll_interval is not None else min(30.0, state.stall_timeout_s / 4)
@@ -371,13 +370,13 @@ async def _watchdog(
             return
         idle = time.monotonic() - state.last_progress_mono
         if idle > state.stall_timeout_s:
-            _abort_stall(state, output_dir, idle)  # does not return
+            _abort_stall(state, idle)  # does not return
 
 
 # Write remaining_urls.txt + job.md then os._exit(1). Never returns.
 # os._exit bypasses asyncio teardown and browser.close() so wedged Chrome processes
 # cannot re-hang the shutdown; raw files already flushed to disk before we reach here.
-def _abort_stall(state: RiderState, output_dir: Path, idle_s: float) -> None:
+def _abort_stall(state: RiderState, idle_s: float) -> None:
     print(
         f"[watchdog] STALL {idle_s:.0f}s ≥ {state.stall_timeout_s:.0f}s — "
         f"writing report + failure log → os._exit(1)",
