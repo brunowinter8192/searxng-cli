@@ -11,13 +11,11 @@ _BACKFILL_TOTAL = 61_000
 
 # ORCHESTRATOR
 
-# Write job.md + three plots for a proxy-riding scrape run to job_dir.
+# Write job.md + cumulative.png for a proxy-riding scrape run to job_dir.
 def write_riding_report(state: RiderState, job_dir: Path, t_job_start: datetime) -> None:
     job_dir.mkdir(parents=True, exist_ok=True)
     stats = _compute_stats(state, t_job_start)
     _write_cumulative_plot(job_dir, stats)
-    _write_ride_length_plot(job_dir, stats)
-    _write_regwall_position_plot(job_dir, stats)
     _write_md(job_dir, state, stats, t_job_start)
 
 
@@ -67,21 +65,6 @@ def _compute_stats(state: RiderState, t_job_start: datetime) -> dict:
     proxies_for_backfill = round(n_proxies_burned / max(n_ok, 1) * _BACKFILL_TOTAL)
     n_fail_rotations     = sum(1 for r in rides if r.n_failed >= FAIL_THRESHOLD)
 
-    # Regwall rate by ride position (position = URL index within a proxy ride)
-    rw_by_pos:    dict[int, int] = {}
-    total_by_pos: dict[int, int] = {}
-    for j in jobs:
-        pos = j.ride_position
-        total_by_pos[pos] = total_by_pos.get(pos, 0) + 1
-        if j.status == "regwall":
-            rw_by_pos[pos] = rw_by_pos.get(pos, 0) + 1
-    max_pos = max(total_by_pos.keys()) if total_by_pos else 0
-    regwall_rate_by_pos = {
-        pos: rw_by_pos.get(pos, 0) / total_by_pos[pos]
-        for pos in range(1, max_pos + 1)
-        if total_by_pos.get(pos, 0) > 0
-    }
-
     # Retry outcome: among URLs that saw at least one regwall, final status
     url_final: dict[str, str] = {}
     url_rw:    set[str]       = set()
@@ -101,12 +84,11 @@ def _compute_stats(state: RiderState, t_job_start: datetime) -> dict:
         "urls_per_min": urls_per_min, "backfill_h": backfill_h,
         "html_pct": html_pct, "md_pct": md_pct,
         "ok_completion_s": ok_completion_s,
-        "ride_lengths": ride_lengths, "ride_ok_counts": ride_ok_counts,
+        "ride_ok_counts": ride_ok_counts,
         "ride_len_stats": ride_len_stats,
         "n_proxies_burned": n_proxies_burned,
         "proxies_for_backfill": proxies_for_backfill,
         "n_fail_rotations": n_fail_rotations,
-        "regwall_rate_by_pos": regwall_rate_by_pos,
         "retried_ok": retried_ok, "retried_failed": retried_failed,
         "n_urls_with_regwall": len(url_rw),
         "wasted_ratio": wasted_ratio,
@@ -156,44 +138,6 @@ def _write_cumulative_plot(job_dir: Path, stats: dict) -> None:
     ax.grid(True, alpha=0.3)
     fig.tight_layout()
     fig.savefig(job_dir / "cumulative.png", dpi=100)
-    plt.close(fig)
-
-
-# Histogram of n_urls_attempted per proxy ride; save as ride_lengths.png.
-def _write_ride_length_plot(job_dir: Path, stats: dict) -> None:
-    import matplotlib.pyplot as plt
-
-    lengths = stats["ride_lengths"]
-    fig, ax = plt.subplots(figsize=(8, 4))
-    if lengths:
-        bins = list(range(0, max(lengths) + 2))
-        ax.hist(lengths, bins=bins, edgecolor="black", alpha=0.8)
-    ax.set_xlabel("URLs attempted per proxy ride")
-    ax.set_ylabel("Number of rides")
-    ax.set_title("Proxy ride length distribution")
-    ax.grid(True, alpha=0.3, axis="y")
-    fig.tight_layout()
-    fig.savefig(job_dir / "ride_lengths.png", dpi=100)
-    plt.close(fig)
-
-
-# Bar chart of regwall rate by ride position; save as regwall_position.png.
-def _write_regwall_position_plot(job_dir: Path, stats: dict) -> None:
-    import matplotlib.pyplot as plt
-
-    rwp = stats["regwall_rate_by_pos"]
-    fig, ax = plt.subplots(figsize=(8, 4))
-    if rwp:
-        positions = sorted(rwp.keys())
-        rates     = [rwp[p] * 100 for p in positions]
-        ax.bar(positions, rates, edgecolor="black", alpha=0.8)
-    ax.set_xlabel("Ride position (URL index within proxy)")
-    ax.set_ylabel("Regwall rate (%)")
-    ax.set_title("Regwall rate vs ride position")
-    ax.set_ylim(0, 100)
-    ax.grid(True, alpha=0.3, axis="y")
-    fig.tight_layout()
-    fig.savefig(job_dir / "regwall_position.png", dpi=100)
     plt.close(fig)
 
 
@@ -331,10 +275,6 @@ def _write_md(
         "## Plots",
         "",
         "![Cumulative OK](cumulative.png)",
-        "",
-        "![Ride length distribution](ride_lengths.png)",
-        "",
-        "![Regwall rate vs position](regwall_position.png)",
         "",
     ]
 

@@ -49,13 +49,13 @@ Touch this package when changing proxy-riding engine behaviour. Do NOT touch `en
 
 ## Modules
 
-### rider.py (459 LOC)
+### rider.py (436 LOC)
 
 **Purpose:** Browser-per-context proxy rider pool. Manages B `AsyncWebCrawler` instances, N slot
 coroutines, per-URL proxy context (`CrawlerRunConfig.proxy_config`), burn/fail rotation, watchdog.
 **Reads:** URL queue (asyncio.Queue), proxy pool list, `PersistentCooldownManager` (shared state).
-**Writes:** `output_dir/raw/{hash}.html` for each ok URL; `state.job_dir/remaining_urls.txt` +
-`state.job_dir/job.md` on watchdog stall abort (via `_abort_stall` — same dir as normal-completion report).
+**Writes:** `output_dir/raw/{hash}.html` for each ok URL; `state.job_dir/job.md` on stall abort
+(via `_abort_stall` — same dir as normal-completion report).
 **Called by:** `scrape.py:scrape_entries_riding` (via `run_riding_pool`).
 **Calls out:** `crawl4ai` (AsyncWebCrawler, BrowserConfig, CrawlerRunConfig, CacheMode, ProxyConfig,
 DefaultMarkdownGenerator); `src.news.engine.proxy_pool.cooldown.PersistentCooldownManager` (import);
@@ -66,16 +66,15 @@ Key dataclasses: `RiderState` (shared mutable job state — fields: `output_dir`
 `all_resolved = len(done_urls) >= len(target_urls)`), `JobRecord` (per-URL outcome),
 `RideRecord` (per-proxy-ride summary). `FAIL_THRESHOLD = 2` (failed/empty strikes before drop).
 
-### reporter.py (341 LOC)
+### reporter.py (281 LOC)
 
 **Purpose:** Job report writer — `job.md` (counts, throughput, percentiles, regwall table, failure
-table) + three matplotlib plots (cumulative ok, ride-length histogram, regwall-rate-by-position bar).
+table) + `cumulative.png` (step-plot of cumulative OK fetches over time).
 **Reads:** `RiderState` (in-memory), `t_job_start` (datetime).
-**Writes:** `{job_dir}/job.md`; `{job_dir}/cumulative.png`; `{job_dir}/ride_lengths.png`;
-`{job_dir}/regwall_position.png`.
+**Writes:** `{job_dir}/job.md`; `{job_dir}/cumulative.png`.
 **Called by:** `pipeline.py:run_scrape_only` (normal completion, via `write_riding_report`);
 `rider._abort_stall` (late import, stall abort path).
-**Calls out:** `matplotlib` (lazy import inside each `_write_*_plot`); `statistics` (stdlib);
+**Calls out:** `matplotlib` (lazy import inside `_write_cumulative_plot`); `statistics` (stdlib);
 `src.news.engine.proxy_riding.rider` (RiderState, FAIL_THRESHOLD).
 
 ### scrape.py (108 LOC)
