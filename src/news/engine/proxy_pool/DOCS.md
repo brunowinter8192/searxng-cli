@@ -97,7 +97,7 @@ Stall-terminate (`STALL_TIMEOUT_S = 3600`): `_last_progress` tracks the last tim
 to `done` or `dead` (queue shrinks). If `now - _last_progress >= STALL_TIMEOUT_S` at the top of
 the `while queue:` loop, the loop breaks and returns `gap = list(queue)` — the remaining unresolved
 URLs. These flow through `_build_manifest` as `status="failed"` and land in
-`data/news/{name}/raw/failed_urls.txt` via `_update_blocked_urls`. Only done/dead events advance
+`data/news/{name}/discover/failed_urls.txt` via `_update_blocked_urls`. Only done/dead events advance
 `_last_progress` — a batch of pure proxy-failures does not reset the clock. Stall fires when
 poison URLs (neither 200 nor 404 from origin) consume all proxies for a full pool-cycle with
 no terminal resolution.
