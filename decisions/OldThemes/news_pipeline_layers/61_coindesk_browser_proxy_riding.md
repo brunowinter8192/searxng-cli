@@ -192,3 +192,120 @@ data/news/coindesk/riding_mb20x6_500` — 20 browsers × 6 contexts = 120 concur
 queue-drain or 60-min stall. **Next session: read `job.md`** — wall-time + 61k projection vs the 137h
 Iteration-1 baseline; the open item is now purely the measured throughput at 20×6, no longer a research
 question.
+
+## Iteration 4 — progress watchdog + hard-abort (the 12h-hang fix)
+
+### Symptom
+
+The `--browsers 20 --concurrency 120 --n-urls 500` run (`riding_mb20x6_500`) wrote **469 raw HTML files in
+a 31-minute window (03:16–03:47), then zero new files for ~11.5 hours** until a manual Ctrl+C. No `job.md`
+was ever written. The Ctrl+C teardown traceback was stuck inside `browser.close()` — browsers were wedged
+at shutdown. The `STALL_TIMEOUT_S = 3600` cooperative terminator (the "60-min stall") never fired despite
+11.5 hours of no progress.
+
+### Root cause
+
+The stall check in `_run_slot` is at the **top of a while loop**, evaluated only when the slot coroutine
+has CPU time:
+
+```python
+if time.monotonic() - state.last_progress_mono > state.stall_timeout_s:
+    state.termination = "stall"
+    break
+```
+
+The coroutine is permanently suspended here:
+
+```python
+status, ... = await _fetch_one_url(crawler, url, pstr, state.page_timeout_ms)
+# internally: result = await crawler.arun(url=url, config=run_cfg)
+```
+
+When Playwright browsers enter a zombie state (process alive, WebSocket connection open, but no CDP
+messages ever returned — consistent with the 11.5 h silence and the `browser.close()` hang on teardown),
+`crawler.arun()` never resolves. Its asyncio future never becomes ready. The slot coroutine stays
+permanently suspended at the `await` — it never gets CPU time again, never reaches the top of the while
+loop, never runs the stall check.
+
+With 120 slots sharing 20 browsers, as each browser wedges its 6 slots pile up in the same permanently
+suspended state. Once all 20 browsers are zombie, all 120 slots are permanently suspended. The asyncio
+event loop has 120 tasks all blocked on I/O futures that will never fire. **There are no remaining
+runnable tasks and no scheduled timer callbacks.** The event loop's `select()` blocks indefinitely on file
+descriptors that will never deliver data. The 60-min check is cooperative — it requires a slot to be
+scheduled. With zero schedulable slots, it never fires.
+
+`kill_session` in `_fetch_one_url`'s `finally` block also cannot run for the same reason: the coroutine
+never exits the `await crawler.arun()` call. The Ctrl+C teardown then hit `browser.close()` on the same
+zombie connections, explaining the observed traceback.
+
+### Fix — independent asyncio.sleep-based watchdog
+
+A separate `asyncio.create_task(_watchdog(state, output_dir))` is created in `run_riding_pool` before the
+slot tasks, and cancelled in the `finally` block when slots return normally. The watchdog polls via
+`asyncio.sleep(min(30, stall_timeout_s / 4))`. Because `asyncio.sleep()` registers a monotonic-clock
+timer via `loop.call_later()`, the event loop's `select()` timeout is bounded to the poll interval — the
+watchdog fires on a timer **even when all slot tasks are permanently suspended on wedged browser I/O**. No
+I/O event is needed; the timer wakes the event loop and resumes the watchdog coroutine.
+
+When `time.monotonic() - state.last_progress_mono > state.stall_timeout_s` is true, the watchdog calls
+`_abort_stall(state, output_dir, idle_s)`, which never returns.
+
+### `_abort_stall` — hard abort sequence
+
+1. Set `state.termination = "stall"`.
+2. Drain `state.url_queue` via `get_nowait()` loop → `queued: list[str]`.
+3. Snapshot `sorted(state.in_flight_urls)` → the wedged URLs (diagnostically valuable).
+4. Write `output_dir/remaining_urls.txt` with two clearly labelled sections:
+   - `# never attempted (queue) — N URLs` + the drained queue URLs
+   - `# in-flight / wedged at abort — N URLs` + the in-flight URL set
+5. Late-import `write_riding_report` from `p4_reporter` (late import avoids circular at module level) →
+   write `job.md` from accumulated `state` data. Fallback: minimal stub `job.md` if reporter raises (e.g.
+   matplotlib absent), so the run is never completely silent.
+6. `sys.stderr.flush()` then **`os._exit(1)`** — bypasses asyncio teardown, `browser.close()`, all Python
+   atexit hooks. The OS reaps Chrome processes. Raw files + `remaining_urls.txt` + `job.md` are already
+   flushed to disk before `os._exit` is reached.
+
+### `in_flight_urls` set
+
+`RiderState` gains `in_flight_urls: set` (default empty). In `_run_slot`, `state.in_flight_urls.add(url)`
+immediately after `state.in_flight += 1`; `state.in_flight_urls.discard(url)` immediately after
+`state.in_flight -= 1`. Crucially, this is NOT in a `try/finally`: when a slot wedges at
+`await _fetch_one_url()`, the `discard` is never called — the URL remains in `in_flight_urls` until abort,
+exactly capturing the set of wedged fetches. `asyncio` is single-threaded so `set.add/discard` are
+atomic.
+
+### `RiderState.t_job_start`
+
+Added as `datetime = field(default_factory=lambda: datetime.now(timezone.utc))`. Used by `_abort_stall`
+when calling `write_riding_report(state, output_dir, state.t_job_start)` — the watchdog has no other
+access to the job start time.
+
+### `--stall-timeout` flag
+
+`run_coindesk_riding.py` gains `--stall-timeout FLOAT` (default `3600.0`). Threaded through
+`run_riding_pool(stall_timeout_s=args.stall_timeout)` → `RiderState(stall_timeout_s=...)`. Allows smoke
+tests to set a short threshold (e.g. `--stall-timeout 25`) to exercise the watchdog without a 60-min
+wait.
+
+### Deterministic test (`test_watchdog.py`)
+
+Two tests, no browser or proxy infrastructure required:
+
+- **test 1 — watchdog task:** constructs `RiderState` with `last_progress_mono` aged 200 s past a 1 s
+  threshold, 2 queued URLs, 1 in-flight URL in `in_flight_urls`. Patches `os._exit` to raise
+  `SystemExit(code)`. Runs `_watchdog(state, tmp_dir, poll_interval=0.1)` inside `asyncio.run()`. The
+  watchdog fires after one 0.1 s sleep, calls `_abort_stall`, which calls the patched `os._exit(1)` →
+  `SystemExit(1)` caught. Asserts: `exit_calls == [1]`; `remaining_urls.txt` exists with both section
+  headers and all 3 URLs; `job.md` exists with `stall` in content. **PASS.**
+
+- **test 2 — `_abort_stall` directly:** same state, calls `_abort_stall(state, tmp_dir, idle_s=999.0)`.
+  Asserts: same file checks + `"999"` present in the header line. **PASS.**
+
+### What was deliberately NOT done
+
+Per-fetch `asyncio.wait_for` around `crawler.arun()` is **NOT added** in this iteration. It is
+evidence-gated: we need the re-run with `--stall-timeout 60` (or similar) to produce a `remaining_urls.txt`
+and failure log that shows whether slots wedge systematically. If wedging is confirmed, per-fetch timeouts
+are the follow-up. Adding `wait_for` before seeing the failure log is speculative.
+
+`src/` remains untouched. Engine is dev-only (`dev/news_pipeline/coindesk_proxy_riding/`).

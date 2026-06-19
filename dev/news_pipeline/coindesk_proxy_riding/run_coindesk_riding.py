@@ -65,6 +65,7 @@ async def _run(args: argparse.Namespace) -> None:
         n_slots=args.concurrency,
         page_timeout_ms=args.page_timeout,
         n_browsers=args.browsers,
+        stall_timeout_s=args.stall_timeout,
     )
 
     elapsed = time.monotonic() - t0
@@ -105,7 +106,8 @@ def _parse_args() -> argparse.Namespace:
     ap.add_argument("--n-urls",         type=int, default=500,   help="URLs to scrape (default 500)")
     ap.add_argument("--output-dir",     default="output",        help="Output directory for raw HTML + report")
     ap.add_argument("--page-timeout",   type=int, default=8_000, help="Playwright page timeout ms (default 8000)")
-    ap.add_argument("--browsers",       type=int, default=1,     help="Browser pool size (default 1)")
+    ap.add_argument("--browsers",       type=int,   default=1,      help="Browser pool size (default 1)")
+    ap.add_argument("--stall-timeout",  type=float, default=3_600.0, help="Stall watchdog threshold in seconds (default 3600)")
     return ap.parse_args()
 
 
