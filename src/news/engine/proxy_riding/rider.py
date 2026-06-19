@@ -392,42 +392,19 @@ async def _watchdog(
             _abort_stall(state, idle)  # does not return
 
 
-# Write remaining_urls.txt + job.md then os._exit(1). Never returns.
+# Write job.md then os._exit(1). Never returns.
 # os._exit bypasses asyncio teardown and browser.close() so wedged Chrome processes
 # cannot re-hang the shutdown; raw files already flushed to disk before we reach here.
 def _abort_stall(state: RiderState, idle_s: float) -> None:
     print(
         f"[watchdog] STALL {idle_s:.0f}s ≥ {state.stall_timeout_s:.0f}s — "
-        f"writing report + failure log → os._exit(1)",
+        f"writing report → os._exit(1)",
         file=sys.stderr,
     )
     state.termination = "stall"
 
-    # Drain remaining queue URLs
-    queued: list[str] = []
-    while True:
-        try:
-            queued.append(state.url_queue.get_nowait())
-        except asyncio.QueueEmpty:
-            break
-
-    # In-flight URLs — the wedged ones: diagnostically valuable
-    inflight = sorted(state.in_flight_urls)
-
-    # Write failure log + report into scrape_jobs/{job_id}/ (same dir as normal completion)
+    # Write report into scrape_jobs/{job_id}/ (same dir as normal completion)
     state.job_dir.mkdir(parents=True, exist_ok=True)
-    fail_log = state.job_dir / "remaining_urls.txt"
-    lines = [
-        f"# Remaining URLs at stall abort — idle {idle_s:.0f}s (threshold {state.stall_timeout_s:.0f}s)",
-        f"# Total un-scraped: {len(queued) + len(inflight)}",
-        "",
-        f"# never attempted (queue) — {len(queued)} URLs",
-    ] + queued + [
-        "",
-        f"# in-flight / wedged at abort — {len(inflight)} URLs",
-    ] + inflight
-    fail_log.write_text("\n".join(lines), encoding="utf-8")
-    print(f"[watchdog] failure log → {fail_log}", file=sys.stderr)
 
     # Write job.md via reporter; fallback to minimal stub on any error
     try:
