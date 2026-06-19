@@ -170,7 +170,7 @@ async def run_pipeline(platform: Platform, skip_index: bool = False) -> None:
                 log.info("STAGE dedup …")
                 failure_urls: set[str] = set()
                 for _fname in ("dead_urls.txt", "failed_urls.txt"):
-                    _p = raw_dir / _fname
+                    _p = discover_dir / _fname
                     if _p.exists():
                         failure_urls |= {u for u in _p.read_text(encoding="utf-8").splitlines() if u}
                 new_entries, n_skip_raw, n_excluded = filter_new_entries(
@@ -209,7 +209,7 @@ async def run_pipeline(platform: Platform, skip_index: bool = False) -> None:
             for e in manifest if e.get("status") == "ok"
         ]
         _append_to_raw_manifest(raw_dir, ok_manifest_entries)
-        _update_blocked_urls(raw_dir, manifest, {"dead": "dead_urls.txt", "failed": "failed_urls.txt"})
+        _update_blocked_urls(discover_dir, manifest, {"dead": "dead_urls.txt", "failed": "failed_urls.txt"})
 
         # Stage 4 — clean-pass (proxy_pool / TheBlock only): raw → clean MD in collection_dir
         if n_ok > 0:
