@@ -7,7 +7,7 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).parent))
 
-from p2_browser_rider import RiderState
+from p2_browser_rider import RiderState, FAIL_THRESHOLD
 
 _BACKFILL_TOTAL = 61_000
 
@@ -68,6 +68,7 @@ def _compute_stats(state: RiderState, t_job_start: datetime) -> dict:
 
     n_proxies_burned     = len(rides)
     proxies_for_backfill = round(n_proxies_burned / max(n_ok, 1) * _BACKFILL_TOTAL)
+    n_fail_rotations     = sum(1 for r in rides if r.n_failed >= FAIL_THRESHOLD)
 
     # Regwall rate by ride position (position = URL index within a proxy ride)
     rw_by_pos:    dict[int, int] = {}
@@ -107,6 +108,7 @@ def _compute_stats(state: RiderState, t_job_start: datetime) -> dict:
         "ride_len_stats": ride_len_stats,
         "n_proxies_burned": n_proxies_burned,
         "proxies_for_backfill": proxies_for_backfill,
+        "n_fail_rotations": n_fail_rotations,
         "regwall_rate_by_pos": regwall_rate_by_pos,
         "retried_ok": retried_ok, "retried_failed": retried_failed,
         "n_urls_with_regwall": len(url_rw),
@@ -222,6 +224,7 @@ def _write_md(
         f"| OK | {stats['n_ok']} |",
         f"| Regwall fetches | {stats['n_regwall_fetches']} |",
         f"| Failed / Empty | {stats['n_failed']} |",
+        f"| Failed rotations (2-strike) | {stats['n_fail_rotations']} |",
         f"| Connect-fail fetches | {stats['n_connect_fail']} |",
         f"| Total fetches | {stats['n_total_fetches']} |",
         f"| Termination | `{stats['termination']}` |",
