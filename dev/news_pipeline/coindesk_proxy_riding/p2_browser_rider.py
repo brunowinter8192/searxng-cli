@@ -2,6 +2,7 @@
 
 import asyncio
 import hashlib
+import os
 import sys
 import time
 import uuid
@@ -93,6 +94,8 @@ class RiderState:
     proxy_lock:         asyncio.Lock = field(default_factory=asyncio.Lock)
     n_browsers:         int        = 1
     n_slots:            int        = 0
+    in_flight_urls:     set        = field(default_factory=set)
+    t_job_start:        datetime   = field(default_factory=lambda: datetime.now(timezone.utc))
 
     @property
     def all_resolved(self) -> bool:
@@ -109,8 +112,9 @@ async def run_riding_pool(
     output_dir:      Path,
     burn_threshold:  int,
     n_slots:         int,
-    page_timeout_ms: int = PAGE_TIMEOUT_MS,
-    n_browsers:      int = 1,
+    page_timeout_ms: int   = PAGE_TIMEOUT_MS,
+    n_browsers:      int   = 1,
+    stall_timeout_s: float = STALL_TIMEOUT_S,
 ) -> RiderState:
     (output_dir / RAW_SUBDIR).mkdir(parents=True, exist_ok=True)
     state = RiderState(
@@ -121,15 +125,18 @@ async def run_riding_pool(
         burn_threshold=burn_threshold,
         page_timeout_ms=page_timeout_ms,
         total_urls=url_queue.qsize(),
+        stall_timeout_s=stall_timeout_s,
     )
     state.n_browsers = n_browsers
     state.n_slots    = n_slots
     crawlers = [AsyncWebCrawler(config=BrowserConfig(headless=True, verbose=False)) for _ in range(n_browsers)]
     await asyncio.gather(*[c.start() for c in crawlers])
+    watchdog = asyncio.create_task(_watchdog(state, output_dir))
     try:
         tasks = [asyncio.create_task(_run_slot(i, crawlers[i % n_browsers], state)) for i in range(n_slots)]
         await asyncio.gather(*tasks)
     finally:
+        watchdog.cancel()
         results = await asyncio.gather(*[c.close() for c in crawlers], return_exceptions=True)
         for idx, r in enumerate(results):
             if isinstance(r, Exception):
@@ -184,6 +191,7 @@ async def _run_slot(slot_id: int, crawler: AsyncWebCrawler, state: RiderState) -
                     continue
 
                 state.in_flight += 1
+                state.in_flight_urls.add(url)
                 ride_pos  = len(positions) + 1
                 t_url_abs = datetime.now(timezone.utc)
 
@@ -191,6 +199,7 @@ async def _run_slot(slot_id: int, crawler: AsyncWebCrawler, state: RiderState) -
                     crawler, url, pstr, state.page_timeout_ms,
                 )
                 state.in_flight -= 1
+                state.in_flight_urls.discard(url)
 
                 positions.append((url, status, round(elapsed, 2)))
                 job = JobRecord(
@@ -343,6 +352,91 @@ def _write_raw(url_hash: str, html: str, output_dir: Path) -> Path:
 # SHA-256 URL hash (12 hex chars) — matches scrape.py convention.
 def _url_hash(url: str) -> str:
     return hashlib.sha256(url.encode()).hexdigest()[:12]
+
+
+# Independent progress watchdog — runs as a separate asyncio task, immune to wedged slots.
+# Uses asyncio.sleep() (timer-based) so it fires even when all slot tasks are permanently
+# suspended on await crawler.arun(). Polls every poll_interval seconds; default is
+# min(30, stall_timeout_s / 4) so a short smoke timeout still gets fast detection.
+async def _watchdog(
+    state:         RiderState,
+    output_dir:    Path,
+    poll_interval: float | None = None,
+) -> None:
+    interval = poll_interval if poll_interval is not None else min(30.0, state.stall_timeout_s / 4)
+    while True:
+        await asyncio.sleep(interval)
+        if state.all_resolved:
+            return
+        idle = time.monotonic() - state.last_progress_mono
+        if idle > state.stall_timeout_s:
+            _abort_stall(state, output_dir, idle)  # does not return
+
+
+# Write remaining_urls.txt + job.md then os._exit(1). Never returns.
+# os._exit bypasses asyncio teardown and browser.close() so wedged Chrome processes
+# cannot re-hang the shutdown; raw files already flushed to disk before we reach here.
+def _abort_stall(state: RiderState, output_dir: Path, idle_s: float) -> None:
+    print(
+        f"[watchdog] STALL {idle_s:.0f}s ≥ {state.stall_timeout_s:.0f}s — "
+        f"writing report + failure log → os._exit(1)",
+        file=sys.stderr,
+    )
+    state.termination = "stall"
+
+    # Drain remaining queue URLs
+    queued: list[str] = []
+    while True:
+        try:
+            queued.append(state.url_queue.get_nowait())
+        except asyncio.QueueEmpty:
+            break
+
+    # In-flight URLs — the wedged ones: diagnostically valuable
+    inflight = sorted(state.in_flight_urls)
+
+    # Write failure log
+    fail_log = output_dir / "remaining_urls.txt"
+    lines = [
+        f"# Remaining URLs at stall abort — idle {idle_s:.0f}s (threshold {state.stall_timeout_s:.0f}s)",
+        f"# Total un-scraped: {len(queued) + len(inflight)}",
+        "",
+        f"# never attempted (queue) — {len(queued)} URLs",
+    ] + queued + [
+        "",
+        f"# in-flight / wedged at abort — {len(inflight)} URLs",
+    ] + inflight
+    fail_log.write_text("\n".join(lines), encoding="utf-8")
+    print(f"[watchdog] failure log → {fail_log}", file=sys.stderr)
+
+    # Write job.md via reporter; fallback to minimal stub on any error
+    try:
+        from p4_reporter import write_riding_report  # late import — avoids circular at module level
+        write_riding_report(state, output_dir, state.t_job_start)
+        print(f"[watchdog] job.md → {output_dir / 'job.md'}", file=sys.stderr)
+    except Exception as exc:
+        print(f"[watchdog] write_riding_report WARN: {exc}", file=sys.stderr)
+        try:
+            (output_dir / "job.md").write_text(
+                "\n".join([
+                    "# CoinDesk riding job — STALL ABORT",
+                    "",
+                    "termination: stall",
+                    f"idle_s: {idle_s:.0f}",
+                    f"n_ok: {state.n_ok}",
+                    f"n_regwall: {state.n_regwall}",
+                    f"n_failed: {state.n_failed}",
+                    f"n_connect_fail: {state.n_connect_fail}",
+                    "",
+                    f"Reporter error: {exc}",
+                ]),
+                encoding="utf-8",
+            )
+        except Exception as write_exc:
+            print(f"[watchdog] fallback job.md WARN: {write_exc}", file=sys.stderr)
+
+    sys.stderr.flush()
+    os._exit(1)
 
 
 # Mini smoke: 5 URLs, 4 slots, raw pool (no feeder), 5-min cap.
