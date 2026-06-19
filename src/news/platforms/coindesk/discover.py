@@ -19,7 +19,7 @@ from src.news.platforms.coindesk.config import (
     CHECKPOINT_EVERY,
     DEFAULT_DELTA_DAYS,
     FULL_MODE_FLOOR,
-    INVENTORY_DIR,
+    DISCOVER_DIR,
 )
 # From browser.py: browser_load_feed(n_clicks) -> (headers, api_url, body)
 from src.news.platforms.coindesk.browser import browser_load_feed
@@ -40,15 +40,15 @@ async def discover(timeframe: str = "30") -> list[dict]:
 
     print(f"[coindesk] Warmup done. First URL: {start_url}", file=sys.stderr)
 
-    INVENTORY_DIR.mkdir(parents=True, exist_ok=True)
-    seen_urls = load_inventory(INVENTORY_DIR)
-    print(f"[coindesk] Inventory loaded: {len(seen_urls)} existing URLs", file=sys.stderr)
+    DISCOVER_DIR.mkdir(parents=True, exist_ok=True)
+    seen_urls = load_discover(DISCOVER_DIR)
+    print(f"[coindesk] Discover loaded: {len(seen_urls)} existing URLs", file=sys.stderr)
 
-    entries = await cursor_loop(headers, start_url, first_body, stop_date, seen_urls, INVENTORY_DIR)
+    entries = await cursor_loop(headers, start_url, first_body, stop_date, seen_urls, DISCOVER_DIR)
 
     new_count = sum(1 for e in entries if e.get("_new"))
     print(
-        f"[coindesk] discover → {len(entries)} entries total, {new_count} new to inventory",
+        f"[coindesk] discover → {len(entries)} entries total, {new_count} new to discover",
         file=sys.stderr,
     )
     return [{k: v for k, v in e.items() if k != "_new"} for e in entries]
@@ -142,7 +142,7 @@ async def try_rewarm(failing_url: str, headers: dict) -> tuple[dict, bytes | Non
     return headers, None, "fatal"
 
 
-# Cursor loop: pages backward to stop_date; writes new URLs incrementally to inventory shards.
+# Cursor loop: pages backward to stop_date; writes new URLs incrementally to discover shards.
 # Returns entry list [{url, lastmod, publication_date, title, section, _new}, ...].
 async def cursor_loop(
     headers: dict,
@@ -150,7 +150,7 @@ async def cursor_loop(
     first_body: bytes,
     stop_date: str,
     seen_urls: set,
-    inventory_dir: Path,
+    discover_dir: Path,
 ) -> list[dict]:
     year_files: dict[str, object] = {}
     all_entries: list[dict] = []
@@ -181,7 +181,7 @@ async def cursor_loop(
                 is_new = entry["url"] not in seen_urls
                 if is_new:
                     seen_urls.add(entry["url"])
-                    _append_to_shard(entry, year_files, inventory_dir)
+                    _append_to_shard(entry, year_files, discover_dir)
                 all_entries.append({**entry, "_new": is_new})
                 d = entry["publication_date"][:10] if entry["publication_date"] else ""
                 if d and (oldest_date is None or d < oldest_date):
@@ -313,22 +313,22 @@ def _is_live_blog(url: str) -> bool:
     return slug.startswith("live-")
 
 
-# Append one entry line to the appropriate per-year inventory shard (streaming, line-buffered)
-def _append_to_shard(entry: dict, year_files: dict, inventory_dir: Path) -> None:
+# Append one entry line to the appropriate per-year discover shard (streaming, line-buffered)
+def _append_to_shard(entry: dict, year_files: dict, discover_dir: Path) -> None:
     date_str = entry["publication_date"][:10]
     year = date_str[:4]
     if year not in year_files:
-        p = inventory_dir / f"coindesk_{year}.txt"
+        p = discover_dir / f"coindesk_{year}.txt"
         year_files[year] = open(p, "a", encoding="utf-8", buffering=1)
     year_files[year].write(f"{date_str}\t{entry['url']}\n")
 
 
-# Read all per-year inventory shards; return set of known URLs
-def load_inventory(inventory_dir: Path) -> set[str]:
+# Read all per-year discover shards; return set of known URLs
+def load_discover(discover_dir: Path) -> set[str]:
     seen: set[str] = set()
-    if not inventory_dir.exists():
+    if not discover_dir.exists():
         return seen
-    for shard in inventory_dir.glob("coindesk_*.txt"):
+    for shard in discover_dir.glob("coindesk_*.txt"):
         with open(shard, encoding="utf-8") as fh:
             for line in fh:
                 line = line.strip()
@@ -337,24 +337,24 @@ def load_inventory(inventory_dir: Path) -> set[str]:
     return seen
 
 
-# Read inventory shards filtered by year or date range; return [{url, publication_date}].
+# Read discover shards filtered by year or date range; return [{url, publication_date}].
 # year:      only reads coindesk_{year}.txt — fast single-shard load.
 # from_date / to_date: YYYY-MM-DD strings; both optional (open-ended range if one is omitted).
 # limit:     cap result count after filtering.
-def load_inventory_filtered(
-    inventory_dir: Path,
+def load_discover_filtered(
+    discover_dir: Path,
     year: str | None = None,
     from_date: str | None = None,
     to_date: str | None = None,
     limit: int | None = None,
 ) -> list[dict]:
-    if not inventory_dir.exists():
+    if not discover_dir.exists():
         return []
     if year is not None:
-        shards = [inventory_dir / f"coindesk_{year}.txt"]
+        shards = [discover_dir / f"coindesk_{year}.txt"]
         shards = [s for s in shards if s.exists()]
     else:
-        shards = sorted(inventory_dir.glob("coindesk_*.txt"))
+        shards = sorted(discover_dir.glob("coindesk_*.txt"))
     entries: list[dict] = []
     for shard in shards:
         with open(shard, encoding="utf-8") as fh:

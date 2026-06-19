@@ -30,7 +30,7 @@ SCRAPE_CHUNK_SIZE = 200   # URLs per scrape chunk; controls crash-loss window
 
 # ORCHESTRATOR
 
-# Discover + inventory-update only — no dedup/scrape/clean/publish. CoinDesk standalone job.
+# Discover + discover-update only — no dedup/scrape/clean/publish. CoinDesk standalone job.
 async def run_discover_only(platform: Platform) -> None:
     LOG_DIR.mkdir(parents=True, exist_ok=True)
     log = _setup_logging(platform.name)
@@ -47,7 +47,7 @@ async def run_discover_only(platform: Platform) -> None:
     log.info(f"=== {platform.name} discover-only complete ===")
 
 
-# Date-filtered scrape job: inventory → raw-diff → chunked scrape → raw persist.
+# Date-filtered scrape job: discover → raw-diff → chunked scrape → raw persist.
 # No cleanup, no publish — raw bodies land in data/news/{name}/raw/{hash}.md.
 # manifest.jsonl + regwall_urls.txt/empty_urls.txt updated per chunk.
 # RegwallGuardError: ok files recovered via raw_dir scan; regwall_abort set, loop stops.
@@ -77,7 +77,7 @@ async def run_scrape_only(
         sys.exit(1)
 
     entries = platform.load_scrape_entries(year=year, from_date=from_date, to_date=to_date, limit=limit)
-    log.info(f"inventory → {len(entries)} candidate URL(s) after filter")
+    log.info(f"discover → {len(entries)} candidate URL(s) after filter")
     if not entries:
         log.info("No entries in date range — done.")
         _write_marker(platform.name, log)

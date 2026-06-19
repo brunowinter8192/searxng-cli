@@ -14,8 +14,8 @@ Do NOT import from `src/crawler/` or `src/scraper/` — `src/news/` is self-cont
 
 ## Entry Points
 
-- `python -m src.news --source coindesk --discover-only [--timeframe 30|full]` — discover + inventory update only; no scrape
-- `python -m src.news --source coindesk --scrape-only --year YYYY [--from YYYY-MM-DD] [--to YYYY-MM-DD] [--limit N]` — date-filtered backfill: inventory → dedup(raw) → chunked scrape → raw persist → job report
+- `python -m src.news --source coindesk --discover-only [--timeframe 30|full]` — discover + discover-update only; no scrape
+- `python -m src.news --source coindesk --scrape-only --year YYYY [--from YYYY-MM-DD] [--to YYYY-MM-DD] [--limit N]` — date-filtered backfill: discover → dedup(raw) → chunked scrape → raw persist → job report
 - `python -m src.news --source coindesk` — full pipeline: discover → dedup(raw) → scrape → raw persist
 - `python -m src.news --source theblock --discover-only [--timeframe full|sub:N|sub:A-B]` — discover → persist master list `data/news/theblock/discover/master_urls.txt`; no scrape
 - `python -m src.news --source theblock [--timeframe delta|full|sub:N]` — full pipeline (proxy_pool engine); also updates master list
@@ -105,7 +105,7 @@ No clean-pass or publish in the browser path. `publish.py` remains on disk but i
 CoinDesk-specific decoupled backfill path — no browser warmup or discover stage.
 Dispatches on `platform.scrape_engine`: `"proxy_riding"` (current CoinDesk) or `"browser"` (legacy).
 
-1. **inventory** — `platform.load_scrape_entries(year, from_date, to_date, limit)` reads per-year shards `data/news/coindesk/inventory/coindesk_{year}.txt` (format `YYYY-MM-DD\t<url>`), applies date filter, returns `[{url, publication_date}]`.
+1. **discover** — `platform.load_scrape_entries(year, from_date, to_date, limit)` reads per-year shards `data/news/coindesk/discover/coindesk_{year}.txt` (format `YYYY-MM-DD\t<url>`), applies date filter, returns `[{url, publication_date}]`.
 2. **raw-diff** — `filter_new_entries(entries, raw_dir, name, mode="raw", raw_ext=ext)` where `ext=".html"` for `proxy_riding`, `".md"` for `browser`. Skips URLs whose raw file already exists. Resumable: re-run picks up where the previous run ended.
 
 **proxy_riding path (CoinDesk current):**

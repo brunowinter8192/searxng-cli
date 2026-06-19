@@ -17,7 +17,7 @@ Auto-registers via `register(CoinDeskPlatform())` at module end.
 **Purpose:** Platform constants — REGWALL_SIGNALS, SCRAPE_CONFIG (ScrapeConfig()), timeline-API
 discovery params (TIMELINE_BASE, COINDESK_BASE, TARGET_URL, CALL_DELAY, REWARM_EVERY,
 CLICKS_WARMUP, CLICKS_REWARM, MAX_CURSOR_FALLBACKS, CHECKPOINT_EVERY, DEFAULT_DELTA_DAYS,
-FULL_MODE_FLOOR, INVENTORY_DIR, SKIP_HEADERS).
+FULL_MODE_FLOOR, DISCOVER_DIR, SKIP_HEADERS).
 **Called by:** `browser.py`, `discover.py`, `__init__.py`.
 
 ### browser.py (170 LOC)
@@ -31,15 +31,15 @@ request (URL + headers + first response body). Returns `(headers, api_url, body_
 
 ### discover.py (376 LOC)
 
-**Purpose:** Timeline-API cursor loop + master inventory management.
-`discover(timeframe)` orchestrates: warmup → load inventory → `cursor_loop` →
-incremental inventory write → return entry list.
+**Purpose:** Timeline-API cursor loop + master discover management.
+`discover(timeframe)` orchestrates: warmup → load discover → `cursor_loop` →
+incremental discover write → return entry list.
 
 Cursor loop pages backward in reverse-chronological order. Each 16-article batch: parse, filter
-live-blogs, append genuinely new URLs to per-year inventory shards (`data/news/coindesk/inventory/
+live-blogs, append genuinely new URLs to per-year discover shards (`data/news/coindesk/discover/
 coindesk_{year}.txt`, format `YYYY-MM-DD\t<url>`). Termination: oldest article in batch < stop_date.
 Re-warm strategy: httpx feedpage GET first; browser re-warm as fallback. Crash-safe: URLs written
-per-article; re-run skips already-present URLs via load_inventory() diff.
+per-article; re-run skips already-present URLs via load_discover() diff.
 
 **Called by:** `__init__.py:CoinDeskPlatform.discover`.
 **Calls out:** `httpx` (cursor loop), `browser.py:browser_load_feed` (warmup + re-warm).
@@ -47,7 +47,7 @@ per-article; re-run skips already-present URLs via load_inventory() diff.
 Timeframe parsing: `"full"` → FULL_MODE_FLOOR (`"2018-01-01"`);
 integer string N → today − N days; anything else (incl. `"delta"`) → DEFAULT_DELTA_DAYS (30).
 
-`load_inventory_filtered(inventory_dir, year, from_date, to_date, limit)` — standalone function (not part of `discover()`). Reads per-year shards `coindesk_{year}.txt`; applies optional date-range filter (`from_date`/`to_date` as `YYYY-MM-DD`); caps result at `limit`. Returns `[{url, publication_date}]`. Called by `__init__.py:load_scrape_entries` for the `--scrape-only` flow.
+`load_discover_filtered(discover_dir, year, from_date, to_date, limit)` — standalone function (not part of `discover()`). Reads per-year shards `coindesk_{year}.txt`; applies optional date-range filter (`from_date`/`to_date` as `YYYY-MM-DD`); caps result at `limit`. Returns `[{url, publication_date}]`. Called by `__init__.py:load_scrape_entries` for the `--scrape-only` flow.
 
 ### cleanup.py (123 LOC)
 
@@ -72,5 +72,5 @@ browser chunking). `riding_scrape_config = RidingScrapeConfig()` — production 
 `n_browsers=4`, `stall_timeout_s=300.0`, `burn_threshold=2`, `page_timeout_ms=8_000`. Raw output is
 `.html` (not `.md`) — `data/news/coindesk/raw/{hash}.html`. `proxy_scrape_config = None`.
 Attribute `timeframe: str = "30"` set by `__main__` via `--timeframe`.
-`load_scrape_entries(year, from_date, to_date, limit)` delegates to `discover.py:load_inventory_filtered` — exposes the `--scrape-only` interface required by `run_scrape_only()` in `pipeline.py`.
+`load_scrape_entries(year, from_date, to_date, limit)` delegates to `discover.py:load_discover_filtered` — exposes the `--scrape-only` interface required by `run_scrape_only()` in `pipeline.py`.
 **Called by:** `__main__.py` (side-effect import); `pipeline.py:run_scrape_only` (via `platform.load_scrape_entries`, `platform.scrape_engine`, `platform.riding_scrape_config`).

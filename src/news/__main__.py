@@ -39,30 +39,30 @@ def main() -> None:
         "--discover-only",
         action="store_true",
         default=False,
-        help="Run discover + inventory-update only — skip dedup/scrape/clean/publish (CoinDesk).",
+        help="Run discover + discover-update only — skip dedup/scrape/clean/publish (CoinDesk).",
     )
     parser.add_argument(
         "--scrape-only",
         action="store_true",
         default=False,
-        help="Read inventory, MD-diff, scrape → clean → publish. No discover. (CoinDesk).",
+        help="Read discover shards, MD-diff, scrape → clean → publish. No discover. (CoinDesk).",
     )
     parser.add_argument(
         "--year",
         default=None,
-        help="Scrape URLs from inventory for one year, e.g. 2018. Mutually exclusive with --from/--to.",
+        help="Scrape URLs from discover shards for one year, e.g. 2018. Mutually exclusive with --from/--to.",
     )
     parser.add_argument(
         "--from",
         dest="from_date",
         default=None,
-        help="Start date YYYY-MM-DD for inventory date range (use with --to).",
+        help="Start date YYYY-MM-DD for discover date range (use with --to).",
     )
     parser.add_argument(
         "--to",
         dest="to_date",
         default=None,
-        help="End date YYYY-MM-DD for inventory date range (use with --from).",
+        help="End date YYYY-MM-DD for discover date range (use with --from).",
     )
     parser.add_argument(
         "--limit",
