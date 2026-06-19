@@ -31,6 +31,7 @@ Self-contained: no imports from `src/`. `p0_pool.py` is a local copy of the prox
 | `--output-dir` | `output` | Directory for raw HTML and report |
 | `--page-timeout` | 8000 | Playwright page timeout ms (dead proxies hit this before rotating) |
 | `--browsers` | 1 | Browser pool size — B separate Chromium processes, N slots spread across them (slot i → browsers[i % B]) |
+| `--stall-timeout` | 3600 | Stall watchdog threshold in seconds — watchdog fires `os._exit(1)` after this many seconds with no new raw file written; set small (e.g. 25) for smoke tests |
 
 ## Expected Output
 
@@ -52,11 +53,14 @@ Self-contained: no imports from `src/`. `p0_pool.py` is a local copy of the prox
 **Exports:** `load_backfill_pool()`, `PersistentCooldownManager`, `proxy_key()`, `fetch_with_retry()`
 **Why local:** hookify blocks `from src.` imports in dev/ scripts.
 
-### p2_browser_rider.py (404 LOC)
+### p2_browser_rider.py (498 LOC)
 
 **Purpose:** Core riding pool — B `AsyncWebCrawler` instances (browser pool, default B=1); N rider tasks distributed round-robin across browsers. Each task pulls raw proxies via `_next_proxy()` (atomic cursor over `eligible_candidates()`). Per-URL: `CrawlerRunConfig(proxy_config=ProxyConfig(server=pstr))` → fresh context per config-signature; `kill_session()` closes context after each fetch (fresh cookies). `page_timeout_ms` (CLI-configurable, default 8s) is the dead-proxy timeout lever.
 **Status routing:** ok → write HTML; regwall → requeue URL, increment burn_count, rotate after `burn_threshold` hits; connect_fail → requeue URL, rotate proxy immediately; failed/empty → requeue URL, increment fail_count, rotate after `FAIL_THRESHOLD=2` hits (2-strike drop) — ride ends, `finally` calls `mark_burned()` → 60-min cooldown.
-**Exports:** `run_riding_pool(n_browsers=1)`, `RiderState`, `RideRecord`, `JobRecord`, `FAIL_THRESHOLD`
+**Watchdog:** `_watchdog(state, output_dir)` asyncio task created in `run_riding_pool`, cancelled when slots return normally. Polls via `asyncio.sleep(min(30, stall_timeout_s/4))` — timer-based, fires regardless of wedged slot I/O. On `60min` (configurable via `stall_timeout_s`) with no new raw written → `_abort_stall`: drain queue + `in_flight_urls` → `remaining_urls.txt` (two sections: `# never attempted (queue)` / `# in-flight / wedged at abort`) + `job.md` via reporter → `os._exit(1)` (bypasses async teardown so wedged Chrome processes cannot re-hang shutdown).
+**`RiderState.in_flight_urls`:** set tracking currently-fetching URLs. `add(url)` immediately after `in_flight += 1`; `discard(url)` immediately after `in_flight -= 1`. NOT in try/finally — wedged slots never reach the discard, keeping the wedged URL in the set until abort (the diagnostically valuable capture).
+**`RiderState.t_job_start`:** `datetime` field (default factory `datetime.now(utc)`), used by `_abort_stall` when calling the reporter without access to the outer scope start time.
+**Exports:** `run_riding_pool(n_browsers=1, stall_timeout_s=3600)`, `RiderState`, `RideRecord`, `JobRecord`, `FAIL_THRESHOLD`, `_watchdog`, `_abort_stall`
 
 ---
 
@@ -75,7 +79,21 @@ Self-contained: no imports from `src/`. `p0_pool.py` is a local copy of the prox
 
 ---
 
-### run_coindesk_riding.py (113 LOC)
+### run_coindesk_riding.py (115 LOC)
 
 **Purpose:** CLI orchestrator — loads pool via `load_backfill_pool()`, wires `run_riding_pool` + `write_riding_report` end-to-end; raises `RLIMIT_NOFILE` at startup.
 **Entry point:** `__main__` via `asyncio.run(_run(_parse_args()))`.
+
+---
+
+### test_watchdog.py (159 LOC)
+
+**Purpose:** Deterministic watchdog verification — no browser or proxy infrastructure needed.
+**Tests:**
+- `test_watchdog_task_fires_and_writes_files`: constructs `RiderState` with `last_progress_mono` aged 200 s past a 1 s threshold + 2 queued + 1 in-flight URL; patches `os._exit` → `SystemExit(code)`; runs `_watchdog(poll_interval=0.1)`; asserts `os._exit(1)` called, `remaining_urls.txt` has both section headers + all 3 URLs, `job.md` exists with `stall`.
+- `test_abort_stall_directly`: same assertions via direct `_abort_stall(idle_s=999.0)` call; also checks `"999"` in the header line.
+
+**Usage:**
+```bash
+./venv/bin/python dev/news_pipeline/coindesk_proxy_riding/test_watchdog.py
+```
