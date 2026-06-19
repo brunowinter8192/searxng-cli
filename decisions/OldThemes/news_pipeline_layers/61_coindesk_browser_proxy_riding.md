@@ -8,8 +8,7 @@ finish the corpus — the IP goes "hot". This theme builds the IP-rotating backf
 
 ## Premise (user-decided, fixed)
 
-- Keep the **crawl4ai browser** fetcher (CoinDesk's body is JS-rendered; The-Block-style curl_cffi was
-  rejected as the 17h path — though see Open Questions, the 137h result undercuts that premise).
+- Keep the **crawl4ai browser** fetcher (CoinDesk's body is JS-rendered). Browser path is fixed.
 - Defeat the regwall by **riding proxies**: a proxy rides URLs; **fresh cookie context per URL on the same
   IP** (keeps OT03 cookie-fix, so the only regwall signal is IP-rate); burn the proxy at a cumulative
   regwall threshold (default 2) → rotate IP.
@@ -97,24 +96,99 @@ once we go multi-browser-pool.
 
 ## Current dev state
 
-`dev/news_pipeline/coindesk_proxy_riding/` on `dev`: `p0_pool` (pool + cooldown, The-Block-copied),
-`p2_browser_rider` (shared browser, per-context proxy, raw pool cursor, requeue-all), `p3_url_sampler`
-(proportional 500 across years), `p4_reporter` (job.md + 3 plots), `run_coindesk_riding` (CLI:
-`--concurrency --burn-threshold --n-urls --page-timeout --output-dir`; raises RLIMIT_NOFILE to 16384 at
-startup; http/socks5 filter; empty-pool guard). `p1_alive_feeder` deleted. Validated at concurrency 20;
-128 deadlocks. `src/` untouched.
+`dev/news_pipeline/coindesk_proxy_riding/` on `dev`: `p0_pool` (pool + 60-min cooldown via
+`PersistentCooldownManager`, `COOLDOWN_S=3600`, The-Block-copied), `p2_browser_rider` (**multi-browser pool**:
+B `AsyncWebCrawler` instances, slots round-robin `i % B`; per-context proxy; **fail-rotation**: 2-strike drop
+of failed/empty proxies, `FAIL_THRESHOLD=2`), `p3_url_sampler` (proportional 500 across years), `p4_reporter`
+(job.md + 3 plots; Browsers / Contexts-per-browser / Failed-rotations rows), `run_coindesk_riding` (CLI:
+`--browsers --concurrency --burn-threshold --n-urls --page-timeout --output-dir`; raises RLIMIT_NOFILE to
+16384; http/socks5 filter; empty-pool guard). `p1_alive_feeder` deleted. `src/` untouched. See Iteration 3.
 
-## Open questions (next session — research FIRST, then decide)
+## Resolved questions — the research that drove Iteration 3
 
-1. **Contexts-per-browser limit** — research before coding. Sources, by authority: Chromium renderer-process
-   cap (`GetMaxRendererProcessCount` in `render_process_host_impl.cc`; historically ~80 desktop, RAM-scaled —
-   likely the deadlock root); Playwright GitHub issues + docs (known "many concurrent contexts hang" + the
-   "use multiple browser instances for parallelism" guidance); crawl4ai docs/issues (`arun_many`,
-   `MemoryAdaptiveDispatcher`, max sessions); SO/Reddit for practical contexts-per-browser numbers. Goal: the
-   safe C between our measured 20 (works) and 128 (hangs).
+Both questions below were answered this session and implemented (see Iteration 3). Kept for the evidence trail.
+
+1. **Contexts-per-browser limit** — goal: the safe C between our measured 20 (works) and 128 (hangs).
+
+   **Finding — Chromium renderer-process cap (resolved).** Source: `GetMaxRendererProcessCount()` in
+   `content/browser/renderer_host/render_process_host_impl.cc` (chromium/chromium, read via gh-cli). Desktop
+   (non-Android) formula:
+   `max_count = clamp( (TotalRAM_MiB / 2) / kEstimatedWebContentsMemoryUsage , 3 , GetPlatformMaxRendererProcessCount() )`
+   - `kEstimatedWebContentsMemoryUsage = 85 MB` on 64-bit (60 MB on 32-bit).
+   - `GetPlatformMaxRendererProcessCount() = GetPlatformProcessLimit() / 2`, **hard-capped at 82**. macOS hits
+     the 82-cap path (unlimited/unknown platform limit). → on any machine ≥ ~14 GB RAM the cap is **82
+     renderer processes**. Source RAM table (64-bit): 16 GB→96 (pre-clamp), 4 GB→24, 1 GB→6.
+   - It is a **soft** limit: above 82 Chromium REUSES renderer processes (consolidates site-instances) instead
+     of spawning new ones. Our arch (fresh BrowserContext + distinct proxy per URL = distinct storage/network
+     partition) DEFEATS reuse → 128 contexts spawned the measured 135 renderer processes, ~1.6× over the 82
+     ceiling, exactly the regime the cap exists to prevent. **128-deadlock explained:** operating above the
+     design ceiling where process-reuse + navigation coordination collapses.
+   - **Implication:** 82 = absolute design ceiling, NOT a target. Safe C is well below it; exact value between
+     20 and 82 is an empirical-sweep question. Multi-browser pool (Q2): keep per-browser C clearly under 82,
+     scale throughput via B browser processes, not more contexts per browser.
+
+   **Still open within Q1:** Playwright-side concurrency behaviour (known "many concurrent contexts hang"
+   issues + "use multiple browser instances for parallelism" guidance); crawl4ai's own concurrency knobs
+   (`arun_many`, `MemoryAdaptiveDispatcher`, max sessions — local in `venv/.../crawl4ai/`). These set the
+   practical C below the 82 hard ceiling.
 2. **Multi-browser pool** — B browser processes × C contexts each = total concurrency, sidestepping the
    single-browser deadlock + spreading CPU/crash-radius. Depends on (1).
-3. **curl_cffi body question (still untested)** — the 137h browser result contradicts the premise that the
-   browser is faster than curl_cffi (The Block: 22k/17h). IF curl_cffi gets CoinDesk's article body, it would
-   sidestep the entire browser thicket (deadlock, renderer-RAM, junk-churn) AND the regwall (rotation solves
-   it). A ~10-min probe settles it. User has repeatedly chosen the browser path; flagged for honesty.
+
+   **Finding — crawl4ai concurrency primitives** (gh-cli `index_issues unclecode/crawl4ai`, indexed into the
+   volatile `github_issues` collection — synthesis preserved here). crawl4ai exposes NO multi-browser-PROCESS
+   pool; concurrency within ONE `AsyncWebCrawler` (= one browser process) is governed by a **dispatcher**:
+   - `MemoryAdaptiveDispatcher` (default for `arun_many`): `max_session_permit` default **20** (matches our
+     empirically-validated 20) + `memory_threshold_percent` (default ~90%, community uses 70-85%) which PAUSES
+     new sessions when RAM exceeds threshold → directly addresses the renderer-RAM wall (Iteration-2 finding).
+   - `SemaphoreDispatcher`: fixed `max_session_permit` cap, no RAM adaptivity.
+   - **Gotcha (#1818, #1584):** `CrawlerRunConfig.semaphore_count` / `mean_delay` / `max_range` are SILENTLY
+     IGNORED by the default dispatcher — to control concurrency you MUST pass an explicit dispatcher with
+     `max_session_permit`. (Wired-up fix in PR #1861; pass-explicit-dispatcher is the safe pattern regardless.)
+   - **Pool = B independent `AsyncWebCrawler` instances** (B browser processes), each with its own dispatcher
+     capped at C ≈ 20. No built-in process pool; community does manual batching (fresh crawler per batch).
+
+   **Finding — high-concurrency race pathology** (#1367, `github_issues`). At high concurrency, per-context
+   proxies + React/SPA navigation cause `net::ERR_ABORTED` / context-recycle races / hangs. Mitigations
+   (several already in our design): `use_persistent_context=False` (we use fresh context/URL ✓),
+   `wait_until="domcontentloaded"` not `networkidle` (we use domcontentloaded ✓); proxy-rotation is the most
+   abort-prone path; React pages are the most navigation-sensitive (**CoinDesk IS React**). Memory-leak /
+   unbounded-growth in 0.6–0.7.8 was fixed in 0.8.0+ (browser-context LRU eviction, CDP leak fixes, browser
+   recycling); we run 0.8.6. → the 128-deadlock is the Chromium renderer-cap (>82, Q1 finding) COMPOUNDED by
+   this race pathology under extreme per-context-proxy concurrency.
+
+   **Pool design (converging):** B browsers × C ≈ 20 contexts, a `MemoryAdaptiveDispatcher` per browser for
+   the RAM throttle; keep per-browser C well under the 82 renderer ceiling, scale via B.
+
+## Iteration 3 — multi-browser pool + fail-rotation fix + first 20×6 run
+
+Built on the Q1/Q2 research above. Two engine changes (`dev/` only, `src/` untouched), each worker-built +
+smoke-verified, merged to `dev`.
+
+### Multi-browser pool (commit `1ebd1c5`)
+
+`run_riding_pool()` now creates B `AsyncWebCrawler` instances (was one), starts all via
+`asyncio.gather(*[c.start() …])`, distributes the N slots round-robin (`slot i → crawlers[i % B]`), closes all
+with `return_exceptions=True`. New `--browsers` flag (default 1 = byte-identical to the old single-browser
+path). `_run_slot` / `_fetch_one_url` unchanged (already took a crawler param). `RiderState` carries
+`n_browsers` + `n_slots`; reporter surfaces Browsers + Contexts-per-browser. Rationale: keep per-browser
+contexts well under the 82 renderer ceiling (Q1), scale concurrency via B processes (Q2). **Smoke (2 browsers ×
+2 contexts):** both browsers launch, 54 ok, rotation + regwall detection work, raw HTML written, **no deadlock**.
+
+### Fail-rotation fix (commit `cb2fb46`)
+
+Bug surfaced by the multi-browser smoke: with the alive-precheck removed (Iteration 2), the engine rides RAW
+garbage proxies — and a proxy returning status `failed`/`empty` was **requeued but never rotated** (the ride
+loop only rotated on `connect_fail` and counted `regwall` toward burn). A garbage proxy that `failed` every URL
+was ridden forever (observed slot at ride-position **353**). Fix (mirrors The Block): per-ride `fail_count`,
+`FAIL_THRESHOLD=2` — on the 2nd failed/empty strike the ride ends (`break`), which falls through to the existing
+`finally → cooldown_mgr.mark_burned`, giving the dropped proxy the 60-min cooldown for free (no new cooldown
+logic). **Smoke delta:** max ride-position **353 → 6**; failed proxies drop exactly at `r=2`; queue drains
+continuously instead of stalling.
+
+### First real run — launched, result pending
+
+`run_coindesk_riding.py --browsers 20 --concurrency 120 --n-urls 500 --output-dir
+data/news/coindesk/riding_mb20x6_500` — 20 browsers × 6 contexts = 120 concurrency. Self-terminates on
+queue-drain or 60-min stall. **Next session: read `job.md`** — wall-time + 61k projection vs the 137h
+Iteration-1 baseline; the open item is now purely the measured throughput at 20×6, no longer a research
+question.
