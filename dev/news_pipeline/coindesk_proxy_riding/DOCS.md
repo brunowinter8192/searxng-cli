@@ -52,11 +52,11 @@ Self-contained: no imports from `src/`. `p0_pool.py` is a local copy of the prox
 **Exports:** `load_backfill_pool()`, `PersistentCooldownManager`, `proxy_key()`, `fetch_with_retry()`
 **Why local:** hookify blocks `from src.` imports in dev/ scripts.
 
-### p2_browser_rider.py (394 LOC)
+### p2_browser_rider.py (404 LOC)
 
 **Purpose:** Core riding pool — B `AsyncWebCrawler` instances (browser pool, default B=1); N rider tasks distributed round-robin across browsers. Each task pulls raw proxies via `_next_proxy()` (atomic cursor over `eligible_candidates()`). Per-URL: `CrawlerRunConfig(proxy_config=ProxyConfig(server=pstr))` → fresh context per config-signature; `kill_session()` closes context after each fetch (fresh cookies). `page_timeout_ms` (CLI-configurable, default 8s) is the dead-proxy timeout lever.
-**Status routing:** ok → write HTML; regwall → requeue URL, increment burn_count; connect_fail → requeue URL, rotate proxy immediately; failed/empty → drop.
-**Exports:** `run_riding_pool(n_browsers=1)`, `RiderState`, `RideRecord`, `JobRecord`
+**Status routing:** ok → write HTML; regwall → requeue URL, increment burn_count, rotate after `burn_threshold` hits; connect_fail → requeue URL, rotate proxy immediately; failed/empty → requeue URL, increment fail_count, rotate after `FAIL_THRESHOLD=2` hits (2-strike drop) — ride ends, `finally` calls `mark_burned()` → 60-min cooldown.
+**Exports:** `run_riding_pool(n_browsers=1)`, `RiderState`, `RideRecord`, `JobRecord`, `FAIL_THRESHOLD`
 
 ---
 
@@ -67,7 +67,7 @@ Self-contained: no imports from `src/`. `p0_pool.py` is a local copy of the prox
 
 ---
 
-### p4_reporter.py (341 LOC)
+### p4_reporter.py (344 LOC)
 
 **Purpose:** Generates `job.md` + 3 plots from a completed `RiderState`.
 **Metrics:** counts/throughput/61k-backfill projection; HTML size percentiles (`char_count = len(result.html)`); markdown length percentiles (`markdown_len` — body-level truncation signal); proxy churn + 61k estimate; ride-length distribution; regwall-position curve; retry outcomes; wasted-fetch ratio. Counts table includes `Browsers` and `Contexts/browser` (`n_slots // n_browsers`) for self-documenting runs.

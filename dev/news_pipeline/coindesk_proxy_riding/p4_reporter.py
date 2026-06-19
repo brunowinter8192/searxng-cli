@@ -7,7 +7,7 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).parent))
 
-from p2_browser_rider import RiderState
+from p2_browser_rider import RiderState, FAIL_THRESHOLD
 
 _BACKFILL_TOTAL = 61_000
 
@@ -68,7 +68,7 @@ def _compute_stats(state: RiderState, t_job_start: datetime) -> dict:
 
     n_proxies_burned     = len(rides)
     proxies_for_backfill = round(n_proxies_burned / max(n_ok, 1) * _BACKFILL_TOTAL)
-    n_fail_rotations     = sum(1 for r in rides if r.n_failed >= 2)
+    n_fail_rotations     = sum(1 for r in rides if r.n_failed >= FAIL_THRESHOLD)
 
     # Regwall rate by ride position (position = URL index within a proxy ride)
     rw_by_pos:    dict[int, int] = {}
