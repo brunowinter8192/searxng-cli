@@ -27,7 +27,7 @@ from src.news.platforms.coindesk.browser import browser_load_feed
 
 # ORCHESTRATOR
 
-# Browser warmup → httpx cursor loop → incremental inventory write → entry list.
+# Browser warmup → httpx cursor loop → incremental discover write → entry list.
 # timeframe: "full" (→ FULL_MODE_FLOOR floor), int-string N (→ N days back), else DEFAULT_DELTA_DAYS.
 async def discover(timeframe: str = "30") -> list[dict]:
     stop_date = _parse_stop_date(timeframe)
