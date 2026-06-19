@@ -225,6 +225,26 @@ Resumability confirmed: the `.html` dedup extension check skips already-scraped 
 **COMPLETE.** Stage 1 (engine package) + Stage 2 (pipeline wiring) done.
 Stage 3 = operator prod 500-run validation with full proxy pool.
 
+### Stage 3 — in flight (verify next session)
+
+The operator launched the prod 500-run at session end:
+`python -m src.news --source coindesk --scrape-only --year 2024 --limit 500`. To verify next session,
+read `data/news/coindesk/scrape_jobs/<job_id>/job.md`: the measured OK/min + 61k projection (expect
+~23-30/min per OT61 Iter 5), that the riding branch dispatched (no "chunked plan"), that CPU stayed
+~50-60% at C=64, and that a re-run reports `dedup → 0 new` (resumability at scale). The Stage-2 5-URL
+smoke already confirmed dispatch + `.html` dedup; this is the scale-confidence check.
+
+## Open / future items (full 61k backfill)
+
+- **Error-URL permanent exclusion.** The watchdog writes un-scraped URLs to `remaining_urls.txt`, which
+  re-queue on the next run. URLs that ALWAYS fail (dead / genuine errors) must NOT re-queue every run —
+  they need permanent exclusion (the OT59 dead/failed-exclusion pattern from The Block), wired into the
+  riding/CoinDesk dedup before the standing 61k backfill. Out of scope for the port; required before the
+  recurring backfill.
+- **dev/ engine cleanup.** `dev/news_pipeline/coindesk_proxy_riding/` is now duplicated by the canonical
+  `src/news/engine/proxy_riding/`. The dev/ copy can be removed (investigation record lives in OT61/OT63)
+  — deferred.
+
 ## Stage-1 Smoke Result
 
 Script: `dev/news_pipeline/coindesk_proxy_riding/smoke_stage1.py`

@@ -309,3 +309,61 @@ and failure log that shows whether slots wedge systematically. If wedging is con
 are the follow-up. Adding `wait_for` before seeing the failure log is speculative.
 
 `src/` remains untouched. Engine is dev-only (`dev/news_pipeline/coindesk_proxy_riding/`).
+
+## Iteration 5 — config tuning (C-sweep) + throughput measurement + prod config
+
+After the watchdog (Iteration 4) made runs hang-safe, this iteration measured the load-vs-concurrency
+curve and the real verified-URL throughput, and decided the production config. (Engine still dev-only
+here; the src/ port is OT63.)
+
+### Hang corrected, not a stall
+
+The Iteration-3 "result pending" 20×6 run did NOT self-terminate — the operator aborted it after ~12 h.
+It hung exactly as Iteration 4 describes (cooperative stall-check unreachable while all slots are
+suspended on wedged-browser awaits). No throughput data came from it.
+
+### Load-vs-concurrency sweep (isolated, clean)
+
+The binding constraint at scale is **CPU**, not RAM: each context is its own Chromium renderer process,
+so renderers = total concurrency C; junk-proxy contexts are cheap connect-fail churns (~100 MB, most
+never render). Machine: 48 GB / 14 cores. Clean isolated numbers (ONE run at a time, killed after a
+~60 s sample — overlapping runs contaminate the readings, a lesson learned the hard way mid-session):
+
+| Concurrency C | CPU busy |
+|---|---|
+| 16 (2×8)  | ~30% |
+| 64 (4×16) | ~55-60% (peaks ~70%) |
+| 120 (the original choke) | ~97% (saturated) |
+
+~Linear (~0.64%/context above a ~15% baseline). **Browser count is minor** (fixed infra-process set per
+browser); the renderers (= C) are the load. Redistributing B↔C at constant C does NOT cut load — only
+lowering C does. (Initial 20→6 browser change at constant C=120 barely helped — the misstep that
+surfaced this.)
+
+### Verified-URL throughput
+
+A C=64 (4×16) run: **280 verified URLs (ok) in 12 min 13 s → ~23/min average, ~28-30/min in the steady
+minutes** (per-minute raw-write counts, NOT collapsing — highest at the end). 93% of fetch attempts are
+connect-fails on dead proxies = the churn cost, not a blocker; at C=64 the engine churns fast enough to
+sustain ~23-30/min. **61k projection ≈ 35-45 h.** Throughput is **proxy-supply-bound, not
+concurrency-bound** — the 2×8 smoke already projected ~33 h, so higher C buys little speed but more CPU.
+
+### Production config
+
+- **C = 64 (4 browsers × 16 contexts)** — ~55% CPU, ample headroom, negligible RAM, clean teardown.
+  Chosen for utilization+safety margin, not raw speed (proxy-bound above ~64).
+- **Stall timeout 300 s (5 min), not 3600.** At ~23/min, 5 min of zero raw is unambiguously stuck. The
+  tail (few URLs left → naturally larger gaps) is handled by `remaining_urls.txt` + re-queue, NOT by
+  tail-aware logic — a "too-early" abort is cheap (stragglers defer to the next run). Tighten from real
+  long-run gap data later.
+- **Pool shuffle.** The pool was consumed sequentially in repo-order (`_next_proxy` cursor over the
+  repo-concatenated pool) → early quality depended on whichever repo was first. `random.shuffle` at
+  pool-load removes the repo-order bias and avoids long junk-streaks from one bad repo → consistent
+  pool quality + steadier good-proxy supply (does not raise average quality, only removes front-load
+  variance).
+- **socks4 stays filtered** (`BROWSER_ELIGIBLE_PROTOS = {http, socks5}`) — technical limit (Playwright
+  cannot drive socks4), not a tuning choice.
+- **Alive-feeder NOT reintroduced** — alive ≠ delivers-the-target (rejected earlier, also dropped for
+  The Block); drive proxy throughput at the target directly.
+
+These values become the `RidingScrapeConfig` defaults in the src/ port (OT63).
