@@ -29,6 +29,7 @@ REGWALL_SIGNALS: list[str] = [
 PAGE_TIMEOUT_MS   = 8_000    # default; overridden per-call via page_timeout_ms param
 DELAY_BEFORE_HTML = 0.5      # s wait after domcontentloaded
 STALL_TIMEOUT_S   = 3_600.0  # 60 min no progress → terminate
+FAIL_THRESHOLD    = 2        # failed/empty strikes before dropping a proxy (mirrors burn_threshold for regwall)
 
 # Playwright error substrings that indicate a proxy-side failure (not CoinDesk)
 _PROXY_ERR = ("timeout", "proxy", "err_proxy", "tunnel", "socks",
@@ -45,6 +46,7 @@ class RideRecord:
     n_ok:             int
     n_regwall:        int
     n_connect_fail:   int
+    n_failed:         int        # URLs that triggered the fail-rotation (2-strike drop)
     n_urls_attempted: int
     burned_threshold: bool
     burned_connect:   bool
@@ -161,6 +163,7 @@ async def _run_slot(slot_id: int, crawler: AsyncWebCrawler, state: RiderState) -
         pstr      = f"{proto}://{hp}"
         t_bind    = time.monotonic()
         burn_count = 0
+        fail_count = 0
         ride_ok    = 0
         positions: list = []
         cf_broke   = False
@@ -222,8 +225,14 @@ async def _run_slot(slot_id: int, crawler: AsyncWebCrawler, state: RiderState) -
                     break
 
                 else:  # failed | empty
+                    fail_count += 1
                     state.url_queue.put_nowait(url)
-                    print(f"[slot {slot_id}] {status} r={ride_pos} → requeue", file=sys.stderr)
+                    print(
+                        f"[slot {slot_id}] {status} fail={fail_count}/{FAIL_THRESHOLD}"
+                        f" r={ride_pos} → requeue", file=sys.stderr,
+                    )
+                    if fail_count >= FAIL_THRESHOLD:
+                        break
 
                 state.job_records.append(job)
 
@@ -232,6 +241,7 @@ async def _run_slot(slot_id: int, crawler: AsyncWebCrawler, state: RiderState) -
                 proxy_str=pstr, proto=proto, host_port=hp,
                 n_ok=ride_ok, n_regwall=burn_count,
                 n_connect_fail=1 if cf_broke else 0,
+                n_failed=fail_count,
                 n_urls_attempted=len(positions),
                 burned_threshold=burn_count >= state.burn_threshold,
                 burned_connect=cf_broke,
