@@ -76,7 +76,7 @@ Proxy platforms set `scrape_engine = "proxy_pool"` and provide a `ProxyScrapeCon
 | `registry.py` | name → Platform registry; register() / get() | 19 |
 | `pipeline.py` | Async orchestrator; stages 1–4 for proxy_pool (TheBlock); raw-only 1–3 for browser; run_discover_only(); run_scrape_only(); _persist_master_list(); _run_clean_pass() | 367 |
 | `__main__.py` | argparse entry point; --source + --skip-index + --timeframe + --discover-only | 102 |
-| `engine/` | Generic scrape engines (browser + proxy_pool) + dedup | — |
+| `engine/` | Generic scrape engines (browser + proxy_pool + proxy_riding) + dedup. proxy_riding ported but not yet wired (Stage 2). | — |
 | `platforms/coindesk/` | CoinDesk platform implementation | — |
 | `platforms/theblock/` | The Block platform — proxy_pool, hash-dedup, JSON-LD cleanup | — |
 

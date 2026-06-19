@@ -1,0 +1,104 @@
+# src/news/engine/proxy_riding/
+
+## Role
+
+Third scrape engine: browser + rotating proxies. Purpose: defeat CoinDesk's IP-rate regwall for the
+61k article-body backfill. Each URL gets a fresh crawl4ai browser context bound to a distinct proxy;
+the proxy is burned after `burn_threshold` regwall hits or `FAIL_THRESHOLD` (2) failed/empty strikes
+and a new one is picked from the shuffled pool. A timer-based asyncio watchdog (`_watchdog`) runs
+independently of the slot tasks and hard-aborts via `os._exit(1)` if no progress occurs for
+`stall_timeout_s` seconds — immune to wedged Playwright I/O.
+
+**NOT yet dispatched by `pipeline.py`.** Stage 2 wiring pending: `platform.scrape_engine ==
+"proxy_riding"` dispatch arm in `pipeline.py`, `RidingScrapeConfig` promotion to `platform.py`,
+and `.html` vs `.md` reconciliation in `filter_new_entries` (dedup) and `_run_clean_pass`.
+
+Touch this package when changing proxy-riding engine behaviour. Do NOT touch `engine/scrape.py` or
+`engine/proxy_pool/` — those engines are strictly independent.
+
+## Public Interface
+
+`__init__.py` is empty. Entry paths:
+
+- `scrape_entries_riding(entries, output_dir, riding_cfg)` in `scrape.py` — async; called by
+  pipeline (Stage 2). Returns `list[{url, hash, status, file, char_count, error}]`.
+- `RidingScrapeConfig` in `scrape.py` — dataclass with production defaults
+  (`n_browsers=4, n_slots=64, stall_timeout_s=300.0, burn_threshold=2, page_timeout_ms=8_000`).
+- `write_riding_report(state, job_dir, t_job_start)` in `reporter.py` — called by `scrape.py` and
+  by `_abort_stall` (late import to avoid circular).
+- `run_riding_pool(url_queue, proxy_pool, cooldown_mgr, output_dir, …)` in `rider.py` — async;
+  called by `scrape_entries_riding`.
+
+## Flow
+
+1. `scrape_entries_riding` builds URL queue from entries, loads pool via `load_backfill_pool()`,
+   filters to `{"http","socks5"}`, shuffles, constructs `PersistentCooldownManager`.
+2. `run_riding_pool` spawns B `AsyncWebCrawler` instances + N slot tasks + 1 watchdog task.
+3. Each slot draws a proxy from the shuffled pool (cursor-atomic under `proxy_lock`), rides URLs
+   until burn_threshold regwall or FAIL_THRESHOLD failed/empty, then rotates to the next proxy.
+4. Ok fetches write `raw/{hash}.html`; state accumulates `job_records` + `ride_records`.
+5. `scrape_entries_riding` maps `state.job_records` → manifest via `_build_manifest`.
+
+## Modules
+
+### rider.py (437 LOC)
+
+**Purpose:** Browser-per-context proxy rider pool. Manages B `AsyncWebCrawler` instances, N slot
+coroutines, per-URL proxy context (`CrawlerRunConfig.proxy_config`), burn/fail rotation, watchdog.
+**Reads:** URL queue (asyncio.Queue), proxy pool list, `PersistentCooldownManager` (shared state).
+**Writes:** `output_dir/raw/{hash}.html` for each ok URL; `output_dir/remaining_urls.txt` +
+`output_dir/job.md` on watchdog stall abort (via `_abort_stall`).
+**Called by:** `scrape.py:scrape_entries_riding` (via `run_riding_pool`).
+**Calls out:** `crawl4ai` (AsyncWebCrawler, BrowserConfig, CrawlerRunConfig, CacheMode, ProxyConfig,
+DefaultMarkdownGenerator); `src.news.engine.proxy_pool.cooldown.PersistentCooldownManager` (import);
+late import of `reporter.write_riding_report` inside `_abort_stall` (avoids circular).
+
+Key dataclasses: `RiderState` (shared mutable job state), `JobRecord` (per-URL outcome),
+`RideRecord` (per-proxy-ride summary). `FAIL_THRESHOLD = 2` (failed/empty strikes before drop).
+
+### reporter.py (341 LOC)
+
+**Purpose:** Job report writer — `job.md` (counts, throughput, percentiles, regwall table, failure
+table) + three matplotlib plots (cumulative ok, ride-length histogram, regwall-rate-by-position bar).
+**Reads:** `RiderState` (in-memory), `t_job_start` (datetime).
+**Writes:** `{job_dir}/job.md`; `{job_dir}/cumulative.png`; `{job_dir}/ride_lengths.png`;
+`{job_dir}/regwall_position.png`.
+**Called by:** `scrape.py:scrape_entries_riding` (normal completion); `rider._abort_stall`
+(late import, stall abort path).
+**Calls out:** `matplotlib` (lazy import inside each `_write_*_plot`); `statistics` (stdlib);
+`src.news.engine.proxy_riding.rider` (RiderState, FAIL_THRESHOLD).
+
+### scrape.py (105 LOC)
+
+**Purpose:** Pipeline entry point + manifest adapter. Loads pool, shuffles, calls `run_riding_pool`,
+maps `RiderState.job_records` → pipeline manifest.
+**Reads:** entries list (in-memory), `RidingScrapeConfig`, proxy pool (network via `load_backfill_pool`).
+**Writes:** delegates to `rider.py` (raw HTML writes); writes nothing directly.
+**Called by:** `pipeline.py` (Stage 2, not yet wired).
+**Calls out:** `src.news.engine.proxy_pool.pool_loaders.load_backfill_pool`;
+`src.news.engine.proxy_pool.cooldown.PersistentCooldownManager`;
+`src.news.engine.proxy_riding.rider.run_riding_pool`.
+
+Status mapping in `_build_manifest`: if any `job_record` for a URL has `status == "ok"` (and a
+written file) → manifest `"ok"`; all other outcomes (regwall, connect_fail, failed, empty, never
+reached) → `"failed"`. No `"dead"` status (CoinDesk doesn't 404/410 through proxy; it regwalls).
+
+## State
+
+`RiderState` (defined in `rider.py`) is the shared mutable state across all slot coroutines and the
+watchdog. Owned and mutated by `rider.py:run_riding_pool` and `rider.py:_run_slot`. Read by
+`reporter.py:write_riding_report` and `scrape.py:_build_manifest` (read-only, after run completes).
+`asyncio` single-threaded: `set.add/discard` on `in_flight_urls` and `int` increments on counters
+are safe without explicit locking. `proxy_lock` (asyncio.Lock) guards `proxy_cursor` advancement.
+
+## Gotchas
+
+- `file` field in manifest points to `.html` (not `.md`). `pipeline.py:_run_clean_pass` hardcodes
+  `raw_dir / f"{h}.md"`; `dedup.py:filter_new_entries` mode `"raw"` checks `{hash}.md`. Both need
+  Stage 2 updates before this engine can run through the full pipeline.
+- `_abort_stall` calls `os._exit(1)` — no Python teardown, no atexit, no `browser.close()`. Raw
+  files flushed before the call are durable; in-flight writes at the moment of abort are lost.
+- Late import of `reporter.write_riding_report` inside `_abort_stall` is intentional: `reporter.py`
+  imports from `rider.py` (RiderState); a top-level cross-import would be circular.
+- Pool load (`load_backfill_pool`) is blocking network I/O, run via `run_in_executor` to avoid
+  blocking the event loop during the async entry point.

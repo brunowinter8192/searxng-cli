@@ -6,7 +6,8 @@ Generic, platform-agnostic pipeline engine modules. Called by `pipeline.py`; no 
 logic lives here. All modules accept platform parameters explicitly (no hardcoded source names).
 
 `pipeline.py` dispatches Stage 3 on `platform.scrape_engine`: `"browser"` → `scrape.py`;
-`"proxy_pool"` → `proxy_pool/scrape.py`.
+`"proxy_pool"` → `proxy_pool/scrape.py`. A third engine, `"proxy_riding"` → `proxy_riding/scrape.py`,
+is ported and package-complete but NOT yet wired in `pipeline.py` — Stage 2 pending.
 
 `publish.py` is kept on disk but is NOT called by any pipe path — cleanup+publish are decoupled
 to a future ad-hoc skill.
@@ -82,6 +83,13 @@ Backfill projection extrapolates from URLs/min → hours to scrape `_BACKFILL_TO
 Generic proxy-rotation scrape engine. Active when `platform.scrape_engine == "proxy_pool"`.
 Entry point: `scrape_entries_proxy()` in `proxy_pool/scrape.py`.
 
+### proxy_riding/ (3 modules — see DOCS.md)
+
+Browser + rotating-proxy engine for CoinDesk backfill. Ported from `dev/news_pipeline/coindesk_proxy_riding/`.
+Entry point: `scrape_entries_riding()` in `proxy_riding/scrape.py`.
+NOT yet active — `platform.scrape_engine == "proxy_riding"` dispatch arm not yet wired in `pipeline.py`.
+
 ## Documentation Tree
 
 - [proxy_pool/DOCS.md](proxy_pool/DOCS.md) — proxy-rotation engine (loop, fetch, cooldown, buffer, logger, janitor, box_lock, proxy_key, pool_loaders, monosans_loader, scrape)
+- [proxy_riding/DOCS.md](proxy_riding/DOCS.md) — browser + rotating-proxy engine (rider, reporter, scrape entry point); Stage 2 pipeline wiring pending
