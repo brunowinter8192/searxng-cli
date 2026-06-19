@@ -56,6 +56,7 @@ async def scrape_entries_riding(
         cooldown_mgr=cm,
         output_dir=output_dir,
         job_dir=job_dir,
+        target_urls=frozenset(urls),
         burn_threshold=riding_cfg.burn_threshold,
         n_slots=riding_cfg.n_slots,
         page_timeout_ms=riding_cfg.page_timeout_ms,
