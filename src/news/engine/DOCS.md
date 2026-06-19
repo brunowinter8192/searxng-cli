@@ -5,9 +5,10 @@
 Generic, platform-agnostic pipeline engine modules. Called by `pipeline.py`; no platform-specific
 logic lives here. All modules accept platform parameters explicitly (no hardcoded source names).
 
-`pipeline.py` dispatches Stage 3 on `platform.scrape_engine`: `"browser"` → `scrape.py`;
-`"proxy_pool"` → `proxy_pool/scrape.py`. A third engine, `"proxy_riding"` → `proxy_riding/scrape.py`,
-is ported and package-complete but NOT yet wired in `pipeline.py` — Stage 2 pending.
+`pipeline.py` dispatches on `platform.scrape_engine`: `"browser"` → `scrape.py` (via
+`scrape_chunks_raw` in `run_scrape_only`); `"proxy_pool"` → `proxy_pool/scrape.py` (via
+`run_pipeline`); `"proxy_riding"` → `proxy_riding/scrape.py` (via `run_scrape_only`, CoinDesk
+backfill path — chunk-bypass, full entry set, returns `(manifest, state)`). All three engines wired.
 
 `publish.py` is kept on disk but is NOT called by any pipe path — cleanup+publish are decoupled
 to a future ad-hoc skill.
@@ -26,7 +27,7 @@ to a future ad-hoc skill.
 `.manifest` attribute on the exception carries the full per-entry manifest (including ok entries
 written before abort) so callers can persist raw data from aborted runs.
 
-### dedup.py (61 LOC)
+### dedup.py (62 LOC)
 
 **Purpose:** Filter discover entries to those not yet in the raw corpus by checking file existence; optionally exclude known-failure URLs permanently.
 **Reads:** entries list (in-memory), dir (filesystem), source name, mode, optional exclusion set.
@@ -34,11 +35,12 @@ written before abort) so callers can persist raw data from aborted runs.
 **Called by:** `pipeline.py:run_pipeline` (mode=`"raw"`), `pipeline.py:run_scrape_only` (mode=`"raw"`).
 **Calls out:** stdlib only.
 
-`filter_new_entries(entries, collection_dir, source, mode="pubdate", exclude_urls=None) → (new_entries, n_skip_raw, n_excluded)`:
-- `exclude_urls: set[str] | None` — when provided, URLs in the set are permanently excluded (counted as `n_excluded`) before the raw-file existence check. Default `None` = no exclusions (unchanged behaviour for browser path + `run_scrape_only`). Only the proxy_pool branch of `run_pipeline` passes this param (loaded from `dead_urls.txt` + `failed_urls.txt`).
+`filter_new_entries(entries, collection_dir, source, mode="pubdate", exclude_urls=None, raw_ext=".md") → (new_entries, n_skip_raw, n_excluded)`:
+- `raw_ext: str` — file extension for `mode="raw"` existence check. Default `".md"` (browser, proxy_pool — unchanged). Pass `".html"` for `proxy_riding` (CoinDesk). All existing callers that omit this param retain `.md` behaviour.
+- `exclude_urls: set[str] | None` — when provided, URLs in the set are permanently excluded (counted as `n_excluded`) before the raw-file existence check. Only the proxy_pool branch of `run_pipeline` passes this (loaded from `dead_urls.txt` + `failed_urls.txt`).
 
 Three modes via `mode` param:
-- `"raw"` (all pipe paths): exact match `{hash}.md` in raw_dir — dedup on raw corpus.
+- `"raw"` (all pipe paths): exact match `{hash}{raw_ext}` in raw_dir — dedup on raw corpus.
 - `"pubdate"`: exact match `{source}__{pubdate}__{hash}.md` — legacy, collection-based.
 - `"hash_only"`: glob `{source}__*__{hash}.md` — legacy, collection-based, no pubdate.
 
@@ -86,10 +88,10 @@ Entry point: `scrape_entries_proxy()` in `proxy_pool/scrape.py`.
 ### proxy_riding/ (3 modules — see DOCS.md)
 
 Browser + rotating-proxy engine for CoinDesk backfill. Ported from `dev/news_pipeline/coindesk_proxy_riding/`.
-Entry point: `scrape_entries_riding()` in `proxy_riding/scrape.py`.
-NOT yet active — `platform.scrape_engine == "proxy_riding"` dispatch arm not yet wired in `pipeline.py`.
+Entry point: `scrape_entries_riding()` in `proxy_riding/scrape.py` — returns `(manifest, state)` tuple.
+Active: `platform.scrape_engine == "proxy_riding"` dispatched from `run_scrape_only` (CoinDesk backfill).
 
 ## Documentation Tree
 
 - [proxy_pool/DOCS.md](proxy_pool/DOCS.md) — proxy-rotation engine (loop, fetch, cooldown, buffer, logger, janitor, box_lock, proxy_key, pool_loaders, monosans_loader, scrape)
-- [proxy_riding/DOCS.md](proxy_riding/DOCS.md) — browser + rotating-proxy engine (rider, reporter, scrape entry point); Stage 2 pipeline wiring pending
+- [proxy_riding/DOCS.md](proxy_riding/DOCS.md) — browser + rotating-proxy engine (rider, reporter, scrape entry point); wired as CoinDesk's run_scrape_only path

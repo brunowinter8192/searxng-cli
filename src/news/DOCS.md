@@ -37,9 +37,9 @@ class Platform(Protocol):
     collection: str             # target RAG collection name (reserved for future publish skill)
     precondition_url: str       # internet-check URL
     regwall_signals: list[str]  # precise strings; [] = guard disabled
-    scrape_engine: str          # "browser" | "proxy_pool" — dispatch key in pipeline.py
-    scrape_config: ScrapeConfig # browser engine params; ignored for proxy_pool platforms
-    proxy_scrape_config: ProxyScrapeConfig | None  # None for browser platforms
+    scrape_engine: str          # "browser" | "proxy_pool" | "proxy_riding" — dispatch key in pipeline.py
+    scrape_config: ScrapeConfig # browser engine params; ignored for proxy_pool/proxy_riding platforms
+    proxy_scrape_config: ProxyScrapeConfig | None  # None for browser/proxy_riding platforms
 
     async def discover(self) -> list[dict]: ...         # [{url,lastmod,publication_date,title,section}]
     def cleanup(self, raw_html: str, entry: dict) -> str: ...   # -> clean Markdown; called by proxy_pool clean-pass (TheBlock only)
@@ -54,10 +54,13 @@ class ProxyScrapeConfig:
 ```
 
 Browser platforms set `scrape_engine = "browser"` and `proxy_scrape_config = None`.
-Proxy platforms set `scrape_engine = "proxy_pool"` and provide a `ProxyScrapeConfig` with a
-`pool_provider` callable (e.g. `load_backfill_pool` from `engine/proxy_pool/pool_loaders.py`).
+Proxy-pool platforms set `scrape_engine = "proxy_pool"` and provide a `ProxyScrapeConfig`.
+Proxy-riding platforms set `scrape_engine = "proxy_riding"` and `proxy_scrape_config = None`.
 
 **Optional platform attributes** (not in Protocol; consumed via `getattr` in `pipeline.py`):
+- `riding_scrape_config: RidingScrapeConfig | None` — config for the `proxy_riding` engine; consumed
+  via `getattr(platform, "riding_scrape_config", None) or RidingScrapeConfig()` in `run_scrape_only`.
+  Only CoinDesk defines this attr. NOT in Protocol (avoids requiring all platforms to declare it).
 - `timeframe: str` — discovery mode; set by `__main__` from `--timeframe`.
   CoinDesk: `"full"` (cursor to 2018-01-01) | integer string N (last N days) | `"delta"` = 30 days.
   TheBlock: `"delta"` (default, top-2 subs) | `"full"` (all subs) | `"sub:N"` | `"sub:A-B"`.
@@ -74,9 +77,9 @@ Proxy platforms set `scrape_engine = "proxy_pool"` and provide a `ProxyScrapeCon
 |---|---|---|
 | `platform.py` | ScrapeConfig + ProxyScrapeConfig + Platform Protocol | 35 |
 | `registry.py` | name → Platform registry; register() / get() | 19 |
-| `pipeline.py` | Async orchestrator; stages 1–4 for proxy_pool (TheBlock); raw-only 1–3 for browser; run_discover_only(); run_scrape_only(); _persist_master_list(); _run_clean_pass() | 367 |
+| `pipeline.py` | Async orchestrator; stages 1–4 for proxy_pool (TheBlock); raw-only for browser/proxy_riding; run_discover_only(); run_scrape_only(); _persist_master_list(); _run_clean_pass() | 420 |
 | `__main__.py` | argparse entry point; --source + --skip-index + --timeframe + --discover-only | 102 |
-| `engine/` | Generic scrape engines (browser + proxy_pool + proxy_riding) + dedup. proxy_riding ported but not yet wired (Stage 2). | — |
+| `engine/` | Generic scrape engines (browser + proxy_pool + proxy_riding) + dedup. All three engines wired. | — |
 | `platforms/coindesk/` | CoinDesk platform implementation | — |
 | `platforms/theblock/` | The Block platform — proxy_pool, hash-dedup, JSON-LD cleanup | — |
 
@@ -100,11 +103,21 @@ No clean-pass or publish in the browser path. `publish.py` remains on disk but i
 ## Scrape-Job Flow (run_scrape_only — CoinDesk `--scrape-only`)
 
 CoinDesk-specific decoupled backfill path — no browser warmup or discover stage.
+Dispatches on `platform.scrape_engine`: `"proxy_riding"` (current CoinDesk) or `"browser"` (legacy).
 
 1. **inventory** — `platform.load_scrape_entries(year, from_date, to_date, limit)` reads per-year shards `data/news/coindesk/inventory/coindesk_{year}.txt` (format `YYYY-MM-DD\t<url>`), applies date filter, returns `[{url, publication_date}]`.
-2. **raw-diff** — `filter_new_entries(entries, raw_dir, name, mode="raw")` skips URLs already present as `{hash}.md` in `data/news/coindesk/raw/`. Resumable: re-run picks up from where the previous run ended.
-3. **chunked scrape → raw persist** — `scrape_chunks_raw()` in `engine/scrape_job.py` processes 200-URL chunks. Each chunk: scrape into raw_dir → `_append_to_raw_manifest()` → `_update_blocked_urls()`. `RegwallGuardError` stops the loop; already-written raw files + manifest entries are durable.
-4. **report** — `write_scrape_report()` writes `data/news/{name}/scrape_jobs/{job_id}/job.md` (counts, regwall rate, throughput, backfill projection, char-count percentiles p10–p95) and `cumulative.png`.
+2. **raw-diff** — `filter_new_entries(entries, raw_dir, name, mode="raw", raw_ext=ext)` where `ext=".html"` for `proxy_riding`, `".md"` for `browser`. Skips URLs whose raw file already exists. Resumable: re-run picks up where the previous run ended.
+
+**proxy_riding path (CoinDesk current):**
+
+3. **scrape** — `scrape_entries_riding(new_entries, platform_dir, riding_cfg)` processes the **full entry set at once** (no chunking). The engine manages its own concurrency (64 slots × 4 browsers), watchdog, and requeue loop. Returns `(manifest, state)`. Raw HTML written to `data/news/coindesk/raw/{hash}.html` by the engine (`platform_dir/raw/{hash}.html`).
+4. **raw persist** — `_append_to_raw_manifest(raw_dir, ok_entries)` appends ok entries to `raw/manifest.jsonl`.
+5. **report** — `write_riding_report(state, job_dir, t_job_start)` writes `data/news/{name}/scrape_jobs/{job_id}/job.md` (counts, throughput, HTML-size percentiles, ride-length histogram, regwall-by-position) + three plots. Note: `write_scrape_report` (browser reporter) is NOT used — it requires `t_chunk_start`/`elapsed_s` fields absent from riding manifests and would crash.
+
+**browser path (legacy):**
+
+3. **chunked scrape → raw persist** — `scrape_chunks_raw()` processes 200-URL chunks. Each chunk: scrape into raw_dir → `_append_to_raw_manifest()` → `_update_blocked_urls()`. Writes `{hash}.md`. `RegwallGuardError` stops the loop; already-written raw files + manifest entries are durable.
+4. **report** — `write_scrape_report()` writes `job.md` (counts, regwall rate, throughput, backfill projection, char-count percentiles p10–p95) and `cumulative.png`.
 
 ## Documentation Tree
 

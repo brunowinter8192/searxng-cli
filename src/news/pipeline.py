@@ -15,6 +15,8 @@ from src.news.engine.proxy_pool.logger import AcquireLogger
 from src.news.engine.proxy_pool.scrape import scrape_entries_proxy
 from src.news.engine.scrape_job import scrape_chunks_raw, _append_to_raw_manifest, _update_blocked_urls
 from src.news.engine.browser_reporter import write_scrape_report
+from src.news.engine.proxy_riding.scrape import scrape_entries_riding, RidingScrapeConfig
+from src.news.engine.proxy_riding.reporter import write_riding_report
 from src.news.engine.publish import pub_date_str
 
 PROJECT_ROOT = Path(__file__).parent.parent.parent   # searxng-cli/
@@ -83,31 +85,59 @@ async def run_scrape_only(
 
     raw_dir = DATA_ROOT / platform.name / "raw"
     raw_dir.mkdir(parents=True, exist_ok=True)
-    new_entries, n_skip, _ = filter_new_entries(entries, raw_dir, platform.name, mode="raw")
+    raw_ext = ".html" if platform.scrape_engine == "proxy_riding" else ".md"
+    new_entries, n_skip, _ = filter_new_entries(entries, raw_dir, platform.name, mode="raw", raw_ext=raw_ext)
     log.info(f"dedup → {len(entries)} total, {n_skip} already in raw, {len(new_entries)} new")
     if not new_entries:
         log.info("All already in raw — done.")
         _write_marker(platform.name, log)
         return
 
-    chunks = [new_entries[i:i + SCRAPE_CHUNK_SIZE] for i in range(0, len(new_entries), SCRAPE_CHUNK_SIZE)]
-    log.info(f"chunked plan: {len(new_entries)} URLs → {len(chunks)} chunk(s) of {SCRAPE_CHUNK_SIZE}")
+    if platform.scrape_engine == "proxy_riding":
+        # Proxy-riding path: bypass chunking — engine owns concurrency, watchdog, requeue.
+        riding_cfg = getattr(platform, "riding_scrape_config", None) or RidingScrapeConfig()
+        t_job_start = datetime.now(timezone.utc)
+        platform_dir = DATA_ROOT / platform.name
+        manifest, state = await scrape_entries_riding(new_entries, platform_dir, riding_cfg)
+        n_ok = sum(1 for e in manifest if e["status"] == "ok")
+        n_failed = sum(1 for e in manifest if e["status"] == "failed")
+        wall_s = (datetime.now(timezone.utc) - t_job_start).total_seconds()
+        log.info(
+            f"=== scrape-only done (proxy_riding): ok={n_ok} failed={n_failed} wall={wall_s:.0f}s ==="
+        )
+        entries_by_url = {e["url"]: e for e in new_entries}
+        ok_manifest_entries = [
+            {
+                "hash": e["hash"],
+                "url": e["url"],
+                "publication_date": entries_by_url.get(e["url"], {}).get("publication_date", ""),
+            }
+            for e in manifest if e.get("status") == "ok"
+        ]
+        _append_to_raw_manifest(raw_dir, ok_manifest_entries)
+        job_dir = DATA_ROOT / platform.name / "scrape_jobs" / job_id
+        write_riding_report(state, job_dir, t_job_start)
+        log.info(f"Job report written to {job_dir}")
+    else:
+        # Browser path: chunk into 200-URL batches
+        chunks = [new_entries[i:i + SCRAPE_CHUNK_SIZE] for i in range(0, len(new_entries), SCRAPE_CHUNK_SIZE)]
+        log.info(f"chunked plan: {len(new_entries)} URLs → {len(chunks)} chunk(s) of {SCRAPE_CHUNK_SIZE}")
 
-    t_job_start = datetime.now(timezone.utc)
-    totals, job_records, regwall_abort = await scrape_chunks_raw(
-        chunks, raw_dir, platform, log
-    )
+        t_job_start = datetime.now(timezone.utc)
+        totals, job_records, regwall_abort = await scrape_chunks_raw(
+            chunks, raw_dir, platform, log
+        )
 
-    wall_s = (datetime.now(timezone.utc) - t_job_start).total_seconds()
-    rw_rate = totals["regwall"] / max(sum(totals.values()), 1)
-    log.info(
-        f"=== scrape-only done: ok={totals['ok']} regwall={totals['regwall']}({rw_rate:.1%}) "
-        f"empty={totals['empty']} failed={totals['failed']} wall={wall_s:.0f}s"
-        + (" [REGWALL ABORT]" if regwall_abort else "") + " ==="
-    )
-    job_dir = DATA_ROOT / platform.name / "scrape_jobs" / job_id
-    write_scrape_report(job_dir, job_records, t_job_start, len(new_entries), filter_desc, regwall_abort)
-    log.info(f"Job report written to {job_dir}")
+        wall_s = (datetime.now(timezone.utc) - t_job_start).total_seconds()
+        rw_rate = totals["regwall"] / max(sum(totals.values()), 1)
+        log.info(
+            f"=== scrape-only done: ok={totals['ok']} regwall={totals['regwall']}({rw_rate:.1%}) "
+            f"empty={totals['empty']} failed={totals['failed']} wall={wall_s:.0f}s"
+            + (" [REGWALL ABORT]" if regwall_abort else "") + " ==="
+        )
+        job_dir = DATA_ROOT / platform.name / "scrape_jobs" / job_id
+        write_scrape_report(job_dir, job_records, t_job_start, len(new_entries), filter_desc, regwall_abort)
+        log.info(f"Job report written to {job_dir}")
     _write_marker(platform.name, log)
     log.info(f"=== {platform.name} scrape-only complete job_id={job_id} ===")
 

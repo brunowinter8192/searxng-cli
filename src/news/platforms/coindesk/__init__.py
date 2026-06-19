@@ -1,6 +1,7 @@
 # INFRASTRUCTURE
 from src.news.platform import ScrapeConfig
 from src.news.registry import register
+from src.news.engine.proxy_riding.scrape import RidingScrapeConfig
 from src.news.platforms.coindesk.config import REGWALL_SIGNALS, SCRAPE_CONFIG, INVENTORY_DIR
 # From coindesk/discover.py: discover(timeframe) -> list[dict]
 from src.news.platforms.coindesk.discover import discover as _discover
@@ -17,9 +18,10 @@ class CoinDeskPlatform:
     collection: str = "coindesk"
     precondition_url: str = "https://www.coindesk.com"
     regwall_signals: list[str] = REGWALL_SIGNALS
-    scrape_engine: str = "browser"
+    scrape_engine: str = "proxy_riding"
     scrape_config: ScrapeConfig = SCRAPE_CONFIG
     proxy_scrape_config = None
+    riding_scrape_config = RidingScrapeConfig()
     timeframe: str = "30"   # set by __main__ via --timeframe; "full" or int-string N-days
 
     async def discover(self) -> list[dict]:

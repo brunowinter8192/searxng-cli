@@ -29,7 +29,7 @@ request (URL + headers + first response body). Returns `(headers, api_url, body_
 **Called by:** `discover.py:discover`, `discover.py:try_rewarm`.
 **Calls out:** `pydoll` (Chrome CDP), `httpx` (first response replay).
 
-### discover.py (337 LOC)
+### discover.py (376 LOC)
 
 **Purpose:** Timeline-API cursor loop + master inventory management.
 `discover(timeframe)` orchestrates: warmup → load inventory → `cursor_loop` →
@@ -64,9 +64,13 @@ Gotcha: at 60 k+ article scale, a fixed cleaner is fragile — CoinDesk articles
 full site footer even after cleanup (observed during scrape-job runs). Per-shape diagnosis against the
 full raw corpus is the recommended approach before cleanup at scale.
 
-### __init__.py (42 LOC)
+### __init__.py (44 LOC)
 
 **Purpose:** `CoinDeskPlatform` class wrapping config + discover + cleanup + scrape-entry loading; auto-registers on import.
+`scrape_engine = "proxy_riding"` — routes `run_scrape_only` to the proxy-riding engine (bypasses
+browser chunking). `riding_scrape_config = RidingScrapeConfig()` — production defaults: `n_slots=64`,
+`n_browsers=4`, `stall_timeout_s=300.0`, `burn_threshold=2`, `page_timeout_ms=8_000`. Raw output is
+`.html` (not `.md`) — `data/news/coindesk/raw/{hash}.html`. `proxy_scrape_config = None`.
 Attribute `timeframe: str = "30"` set by `__main__` via `--timeframe`.
 `load_scrape_entries(year, from_date, to_date, limit)` delegates to `discover.py:load_inventory_filtered` — exposes the `--scrape-only` interface required by `run_scrape_only()` in `pipeline.py`.
-**Called by:** `__main__.py` (side-effect import); `pipeline.py:run_scrape_only` (via `platform.load_scrape_entries`).
+**Called by:** `__main__.py` (side-effect import); `pipeline.py:run_scrape_only` (via `platform.load_scrape_entries`, `platform.scrape_engine`, `platform.riding_scrape_config`).

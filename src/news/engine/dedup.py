@@ -36,6 +36,7 @@ def filter_new_entries(
     source: str,
     mode: str = "pubdate",
     exclude_urls: set[str] | None = None,
+    raw_ext: str = ".md",
 ) -> tuple[list[dict], int, int]:
     new_entries = []
     n_skip_raw = 0
@@ -49,7 +50,7 @@ def filter_new_entries(
         if mode == "hash_only":
             already_have = bool(list(collection_dir.glob(f"{source}__*__{h}.md")))
         elif mode == "raw":
-            already_have = (collection_dir / f"{h}.md").exists()
+            already_have = (collection_dir / f"{h}{raw_ext}").exists()
         else:
             pubdate = pub_date_str(entry)
             target = collection_dir / f"{source}__{pubdate}__{h}.md"
