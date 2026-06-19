@@ -98,7 +98,8 @@ async def run_scrape_only(
         riding_cfg = getattr(platform, "riding_scrape_config", None) or RidingScrapeConfig()
         t_job_start = datetime.now(timezone.utc)
         platform_dir = DATA_ROOT / platform.name
-        manifest, state = await scrape_entries_riding(new_entries, platform_dir, riding_cfg)
+        job_dir = DATA_ROOT / platform.name / "scrape_jobs" / job_id
+        manifest, state = await scrape_entries_riding(new_entries, platform_dir, riding_cfg, job_dir)
         n_ok = sum(1 for e in manifest if e["status"] == "ok")
         n_failed = sum(1 for e in manifest if e["status"] == "failed")
         wall_s = (datetime.now(timezone.utc) - t_job_start).total_seconds()
@@ -115,7 +116,6 @@ async def run_scrape_only(
             for e in manifest if e.get("status") == "ok"
         ]
         _append_to_raw_manifest(raw_dir, ok_manifest_entries)
-        job_dir = DATA_ROOT / platform.name / "scrape_jobs" / job_id
         write_riding_report(state, job_dir, t_job_start)
         log.info(f"Job report written to {job_dir}")
     else:

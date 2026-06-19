@@ -110,9 +110,9 @@ Dispatches on `platform.scrape_engine`: `"proxy_riding"` (current CoinDesk) or `
 
 **proxy_riding path (CoinDesk current):**
 
-3. **scrape** — `scrape_entries_riding(new_entries, platform_dir, riding_cfg)` processes the **full entry set at once** (no chunking). The engine manages its own concurrency (64 slots × 4 browsers), watchdog, and requeue loop. Returns `(manifest, state)`. Raw HTML written to `data/news/coindesk/raw/{hash}.html` by the engine (`platform_dir/raw/{hash}.html`).
+3. **scrape** — `scrape_entries_riding(new_entries, platform_dir, riding_cfg, job_dir)` processes the **full entry set at once** (no chunking). The engine manages its own concurrency (64 slots × 4 browsers), watchdog, and requeue loop. Returns `(manifest, state)`. Raw HTML written to `data/news/coindesk/raw/{hash}.html` by the engine (`platform_dir/raw/{hash}.html`). `job_dir` is passed so the stall-watchdog abort path writes its report to the same location as normal completion (see report step below).
 4. **raw persist** — `_append_to_raw_manifest(raw_dir, ok_entries)` appends ok entries to `raw/manifest.jsonl`.
-5. **report** — `write_riding_report(state, job_dir, t_job_start)` writes `data/news/{name}/scrape_jobs/{job_id}/job.md` (counts, throughput, HTML-size percentiles, ride-length histogram, regwall-by-position) + three plots. Note: `write_scrape_report` (browser reporter) is NOT used — it requires `t_chunk_start`/`elapsed_s` fields absent from riding manifests and would crash.
+5. **report** — `write_riding_report(state, job_dir, t_job_start)` writes `data/news/{name}/scrape_jobs/{job_id}/job.md` (counts, throughput, HTML-size percentiles, ride-length histogram, regwall-by-position) + three plots. Note: `write_scrape_report` (browser reporter) is NOT used — it requires `t_chunk_start`/`elapsed_s` fields absent from riding manifests and would crash. **Stall-abort path writes to the identical `scrape_jobs/{job_id}/` dir** — `_abort_stall` uses `state.job_dir` (= `job_dir`) for `remaining_urls.txt`, `job.md`, and the three plots; the platform root is never written to by either path.
 
 **browser path (legacy):**
 

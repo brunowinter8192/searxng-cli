@@ -32,6 +32,7 @@ async def scrape_entries_riding(
     entries:    list[dict],
     output_dir: Path,
     riding_cfg: RidingScrapeConfig,
+    job_dir:    Path,
 ) -> tuple[list[dict], RiderState]:
     output_dir.mkdir(parents=True, exist_ok=True)
 
@@ -54,6 +55,7 @@ async def scrape_entries_riding(
         proxy_pool=proxy_pool,
         cooldown_mgr=cm,
         output_dir=output_dir,
+        job_dir=job_dir,
         burn_threshold=riding_cfg.burn_threshold,
         n_slots=riding_cfg.n_slots,
         page_timeout_ms=riding_cfg.page_timeout_ms,
