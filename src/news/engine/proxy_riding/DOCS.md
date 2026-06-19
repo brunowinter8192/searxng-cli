@@ -20,14 +20,16 @@ Touch this package when changing proxy-riding engine behaviour. Do NOT touch `en
 
 `__init__.py` is empty. Entry paths:
 
-- `scrape_entries_riding(entries, output_dir, riding_cfg)` in `scrape.py` — async; called by
+- `scrape_entries_riding(entries, output_dir, riding_cfg, job_dir)` in `scrape.py` — async; called by
   `pipeline.py:run_scrape_only`. Returns `tuple[list[dict], RiderState]`: manifest
   `[{url, hash, status, file, char_count, error}]` + full rider state (for `write_riding_report`).
+  `job_dir` is threaded to the watchdog so stall-abort writes land in `scrape_jobs/{job_id}/` (same as
+  normal completion), not the platform root.
 - `RidingScrapeConfig` in `scrape.py` — dataclass with production defaults
   (`n_browsers=4, n_slots=64, stall_timeout_s=300.0, burn_threshold=2, page_timeout_ms=8_000`).
 - `write_riding_report(state, job_dir, t_job_start)` in `reporter.py` — called by
   `pipeline.py:run_scrape_only` (normal completion) and by `_abort_stall` (late import, stall abort).
-- `run_riding_pool(url_queue, proxy_pool, cooldown_mgr, output_dir, …)` in `rider.py` — async;
+- `run_riding_pool(url_queue, proxy_pool, cooldown_mgr, output_dir, job_dir, …)` in `rider.py` — async;
   called by `scrape_entries_riding`.
 
 ## Flow
@@ -42,20 +44,21 @@ Touch this package when changing proxy-riding engine behaviour. Do NOT touch `en
 
 ## Modules
 
-### rider.py (437 LOC)
+### rider.py (441 LOC)
 
 **Purpose:** Browser-per-context proxy rider pool. Manages B `AsyncWebCrawler` instances, N slot
 coroutines, per-URL proxy context (`CrawlerRunConfig.proxy_config`), burn/fail rotation, watchdog.
 **Reads:** URL queue (asyncio.Queue), proxy pool list, `PersistentCooldownManager` (shared state).
-**Writes:** `output_dir/raw/{hash}.html` for each ok URL; `output_dir/remaining_urls.txt` +
-`output_dir/job.md` on watchdog stall abort (via `_abort_stall`).
+**Writes:** `output_dir/raw/{hash}.html` for each ok URL; `state.job_dir/remaining_urls.txt` +
+`state.job_dir/job.md` on watchdog stall abort (via `_abort_stall` — same dir as normal-completion report).
 **Called by:** `scrape.py:scrape_entries_riding` (via `run_riding_pool`).
 **Calls out:** `crawl4ai` (AsyncWebCrawler, BrowserConfig, CrawlerRunConfig, CacheMode, ProxyConfig,
 DefaultMarkdownGenerator); `src.news.engine.proxy_pool.cooldown.PersistentCooldownManager` (import);
 late import of `reporter.write_riding_report` inside `_abort_stall` (avoids circular).
 
-Key dataclasses: `RiderState` (shared mutable job state), `JobRecord` (per-URL outcome),
-`RideRecord` (per-proxy-ride summary). `FAIL_THRESHOLD = 2` (failed/empty strikes before drop).
+Key dataclasses: `RiderState` (shared mutable job state — fields: `output_dir` for raw writes,
+`job_dir` for report writes; both distinct), `JobRecord` (per-URL outcome), `RideRecord`
+(per-proxy-ride summary). `FAIL_THRESHOLD = 2` (failed/empty strikes before drop).
 
 ### reporter.py (341 LOC)
 
@@ -69,7 +72,7 @@ table) + three matplotlib plots (cumulative ok, ride-length histogram, regwall-r
 **Calls out:** `matplotlib` (lazy import inside each `_write_*_plot`); `statistics` (stdlib);
 `src.news.engine.proxy_riding.rider` (RiderState, FAIL_THRESHOLD).
 
-### scrape.py (105 LOC)
+### scrape.py (107 LOC)
 
 **Purpose:** Pipeline entry point + manifest adapter. Loads pool, shuffles, calls `run_riding_pool`,
 maps `RiderState.job_records` → pipeline manifest.
@@ -83,7 +86,8 @@ maps `RiderState.job_records` → pipeline manifest.
 Returns `tuple[list[dict], RiderState]` — manifest + state. State is consumed by caller
 (`pipeline.py`) to call `write_riding_report`; manifest is consumed to build `ok_manifest_entries`
 for `_append_to_raw_manifest`. `output_dir` must be `platform_dir` (`data/news/{name}/`) so the
-engine writes to `platform_dir/raw/{hash}.html` = the path dedup checks.
+engine writes to `platform_dir/raw/{hash}.html` = the path dedup checks. `job_dir` must be
+`platform_dir/"scrape_jobs"/{job_id}` (computed in `pipeline.py` before the call).
 
 Status mapping in `_build_manifest`: if any `job_record` for a URL has `status == "ok"` (and a
 written file) → manifest `"ok"`; all other outcomes (regwall, connect_fail, failed, empty, never
@@ -108,6 +112,8 @@ are safe without explicit locking. `proxy_lock` (asyncio.Lock) guards `proxy_cur
   `raw/raw/` (wrong), breaking dedup.
 - `_abort_stall` calls `os._exit(1)` — no Python teardown, no atexit, no `browser.close()`. Raw
   files flushed before the call are durable; in-flight writes at the moment of abort are lost.
+  `_abort_stall` writes to `state.job_dir` (= `scrape_jobs/{job_id}/`), NOT to `output_dir`; it
+  creates the dir itself (`mkdir`) before the first write because the dir may not exist at stall time.
 - Late import of `reporter.write_riding_report` inside `_abort_stall` is intentional: `reporter.py`
   imports from `rider.py` (RiderState); a top-level cross-import would be circular.
 - Pool load (`load_backfill_pool`) is blocking network I/O, run via `run_in_executor` to avoid

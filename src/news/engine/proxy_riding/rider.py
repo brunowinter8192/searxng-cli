@@ -73,7 +73,8 @@ class RiderState:
     url_queue:       asyncio.Queue
     proxy_pool:      list               # raw (proto, hp) tuples from load_backfill_pool()
     cooldown_mgr:    PersistentCooldownManager
-    output_dir:      Path
+    output_dir:      Path               # raw HTML target: output_dir/raw/{hash}.html
+    job_dir:         Path               # report target: scrape_jobs/{job_id}/
     burn_threshold:  int
     page_timeout_ms: int
     total_urls:      int
@@ -108,6 +109,7 @@ async def run_riding_pool(
     proxy_pool:      list,
     cooldown_mgr:    PersistentCooldownManager,
     output_dir:      Path,
+    job_dir:         Path,
     burn_threshold:  int,
     n_slots:         int,
     page_timeout_ms: int   = PAGE_TIMEOUT_MS,
@@ -120,6 +122,7 @@ async def run_riding_pool(
         proxy_pool=proxy_pool,
         cooldown_mgr=cooldown_mgr,
         output_dir=output_dir,
+        job_dir=job_dir,
         burn_threshold=burn_threshold,
         page_timeout_ms=page_timeout_ms,
         total_urls=url_queue.qsize(),
@@ -129,7 +132,7 @@ async def run_riding_pool(
     state.n_slots    = n_slots
     crawlers = [AsyncWebCrawler(config=BrowserConfig(headless=True, verbose=False)) for _ in range(n_browsers)]
     await asyncio.gather(*[c.start() for c in crawlers])
-    watchdog = asyncio.create_task(_watchdog(state, output_dir))
+    watchdog = asyncio.create_task(_watchdog(state))
     try:
         tasks = [asyncio.create_task(_run_slot(i, crawlers[i % n_browsers], state)) for i in range(n_slots)]
         await asyncio.gather(*tasks)
@@ -358,7 +361,6 @@ def _url_hash(url: str) -> str:
 # min(30, stall_timeout_s / 4) so a short smoke timeout still gets fast detection.
 async def _watchdog(
     state:         RiderState,
-    output_dir:    Path,
     poll_interval: float | None = None,
 ) -> None:
     interval = poll_interval if poll_interval is not None else min(30.0, state.stall_timeout_s / 4)
@@ -368,13 +370,13 @@ async def _watchdog(
             return
         idle = time.monotonic() - state.last_progress_mono
         if idle > state.stall_timeout_s:
-            _abort_stall(state, output_dir, idle)  # does not return
+            _abort_stall(state, idle)  # does not return
 
 
 # Write remaining_urls.txt + job.md then os._exit(1). Never returns.
 # os._exit bypasses asyncio teardown and browser.close() so wedged Chrome processes
 # cannot re-hang the shutdown; raw files already flushed to disk before we reach here.
-def _abort_stall(state: RiderState, output_dir: Path, idle_s: float) -> None:
+def _abort_stall(state: RiderState, idle_s: float) -> None:
     print(
         f"[watchdog] STALL {idle_s:.0f}s ≥ {state.stall_timeout_s:.0f}s — "
         f"writing report + failure log → os._exit(1)",
@@ -393,8 +395,9 @@ def _abort_stall(state: RiderState, output_dir: Path, idle_s: float) -> None:
     # In-flight URLs — the wedged ones: diagnostically valuable
     inflight = sorted(state.in_flight_urls)
 
-    # Write failure log
-    fail_log = output_dir / "remaining_urls.txt"
+    # Write failure log + report into scrape_jobs/{job_id}/ (same dir as normal completion)
+    state.job_dir.mkdir(parents=True, exist_ok=True)
+    fail_log = state.job_dir / "remaining_urls.txt"
     lines = [
         f"# Remaining URLs at stall abort — idle {idle_s:.0f}s (threshold {state.stall_timeout_s:.0f}s)",
         f"# Total un-scraped: {len(queued) + len(inflight)}",
@@ -410,12 +413,12 @@ def _abort_stall(state: RiderState, output_dir: Path, idle_s: float) -> None:
     # Write job.md via reporter; fallback to minimal stub on any error
     try:
         from src.news.engine.proxy_riding.reporter import write_riding_report  # late import — avoids circular at module level
-        write_riding_report(state, output_dir, state.t_job_start)
-        print(f"[watchdog] job.md → {output_dir / 'job.md'}", file=sys.stderr)
+        write_riding_report(state, state.job_dir, state.t_job_start)
+        print(f"[watchdog] job.md → {state.job_dir / 'job.md'}", file=sys.stderr)
     except Exception as exc:
         print(f"[watchdog] write_riding_report WARN: {exc}", file=sys.stderr)
         try:
-            (output_dir / "job.md").write_text(
+            (state.job_dir / "job.md").write_text(
                 "\n".join([
                     "# CoinDesk riding job — STALL ABORT",
                     "",
