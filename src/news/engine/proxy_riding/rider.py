@@ -78,6 +78,7 @@ class RiderState:
     burn_threshold:  int
     page_timeout_ms: int
     total_urls:      int
+    target_urls:     frozenset               # all distinct target URLs; open = target_urls − done_urls
 
     n_ok:            int   = 0
     n_regwall:       int   = 0
@@ -94,11 +95,12 @@ class RiderState:
     n_browsers:         int        = 1
     n_slots:            int        = 0
     in_flight_urls:     set        = field(default_factory=set)
+    done_urls:          set        = field(default_factory=set)    # URLs written; first-writer guard
     t_job_start:        datetime   = field(default_factory=lambda: datetime.now(timezone.utc))
 
     @property
     def all_resolved(self) -> bool:
-        return self.url_queue.empty() and self.in_flight == 0
+        return len(self.done_urls) >= len(self.target_urls)
 
 
 # ORCHESTRATOR
@@ -110,6 +112,7 @@ async def run_riding_pool(
     cooldown_mgr:    PersistentCooldownManager,
     output_dir:      Path,
     job_dir:         Path,
+    target_urls:     frozenset,
     burn_threshold:  int,
     n_slots:         int,
     page_timeout_ms: int   = PAGE_TIMEOUT_MS,
@@ -126,6 +129,7 @@ async def run_riding_pool(
         burn_threshold=burn_threshold,
         page_timeout_ms=page_timeout_ms,
         total_urls=url_queue.qsize(),
+        target_urls=target_urls,
         stall_timeout_s=stall_timeout_s,
     )
     state.n_browsers = n_browsers
@@ -184,12 +188,19 @@ async def _run_slot(slot_id: int, crawler: AsyncWebCrawler, state: RiderState) -
                     state.termination = "stall"
                     break
 
+                dequeued = True
                 try:
-                    url = await asyncio.wait_for(state.url_queue.get(), timeout=10.0)
-                except asyncio.TimeoutError:
+                    url = state.url_queue.get_nowait()
+                    if url in state.done_urls:
+                        continue   # stale queue entry — already won by a racer
+                except asyncio.QueueEmpty:
                     if state.all_resolved:
                         break
-                    continue
+                    open_list = sorted(state.target_urls - state.done_urls)
+                    if not open_list:
+                        break
+                    url = open_list[slot_id % len(open_list)]
+                    dequeued = False
 
                 state.in_flight += 1
                 state.in_flight_urls.add(url)
@@ -211,17 +222,23 @@ async def _run_slot(slot_id: int, crawler: AsyncWebCrawler, state: RiderState) -
                 )
 
                 if status == "ok":
-                    out      = _write_raw(_url_hash(url), html, state.output_dir)
-                    job.file = str(out)
-                    state.n_ok += 1
-                    ride_ok   += 1
-                    state.last_progress_mono = time.monotonic()
-                    print(f"[slot {slot_id}] ok  r={ride_pos} {url[:70]}", file=sys.stderr)
+                    if url not in state.done_urls:
+                        state.done_urls.add(url)
+                        out      = _write_raw(_url_hash(url), html, state.output_dir)
+                        job.file = str(out)
+                        state.n_ok += 1
+                        ride_ok   += 1
+                        state.last_progress_mono = time.monotonic()
+                        print(f"[slot {slot_id}] ok  r={ride_pos} {url[:70]}", file=sys.stderr)
+                    else:
+                        print(f"[slot {slot_id}] dup-race discarded {url[:70]}", file=sys.stderr)
+                        continue   # skip job_records.append — dup fetch, no stats
 
                 elif status == "regwall":
                     burn_count      += 1
                     state.n_regwall += 1
-                    state.url_queue.put_nowait(url)
+                    if dequeued and url not in state.done_urls:
+                        state.url_queue.put_nowait(url)
                     print(
                         f"[slot {slot_id}] RW  burn={burn_count}/{state.burn_threshold}"
                         f" r={ride_pos}", file=sys.stderr,
@@ -229,14 +246,16 @@ async def _run_slot(slot_id: int, crawler: AsyncWebCrawler, state: RiderState) -
 
                 elif status == "connect_fail":
                     state.n_connect_fail += 1
-                    state.url_queue.put_nowait(url)
+                    if dequeued and url not in state.done_urls:
+                        state.url_queue.put_nowait(url)
                     cf_broke = True
                     print(f"[slot {slot_id}] CF  rotating", file=sys.stderr)
                     break
 
                 else:  # failed | empty
                     fail_count += 1
-                    state.url_queue.put_nowait(url)
+                    if dequeued and url not in state.done_urls:
+                        state.url_queue.put_nowait(url)
                     print(
                         f"[slot {slot_id}] {status} fail={fail_count}/{FAIL_THRESHOLD}"
                         f" r={ride_pos} → requeue", file=sys.stderr,

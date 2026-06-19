@@ -29,7 +29,7 @@ Touch this package when changing proxy-riding engine behaviour. Do NOT touch `en
   (`n_browsers=4, n_slots=64, stall_timeout_s=300.0, burn_threshold=2, page_timeout_ms=8_000`).
 - `write_riding_report(state, job_dir, t_job_start)` in `reporter.py` — called by
   `pipeline.py:run_scrape_only` (normal completion) and by `_abort_stall` (late import, stall abort).
-- `run_riding_pool(url_queue, proxy_pool, cooldown_mgr, output_dir, job_dir, …)` in `rider.py` — async;
+- `run_riding_pool(url_queue, proxy_pool, cooldown_mgr, output_dir, job_dir, target_urls, …)` in `rider.py` — async;
   called by `scrape_entries_riding`.
 
 ## Flow
@@ -39,12 +39,17 @@ Touch this package when changing proxy-riding engine behaviour. Do NOT touch `en
 2. `run_riding_pool` spawns B `AsyncWebCrawler` instances + N slot tasks + 1 watchdog task.
 3. Each slot draws a proxy from the shuffled pool (cursor-atomic under `proxy_lock`), rides URLs
    until burn_threshold regwall or FAIL_THRESHOLD failed/empty, then rotates to the next proxy.
-4. Ok fetches write `raw/{hash}.html`; state accumulates `job_records` + `ride_records`.
-5. `scrape_entries_riding` maps `state.job_records` → manifest via `_build_manifest`.
+   **Tail-race:** when `url_queue` is empty (unresolved URLs < n_slots), slots immediately race an
+   open URL (`sorted(target_urls − done_urls)[slot_id % len]`) with their current proxy — no 10 s
+   wait. `asyncio.QueueEmpty` → race path; `asyncio.Queue.get_nowait()` replaces `wait_for(…, 10s)`.
+4. Ok fetches write `raw/{hash}.html` guarded by first-writer check (`done_urls`); dup-race arrivals
+   are discarded without write or n_ok increment. State accumulates `job_records` + `ride_records`.
+5. Termination: `all_resolved = len(done_urls) >= len(target_urls)` (not queue-empty + in_flight==0).
+6. `scrape_entries_riding` maps `state.job_records` → manifest via `_build_manifest`.
 
 ## Modules
 
-### rider.py (441 LOC)
+### rider.py (459 LOC)
 
 **Purpose:** Browser-per-context proxy rider pool. Manages B `AsyncWebCrawler` instances, N slot
 coroutines, per-URL proxy context (`CrawlerRunConfig.proxy_config`), burn/fail rotation, watchdog.
@@ -56,9 +61,10 @@ coroutines, per-URL proxy context (`CrawlerRunConfig.proxy_config`), burn/fail r
 DefaultMarkdownGenerator); `src.news.engine.proxy_pool.cooldown.PersistentCooldownManager` (import);
 late import of `reporter.write_riding_report` inside `_abort_stall` (avoids circular).
 
-Key dataclasses: `RiderState` (shared mutable job state — fields: `output_dir` for raw writes,
-`job_dir` for report writes; both distinct), `JobRecord` (per-URL outcome), `RideRecord`
-(per-proxy-ride summary). `FAIL_THRESHOLD = 2` (failed/empty strikes before drop).
+Key dataclasses: `RiderState` (shared mutable job state — fields: `output_dir` raw writes,
+`job_dir` report writes, `target_urls` frozenset of all distinct targets, `done_urls` set of written URLs;
+`all_resolved = len(done_urls) >= len(target_urls)`), `JobRecord` (per-URL outcome),
+`RideRecord` (per-proxy-ride summary). `FAIL_THRESHOLD = 2` (failed/empty strikes before drop).
 
 ### reporter.py (341 LOC)
 
@@ -72,7 +78,7 @@ table) + three matplotlib plots (cumulative ok, ride-length histogram, regwall-r
 **Calls out:** `matplotlib` (lazy import inside each `_write_*_plot`); `statistics` (stdlib);
 `src.news.engine.proxy_riding.rider` (RiderState, FAIL_THRESHOLD).
 
-### scrape.py (107 LOC)
+### scrape.py (108 LOC)
 
 **Purpose:** Pipeline entry point + manifest adapter. Loads pool, shuffles, calls `run_riding_pool`,
 maps `RiderState.job_records` → pipeline manifest.
