@@ -32,7 +32,7 @@ async def scrape_entries_riding(
     entries:    list[dict],
     output_dir: Path,
     riding_cfg: RidingScrapeConfig,
-) -> list[dict]:
+) -> tuple[list[dict], RiderState]:
     output_dir.mkdir(parents=True, exist_ok=True)
 
     urls        = [e["url"] for e in entries]
@@ -61,7 +61,7 @@ async def scrape_entries_riding(
         stall_timeout_s=riding_cfg.stall_timeout_s,
     )
 
-    return _build_manifest(entries, url_to_hash, state)
+    return _build_manifest(entries, url_to_hash, state), state
 
 
 # FUNCTIONS

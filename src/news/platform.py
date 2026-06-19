@@ -27,7 +27,7 @@ class Platform(Protocol):
     collection: str             # target RAG collection; CoinDesk -> "coindesk"
     precondition_url: str       # internet-check URL; CoinDesk -> "https://www.coindesk.com"
     regwall_signals: list[str]  # precise match strings; [] = guard disabled
-    scrape_engine: str          # "browser" | "proxy_pool" — selects engine in pipeline.py
+    scrape_engine: str          # "browser" | "proxy_pool" | "proxy_riding" — selects engine in pipeline.py
     scrape_config: ScrapeConfig
     proxy_scrape_config: "ProxyScrapeConfig | None"  # None for browser platforms
 
