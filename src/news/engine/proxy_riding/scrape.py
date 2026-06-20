@@ -43,12 +43,8 @@ async def scrape_entries_riding(
     for url in urls:
         url_queue.put_nowait(url)
 
-    loop        = asyncio.get_running_loop()
-    raw_pool, _ = await loop.run_in_executor(None, load_backfill_pool)
-    proxy_pool  = [(p, hp) for p, hp in raw_pool if p in BROWSER_ELIGIBLE_PROTOS]
-    random.shuffle(proxy_pool)
-
-    cm = PersistentCooldownManager()
+    proxy_pool = await _pool_provider()
+    cm         = PersistentCooldownManager()
 
     state = await run_riding_pool(
         url_queue=url_queue,
@@ -62,12 +58,21 @@ async def scrape_entries_riding(
         page_timeout_ms=riding_cfg.page_timeout_ms,
         n_browsers=riding_cfg.n_browsers,
         stall_timeout_s=riding_cfg.stall_timeout_s,
+        pool_provider=_pool_provider,
     )
 
     return _build_manifest(entries, url_to_hash, state), state
 
 
 # FUNCTIONS
+
+# Load + filter + shuffle the backfill pool; shared by initial load and 60-min watchdog refresh.
+async def _pool_provider() -> list[tuple[str, str]]:
+    loop       = asyncio.get_running_loop()
+    raw_pool, _ = await loop.run_in_executor(None, load_backfill_pool)
+    pool       = [(p, hp) for p, hp in raw_pool if p in BROWSER_ELIGIBLE_PROTOS]
+    random.shuffle(pool)
+    return pool
 
 # Map rider job_records to pipeline manifest; entries order preserved.
 # ok: at least one job_record with status=="ok" and a written file.

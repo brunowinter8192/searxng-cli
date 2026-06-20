@@ -25,10 +25,11 @@ REGWALL_SIGNALS: list[str] = [
     "You've reached your monthly limit",
 ]
 
-PAGE_TIMEOUT_MS   = 8_000    # default; overridden per-call via page_timeout_ms param
-DELAY_BEFORE_HTML = 0.5      # s wait after domcontentloaded
-STALL_TIMEOUT_S   = 3_600.0  # 60 min no progress → terminate
-FAIL_THRESHOLD    = 2        # failed/empty strikes before dropping a proxy (mirrors burn_threshold for regwall)
+PAGE_TIMEOUT_MS          = 8_000    # default; overridden per-call via page_timeout_ms param
+DELAY_BEFORE_HTML        = 0.5      # s wait after domcontentloaded
+STALL_TIMEOUT_S          = 3_600.0  # 60 min no progress → terminate
+POOL_REFRESH_INTERVAL_S  = 3_600.0  # re-fetch + filter + shuffle pool every 60 min
+FAIL_THRESHOLD           = 2        # failed/empty strikes before dropping a proxy (mirrors burn_threshold for regwall)
 
 # Playwright error substrings that indicate a proxy-side failure (not CoinDesk)
 _PROXY_ERR = ("timeout", "proxy", "err_proxy", "tunnel", "socks",
@@ -98,6 +99,7 @@ class RiderState:
     done_urls:          set        = field(default_factory=set)    # URLs written; first-writer guard
     t_job_start:        datetime   = field(default_factory=lambda: datetime.now(timezone.utc))
     pool_samples:       list       = field(default_factory=list)   # (elapsed_s, n_eligible, n_cooldown)
+    pool_provider:      object     = None                          # async () -> list[tuple[str,str]] | None = static pool
 
     @property
     def all_resolved(self) -> bool:
@@ -119,6 +121,7 @@ async def run_riding_pool(
     page_timeout_ms: int   = PAGE_TIMEOUT_MS,
     n_browsers:      int   = 1,
     stall_timeout_s: float = STALL_TIMEOUT_S,
+    pool_provider:   object = None,
 ) -> RiderState:
     (output_dir / RAW_SUBDIR).mkdir(parents=True, exist_ok=True)
     state = RiderState(
@@ -132,6 +135,7 @@ async def run_riding_pool(
         total_urls=url_queue.qsize(),
         target_urls=target_urls,
         stall_timeout_s=stall_timeout_s,
+        pool_provider=pool_provider,
     )
     state.n_browsers = n_browsers
     state.n_slots    = n_slots
@@ -384,14 +388,24 @@ async def _watchdog(
     state:         RiderState,
     poll_interval: float | None = None,
 ) -> None:
-    interval = poll_interval if poll_interval is not None else min(30.0, state.stall_timeout_s / 4)
-    t0_mono  = time.monotonic()
+    interval           = poll_interval if poll_interval is not None else min(30.0, state.stall_timeout_s / 4)
+    t0_mono            = time.monotonic()
+    _last_refresh_mono = time.monotonic()
     while True:
         await asyncio.sleep(interval)
         elapsed_s  = time.monotonic() - t0_mono
         n_eligible = len(state.cooldown_mgr.eligible_candidates(state.proxy_pool))
         n_cooldown = state.cooldown_mgr.cooldown_count()
         state.pool_samples.append((elapsed_s, n_eligible, n_cooldown))
+        if state.pool_provider and time.monotonic() - _last_refresh_mono >= POOL_REFRESH_INTERVAL_S:
+            new_pool = await state.pool_provider()
+            if new_pool:
+                old_n = len(state.proxy_pool)
+                state.proxy_pool = new_pool
+                _last_refresh_mono = time.monotonic()
+                print(f"[watchdog] pool refresh: {old_n} → {len(new_pool)} proxies", file=sys.stderr)
+            else:
+                print("[watchdog] pool refresh returned empty — keeping current pool", file=sys.stderr)
         if state.all_resolved:
             if state.in_flight == 0:
                 return   # clean drain — all slots exited before this poll
