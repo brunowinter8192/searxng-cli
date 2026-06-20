@@ -84,6 +84,10 @@ VAKHOV_SOURCES: list[tuple[str, str]] = [
     ("http",   "https://raw.githubusercontent.com/vakhov/fresh-proxy-list/master/http.txt"),
     ("socks5", "https://raw.githubusercontent.com/vakhov/fresh-proxy-list/master/socks5.txt"),
 ]
+MURONGPIG_SOURCES: list[tuple[str, str]] = [
+    ("http",   "https://raw.githubusercontent.com/MuRongPIG/Proxy-Master/main/http_checked.txt"),
+    ("socks5", "https://raw.githubusercontent.com/MuRongPIG/Proxy-Master/main/socks5_checked.txt"),
+]
 
 _IP_PORT_RE = re.compile(r"\d{1,3}(?:\.\d{1,3}){3}:\d+")
 
@@ -94,10 +98,11 @@ _IP_PORT_RE = re.compile(r"\d{1,3}(?:\.\d{1,3}){3}:\d+")
 def load_backfill_pool() -> tuple[list[tuple[str, str]], list[dict]]:
     """Fetch all active sources; merge, dedup; return (pool, sources).
 
-    Sources (17): monosans, roosterkid, TheSpeedX, themiralay, r00tee, iplocate,
+    Sources (18): monosans, roosterkid, TheSpeedX, themiralay, r00tee, iplocate,
     sunny9577, ALIILAPRO, dpangestuw, Zaeem20, zloi-user, hookzof,
     proxifly (JSON), jetkai (http/https/socks4/socks5),
-    prxchk (http/socks5), ShiftyTR (http/socks5), vakhov (http/socks5).
+    prxchk (http/socks5), ShiftyTR (http/socks5), vakhov (http/socks5),
+    MuRongPIG (http/socks5 validated subset).
     databay-labs removed (repo deleted from GitHub — 404 on all URLs).
     Target: ~30k+ unique.
 
@@ -141,6 +146,8 @@ def load_backfill_pool() -> tuple[list[tuple[str, str]], list[dict]]:
     for proto, url in SHIFTYTR_SOURCES:
         _try_source(url, lambda p=proto, u=url: _fetch_roosterkid(p, u), entries, sources)
     for proto, url in VAKHOV_SOURCES:
+        _try_source(url, lambda p=proto, u=url: _fetch_roosterkid(p, u), entries, sources)
+    for proto, url in MURONGPIG_SOURCES:
         _try_source(url, lambda p=proto, u=url: _fetch_roosterkid(p, u), entries, sources)
 
     return _merge_dedup(entries), sources
@@ -271,6 +278,14 @@ def load_vakhov_proxies() -> list[tuple[str, str]]:
     """Fetch vakhov/fresh-proxy-list http/socks5 txt; regex-parse IP:PORT; dedup."""
     entries: list[tuple[str, str]] = []
     for proto, url in VAKHOV_SOURCES:
+        entries.extend(_fetch_roosterkid(proto, url))
+    return _merge_dedup(entries)
+
+
+def load_murongpig_proxies() -> list[tuple[str, str]]:
+    """Fetch MuRongPIG/Proxy-Master http/socks5 validated (_checked) txt; regex-parse IP:PORT; dedup."""
+    entries: list[tuple[str, str]] = []
+    for proto, url in MURONGPIG_SOURCES:
         entries.extend(_fetch_roosterkid(proto, url))
     return _merge_dedup(entries)
 
