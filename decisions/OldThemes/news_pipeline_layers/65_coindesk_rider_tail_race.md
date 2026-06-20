@@ -134,4 +134,20 @@ all src/ imports lazy (inside function bodies), `_fetch_one_url` + `_next_proxy`
 | 4 | 4 URLs, 4 slots, normal path | n_ok==4, 4 raw files, no racing |
 | 5 | 1 URL, fail then ok, 1 slot | fetch called twice, n_ok==1, done exactly once |
 
-All 5 tests pass (exit 0).
+All 5 tests pass (exit 0). (Suite later extended to 7 — test_6 wedge-after-all_resolved per OT69,
+test_7 pool refresh per OT70.)
+
+## Live verification (4×16 baseline, 2026-06-20)
+
+Run `--year 2019 --limit 500` at 4 browsers × 16 (n_slots=64), job `20260620T010358Z`:
+
+| Metric | Value |
+|---|---|
+| OK / Target | 500 / 500 |
+| Termination | `all-done` (clean — no hang; OT69 fix in place) |
+| Wall-clock | 1531 s (~25.5 min) — vs the ~2251 s pre-tail-race reference, ~32% faster |
+| OK URLs/min | 19.6 → 61k projection ~52 h at 4×16 |
+| cumulative.png | constant slope held to URL 500, **no tail plateau** (the ~400 s plateau the tail-race targeted is gone) |
+
+The tail-race is confirmed: every URL resolved, the slow tail eliminated, the run terminates cleanly.
+Eligible-pool trajectory from the same run lives in OT70 (the refresh-interval evidence).
