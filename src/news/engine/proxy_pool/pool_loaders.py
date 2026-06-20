@@ -72,6 +72,18 @@ ZLOI_SOURCES: list[tuple[str, str]] = [
 HOOKZOF_SOURCES: list[tuple[str, str]] = [
     ("socks5", "https://raw.githubusercontent.com/hookzof/socks5_list/master/proxy.txt"),
 ]
+PRXCHK_SOURCES: list[tuple[str, str]] = [
+    ("http",   "https://raw.githubusercontent.com/prxchk/proxy-list/main/http.txt"),
+    ("socks5", "https://raw.githubusercontent.com/prxchk/proxy-list/main/socks5.txt"),
+]
+SHIFTYTR_SOURCES: list[tuple[str, str]] = [
+    ("http",   "https://raw.githubusercontent.com/ShiftyTR/Proxy-List/master/http.txt"),
+    ("socks5", "https://raw.githubusercontent.com/ShiftyTR/Proxy-List/master/socks5.txt"),
+]
+VAKHOV_SOURCES: list[tuple[str, str]] = [
+    ("http",   "https://raw.githubusercontent.com/vakhov/fresh-proxy-list/master/http.txt"),
+    ("socks5", "https://raw.githubusercontent.com/vakhov/fresh-proxy-list/master/socks5.txt"),
+]
 
 _IP_PORT_RE = re.compile(r"\d{1,3}(?:\.\d{1,3}){3}:\d+")
 
@@ -124,6 +136,12 @@ def load_backfill_pool() -> tuple[list[tuple[str, str]], list[dict]]:
     _try_source(PROXIFLY_URL, _fetch_proxifly, entries, sources)
     for proto, url in JETKAI_SOURCES:
         _try_source(url, lambda p=proto, u=url: _fetch_bare_txt(p, u), entries, sources)
+    for proto, url in PRXCHK_SOURCES:
+        _try_source(url, lambda p=proto, u=url: _fetch_roosterkid(p, u), entries, sources)
+    for proto, url in SHIFTYTR_SOURCES:
+        _try_source(url, lambda p=proto, u=url: _fetch_roosterkid(p, u), entries, sources)
+    for proto, url in VAKHOV_SOURCES:
+        _try_source(url, lambda p=proto, u=url: _fetch_roosterkid(p, u), entries, sources)
 
     return _merge_dedup(entries), sources
 
@@ -229,6 +247,30 @@ def load_hookzof_proxies() -> list[tuple[str, str]]:
     """Fetch hookzof/socks5_list socks5 bare txt; regex-parse IP:PORT; dedup."""
     entries: list[tuple[str, str]] = []
     for proto, url in HOOKZOF_SOURCES:
+        entries.extend(_fetch_roosterkid(proto, url))
+    return _merge_dedup(entries)
+
+
+def load_prxchk_proxies() -> list[tuple[str, str]]:
+    """Fetch prxchk/proxy-list http/socks5 validated txt; regex-parse IP:PORT; dedup."""
+    entries: list[tuple[str, str]] = []
+    for proto, url in PRXCHK_SOURCES:
+        entries.extend(_fetch_roosterkid(proto, url))
+    return _merge_dedup(entries)
+
+
+def load_shiftytr_proxies() -> list[tuple[str, str]]:
+    """Fetch ShiftyTR/Proxy-List http/socks5 txt; regex-parse IP:PORT; dedup."""
+    entries: list[tuple[str, str]] = []
+    for proto, url in SHIFTYTR_SOURCES:
+        entries.extend(_fetch_roosterkid(proto, url))
+    return _merge_dedup(entries)
+
+
+def load_vakhov_proxies() -> list[tuple[str, str]]:
+    """Fetch vakhov/fresh-proxy-list http/socks5 txt; regex-parse IP:PORT; dedup."""
+    entries: list[tuple[str, str]] = []
+    for proto, url in VAKHOV_SOURCES:
         entries.extend(_fetch_roosterkid(proto, url))
     return _merge_dedup(entries)
 
