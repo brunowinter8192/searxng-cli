@@ -62,6 +62,7 @@ async def run_scrape_only(
     skip_index: bool = False,
     n_browsers: int | None = None,
     n_slots: int | None = None,
+    cooldown_policy: str | None = None,
 ) -> None:
     LOG_DIR.mkdir(parents=True, exist_ok=True)
     log = _setup_logging(platform.name)
@@ -99,7 +100,7 @@ async def run_scrape_only(
     if platform.scrape_engine == "proxy_riding":
         # Proxy-riding path: bypass chunking — engine owns concurrency, watchdog, requeue.
         riding_cfg = getattr(platform, "riding_scrape_config", None) or RidingScrapeConfig()
-        overrides = {k: v for k, v in (("n_browsers", n_browsers), ("n_slots", n_slots)) if v is not None}
+        overrides = {k: v for k, v in (("n_browsers", n_browsers), ("n_slots", n_slots), ("cooldown_policy", cooldown_policy)) if v is not None}
         if overrides:
             riding_cfg = dataclasses.replace(riding_cfg, **overrides)
         t_job_start = datetime.now(timezone.utc)

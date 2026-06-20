@@ -82,6 +82,13 @@ def main() -> None:
         default=None,
         help="Total concurrent rider slots (default 64); spread across browsers.",
     )
+    parser.add_argument(
+        "--cooldown-policy",
+        dest="cooldown_policy",
+        choices=["fixed", "exp"],
+        default=None,
+        help="Proxy cooldown policy for proxy_riding scrape-only: 'fixed' (60-min flat, default) or 'exp' (exponential backoff with jitter).",
+    )
     args = parser.parse_args()
 
     platform = get(args.source)
@@ -105,6 +112,7 @@ def main() -> None:
             skip_index=skip_index,
             n_browsers=args.browsers,
             n_slots=args.slots,
+            cooldown_policy=args.cooldown_policy,
         ))
     elif args.discover_only:
         asyncio.run(run_discover_only(platform))

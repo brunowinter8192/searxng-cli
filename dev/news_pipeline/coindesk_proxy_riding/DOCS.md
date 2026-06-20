@@ -123,6 +123,27 @@ fetches over time (top) and per-bin rate + rolling mean + 30-min pool-refresh ma
 
 ---
 
+### test_cooldown_policy.py (251 LOC)
+
+**Purpose:** Deterministic tests for `RidingCooldownManager` (both `fixed` and `exp` policies).
+No browser or proxy infrastructure needed. All `src/` imports lazy (worktree-root `sys.path` insert).
+**Tests (8):**
+- `test_fixed_60min` — burned proxy ineligible at t+59min, eligible at t+61min.
+- `test_fixed_default_equiv` — `RidingCooldownManager()` default = `policy='fixed'` 60-min.
+- `test_exp_unproductive_bounds` — 3 consecutive `ride_ok=0` burns; each `next_eligible` ≤ `now + base*2**n` (n=0,1,2); ineligible immediately after burn.
+- `test_exp_cap` — after 20 unproductive burns backoff capped at 3600s.
+- `test_exp_reset_on_productive` — after 2 unproductive burns, `ride_ok=1` resets counter; next backoff ≤ base (300s), not 1200s; `failed_attempts==1` post-reset.
+- `test_exp_eligible_after_backoff` — proxy becomes eligible once `next_eligible` is backdated past `now`.
+- `test_exp_cooldown_count` — `cooldown_count()==N` after N burns; `0` + full eligibility after backdating `_next_eligible` to past. **A/B correctness gate:** watchdog pool_samples rely on this.
+- `test_fixed_cooldown_count` — `cooldown_count()` under `fixed` mirrors `is_eligible`; drops correctly when burn time is backdated past 3600s.
+
+**Usage:**
+```bash
+./venv/bin/python dev/news_pipeline/coindesk_proxy_riding/test_cooldown_policy.py
+```
+
+---
+
 ### test_watchdog.py (159 LOC)
 
 **Purpose:** Deterministic watchdog verification — no browser or proxy infrastructure needed.
