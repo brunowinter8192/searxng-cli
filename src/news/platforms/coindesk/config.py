@@ -29,8 +29,8 @@ CHECKPOINT_EVERY     = 50      # log progress every N successful cursor calls
 DEFAULT_DELTA_DAYS   = 30      # days back when timeframe is "delta" or unparseable int
 FULL_MODE_FLOOR      = "2018-01-01"   # full-mode stop date; Binance candles start 2017-08
 
-# Master URL inventory shards: data/news/coindesk/inventory/coindesk_{year}.txt
-INVENTORY_DIR = PROJECT_ROOT / "data" / "news" / "coindesk" / "inventory"
+# Master URL discover shards: data/news/coindesk/discover/coindesk_{year}.txt
+DISCOVER_DIR = PROJECT_ROOT / "data" / "news" / "coindesk" / "discover"
 
 SKIP_HEADERS = frozenset({
     ":authority", ":method", ":path", ":scheme",
