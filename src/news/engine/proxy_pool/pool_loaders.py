@@ -121,6 +121,10 @@ def load_backfill_pool() -> tuple[list[tuple[str, str]], list[dict]]:
     for proto, url in HOOKZOF_SOURCES:
         _try_source(url, lambda p=proto, u=url: _fetch_roosterkid(p, u), entries, sources)
 
+    _try_source(PROXIFLY_URL, _fetch_proxifly, entries, sources)
+    for proto, url in JETKAI_SOURCES:
+        _try_source(url, lambda p=proto, u=url: _fetch_bare_txt(p, u), entries, sources)
+
     return _merge_dedup(entries), sources
 
 
