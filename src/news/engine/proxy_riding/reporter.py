@@ -64,6 +64,25 @@ def _compute_stats(state: RiderState, t_job_start: datetime) -> dict:
     retried_failed = len(url_rw) - retried_ok
     wasted_ratio   = n_regwall_fetches / max(n_total_fetches, 1)
 
+    # Eligible pool over time — bucket pool_samples into 10-min windows
+    pool_total   = len(state.proxy_pool)
+    pool_windows: list[dict] = []
+    if state.pool_samples:
+        _WIN_S = 600
+        max_win = int(state.pool_samples[-1][0] / _WIN_S)
+        for k in range(max_win + 1):
+            win = [(e, ne, nc) for e, ne, nc in state.pool_samples if int(e / _WIN_S) == k]
+            if win:
+                min_eligible  = min(ne for _, ne, _ in win)
+                avg_eligible  = round(sum(ne for _, ne, _ in win) / len(win))
+                peak_cooldown = max(nc for _, _, nc in win)
+                pool_windows.append({
+                    "window_min":    k * 10,
+                    "min_eligible":  min_eligible,
+                    "avg_eligible":  avg_eligible,
+                    "peak_cooldown": peak_cooldown,
+                })
+
     return {
         "n_ok": n_ok, "n_regwall_fetches": n_regwall_fetches,
         "n_failed": n_failed, "n_connect_fail": n_connect_fail,
@@ -80,6 +99,7 @@ def _compute_stats(state: RiderState, t_job_start: datetime) -> dict:
         "n_urls_with_regwall": len(url_rw),
         "wasted_ratio": wasted_ratio,
         "termination": state.termination,
+        "pool_total": pool_total, "pool_windows": pool_windows,
     }
 
 
@@ -170,6 +190,29 @@ def _write_md(
         f"min={_fmt(rls['min'])}  "
         f"max={_fmt(rls['max'])}",
         "",
+        "## Eligible proxy pool over time",
+        "",
+        f"Browser-eligible pool (loaded): {stats['pool_total']:,}",
+        "",
+    ]
+
+    pw = stats["pool_windows"]
+    if pw:
+        lines += [
+            "| t (min) | min eligible | avg eligible | peak in-cooldown |",
+            "|---|---|---|---|",
+        ]
+        for w in pw:
+            t_label = f"{w['window_min']}–{w['window_min'] + 10}"
+            lines.append(
+                f"| {t_label} | {w['min_eligible']:,} | {w['avg_eligible']:,}"
+                f" | {w['peak_cooldown']:,} |"
+            )
+        lines += [""]
+    else:
+        lines += ["No samples — run completed before first poll.", ""]
+
+    lines += [
         "## Regwall",
         "",
         "| Metric | Value |",
