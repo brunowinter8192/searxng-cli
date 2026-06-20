@@ -15,7 +15,7 @@ Do NOT import from `src/crawler/` or `src/scraper/` — `src/news/` is self-cont
 ## Entry Points
 
 - `python -m src.news --source coindesk --discover-only [--timeframe 30|full]` — discover + inventory update only; no scrape
-- `python -m src.news --source coindesk --scrape-only --year YYYY [--from YYYY-MM-DD] [--to YYYY-MM-DD] [--limit N]` — date-filtered backfill: inventory → dedup(raw) → chunked scrape → raw persist → job report
+- `python -m src.news --source coindesk --scrape-only --year YYYY [--from YYYY-MM-DD] [--to YYYY-MM-DD] [--limit N] [--browsers N] [--slots N]` — date-filtered backfill: inventory → dedup(raw) → proxy_riding scrape → raw persist → job report; `--browsers`/`--slots` override `RidingScrapeConfig` defaults (4 browsers, 64 slots) per-run without code edits
 - `python -m src.news --source coindesk` — full pipeline: discover → dedup(raw) → scrape → raw persist
 - `python -m src.news --source theblock --discover-only [--timeframe full|sub:N|sub:A-B]` — discover → persist master list `data/news/theblock/discover/master_urls.txt`; no scrape
 - `python -m src.news --source theblock [--timeframe delta|full|sub:N]` — full pipeline (proxy_pool engine); also updates master list
