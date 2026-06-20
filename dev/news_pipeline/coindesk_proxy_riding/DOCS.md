@@ -86,7 +86,7 @@ Self-contained: no imports from `src/`. `p0_pool.py` is a local copy of the prox
 
 ---
 
-### analyze_write_times.py (225 LOC)
+### analyze_write_times.py (258 LOC)
 
 **Purpose:** Reconstructs proxy-riding throughput from `raw/*.html` file mtimes. Used when
 `job.md`/`cumulative.png` are missing (manual abort before fix, or any crash that skips the report
