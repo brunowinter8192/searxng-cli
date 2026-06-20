@@ -188,10 +188,19 @@ Key: `_sleep = time.sleep` is a module-level alias — patch `pool_retry._sleep`
 
 ---
 
-### pool_loaders.py (293 LOC)
+### pool_loaders.py (326 LOC)
 
-**Purpose:** 13 Top-Repo proxy loaders + `load_backfill_pool()` — fetches all sources per-URL with retry and per-source failure isolation; returns `(pool, sources)` where `pool` is deduped `[(protocol, host:port)]` (~22k unique) and `sources` is `[{url, ok, count}, …]` one entry per URL.
-**Reads:** 13 GitHub raw proxy-list URLs via httpx (each wrapped in `fetch_with_retry`).
+**Purpose:** 17 proxy-source loaders + `load_backfill_pool()` — fetches all sources per-URL with retry and per-source failure isolation; returns `(pool, sources)` where `pool` is deduped `[(protocol, host:port)]` (~32k unique) and `sources` is `[{url, ok, count}, …]` one entry per URL.
+
+Sources active in `load_backfill_pool` (44 URLs across 17 repos):
+monosans, roosterkid, TheSpeedX, themiralay, r00tee, iplocate, sunny9577, ALIILAPRO, dpangestuw,
+Zaeem20, zloi-user, hookzof, proxifly (JSON), jetkai (http/https/socks4/socks5),
+prxchk (http/socks5, validated, refreshed every 10 min),
+ShiftyTR (http/socks5, updated hourly),
+vakhov (http/socks5, fresh/working).
+databay-labs removed (repo deleted from GitHub — all URLs 404).
+
+**Reads:** 44 GitHub raw proxy-list URLs via httpx (each wrapped in `fetch_with_retry`).
 **Writes:** nothing.
 **Called by:** `theblock/config.py` (via `ProxyScrapeConfig.pool_provider`); `theblock/discover.py:_fetch_xml` (fallback pool, unpacks `pool, _ = load_backfill_pool()`).
 **Calls out:** `httpx`, `pool_retry.py:fetch_with_retry`, `monosans_loader.py:load_monosans_proxies`, `proxy_key.py:proxy_key`.
@@ -210,7 +219,7 @@ Key: `_try_source(url, fn, entries, sources)` is the per-URL isolation helper �
 
 ## Gotchas
 
-- `pool_loaders.py` at 293 LOC exceeds the 200-LOC heuristic — no extractable concern exists (flat list of 13 loader functions sharing one `_merge_dedup` utility). Do not split.
+- `pool_loaders.py` at 326 LOC exceeds the 200-LOC heuristic — no extractable concern exists (flat list of 17 loader functions sharing one `_merge_dedup` utility). Do not split.
 - `janitor.end_job` calls `jsonl_path.unlink()` then wipes `log_dir`. Interrupt between these two orphans the JSONL in `log_dir`. Non-critical: `start_job` wipes `log_dir` at the next run.
 - `box_lock`: SIGTERM kills Python before `finally` runs → sidecar stays; kernel releases flock. Next `acquire()` recovers via `cleanup_stale()` (dead-PID detection).
 - `_sleep` in `loop.py` AND `pool_retry.py` are both module aliases (`_sleep = time.sleep`) — patch the alias in the target module in tests, not `time.sleep` directly. For retry tests patch `pool_retry._sleep`; for exhaustion-sleep tests patch `loop._sleep`.
