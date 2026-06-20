@@ -86,6 +86,43 @@ Self-contained: no imports from `src/`. `p0_pool.py` is a local copy of the prox
 
 ---
 
+### analyze_write_times.py (225 LOC)
+
+**Purpose:** Reconstructs proxy-riding throughput from `raw/*.html` file mtimes. Used when
+`job.md`/`cumulative.png` are missing (manual abort before fix, or any crash that skips the report
+write). Reads mtime of every `.html` in `--raw-dir`, optionally filters to a `--since` cutoff
+(needed when `raw/` is a cumulative dedup corpus spanning multiple runs), then plots cumulative OK
+fetches over time (top) and per-bin rate + rolling mean + 30-min pool-refresh markers (bottom).
+
+**Usage:**
+```bash
+# All files in default raw dir (cumulative corpus):
+./venv/bin/python dev/news_pipeline/coindesk_proxy_riding/analyze_write_times.py
+
+# Isolate a single run by local start time (recommended when raw/ spans multiple runs):
+./venv/bin/python dev/news_pipeline/coindesk_proxy_riding/analyze_write_times.py \
+    --since '2026-06-20 03:45'
+
+# Custom bin width and smoothing:
+./venv/bin/python dev/news_pipeline/coindesk_proxy_riding/analyze_write_times.py \
+    --since '2026-06-20 03:45' --bin-minutes 2 --rolling 10
+```
+
+**CLI Flags:**
+
+| Flag | Default | Description |
+|---|---|---|
+| `--raw-dir` | `data/news/coindesk/raw` | Directory of `*.html` files (resolved from repo root via `git rev-parse --git-common-dir`) |
+| `--bin-minutes` | `1` | Bin width for the rate histogram in minutes |
+| `--rolling` | `5` | Rolling-mean window in bins (overlaid on rate bars) |
+| `--since` | `None` | Local timestamp `'YYYY-MM-DD HH:MM'` — exclude mtimes before this cutoff; use to isolate one run from a shared raw/ corpus |
+
+**Output:**
+- PNG → `dev/news_pipeline/coindesk_proxy_riding/01_reports/raw_write_times_<YYYYMMDD>[_since<stamp>].png`
+- Stdout: filter summary (files before/after cutoff), Files, Span (local timezone), Mean rate, Median rate (non-zero bins only), Longest gap between consecutive writes.
+
+---
+
 ### test_watchdog.py (159 LOC)
 
 **Purpose:** Deterministic watchdog verification — no browser or proxy infrastructure needed.
