@@ -79,15 +79,22 @@ would not predict our target. Pre-checks rejected (again).
   was lost to the manual Ctrl-C (now fixed by SIGINT/SIGTERM report-on-abort, OT73) — the A/B runs will
   capture it.
 
-## A/B approach (in progress)
+## A/B approach (implemented; runs pending)
 
-Selectable `--cooldown-policy fixed|exp` (default `fixed` = byte-identical control). **Isolation constraint:**
-`cooldown.py` is SHARED with the theblock proxy_pool engine (`buffer.py` / `loop.py` / `scrape.py`) — the new
-policy must not change theblock behavior. User runs two 1000-URL backfills (fixed + exp), compares throughput
-+ eligible-curve + ride-length; winner becomes default.
+Selectable `--cooldown-policy fixed|exp` (default `fixed` = byte-identical control), implemented in a
+DEDICATED `src/news/engine/proxy_riding/cooldown.py` (`RidingCooldownManager`) — the shared
+`proxy_pool/cooldown.py` (theblock) is untouched, verified byte-identical (not in the change diff; theblock
+callers `buffer.py`/`loop.py`/`scrape.py` unchanged). The active policy is rendered in each run's `job.md`
+Counts table (`| Cooldown policy | fixed|exp |`) so the two A/B reports self-identify.
+
+Run guidance: `--limit N` is applied BEFORE the in-raw dedup (`load_discover_filtered(limit)` → then
+`filter_new_entries`), so re-running an already-scraped date-range yields 0 new ("all already in raw"). Run
+each A/B variant on a FRESH, untouched year (e.g. fixed→2023, exp→2025; hash-verified 0 prior coverage) so
+each gets a full N fresh URLs. Metric is proxy-pool dynamics (throughput + eligible-curve + ride-length),
+range-independent; winner becomes default.
 
 ## Open
 
-- Isolation mechanism (dedicated `proxy_riding/cooldown.py` vs additive default-fixed param on the shared
-  class) — worker to propose + prove theblock stays byte-identical.
+- Isolation mechanism resolved → dedicated `proxy_riding/cooldown.py` (theblock byte-identical, verified).
+- A/B runs not yet executed (fixed→2023, exp→2025). Pending: compare throughput + eligible-curve + ride-length.
 - Whether base = 5 min / cap = 60 min fit our connect_fail-dominated pool, or need tuning — the A/B informs.
