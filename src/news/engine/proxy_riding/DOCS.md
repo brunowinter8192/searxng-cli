@@ -49,7 +49,7 @@ Touch this package when changing proxy-riding engine behaviour. Do NOT touch `en
 
 ## Modules
 
-### rider.py (436 LOC)
+### rider.py (443 LOC)
 
 **Purpose:** Browser-per-context proxy rider pool. Manages B `AsyncWebCrawler` instances, N slot
 coroutines, per-URL proxy context (`CrawlerRunConfig.proxy_config`), burn/fail rotation, watchdog.
@@ -62,14 +62,19 @@ DefaultMarkdownGenerator); `src.news.engine.proxy_pool.cooldown.PersistentCooldo
 late import of `reporter.write_riding_report` inside `_abort_stall` (avoids circular).
 
 Key dataclasses: `RiderState` (shared mutable job state — fields: `output_dir` raw writes,
-`job_dir` report writes, `target_urls` frozenset of all distinct targets, `done_urls` set of written URLs;
+`job_dir` report writes, `target_urls` frozenset of all distinct targets, `done_urls` set of written URLs,
+`pool_samples` list of `(elapsed_s, n_eligible, n_cooldown)` tuples appended by `_watchdog` each poll;
 `all_resolved = len(done_urls) >= len(target_urls)`), `JobRecord` (per-URL outcome),
 `RideRecord` (per-proxy-ride summary). `FAIL_THRESHOLD = 2` (failed/empty strikes before drop).
 
-### reporter.py (281 LOC)
+`_watchdog` captures `t0_mono = time.monotonic()` at start; each poll appends
+`(elapsed_s, n_eligible, n_cooldown)` via `cooldown_mgr.eligible_candidates(proxy_pool)` +
+`cooldown_mgr.cooldown_count()`. Sampling overhead: ~1–5 ms per poll on ~26k-proxy pool. Negligible.
 
-**Purpose:** Job report writer — `job.md` (counts, throughput, percentiles, regwall table, failure
-table) + `cumulative.png` (step-plot of cumulative OK fetches over time).
+### reporter.py (235 LOC)
+
+**Purpose:** Job report writer — `job.md` (counts, throughput, proxy-riding stats, eligible-pool-over-time
+table, regwall counts) + `cumulative.png` (step-plot of cumulative OK fetches over time).
 **Reads:** `RiderState` (in-memory), `t_job_start` (datetime).
 **Writes:** `{job_dir}/job.md`; `{job_dir}/cumulative.png`.
 **Called by:** `pipeline.py:run_scrape_only` (normal completion, via `write_riding_report`);
