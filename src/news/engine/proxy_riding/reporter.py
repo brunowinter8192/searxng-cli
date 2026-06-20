@@ -155,6 +155,7 @@ def _write_md(
         f"| Target URLs | {state.total_urls} |",
         f"| Browsers | {state.n_browsers} |",
         f"| Contexts/browser | {state.n_slots // max(state.n_browsers, 1)} |",
+        f"| Cooldown policy | {state.cooldown_mgr.policy} |",
         f"| OK | {stats['n_ok']} |",
         f"| Regwall fetches | {stats['n_regwall_fetches']} |",
         f"| Failed / Empty | {stats['n_failed']} |",

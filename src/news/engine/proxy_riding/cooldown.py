@@ -32,6 +32,10 @@ class RidingCooldownManager:
         self._next_eligible:    dict[str, datetime] = {}   # exp path
         self._failed_attempts:  dict[str, int]      = {}   # exp path
 
+    @property
+    def policy(self) -> str:
+        return self._policy
+
 
 # FUNCTIONS
 
