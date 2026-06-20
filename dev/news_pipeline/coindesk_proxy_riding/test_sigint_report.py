@@ -66,7 +66,7 @@ def _run(name: str, fn) -> bool:
 # Build a minimal RiderState with two resolved job records so reporter has data.
 def _make_state(tmp_dir: Path) -> object:
     from src.news.engine.proxy_riding.rider import RiderState, JobRecord, RideRecord
-    from src.news.engine.proxy_pool.cooldown import PersistentCooldownManager
+    from src.news.engine.proxy_riding.cooldown import RidingCooldownManager
     from datetime import datetime, timezone
 
     job_dir = tmp_dir / "scrape_jobs" / "20250101T000000Z"
@@ -76,7 +76,7 @@ def _make_state(tmp_dir: Path) -> object:
     state = RiderState(
         url_queue=q,
         proxy_pool=[("http", "proxy:8080")],
-        cooldown_mgr=PersistentCooldownManager(),
+        cooldown_mgr=RidingCooldownManager(),
         output_dir=tmp_dir,
         job_dir=job_dir,
         burn_threshold=2,
