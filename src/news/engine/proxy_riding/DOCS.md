@@ -36,7 +36,7 @@ Touch this package when changing proxy-riding engine behaviour. Do NOT touch `en
 ## Flow
 
 1. `scrape_entries_riding` builds URL queue from entries, loads pool via `load_backfill_pool()`,
-   filters to `{"http","socks5"}`, shuffles, constructs `PersistentCooldownManager`.
+   filters to `{"http","socks5"}`, shuffles, constructs `RidingCooldownManager(policy=riding_cfg.cooldown_policy)`.
 2. `run_riding_pool` spawns B `AsyncWebCrawler` instances + N slot tasks + 1 watchdog task.
 3. Each slot draws a proxy from the shuffled pool (cursor-atomic under `proxy_lock`), rides URLs
    until burn_threshold regwall or FAIL_THRESHOLD failed/empty, then rotates to the next proxy.
@@ -50,18 +50,39 @@ Touch this package when changing proxy-riding engine behaviour. Do NOT touch `en
 
 ## Modules
 
+### cooldown.py (91 LOC)
+
+**Purpose:** Riding-specific proxy cooldown manager (`RidingCooldownManager`). Isolated from the
+theblock-shared `proxy_pool/cooldown.py` (`PersistentCooldownManager`) — the theblock path is
+untouched. Supports two policies selectable per-run via `RidingScrapeConfig.cooldown_policy`:
+`"fixed"` (60-min flat cooldown, byte-identical to current production control arm) and `"exp"`
+(exponential backoff with full jitter, ported from scrapy-rotating-proxies: base=300s, cap=3600s;
+reset-on-productive-ride: if `ride_ok >= 1` the `failed_attempts` counter resets before computing
+the backoff, so a proxy that delivered a successful fetch re-enters the eligible pool quickly).
+`cooldown_count()` correct under both policies — counts proxies with `now < next_eligible` (exp) or
+`now - burned_at < 3600s` (fixed), used by the watchdog's `pool_samples` A/B telemetry.
+**Reads:** `_burned_at` / `_next_eligible` / `_failed_attempts` (in-memory dicts keyed by `proxy_key`).
+**Writes:** same dicts on `mark_burned(proto, hp, ride_ok=0)`.
+**Called by:** `rider.py:_run_slot` (via `state.cooldown_mgr.mark_burned`);
+`rider.py:_next_proxy` (via `state.cooldown_mgr.eligible_candidates`);
+`rider.py:_watchdog` (via `state.cooldown_mgr.eligible_candidates` + `cooldown_count`);
+`scrape.py:scrape_entries_riding` (instantiation: `RidingCooldownManager(policy=riding_cfg.cooldown_policy)`).
+**Calls out:** `src.news.engine.proxy_pool.proxy_key.proxy_key`.
+
+---
+
 ### rider.py (552 LOC)
 
 **Purpose:** Browser-per-context proxy rider pool. Manages B `AsyncWebCrawler` instances, N slot
 coroutines, per-URL proxy context (`CrawlerRunConfig.proxy_config`), burn/fail rotation, watchdog,
 30-min pool refresh. Installs SIGINT/SIGTERM handlers so manual aborts also produce a report.
-**Reads:** URL queue (asyncio.Queue), proxy pool list, `PersistentCooldownManager` (shared state).
+**Reads:** URL queue (asyncio.Queue), proxy pool list, `RidingCooldownManager` (shared state).
 **Writes:** `output_dir/raw/{hash}.html` for each ok URL; `state.job_dir/job.md` + `cumulative.png`
 on stall abort, wedge-after-done, or manual abort (via `_abort_stall` / `_abort_done` /
 `_abort_interrupted` — same dir as normal-completion report).
 **Called by:** `scrape.py:scrape_entries_riding` (via `run_riding_pool`).
 **Calls out:** `crawl4ai` (AsyncWebCrawler, BrowserConfig, CrawlerRunConfig, CacheMode, ProxyConfig,
-DefaultMarkdownGenerator); `src.news.engine.proxy_pool.cooldown.PersistentCooldownManager` (import);
+DefaultMarkdownGenerator); `src.news.engine.proxy_riding.cooldown.RidingCooldownManager` (import);
 late import of `reporter.write_riding_report` inside `_abort_stall` / `_abort_done` /
 `_abort_interrupted` (avoids circular).
 
@@ -110,7 +131,7 @@ maps `RiderState.job_records` → pipeline manifest.
 **Writes:** delegates to `rider.py` (raw HTML writes to `output_dir/raw/{hash}.html`); writes nothing directly.
 **Called by:** `pipeline.py:run_scrape_only` (proxy_riding dispatch arm).
 **Calls out:** `src.news.engine.proxy_pool.pool_loaders.load_backfill_pool`;
-`src.news.engine.proxy_pool.cooldown.PersistentCooldownManager`;
+`src.news.engine.proxy_riding.cooldown.RidingCooldownManager`;
 `src.news.engine.proxy_riding.rider.run_riding_pool`.
 
 `_pool_provider()` — shared async helper used for BOTH initial pool load (at `scrape_entries_riding`
