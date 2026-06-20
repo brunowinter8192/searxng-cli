@@ -49,17 +49,17 @@ Touch this package when changing proxy-riding engine behaviour. Do NOT touch `en
 
 ## Modules
 
-### rider.py (443 LOC)
+### rider.py (485 LOC)
 
 **Purpose:** Browser-per-context proxy rider pool. Manages B `AsyncWebCrawler` instances, N slot
 coroutines, per-URL proxy context (`CrawlerRunConfig.proxy_config`), burn/fail rotation, watchdog.
 **Reads:** URL queue (asyncio.Queue), proxy pool list, `PersistentCooldownManager` (shared state).
 **Writes:** `output_dir/raw/{hash}.html` for each ok URL; `state.job_dir/job.md` on stall abort
-(via `_abort_stall` — same dir as normal-completion report).
+or wedge-after-done (via `_abort_stall` / `_abort_done` — same dir as normal-completion report).
 **Called by:** `scrape.py:scrape_entries_riding` (via `run_riding_pool`).
 **Calls out:** `crawl4ai` (AsyncWebCrawler, BrowserConfig, CrawlerRunConfig, CacheMode, ProxyConfig,
 DefaultMarkdownGenerator); `src.news.engine.proxy_pool.cooldown.PersistentCooldownManager` (import);
-late import of `reporter.write_riding_report` inside `_abort_stall` (avoids circular).
+late import of `reporter.write_riding_report` inside `_abort_stall` / `_abort_done` (avoids circular).
 
 Key dataclasses: `RiderState` (shared mutable job state — fields: `output_dir` raw writes,
 `job_dir` report writes, `target_urls` frozenset of all distinct targets, `done_urls` set of written URLs,
@@ -67,9 +67,12 @@ Key dataclasses: `RiderState` (shared mutable job state — fields: `output_dir`
 `all_resolved = len(done_urls) >= len(target_urls)`), `JobRecord` (per-URL outcome),
 `RideRecord` (per-proxy-ride summary). `FAIL_THRESHOLD = 2` (failed/empty strikes before drop).
 
-`_watchdog` captures `t0_mono = time.monotonic()` at start; each poll appends
-`(elapsed_s, n_eligible, n_cooldown)` via `cooldown_mgr.eligible_candidates(proxy_pool)` +
-`cooldown_mgr.cooldown_count()`. Sampling overhead: ~1–5 ms per poll on ~26k-proxy pool. Negligible.
+`_watchdog` captures `t0_mono = time.monotonic()` at start; each poll appends pool sample, then:
+- `all_resolved AND in_flight == 0` → `return` (clean drain, normal path).
+- `all_resolved AND in_flight > 0` → `_abort_done(state)`: report write + `os._exit(0)`. Handles
+  the tail-wedge case: last URL written by winner, dup-racing slot still suspended in Playwright I/O.
+- `not all_resolved AND idle > stall_timeout_s` → `_abort_stall(state, idle)`: report write +
+  `os._exit(1)`. Genuine no-progress stall.
 
 ### reporter.py (235 LOC)
 

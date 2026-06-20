@@ -393,10 +393,52 @@ async def _watchdog(
         n_cooldown = state.cooldown_mgr.cooldown_count()
         state.pool_samples.append((elapsed_s, n_eligible, n_cooldown))
         if state.all_resolved:
-            return
+            if state.in_flight == 0:
+                return   # clean drain — all slots exited before this poll
+            _abort_done(state)   # wedged slot(s) on already-done URLs — does not return
         idle = time.monotonic() - state.last_progress_mono
         if idle > state.stall_timeout_s:
             _abort_stall(state, idle)  # does not return
+
+
+# All URLs done but in_flight > 0: wedged slot(s) racing already-done URLs. Write report +
+# os._exit(0). Never returns. Work is complete — exit code 0 signals success.
+def _abort_done(state: RiderState) -> None:
+    print(
+        f"[watchdog] all-done but in_flight={state.in_flight} — "
+        f"wedged slot(s) on already-done URLs; writing report → os._exit(0)",
+        file=sys.stderr,
+    )
+    state.termination = "all-done"
+
+    state.job_dir.mkdir(parents=True, exist_ok=True)
+
+    try:
+        from src.news.engine.proxy_riding.reporter import write_riding_report  # late import — avoids circular at module level
+        write_riding_report(state, state.job_dir, state.t_job_start)
+        print(f"[watchdog] job.md → {state.job_dir / 'job.md'}", file=sys.stderr)
+    except Exception as exc:
+        print(f"[watchdog] write_riding_report WARN: {exc}", file=sys.stderr)
+        try:
+            (state.job_dir / "job.md").write_text(
+                "\n".join([
+                    "# CoinDesk riding job — DONE (wedged slot)",
+                    "",
+                    "termination: all-done",
+                    f"n_ok: {state.n_ok}",
+                    f"n_regwall: {state.n_regwall}",
+                    f"n_failed: {state.n_failed}",
+                    f"n_connect_fail: {state.n_connect_fail}",
+                    "",
+                    f"Reporter error: {exc}",
+                ]),
+                encoding="utf-8",
+            )
+        except Exception as write_exc:
+            print(f"[watchdog] fallback job.md WARN: {write_exc}", file=sys.stderr)
+
+    sys.stderr.flush()
+    os._exit(0)
 
 
 # Write job.md then os._exit(1). Never returns.

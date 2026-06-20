@@ -36,11 +36,12 @@ if str(_WORKTREE) not in sys.path:
 
 def main() -> None:
     results = [
-        _run("test_1_surplus_slots_race_both_done",     test_1_surplus_slots_race_both_done),
-        _run("test_2_write_exactly_once_per_url",       test_2_write_exactly_once_per_url),
-        _run("test_3_no_spurious_requeue",              test_3_no_spurious_requeue),
-        _run("test_4_normal_path_no_racing",            test_4_normal_path_no_racing),
-        _run("test_5_fail_before_success_done_once",    test_5_fail_before_success_done_once),
+        _run("test_1_surplus_slots_race_both_done",              test_1_surplus_slots_race_both_done),
+        _run("test_2_write_exactly_once_per_url",                test_2_write_exactly_once_per_url),
+        _run("test_3_no_spurious_requeue",                       test_3_no_spurious_requeue),
+        _run("test_4_normal_path_no_racing",                     test_4_normal_path_no_racing),
+        _run("test_5_fail_before_success_done_once",             test_5_fail_before_success_done_once),
+        _run("test_6_watchdog_wedge_after_all_resolved",         test_6_watchdog_wedge_after_all_resolved),
     ]
     passed = sum(results)
     print(f"\n{'='*55}")
@@ -341,6 +342,54 @@ def test_5_fail_before_success_done_once() -> None:
         assert state.done_urls == {url_x},    f"done_urls={state.done_urls}"
         raw_files = list((p / RAW_SUBDIR).iterdir())
         assert len(raw_files) == 1,           f"raw file count={len(raw_files)} (expected 1)"
+
+
+# all_resolved=True (last URL in done_urls) but in_flight=1 (one wedged slot) →
+# _watchdog must call os._exit(0) and set termination='all-done', NOT return silently.
+def test_6_watchdog_wedge_after_all_resolved() -> None:
+    from src.news.engine.proxy_riding import rider as rider_mod
+    from src.news.engine.proxy_riding.rider import RiderState, RAW_SUBDIR, _watchdog
+    from src.news.engine.proxy_pool.cooldown import PersistentCooldownManager
+
+    url_done = "https://cd.com/already-done"
+    exit_calls: list[int] = []
+
+    def fake_exit(code: int) -> None:
+        exit_calls.append(code)
+        raise SystemExit(code)
+
+    with tempfile.TemporaryDirectory() as tmp:
+        p = Path(tmp)
+        (p / RAW_SUBDIR).mkdir()
+
+        async def run() -> RiderState:
+            q = asyncio.Queue()
+            state = RiderState(
+                url_queue=q, proxy_pool=[],
+                cooldown_mgr=PersistentCooldownManager(),
+                output_dir=p, job_dir=p / "jobs",
+                burn_threshold=2, page_timeout_ms=8_000,
+                total_urls=1, target_urls=frozenset([url_done]),
+            )
+            # Simulate: last URL written by first-writer winner → all_resolved=True.
+            state.done_urls.add(url_done)
+            # Simulate: one slot still suspended inside await _fetch_one_url on dup-race.
+            state.in_flight = 1
+
+            with (
+                unittest.mock.patch.object(rider_mod.os, "_exit", fake_exit),
+                unittest.mock.patch("src.news.engine.proxy_riding.reporter.write_riding_report"),
+            ):
+                try:
+                    await _watchdog(state, poll_interval=0.1)
+                except SystemExit:
+                    return state   # os._exit(0) raised by fake_exit — expected termination
+            return state
+
+        state = asyncio.run(run())
+
+    assert exit_calls == [0],               f"expected os._exit(0), got {exit_calls}"
+    assert state.termination == "all-done", f"termination={state.termination!r}"
 
 
 if __name__ == "__main__":
