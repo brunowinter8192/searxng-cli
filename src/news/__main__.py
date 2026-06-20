@@ -70,6 +70,18 @@ def main() -> None:
         default=None,
         help="Cap URL count after date filter (quick probe, e.g. --limit 5).",
     )
+    parser.add_argument(
+        "--browsers",
+        type=int,
+        default=None,
+        help="Browser-process pool size for proxy_riding scrape-only (default from config: 4).",
+    )
+    parser.add_argument(
+        "--slots",
+        type=int,
+        default=None,
+        help="Total concurrent rider slots (default 64); spread across browsers.",
+    )
     args = parser.parse_args()
 
     platform = get(args.source)
@@ -91,6 +103,8 @@ def main() -> None:
             to_date=args.to_date,
             limit=args.limit,
             skip_index=skip_index,
+            n_browsers=args.browsers,
+            n_slots=args.slots,
         ))
     elif args.discover_only:
         asyncio.run(run_discover_only(platform))
