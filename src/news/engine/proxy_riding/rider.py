@@ -28,7 +28,7 @@ REGWALL_SIGNALS: list[str] = [
 PAGE_TIMEOUT_MS          = 8_000    # default; overridden per-call via page_timeout_ms param
 DELAY_BEFORE_HTML        = 0.5      # s wait after domcontentloaded
 STALL_TIMEOUT_S          = 3_600.0  # 60 min no progress → terminate
-POOL_REFRESH_INTERVAL_S  = 3_600.0  # re-fetch + filter + shuffle pool every 60 min
+POOL_REFRESH_INTERVAL_S  = 1_800.0  # re-fetch + filter + shuffle pool every 30 min
 FAIL_THRESHOLD           = 2        # failed/empty strikes before dropping a proxy (mirrors burn_threshold for regwall)
 
 # Playwright error substrings that indicate a proxy-side failure (not CoinDesk)

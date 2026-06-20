@@ -53,7 +53,7 @@ Touch this package when changing proxy-riding engine behaviour. Do NOT touch `en
 
 **Purpose:** Browser-per-context proxy rider pool. Manages B `AsyncWebCrawler` instances, N slot
 coroutines, per-URL proxy context (`CrawlerRunConfig.proxy_config`), burn/fail rotation, watchdog,
-60-min pool refresh.
+30-min pool refresh.
 **Reads:** URL queue (asyncio.Queue), proxy pool list, `PersistentCooldownManager` (shared state).
 **Writes:** `output_dir/raw/{hash}.html` for each ok URL; `state.job_dir/job.md` on stall abort
 or wedge-after-done (via `_abort_stall` / `_abort_done` — same dir as normal-completion report).
@@ -65,13 +65,13 @@ late import of `reporter.write_riding_report` inside `_abort_stall` / `_abort_do
 Key dataclasses: `RiderState` (shared mutable job state — fields: `output_dir` raw writes,
 `job_dir` report writes, `target_urls` frozenset of all distinct targets, `done_urls` set of written URLs,
 `pool_samples` list of `(elapsed_s, n_eligible, n_cooldown)` tuples appended by `_watchdog` each poll,
-`pool_provider` async callable `() -> list[tuple[str,str]]` for 60-min refresh (None = static pool);
+`pool_provider` async callable `() -> list[tuple[str,str]]` for 30-min refresh (None = static pool);
 `all_resolved = len(done_urls) >= len(target_urls)`), `JobRecord` (per-URL outcome),
 `RideRecord` (per-proxy-ride summary). `FAIL_THRESHOLD = 2` (failed/empty strikes before drop).
 
 `_watchdog` poll loop (every `min(30, stall_timeout_s/4)` s), in order:
 1. Append pool sample `(elapsed_s, n_eligible, n_cooldown)`.
-2. **Pool refresh** (if `pool_provider` set and `POOL_REFRESH_INTERVAL_S = 3600` elapsed): `await
+2. **Pool refresh** (if `pool_provider` set and `POOL_REFRESH_INTERVAL_S = 1800` elapsed): `await
    state.pool_provider()` via `run_in_executor` thread; guard against empty result; atomic assign
    `state.proxy_pool = new_pool`; `cooldown_mgr` persists unchanged.
 3. `all_resolved AND in_flight == 0` → `return` (clean drain).
@@ -101,7 +101,7 @@ maps `RiderState.job_records` → pipeline manifest.
 `src.news.engine.proxy_riding.rider.run_riding_pool`.
 
 `_pool_provider()` — shared async helper used for BOTH initial pool load (at `scrape_entries_riding`
-start) AND as the `pool_provider` callable threaded into `RiderState` for 60-min watchdog refresh.
+start) AND as the `pool_provider` callable threaded into `RiderState` for 30-min watchdog refresh.
 Runs `load_backfill_pool()` in `run_in_executor` (blocking network I/O), filters to
 `BROWSER_ELIGIBLE_PROTOS = {"http","socks5"}`, shuffles. Single source of truth — no separate
 init-vs-refresh code paths.
