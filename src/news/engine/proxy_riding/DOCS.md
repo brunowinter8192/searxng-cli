@@ -50,7 +50,7 @@ Touch this package when changing proxy-riding engine behaviour. Do NOT touch `en
 
 ## Modules
 
-### cooldown.py (91 LOC)
+### cooldown.py (95 LOC)
 
 **Purpose:** Riding-specific proxy cooldown manager (`RidingCooldownManager`). Isolated from the
 theblock-shared `proxy_pool/cooldown.py` (`PersistentCooldownManager`) — the theblock path is
@@ -61,12 +61,14 @@ reset-on-productive-ride: if `ride_ok >= 1` the `failed_attempts` counter resets
 the backoff, so a proxy that delivered a successful fetch re-enters the eligible pool quickly).
 `cooldown_count()` correct under both policies — counts proxies with `now < next_eligible` (exp) or
 `now - burned_at < 3600s` (fixed), used by the watchdog's `pool_samples` A/B telemetry.
+Read-only `.policy` property exposes the active policy string for the reporter.
 **Reads:** `_burned_at` / `_next_eligible` / `_failed_attempts` (in-memory dicts keyed by `proxy_key`).
 **Writes:** same dicts on `mark_burned(proto, hp, ride_ok=0)`.
 **Called by:** `rider.py:_run_slot` (via `state.cooldown_mgr.mark_burned`);
 `rider.py:_next_proxy` (via `state.cooldown_mgr.eligible_candidates`);
 `rider.py:_watchdog` (via `state.cooldown_mgr.eligible_candidates` + `cooldown_count`);
-`scrape.py:scrape_entries_riding` (instantiation: `RidingCooldownManager(policy=riding_cfg.cooldown_policy)`).
+`scrape.py:scrape_entries_riding` (instantiation: `RidingCooldownManager(policy=riding_cfg.cooldown_policy)`);
+`reporter.py:_write_md` (via `state.cooldown_mgr.policy`).
 **Calls out:** `src.news.engine.proxy_pool.proxy_key.proxy_key`.
 
 ---
@@ -111,7 +113,7 @@ Key dataclasses: `RiderState` (shared mutable job state — fields: `output_dir`
 calls `write_riding_report`, `os._exit(130)` for SIGINT / `os._exit(143)` for SIGTERM. Same
 structure and late-import pattern as `_abort_stall` / `_abort_done`.
 
-### reporter.py (235 LOC)
+### reporter.py (236 LOC)
 
 **Purpose:** Job report writer — `job.md` (counts, throughput, proxy-riding stats, eligible-pool-over-time
 table, regwall counts) + `cumulative.png` (step-plot of cumulative OK fetches over time).
