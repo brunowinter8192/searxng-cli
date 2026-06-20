@@ -39,17 +39,21 @@ source read corrected it.)
   "proxies online at the time of testing", updated hourly). Revisits proxifly's deliberate survey-rank-15
   exclusion — justified by the current goal: maximise validated supply against the eligible-pool depletion.
 - Fix the stale proxifly docstring → make the source inventory comment reflect reality (the actual backfill set).
-- Add three more SOURCE-VALIDATED (pre-filtered) sources, deliberately small for high live-fraction / low churn
+- Add four more SOURCE-VALIDATED (pre-filtered) sources, deliberately small for high live-fraction / low churn
   (user: "am besten vorgefiltert ... so klein dass selbst wenn Trash, verwässert den Pool nicht arg"):
   - **prxchk/proxy-list** — validated ("highly anonymous, accuracy"), refreshed EVERY 10 MIN; ~58 http / ~10 socks5.
   - **ShiftyTR/Proxy-List** — updated hourly; ~40 http / ~279 socks5.
   - **vakhov/fresh-proxy-list** — "fresh, working"; ~528 http / ~21 socks5.
-  Together ~936 vs ~19,576 currently-eligible → <5% dilution even if all were dead.
+  - **MuRongPIG/Proxy-Master** `_checked` subset — the repo's own validated files only (NOT the raw dump);
+    ~158 http / ~39 socks5.
+  Together ~1133 vs ~19,576 currently-eligible → <6% dilution even if all were dead.
 
 ### Rejected
 
-- **MuRongPIG/Proxy-Master** (~28k/protocol RAW dump, "maybe the best free proxy list"): rejected — user wants
-  pre-filtered, not raw. Its validated `_checked` subset (~158 http / ~39 socks5) is too small to bother.
+- **MuRongPIG/Proxy-Master RAW dumps** (~28k/protocol http.txt/socks5.txt): rejected — user wants pre-filtered,
+  not raw. BUT its `_checked` validated subset was ADDED (see above) — Opus first dismissed it as "too small
+  to bother", the user flagged that as inconsistent with adding prxchk (~68), and was right: the `_checked`
+  subset (~197 http+socks5) is the same scale as the other small validated sources, so it goes in.
 - **oxylabs/free-proxy-list** (⭐3068): rejected — NO data file; proxies live in a README markdown table,
   US-only, marketing repo. Not machine-readable.
 
@@ -64,13 +68,19 @@ ourselves via backoff (OT74).
 
 ## IST after change
 
-`load_backfill_pool()` source set after change: monosans, roosterkid, TheSpeedX, themiralay, r00tee,
-iplocate, sunny9577, ALIILAPRO, dpangestuw, Zaeem20, zloi-user, hookzof (the surviving 12 of the old 13),
-**+ proxifly, + jetkai (wired in), + prxchk, + ShiftyTR, + vakhov** (− databay-labs). The 30-min pool
-refresh auto-covers all of these via `_pool_provider()` → `load_backfill_pool()` — no separate wiring. Robust `ip:port` regex parser per source (roosterkid pattern),
+`load_backfill_pool()` source set after change (18 sources, 46 URLs): monosans, roosterkid, TheSpeedX,
+themiralay, r00tee, iplocate, sunny9577, ALIILAPRO, dpangestuw, Zaeem20, zloi-user, hookzof (the surviving
+12 of the old 13), **+ proxifly, + jetkai (wired in), + prxchk, + ShiftyTR, + vakhov, + MuRongPIG (`_checked`
+validated subset)** (− databay-labs). The 30-min pool refresh auto-covers all of these via `_pool_provider()`
+→ `load_backfill_pool()` — no separate wiring. Robust `ip:port` regex parser per source (roosterkid pattern),
 404/failure recorded `ok=False` and skipped via `_try_source`.
+
+**Smoke verified (live `load_backfill_pool()` on dev):** 46 source-URLs, **0 fail**, deduped pool **~32.7k**
+(up from ~22-26k). Per-source: proxifly ~3,247; jetkai ~5,970 (4 files); prxchk 58+10; ShiftyTR 40+279;
+vakhov 528+21; MuRongPIG `_checked` 158+39. databay no longer referenced.
 
 ## Open
 
-- Live-fraction contribution of the three new validated sources after dedup with existing aggregators —
-  the next pool-load smoke + job.md `## Pool source breakdown` per-source counts will show it.
+- Live-fraction contribution of the new validated sources after dedup with existing aggregators — the next
+  full backfill's job.md `## Pool source breakdown` + eligible-pool curve will show whether the bigger
+  validated pool measurably slows the depletion.
