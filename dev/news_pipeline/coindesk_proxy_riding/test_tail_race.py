@@ -42,6 +42,7 @@ def main() -> None:
         _run("test_4_normal_path_no_racing",                     test_4_normal_path_no_racing),
         _run("test_5_fail_before_success_done_once",             test_5_fail_before_success_done_once),
         _run("test_6_watchdog_wedge_after_all_resolved",         test_6_watchdog_wedge_after_all_resolved),
+        _run("test_7_watchdog_pool_refresh",                     test_7_watchdog_pool_refresh),
     ]
     passed = sum(results)
     print(f"\n{'='*55}")
@@ -390,6 +391,52 @@ def test_6_watchdog_wedge_after_all_resolved() -> None:
 
     assert exit_calls == [0],               f"expected os._exit(0), got {exit_calls}"
     assert state.termination == "all-done", f"termination={state.termination!r}"
+
+
+# pool_provider is called once per refresh interval; proxy_pool is atomically replaced.
+# Patches POOL_REFRESH_INTERVAL_S=0.0 so the first poll always triggers refresh.
+# State has all_resolved=True + in_flight=0 → watchdog returns cleanly after the refresh.
+def test_7_watchdog_pool_refresh() -> None:
+    from src.news.engine.proxy_riding import rider as rider_mod
+    from src.news.engine.proxy_riding.rider import RiderState, RAW_SUBDIR, _watchdog
+    from src.news.engine.proxy_pool.cooldown import PersistentCooldownManager
+
+    pool_a = [("http", "proxy-a1:1"), ("http", "proxy-a2:2")]
+    pool_b = [("http", "proxy-b1:1"), ("socks5", "proxy-b2:2"), ("http", "proxy-b3:3")]
+    refresh_count = [0]
+
+    async def mock_provider() -> list:
+        refresh_count[0] += 1
+        return pool_b
+
+    url_done = "https://cd.com/refreshed"
+
+    with tempfile.TemporaryDirectory() as tmp:
+        p = Path(tmp)
+        (p / RAW_SUBDIR).mkdir()
+
+        async def run():
+            q = asyncio.Queue()
+            state = RiderState(
+                url_queue=q, proxy_pool=pool_a,
+                cooldown_mgr=PersistentCooldownManager(),
+                output_dir=p, job_dir=p / "jobs",
+                burn_threshold=2, page_timeout_ms=8_000,
+                total_urls=1, target_urls=frozenset([url_done]),
+                pool_provider=mock_provider,
+            )
+            # all_resolved=True + in_flight=0 → watchdog returns cleanly after refresh
+            state.done_urls.add(url_done)
+
+            # POOL_REFRESH_INTERVAL_S=0.0: any elapsed time satisfies the refresh check
+            with unittest.mock.patch.object(rider_mod, "POOL_REFRESH_INTERVAL_S", 0.0):
+                await _watchdog(state, poll_interval=0.05)
+            return state
+
+        state = asyncio.run(run())
+
+    assert refresh_count[0] >= 1,      f"pool_provider not called (refresh_count={refresh_count[0]})"
+    assert state.proxy_pool is pool_b, f"proxy_pool not replaced: {state.proxy_pool}"
 
 
 if __name__ == "__main__":
