@@ -38,19 +38,7 @@ def _compute_stats(state: RiderState, t_job_start: datetime) -> dict:
     median_s = statistics.median(elapsed_values) if elapsed_values else None
 
     wall_s       = (datetime.now(timezone.utc) - t_job_start).total_seconds()
-    urls_per_min = (n_ok / wall_s * 60)                    if wall_s > 0 and n_ok else None
-    backfill_h   = (_BACKFILL_TOTAL / urls_per_min / 60)   if urls_per_min         else None
-
-    ok_html_sizes = sorted(
-        j.char_count for j in jobs if j.status == "ok" and j.char_count is not None
-    )
-    html_pct = _percentiles(ok_html_sizes)
-
-    ok_md_lens = sorted(
-        j.markdown_len for j in jobs
-        if j.status == "ok" and getattr(j, "markdown_len", None) is not None
-    )
-    md_pct = _percentiles(ok_md_lens)
+    urls_per_min = (n_ok / wall_s * 60) if wall_s > 0 and n_ok else None
 
     ok_completion_s = sorted(
         (j.t_start - t_job_start).total_seconds() + (j.elapsed_s or 0)
@@ -76,13 +64,31 @@ def _compute_stats(state: RiderState, t_job_start: datetime) -> dict:
     retried_failed = len(url_rw) - retried_ok
     wasted_ratio   = n_regwall_fetches / max(n_total_fetches, 1)
 
+    # Eligible pool over time — bucket pool_samples into 10-min windows
+    pool_total   = len(state.proxy_pool)
+    pool_windows: list[dict] = []
+    if state.pool_samples:
+        _WIN_S = 600
+        max_win = int(state.pool_samples[-1][0] / _WIN_S)
+        for k in range(max_win + 1):
+            win = [(e, ne, nc) for e, ne, nc in state.pool_samples if int(e / _WIN_S) == k]
+            if win:
+                min_eligible  = min(ne for _, ne, _ in win)
+                avg_eligible  = round(sum(ne for _, ne, _ in win) / len(win))
+                peak_cooldown = max(nc for _, _, nc in win)
+                pool_windows.append({
+                    "window_min":    k * 10,
+                    "min_eligible":  min_eligible,
+                    "avg_eligible":  avg_eligible,
+                    "peak_cooldown": peak_cooldown,
+                })
+
     return {
         "n_ok": n_ok, "n_regwall_fetches": n_regwall_fetches,
         "n_failed": n_failed, "n_connect_fail": n_connect_fail,
         "n_total_fetches": n_total_fetches,
         "wall_s": wall_s, "mean_s": mean_s, "median_s": median_s,
-        "urls_per_min": urls_per_min, "backfill_h": backfill_h,
-        "html_pct": html_pct, "md_pct": md_pct,
+        "urls_per_min": urls_per_min,
         "ok_completion_s": ok_completion_s,
         "ride_ok_counts": ride_ok_counts,
         "ride_len_stats": ride_len_stats,
@@ -93,20 +99,7 @@ def _compute_stats(state: RiderState, t_job_start: datetime) -> dict:
         "n_urls_with_regwall": len(url_rw),
         "wasted_ratio": wasted_ratio,
         "termination": state.termination,
-    }
-
-
-# Compute p10/p25/p50/p75/p90/p95 from a sorted list; return None if empty.
-def _percentiles(sorted_values: list) -> dict | None:
-    n = len(sorted_values)
-    if n == 0:
-        return None
-    if n == 1:
-        return {k: sorted_values[0] for k in ("p10", "p25", "p50", "p75", "p90", "p95")}
-    qs = statistics.quantiles(sorted_values, n=100, method="inclusive")
-    return {
-        "p10": int(round(qs[9])),  "p25": int(round(qs[24])), "p50": int(round(qs[49])),
-        "p75": int(round(qs[74])), "p90": int(round(qs[89])), "p95": int(round(qs[94])),
+        "pool_total": pool_total, "pool_windows": pool_windows,
     }
 
 
@@ -178,49 +171,8 @@ def _write_md(
         f"| Mean s/fetch | {_fmt(stats['mean_s'], '.2f', 's')} |",
         f"| Median s/fetch | {_fmt(stats['median_s'], '.2f', 's')} |",
         f"| OK URLs/min | {_fmt(stats['urls_per_min'], '.1f')} |",
-        f"| Backfill projection (61k) | {_fmt(stats['backfill_h'], '.1f', 'h')} |",
-        "",
-        "## HTML size distribution (ok URLs)",
-        "",
-        "> char_count = len(result.html) — full rendered HTML, typically 300–600 KB.",
-        "> Low p50 (< 50k) would indicate truncation or near-empty pages.",
         "",
     ]
-
-    p = stats["html_pct"]
-    if p:
-        lines += [
-            "| Percentile | Chars |",
-            "|---|---|",
-            f"| p10 | {p['p10']:,} |",
-            f"| p25 | {p['p25']:,} |",
-            f"| p50 | {p['p50']:,} |",
-            f"| p75 | {p['p75']:,} |",
-            f"| p90 | {p['p90']:,} |",
-            f"| p95 | {p['p95']:,} |",
-            "",
-        ]
-    else:
-        lines += ["No ok URLs — skipped.", ""]
-
-    mp = stats["md_pct"]
-    if mp:
-        lines += [
-            "## Markdown length distribution (ok URLs — body-level signal)",
-            "",
-            "> markdown_len = len(result.markdown.raw_markdown) — visible rendered text.",
-            "> Low p50 (< 5k) despite ok HTML = likely silent regwall or empty body.",
-            "",
-            "| Percentile | Chars |",
-            "|---|---|",
-            f"| p10 | {mp['p10']:,} |",
-            f"| p25 | {mp['p25']:,} |",
-            f"| p50 | {mp['p50']:,} |",
-            f"| p75 | {mp['p75']:,} |",
-            f"| p90 | {mp['p90']:,} |",
-            f"| p95 | {mp['p95']:,} |",
-            "",
-        ]
 
     lines += [
         "## Proxy riding",
@@ -238,6 +190,29 @@ def _write_md(
         f"min={_fmt(rls['min'])}  "
         f"max={_fmt(rls['max'])}",
         "",
+        "## Eligible proxy pool over time",
+        "",
+        f"Browser-eligible pool (loaded): {stats['pool_total']:,}",
+        "",
+    ]
+
+    pw = stats["pool_windows"]
+    if pw:
+        lines += [
+            "| t (min) | min eligible | avg eligible | peak in-cooldown |",
+            "|---|---|---|---|",
+        ]
+        for w in pw:
+            t_label = f"{w['window_min']}–{w['window_min'] + 10}"
+            lines.append(
+                f"| {t_label} | {w['min_eligible']:,} | {w['avg_eligible']:,}"
+                f" | {w['peak_cooldown']:,} |"
+            )
+        lines += [""]
+    else:
+        lines += ["No samples — run completed before first poll.", ""]
+
+    lines += [
         "## Regwall",
         "",
         "| Metric | Value |",
@@ -249,27 +224,6 @@ def _write_md(
         f"| → stayed failed | {stats['retried_failed']} |",
         "",
     ]
-
-    failures = [j for j in state.job_records if j.status == "failed"]
-    if failures:
-        lines += ["## Failed URLs", "", "| URL | Error |", "|---|---|"]
-        for j in failures[:20]:
-            err = (j.error or "").replace("|", "\\|")[:120]
-            lines.append(f"| {j.url[:80]} | {err} |")
-        if len(failures) > 20:
-            lines.append(f"| … ({len(failures) - 20} more) | |")
-        lines.append("")
-
-    rw_entries = [j for j in state.job_records if j.status == "regwall"]
-    if rw_entries:
-        seen_urls: set[str] = set()
-        distinct_rw = [j for j in rw_entries if not (j.url in seen_urls or seen_urls.add(j.url))]
-        lines += ["## Regwall URLs (distinct)", "", "| URL |", "|---|"]
-        for j in distinct_rw[:50]:
-            lines.append(f"| {j.url[:100]} |")
-        if len(distinct_rw) > 50:
-            lines.append(f"| … ({len(distinct_rw) - 50} more) |")
-        lines.append("")
 
     lines += [
         "## Plots",

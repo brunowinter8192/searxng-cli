@@ -97,6 +97,7 @@ class RiderState:
     in_flight_urls:     set        = field(default_factory=set)
     done_urls:          set        = field(default_factory=set)    # URLs written; first-writer guard
     t_job_start:        datetime   = field(default_factory=lambda: datetime.now(timezone.utc))
+    pool_samples:       list       = field(default_factory=list)   # (elapsed_s, n_eligible, n_cooldown)
 
     @property
     def all_resolved(self) -> bool:
@@ -378,13 +379,19 @@ def _url_hash(url: str) -> str:
 # Uses asyncio.sleep() (timer-based) so it fires even when all slot tasks are permanently
 # suspended on await crawler.arun(). Polls every poll_interval seconds; default is
 # min(30, stall_timeout_s / 4) so a short smoke timeout still gets fast detection.
+# Appends (elapsed_s, n_eligible, n_cooldown) to state.pool_samples each poll for the reporter.
 async def _watchdog(
     state:         RiderState,
     poll_interval: float | None = None,
 ) -> None:
     interval = poll_interval if poll_interval is not None else min(30.0, state.stall_timeout_s / 4)
+    t0_mono  = time.monotonic()
     while True:
         await asyncio.sleep(interval)
+        elapsed_s  = time.monotonic() - t0_mono
+        n_eligible = len(state.cooldown_mgr.eligible_candidates(state.proxy_pool))
+        n_cooldown = state.cooldown_mgr.cooldown_count()
+        state.pool_samples.append((elapsed_s, n_eligible, n_cooldown))
         if state.all_resolved:
             return
         idle = time.monotonic() - state.last_progress_mono
