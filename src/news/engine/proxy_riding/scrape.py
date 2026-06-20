@@ -6,7 +6,7 @@ import random
 from dataclasses import dataclass
 from pathlib import Path
 
-from src.news.engine.proxy_pool.cooldown import PersistentCooldownManager
+from src.news.engine.proxy_riding.cooldown import RidingCooldownManager
 from src.news.engine.proxy_pool.pool_loaders import load_backfill_pool
 from src.news.engine.proxy_riding.rider import run_riding_pool, RiderState
 
@@ -20,6 +20,7 @@ class RidingScrapeConfig:
     n_browsers:      int   = 4
     page_timeout_ms: int   = 8_000
     stall_timeout_s: float = 300.0
+    cooldown_policy: str   = "fixed"
 
 
 # ORCHESTRATOR
@@ -44,7 +45,7 @@ async def scrape_entries_riding(
         url_queue.put_nowait(url)
 
     proxy_pool = await _pool_provider()
-    cm         = PersistentCooldownManager()
+    cm         = RidingCooldownManager(policy=riding_cfg.cooldown_policy)
 
     state = await run_riding_pool(
         url_queue=url_queue,

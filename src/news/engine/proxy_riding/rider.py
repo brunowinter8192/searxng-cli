@@ -16,7 +16,7 @@ from crawl4ai import (
 )
 from crawl4ai.markdown_generation_strategy import DefaultMarkdownGenerator
 
-from src.news.engine.proxy_pool.cooldown import PersistentCooldownManager
+from src.news.engine.proxy_riding.cooldown import RidingCooldownManager
 
 # Regwall signals checked on result.markdown.raw_markdown (browser-rendered visible text).
 # NOT on result.html — signals are embedded as hidden React components in all CoinDesk pages.
@@ -74,7 +74,7 @@ class JobRecord:
 class RiderState:
     url_queue:       asyncio.Queue
     proxy_pool:      list               # raw (proto, hp) tuples from load_backfill_pool()
-    cooldown_mgr:    PersistentCooldownManager
+    cooldown_mgr:    RidingCooldownManager
     output_dir:      Path               # raw HTML target: output_dir/raw/{hash}.html
     job_dir:         Path               # report target: scrape_jobs/{job_id}/
     burn_threshold:  int
@@ -113,7 +113,7 @@ class RiderState:
 async def run_riding_pool(
     url_queue:       asyncio.Queue,
     proxy_pool:      list,
-    cooldown_mgr:    PersistentCooldownManager,
+    cooldown_mgr:    RidingCooldownManager,
     output_dir:      Path,
     job_dir:         Path,
     target_urls:     frozenset,
@@ -294,7 +294,7 @@ async def _run_slot(slot_id: int, crawler: AsyncWebCrawler, state: RiderState) -
                 positions=positions,
             )
             state.ride_records.append(ride)
-            state.cooldown_mgr.mark_burned(proto, hp)
+            state.cooldown_mgr.mark_burned(proto, hp, ride_ok=ride_ok)
             print(
                 f"[slot {slot_id}] proxy done ok={ride_ok} rw={burn_count}"
                 f" cf={int(cf_broke)} n={len(positions)} {pstr}",
