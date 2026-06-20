@@ -1,4 +1,4 @@
-# 70 — CoinDesk rider: 60-min pool refresh
+# 70 — CoinDesk rider: pool refresh (60 min → 30 min)
 
 **Branch:** `riding-report-trim`.
 Cross-reference: OT65 (`65_coindesk_rider_tail_race.md`) — initial pool load + scrape.py structure.
@@ -55,7 +55,9 @@ and shuffle without any duplication.
 ### `RiderState` + `run_riding_pool` — `rider.py`
 
 `RiderState` gains `pool_provider: object = None` (optional, default None = static pool — backward
-compatible). `run_riding_pool` gains `pool_provider=None` param threaded to state. `POOL_REFRESH_INTERVAL_S = 3600.0` constant in INFRASTRUCTURE (mirrors `loop.py`'s `REFRESH_INTERVAL_S`).
+compatible). `run_riding_pool` gains `pool_provider=None` param threaded to state. `POOL_REFRESH_INTERVAL_S`
+constant in INFRASTRUCTURE: initially `3600.0` (mirrors `loop.py`); tightened to `1800.0` (30 min)
+after baseline measurement — see below.
 
 ### Refresh in `_watchdog` — poll loop order
 
@@ -100,6 +102,29 @@ warning, keep current pool. Prevents a failed refresh from clearing the pool.
 `state.pool_samples` is appended BEFORE the refresh check (step 1). The pre-refresh eligible count
 is recorded; the new count appears in the NEXT poll sample. In the 10-min window table the refresh
 shows as a jump in `avg_eligible` / `min_eligible` — exactly the intended signal.
+
+## Interval tightened: 3600 s → 1800 s (30 min)
+
+**Baseline run:** job `20260620T010358Z`, config 4 browsers × 16 slots = 64 concurrent.
+
+Key measurements from `job.md`:
+- Browser-eligible pool at job start: **19,576** (http + socks5 only — NOT the raw 23-26 k total;
+  other protocols filtered by `BROWSER_ELIGIBLE_PROTOS`).
+- Completed URLs in 1,531 s: 8,627 → burn rate **≈ 338 proxies/min** (each proxy burned once
+  and enters 60-min cooldown).
+- Extrapolation: at 60 min, cumulative burned ≈ 338 × 60 = **20,280 proxies** in cooldown.
+  19,576 eligible < 20,280 → the eligible set would hit zero around t ≈ 58 min, just before
+  the 60-min refresh would fire. The rider would stall on an empty eligible pool in the last ~2 min.
+- At 30 min: cumulative burned ≈ 338 × 30 = **10,140** in cooldown → 9,436 eligible remain → safe margin.
+  Pool refresh at t=30 re-injects the full live source-list snapshot; cooldown recycling then
+  starts returning burned proxies (first batch at t=60, 30 min after they were burned).
+
+**Cooldown stays at 60 min** (`cooldown.py` — unchanged). 30-min refresh and 60-min cooldown are
+orthogonal: refresh widens the eligible pool; cooldown controls re-use of burned proxies.
+
+**Validation target:** 5 browsers × 16 slots = 80-slot run. Burn rate expected ~5/4 × 338 ≈ 422/min.
+At 30 min: ~12,660 in cooldown → 6,916 eligible still safe. If burn rate scales higher, interval
+may need further tightening; will update after the next production run.
 
 ## Test
 
