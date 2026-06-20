@@ -9,11 +9,21 @@ will now appear as eligible-pool jumps in the 10-min window table.
 
 `scrape_entries_riding` (`scrape.py`) loads the pool once at job start via `load_backfill_pool()`,
 filters to `BROWSER_ELIGIBLE_PROTOS = {"http","socks5"}`, shuffles. The pool snapshot is static for
-the entire run. Over a multi-hour backfill (~74 h at 60-min stall timeout, potentially much longer):
-- Proxies on the source lists that were dead at load time may come online later.
-- The burned proxy count grows monotonically (1-hour cooldown per proxy, cooldown_mgr never reset).
-- At ~26k browser-eligible proxies burned at roughly 64 proxies/min (production config), the pool
-  exhausts in ~6.7 h of continuous riding — well within the backfill window.
+the entire run.
+
+The risk over a multi-hour backfill (~74 h projected) is NOT hard exhaustion. The 60-min cooldown
+recycles burned proxies, so the eligible set reaches a steady state (~`burn_rate × cooldown_window`
+in cooldown at any moment) and never hits zero. Measured: the 2251 s / ~500-URL run burned 9559
+proxies ≈ **255/min** (NOT 64 — 64 is `n_slots`, not a rate), and eligible bottomed at ~16k of ~26k —
+no exhaustion in that window.
+
+The real risk is **live-fraction decay**. The static snapshot's live proxies die over the hours, while
+the source lists rotate in new live proxies the rider can never pull in. Cooldown recycling only
+re-tries the SAME (increasingly dead) proxies — it adds no fresh supply. So over a long run the live
+fraction of the eligible set monotonically drops → more wasted fetches on dead proxies → throughput
+degrades. A 60-min re-fetch re-aligns the pool with the current live source-list state (drops proxies
+that died and fell off the lists, adds new ones), holding the live fraction up. The eligible-pool
+metric (OT68) makes this visible: each refresh shows as an eligible jump in the 10-min window table.
 
 TheBlock's `proxy_pool` engine refreshes every 60 min via `pool_provider()` in `run_loop` (OT reference:
 `src/news/engine/proxy_pool/loop.py`, `REFRESH_INTERVAL_S = 3600`). The rider had no equivalent.
