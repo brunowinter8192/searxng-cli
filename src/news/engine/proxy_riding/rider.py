@@ -3,6 +3,7 @@
 import asyncio
 import hashlib
 import os
+import signal
 import sys
 import time
 import uuid
@@ -139,6 +140,11 @@ async def run_riding_pool(
     )
     state.n_browsers = n_browsers
     state.n_slots    = n_slots
+
+    loop = asyncio.get_running_loop()
+    loop.add_signal_handler(signal.SIGINT,  _abort_interrupted, state, signal.SIGINT)
+    loop.add_signal_handler(signal.SIGTERM, _abort_interrupted, state, signal.SIGTERM)
+
     crawlers = [AsyncWebCrawler(config=BrowserConfig(headless=True, verbose=False)) for _ in range(n_browsers)]
     await asyncio.gather(*[c.start() for c in crawlers])
     watchdog = asyncio.create_task(_watchdog(state))
@@ -146,6 +152,11 @@ async def run_riding_pool(
         tasks = [asyncio.create_task(_run_slot(i, crawlers[i % n_browsers], state)) for i in range(n_slots)]
         await asyncio.gather(*tasks)
     finally:
+        try:
+            loop.remove_signal_handler(signal.SIGINT)
+            loop.remove_signal_handler(signal.SIGTERM)
+        except Exception as exc:
+            print(f"[rider] remove_signal_handler warn: {exc}", file=sys.stderr)
         watchdog.cancel()
         results = await asyncio.gather(*[c.close() for c in crawlers], return_exceptions=True)
         for idx, r in enumerate(results):
@@ -453,6 +464,48 @@ def _abort_done(state: RiderState) -> None:
 
     sys.stderr.flush()
     os._exit(0)
+
+
+# Write report + os._exit on SIGINT/SIGTERM. Never returns.
+# os._exit bypasses asyncio teardown — same rationale as _abort_stall/_abort_done.
+# exit 130 (128+SIGINT=2) / 143 (128+SIGTERM=15) — Unix conventions for signal-killed processes.
+def _abort_interrupted(state: RiderState, signum: int) -> None:
+    name      = "SIGINT" if signum == signal.SIGINT else "SIGTERM"
+    exit_code = 130      if signum == signal.SIGINT else 143
+    print(
+        f"[rider] {name} received — writing report → os._exit({exit_code})",
+        file=sys.stderr,
+    )
+    state.termination = "interrupted"
+
+    state.job_dir.mkdir(parents=True, exist_ok=True)
+
+    try:
+        from src.news.engine.proxy_riding.reporter import write_riding_report  # late import — avoids circular at module level
+        write_riding_report(state, state.job_dir, state.t_job_start)
+        print(f"[rider] job.md → {state.job_dir / 'job.md'}", file=sys.stderr)
+    except Exception as exc:
+        print(f"[rider] write_riding_report WARN: {exc}", file=sys.stderr)
+        try:
+            (state.job_dir / "job.md").write_text(
+                "\n".join([
+                    f"# CoinDesk riding job — {name} ABORT",
+                    "",
+                    "termination: interrupted",
+                    f"n_ok: {state.n_ok}",
+                    f"n_regwall: {state.n_regwall}",
+                    f"n_failed: {state.n_failed}",
+                    f"n_connect_fail: {state.n_connect_fail}",
+                    "",
+                    f"Reporter error: {exc}",
+                ]),
+                encoding="utf-8",
+            )
+        except Exception as write_exc:
+            print(f"[rider] fallback job.md WARN: {write_exc}", file=sys.stderr)
+
+    sys.stderr.flush()
+    os._exit(exit_code)
 
 
 # Write job.md then os._exit(1). Never returns.

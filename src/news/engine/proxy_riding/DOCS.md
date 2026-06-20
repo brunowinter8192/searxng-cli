@@ -28,7 +28,8 @@ Touch this package when changing proxy-riding engine behaviour. Do NOT touch `en
 - `RidingScrapeConfig` in `scrape.py` — dataclass with production defaults
   (`n_browsers=4, n_slots=64, stall_timeout_s=300.0, burn_threshold=2, page_timeout_ms=8_000`).
 - `write_riding_report(state, job_dir, t_job_start)` in `reporter.py` — called by
-  `pipeline.py:run_scrape_only` (normal completion) and by `_abort_stall` (late import, stall abort).
+  `pipeline.py:run_scrape_only` (normal completion) and by `_abort_stall` / `_abort_done` /
+  `_abort_interrupted` (late import, abort paths).
 - `run_riding_pool(url_queue, proxy_pool, cooldown_mgr, output_dir, job_dir, target_urls, …)` in `rider.py` — async;
   called by `scrape_entries_riding`.
 
@@ -49,18 +50,20 @@ Touch this package when changing proxy-riding engine behaviour. Do NOT touch `en
 
 ## Modules
 
-### rider.py (499 LOC)
+### rider.py (552 LOC)
 
 **Purpose:** Browser-per-context proxy rider pool. Manages B `AsyncWebCrawler` instances, N slot
 coroutines, per-URL proxy context (`CrawlerRunConfig.proxy_config`), burn/fail rotation, watchdog,
-30-min pool refresh.
+30-min pool refresh. Installs SIGINT/SIGTERM handlers so manual aborts also produce a report.
 **Reads:** URL queue (asyncio.Queue), proxy pool list, `PersistentCooldownManager` (shared state).
-**Writes:** `output_dir/raw/{hash}.html` for each ok URL; `state.job_dir/job.md` on stall abort
-or wedge-after-done (via `_abort_stall` / `_abort_done` — same dir as normal-completion report).
+**Writes:** `output_dir/raw/{hash}.html` for each ok URL; `state.job_dir/job.md` + `cumulative.png`
+on stall abort, wedge-after-done, or manual abort (via `_abort_stall` / `_abort_done` /
+`_abort_interrupted` — same dir as normal-completion report).
 **Called by:** `scrape.py:scrape_entries_riding` (via `run_riding_pool`).
 **Calls out:** `crawl4ai` (AsyncWebCrawler, BrowserConfig, CrawlerRunConfig, CacheMode, ProxyConfig,
 DefaultMarkdownGenerator); `src.news.engine.proxy_pool.cooldown.PersistentCooldownManager` (import);
-late import of `reporter.write_riding_report` inside `_abort_stall` / `_abort_done` (avoids circular).
+late import of `reporter.write_riding_report` inside `_abort_stall` / `_abort_done` /
+`_abort_interrupted` (avoids circular).
 
 Key dataclasses: `RiderState` (shared mutable job state — fields: `output_dir` raw writes,
 `job_dir` report writes, `target_urls` frozenset of all distinct targets, `done_urls` set of written URLs,
@@ -68,6 +71,11 @@ Key dataclasses: `RiderState` (shared mutable job state — fields: `output_dir`
 `pool_provider` async callable `() -> list[tuple[str,str]]` for 30-min refresh (None = static pool);
 `all_resolved = len(done_urls) >= len(target_urls)`), `JobRecord` (per-URL outcome),
 `RideRecord` (per-proxy-ride summary). `FAIL_THRESHOLD = 2` (failed/empty strikes before drop).
+
+`run_riding_pool` signal handler lifecycle: after `state` is constructed, installs
+`loop.add_signal_handler(SIGINT/SIGTERM, _abort_interrupted, state, signum)`. Removed in the
+`finally` block (before `watchdog.cancel()`) so they don't fire during the normal-completion
+`write_riding_report` call in `pipeline.py`.
 
 `_watchdog` poll loop (every `min(30, stall_timeout_s/4)` s), in order:
 1. Append pool sample `(elapsed_s, n_eligible, n_cooldown)`.
@@ -78,6 +86,10 @@ Key dataclasses: `RiderState` (shared mutable job state — fields: `output_dir`
 4. `all_resolved AND in_flight > 0` → `_abort_done(state)`: report + `os._exit(0)` (wedge-after-done).
 5. `idle > stall_timeout_s` → `_abort_stall(state, idle)`: report + `os._exit(1)` (genuine stall).
 
+`_abort_interrupted(state, signum)`: SIGINT/SIGTERM handler. Sets `termination="interrupted"`,
+calls `write_riding_report`, `os._exit(130)` for SIGINT / `os._exit(143)` for SIGTERM. Same
+structure and late-import pattern as `_abort_stall` / `_abort_done`.
+
 ### reporter.py (235 LOC)
 
 **Purpose:** Job report writer — `job.md` (counts, throughput, proxy-riding stats, eligible-pool-over-time
@@ -85,7 +97,8 @@ table, regwall counts) + `cumulative.png` (step-plot of cumulative OK fetches ov
 **Reads:** `RiderState` (in-memory), `t_job_start` (datetime).
 **Writes:** `{job_dir}/job.md`; `{job_dir}/cumulative.png`.
 **Called by:** `pipeline.py:run_scrape_only` (normal completion, via `write_riding_report`);
-`rider._abort_stall` (late import, stall abort path).
+`rider._abort_stall` (late import, stall abort); `rider._abort_done` (late import, wedge-after-done);
+`rider._abort_interrupted` (late import, SIGINT/SIGTERM abort).
 **Calls out:** `matplotlib` (lazy import inside `_write_cumulative_plot`); `statistics` (stdlib);
 `src.news.engine.proxy_riding.rider` (RiderState, FAIL_THRESHOLD).
 
@@ -133,11 +146,12 @@ are safe without explicit locking. `proxy_lock` (asyncio.Lock) guards `proxy_cur
 - `output_dir` passed to `scrape_entries_riding` must be `platform_dir` (`data/news/{name}/`), NOT
   `raw_dir`. The rider writes to `output_dir/raw/{hash}.html`; passing `raw_dir` puts files at
   `raw/raw/` (wrong), breaking dedup.
-- `_abort_stall` calls `os._exit(1)` — no Python teardown, no atexit, no `browser.close()`. Raw
-  files flushed before the call are durable; in-flight writes at the moment of abort are lost.
-  `_abort_stall` writes to `state.job_dir` (= `scrape_jobs/{job_id}/`), NOT to `output_dir`; it
-  creates the dir itself (`mkdir`) before the first write because the dir may not exist at stall time.
-- Late import of `reporter.write_riding_report` inside `_abort_stall` is intentional: `reporter.py`
-  imports from `rider.py` (RiderState); a top-level cross-import would be circular.
+- All three abort functions (`_abort_stall`, `_abort_done`, `_abort_interrupted`) call `os._exit`
+  — no Python teardown, no atexit, no `browser.close()`. Raw files flushed before the call are
+  durable; in-flight writes at the moment of abort are lost. All write to `state.job_dir`
+  (= `scrape_jobs/{job_id}/`), NOT to `output_dir`; each creates the dir itself (`mkdir`) before
+  the first write because the dir may not exist at abort time.
+- Late import of `reporter.write_riding_report` inside all abort functions is intentional:
+  `reporter.py` imports from `rider.py` (RiderState); a top-level cross-import would be circular.
 - Pool load (`load_backfill_pool`) is blocking network I/O, run via `run_in_executor` to avoid
   blocking the event loop during the async entry point.
