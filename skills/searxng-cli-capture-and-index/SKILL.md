@@ -225,196 +225,59 @@ place first — derive the name from the first page / title metadata, sanitize p
 The markdown then simply inherits the PDF's basename: `STEM = basename(PDF without .pdf)`, output =
 `$OUTPUT_DIR/$STEM.md`. PDF name and md name stay identical.
 
-##### Category Check — BEFORE converting (pdfimages + pdfinfo)
+##### Category Check — handled by the driver
 
-Three categories, decided by whether each page carries a full-page raster image:
-- **born-digital** — no page-image, vector text → normal convert.
-- **OCR'd scan** — full-page image on every page + an OCR text layer → SCAN path.
-- **pure scan** — full-page image, no text layer → SCAN path.
+The driver categorizes each PDF via `pdfinfo`/`pdfimages` internally — born-digital → MinerU `pipeline` backend; scan → `--scan-backend` (default: `vlm`). No manual pre-check required.
 
-Decisive test = `pdfimages` (a full-page image across the SAMPLED pages = scan), corroborated by
-`pdfinfo` (Creator/Producer naming a scanner/OCR tool). Do NOT use pdffonts or pdftotext: an OCR text
-layer that uses a normal font name passes both as "digital" (false negative — e.g. Silverman, EfronMorris).
+##### Convert — one hybrid-driver call over all PDFs
+
+Set `OUTPUT_DIR` to the collection directory **before** the driver call:
 
 ```bash
-# corroboration — scanner/OCR tool in metadata = SCAN
-pdfinfo "$PDF" | grep -iE 'Creator|Producer'
-#   SCAN markers: "Scan Plug-in", "Paper Capture", "ABBYY", "FineReader", "ScanSnap", "Scanner"
-
-# decisive — full-page image (width > 1000 px) across a spread of sampled pages
-N=$(pdfinfo "$PDF" | awk '/^Pages:/{print $2}')
-hits=0; tot=0
-for p in $((N/6)) $((N/3)) $((N/2)) $((2*N/3)) $((5*N/6)); do
-  [ "$p" -lt 1 ] && p=1
-  big=$(pdfimages -list -f "$p" -l "$p" "$PDF" 2>/dev/null | awk 'NR>2 && $4>1000{c++} END{print c+0}')
-  tot=$((tot+1)); [ "$big" -ge 1 ] && hits=$((hits+1))
-done
-echo "full-page image on $hits/$tot sampled pages"
-```
-
-Decision:
-- image on (nearly) ALL sampled pages, OR a scanner/OCR tool in `pdfinfo` → **SCAN** (use the hybrid path below).
-- image on 0 sampled pages — or only 1, which is just an isolated figure, not a scan → **born-digital** (normal convert).
-
-If SCAN:
-
-```bash
-cd /Users/brunowinter2000/Documents/ai/Mineru
-./venv/bin/python workflow.py convert --pdf "$PDF" --backend hybrid-engine --chunk-pages 100
-```
-
-Work dir: `Mineru/output/<stem>/`. Check all parts present via `Mineru/output/<stem>/parts.json`
-(any `"md": null` = gap). Then:
-
-```bash
-# all parts present
-./venv/bin/python workflow.py merge --stem "$STEM" --out-dir "$OUTPUT_DIR" --clean
-
-# gap — re-run convert (fills only missing parts), then merge
-./venv/bin/python workflow.py convert --pdf "$PDF" --backend hybrid-engine --chunk-pages 100
-./venv/bin/python workflow.py merge --stem "$STEM" --out-dir "$OUTPUT_DIR" --clean
-```
-
-Then proceed to Job-Log Check and Phase 1.
-
-##### A part repeatedly fails (crash at VLM `Predict`) → find dense pages, flag, remove
-
-Apply this when the part stays `"md": null` after a re-run AND its `Mineru/logs/mineru_*.log` dies at
-`Predict: 0/N` (the VLM step), right after `Layout Predict` and `Table orientation` completed. Do NOT
-finer-split the part, and do NOT re-chunk the whole PDF (changing `--chunk-pages` errors on the existing
-parts.json and re-converts the parts that already succeeded).
-
-Read the failing part's index K and page range S (`pages_start`)–E (`pages_end`) from
-`Mineru/output/<stem>/parts.json`, then scan that range — flag a page on digit-share > 10 % (table of
-contents / index / reference-number lists), a repeat-run ≥ 8, or a `Contents`/`Index`/`Bibliography`/`References`
-marker at the page head:
-
-```bash
-/Users/brunowinter2000/Documents/ai/Mineru/venv/bin/python -c "
-import sys
-from pypdf import PdfReader
-r = PdfReader('$PDF')
-def maxrun(t):
-    b = c = 1
-    for i in range(1, len(t)):
-        if t[i] == t[i-1] and not t[i].isspace(): c += 1; b = max(b, c)
-        else: c = 1
-    return b
-for p in range($S-1, $E):
-    t = r.pages[p].extract_text() or ''
-    n = len(t); d = sum(c.isdigit() for c in t); run = maxrun(t)
-    dense = (n and d/n > 0.10) or run >= 8 or any(m in t[:90].lower() for m in ('contents','index','bibliography','references'))
-    print(p+1, 'chars', n, 'dig%', round(d/n*100 if n else 0), 'run', run, 'DENSE' if dense else '')
-"
-```
-
-Render the flagged pages and confirm what they are:
-
-```bash
-pdftoppm -png -r 90 -f <pg> -l <pg> "$PDF" /tmp/chk    # inspect /tmp/chk-*.png
-```
-
-Report to the user: the flagged page range and what it is (e.g. "Table of Contents pp.14–24"), and
-propose removing it. STOP — wait for the user's OK.
-
-On OK, cut a sub-PDF of S–E WITHOUT the flagged pages (DROP = the flagged 1-based page numbers),
-convert it at the same `--chunk-pages`, and merge:
-
-```bash
-DROP="14 15 16 17 18 19 20 21 22 23 24"   # the flagged pages, space-separated
-/Users/brunowinter2000/Documents/ai/Mineru/venv/bin/python -c "
-from pypdf import PdfReader, PdfWriter
-r = PdfReader('$PDF'); w = PdfWriter()
-drop = {int(x) for x in '$DROP'.split()}
-for i in range($S-1, $E):
-    if (i+1) not in drop: w.add_page(r.pages[i])
-w.write('/tmp/sub.pdf')
-"
-cd /Users/brunowinter2000/Documents/ai/Mineru
-./venv/bin/python workflow.py convert --pdf /tmp/sub.pdf --backend hybrid-engine --chunk-pages 100
-./venv/bin/python workflow.py merge --stem sub --out-dir /tmp        # -> /tmp/sub.md (+ /tmp/images)
-```
-
-Slot it back as the failed part, then merge the whole stem:
-
-```bash
-cp /tmp/sub.md Mineru/output/<stem>/part_00K.md
-[ -d /tmp/images ] && cp -r /tmp/images/. Mineru/output/<stem>/images/
-# in parts.json: set parts[K]["md"] = "part_00K.md"
-./venv/bin/python workflow.py merge --stem <stem> --out-dir "$OUTPUT_DIR" --clean
-```
-
-The merge concatenates part mds in order, so the trimmed sub-range md drops cleanly into place; the
-already-converted parts are never re-run.
-
-##### Convert — one PDF per call
-
-**Convert ONE PDF per `workflow.py convert` call, in a loop — NOT all PDFs in a single call.**
-Output per PDF: `$OUTPUT_DIR/<stem>.md` (`stem = basename(PDF without .pdf)`).
-
-`MINERU_PDF_RENDER_THREADS=1` is hard-wired in `workflow.py` — nothing to export.
-
-A directory of PDFs (rename any cryptic ones first — see below) — loop, ONE call per PDF,
-continue-on-failure (no `set -e`):
-
-```bash
+RAG_ROOT=~/Documents/ai/Meta/ClaudeCode/cli/rag-cli
+OUTPUT_DIR="$RAG_ROOT/data/documents/$COLLECTION"
 mkdir -p "$OUTPUT_DIR"
-cd /Users/brunowinter2000/Documents/ai/Mineru
-for pdf in "$PDF_DIR"/*.pdf; do
-    echo "=== $(basename "$pdf") ($(date +%H:%M:%S)) ==="
-    ./venv/bin/python workflow.py convert --pdf "$pdf" --out-dir "$OUTPUT_DIR"
-done
 ```
 
-A single PDF — pass just that one path:
+Launch as a **background Bash call** (`run_in_background=true`) and go idle:
 
 ```bash
-./venv/bin/python workflow.py convert --pdf "$INPUT" --out-dir "$OUTPUT_DIR"
+/Users/brunowinter2000/Documents/ai/Docling/venv/bin/python \
+    /Users/brunowinter2000/Documents/ai/Docling/hybrid_driver.py convert \
+    --pdf <pdf1> [<pdf2> ...] \
+    --out-dir "$OUTPUT_DIR" \
+    > /tmp/hybrid_engine_map.json
 ```
 
-The lock allows at most one job at a time; a second concurrent call fails immediately with
-exit 1. workflow prints only `job done` on success — per-PDF detail (output md, page/word counts)
-goes to the job log, read in the Job-Log Check below, not to the console.
+The driver runs sequentially (MinerU and docling never overlap — Req 3):
+- Categorizes all PDFs; processes born-digital first (Req 2).
+- **Pass 1 — MinerU:** formula-weight chunked, continue-on-failure. Born-digital → `pipeline`; scan → `vlm` (override: `--scan-backend hybrid-engine`).
+- **Pass 2 — docling:** fallback for failed MinerU chunks; full-PDF fallback if MinerU fails catastrophically. Only after Pass 1 fully complete.
+- **Merge:** assembles each PDF's chunks into `$OUTPUT_DIR/<stem>.md`.
+- **Engine map:** JSON printed to stdout (captured to `/tmp/hybrid_engine_map.json`).
 
-Note on naming a cryptic PDF: when a PDF's filename is not already speaking, derive a descriptive PascalCase name from the first page header / title metadata, condensed to ~30 chars (e.g. `AslamMontague2001MetasearchModels`, `ManningRaghavanSchutze2008IRTextbook`), and RENAME the PDF to it. Once the PDF carries a speaking name, `STEM = basename(PDF)` is correct and the md inherits it. Avoid filename collisions inside one batch — append year or first-author-initial when needed.
+Note on naming a cryptic PDF: derive a descriptive PascalCase name from the first page header / title metadata, condensed to ~30 chars (e.g. `AslamMontague2001MetasearchModels`, `ManningRaghavanSchutze2008IRTextbook`), and RENAME the PDF before the driver call. The md inherits the PDF stem. Avoid filename collisions inside one batch — append year or first-author-initial when needed.
 
-**STEM character constraints (hard rules):** alphanumeric + underscore ONLY. NEVER include brackets `[ ]`, parentheses `( )`, dots `.` (other than the trailing `.md` extension), commas, spaces, or any glob metachar. Sanitize the stem at derivation time.
+**STEM character constraints (hard rules):** alphanumeric + underscore ONLY. NEVER include brackets `[ ]`, parentheses `( )`, dots `.` (other than the trailing `.md` extension), commas, spaces, or any glob metachar. Sanitize at derivation time.
 
-`STEM = basename(PDF)` — no `pdf → stem` mapping table. Rename cryptic PDFs once, BEFORE the job runs.
+##### Engine-Map Report — MANDATORY before Phase 1 (Req 1)
 
-A PDF that fails to convert surfaces in the job log with `md: null` (no output produced) → report
-it to the user (PDF name). Do NOT auto-retry; the user decides whether to re-run.
-
-##### Background Convert — launch + go idle
-
-Launch the entire `for`-loop as a single background Bash call (`run_in_background=true`) and go
-idle. Do NOT `pgrep`/name-poll/`wait`-loop. When the loop has attempted every PDF, run the
-Job-Log Check.
-
-##### Job-Log Check — read after the loop
-
-Each normal `workflow.py convert` call appends 2 lines to
-`/Users/brunowinter2000/Documents/ai/Mineru/logs/jobs.jsonl` (one per-PDF line + one `job_summary`).
-The two-phase scan path writes to the log in two steps: `convert` appends `N_parts` `type:"part"`
-lines (one per 100-page chunk); `merge` appends 1 per-pdf line. No `job_summary` in the chunked path.
-
-For a loop over N normal PDFs — read **2N** tail lines:
+After the driver completes, read and report the engine map **before** proceeding to Cleanup:
 
 ```bash
-tail -n $((2*N)) /Users/brunowinter2000/Documents/ai/Mineru/logs/jobs.jsonl
+cat /tmp/hybrid_engine_map.json
 ```
 
-For a single chunked convert — N_parts = ceil(total_pages / 100): after `convert`, tail `N_parts`
-lines; after `merge`, tail 1 line.
+Report to Opus:
+- Which engine (MinerU / docling) handled each chunk and page range for every PDF.
+- Any PDF with `"engine": "docling-full-fallback"` — MinerU failed entirely for that document; docling converted the whole PDF.
+- **Any chunk with `"status": "null"` — both engines failed; that page range is missing from the md.**
 
-Any per-PDF line with `md: null` → no output produced → report it to the user (PDF name). That is
-the only check here. Fidelity of the produced md is judged in Phase 1.
+**If any `"status": "null"` chunk exists: STOP. Report PDF name + page range to Opus. Do not proceed to Cleanup or Index until Opus decides (accept the gap / retry / other).**
 
 #### Phase 1 — Cleanup
 
-PDFs come from MinerU as Markdown. Phase 1 opens with a per-md fidelity check that both catches bad
-converts AND detects the cleanable artifacts. Cleanup itself focuses on inline OCR artifacts, not
-block chrome. Skip any md with `md: null` (failed convert, already reported).
+PDFs are produced as Markdown by the hybrid driver (MinerU for most chunks, docling for fallback chunks). Phase 1 opens with a per-md fidelity check that both catches bad converts AND detects the cleanable artifacts. Cleanup itself focuses on inline OCR artifacts, not block chrome. Skip any md where all chunks have `"status": "null"` in the engine map (both engines failed — already reported to Opus before this phase).
 
 ##### Audit — systematic fidelity scan (EVERY md, BEFORE cleaning)
 
@@ -436,8 +299,7 @@ signal** — a fully garbled scan sits at a normal words-per-page (a 366p scan O
   `python3 -c 'import sys;p=open(sys.argv[1]).read().split("$$");print(sum(1 for i in range(1,len(p),2) if not p[i].strip()))' "$MD"`.
   Do NOT use a `$$\s*$$` regex — it false-matches the blank gap between two consecutive formula blocks
   and reports phantom empties.
-- Any Class-A hit = source content is gone, no regex recovers it. Flag the file for a hybrid reconvert
-  (two-phase Scan path above). List which symbol/formula to the user.
+- Any Class-A hit = source content is gone, no regex recovers it. Flag the file and report to Opus — re-run `hybrid_driver.py convert` on that PDF to retry. List which symbol/formula is lost.
 
 **Class B — Spaced math (RECOVERABLE → de-space):**
 - spaced sub-/superscripts: `_ {` , `^ {`
@@ -637,6 +499,6 @@ Collection:                         <COLLECTION>
 
 Keep the two drop reasons separate: scrape errors **E** come from the scraper, thin/noise **D** comes from the cleanup check.
 
-**pdf:** `convert: M ok, K md:null (reported to user)` · `bad converts excluded (reported to user, need better source/reconvert): B` · `cleaned: C files` · `indexed: N chunks across M documents`.
+**pdf:** `engine-map: M PDFs (N chunks MinerU, K chunks docling-fallback, J status:null — reported to Opus before cleanup)` · `bad converts excluded (reported, need reconvert): B` · `cleaned: C files` · `indexed: N chunks across M documents`.
 
 End with this report. STOP. No commit needed (output is data files, not code).
