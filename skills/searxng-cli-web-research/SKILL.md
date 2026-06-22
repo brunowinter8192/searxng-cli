@@ -130,7 +130,7 @@ For **PDF mode**, Opus ALSO decides the canonical PascalCase stem per PDF, match
 
 **3.** Spawn the worker. It activates the `searxng-cli-capture-and-index` skill and runs the pipe. The two modes differ in where Opus intervenes:
 - **web-md:** Discovery → URL Selection → **STOP (Opus cull, Phase 1b)** → Scrape → Cleanup → Index.
-- **pdf:** Acquisition (category-check + convert) → **STOP (Opus audit review, Gate A)** → Cleanup → Index. Plus the conditional Gates B/C/D below.
+- **pdf:** Acquisition (hybrid driver — MinerU pass 1 + docling fallback pass 2) → **STOP (Opus engine-map report, then Gate A audit)** → Cleanup → Index. Plus the conditional Gates B/D below.
 
 Opus provides the seed/input, collection, output dir, and (pdf) the canonical stems.
 
@@ -161,14 +161,16 @@ Inputs:
 - OUTPUT_DIR: ~/Documents/ai/Meta/ClaudeCode/cli/rag-cli/data/documents/<name>/
 
 Gates — STOP and report, WAIT for my Go:
+- ENGINE-MAP REPORT (ALWAYS): after the hybrid driver finishes, BEFORE any cleaning, report the engine
+  map (per PDF/chunk: MinerU vs docling). Flag any chunk with "status":"null" (both engines failed —
+  that page range is missing). STOP.
 - GATE A (ALWAYS): after the Phase 1 fidelity audit, BEFORE any cleaning / backmatter-strip / index,
   report the Class A–F counts per md + one real prose-window line per md, then STOP for Go.
-- GATE B: Class-A loss a reconvert can't fix → STOP, report which symbol/formula + which PDF + your read of the cause.
-- GATE C: a scan part crashes on dense pages (ToC/index/reference lists) → STOP, report the page range + what it is.
-- GATE D: md:null (convert produced no output) → report the PDF name, no auto-retry.
+- GATE B: Class-A loss a re-run can't fix → STOP, report which symbol/formula + which PDF + your read of the cause.
+- GATE D: a chunk failed BOTH engines (engine-map "status":"null") → report the PDF + page range, no auto-retry.
 
-Completion Checklist: category decision + evidence per PDF · convert result (md? word/page counts) ·
-Phase 1 audit table · index summary line · both docs confirmed in the collection.
+Completion Checklist: engine map (MinerU/docling per chunk, any status:null) · merged md per PDF (word/page counts) ·
+Phase 1 audit table · index summary line · docs confirmed in the collection.
 No git commit (data files only).
 ```
 
@@ -198,11 +200,11 @@ PDF capture has NO Phase-1b cull stop. Instead Opus mans the gates below, baked 
 
 | Gate | When it fires | Worker action | Who decides |
 |---|---|---|---|
-| **A — Audit-before-clean (ALWAYS ON)** | after the Phase 1 fidelity audit, before ANY cleaning / backmatter-strip / index | STOP, present Class A–F counts per md + one real prose-window line per md | **OPUS** — review convert fidelity; Go to clean+index. If the conclusion is "reconvert" → escalate to the USER first (see below) |
-| **B — Class-A loss** | convert dropped formula content (`??`, ``, broken sub/sup) a reconvert can't recover | STOP, report which symbol/formula + which PDF + cause | **USER** — accept lossy / source a better PDF / split the doc |
-| **C — Dense-page crash (scans)** | a scan part repeatedly crashes the OCR VLM on dense pages (ToC / index / reference lists) | STOP, report the flagged page range + what it is | **USER** — OK to cut those pages? |
-| **D — md:null** | convert produced no output at all | report the PDF name, NO auto-retry | **USER** — better source / re-run |
+| **Engine-map report (ALWAYS ON)** | after the hybrid driver finishes, before cleanup | report per-PDF/chunk engine (MinerU/docling) + flag any `"status":"null"` | **OPUS** — review which engine did what; STOP if any status:null |
+| **A — Audit-before-clean (ALWAYS ON)** | after the Phase 1 fidelity audit, before ANY cleaning / backmatter-strip / index | STOP, present Class A–F counts per md + one real prose-window line per md | **OPUS** — review convert fidelity; Go to clean+index. If the conclusion is "re-run" → escalate to the USER first (see below) |
+| **B — Class-A loss** | convert dropped formula content (`??`, ``, broken sub/sup) a re-run can't recover | STOP, report which symbol/formula + which PDF + cause | **USER** — accept lossy / source a better PDF / split the doc |
+| **D — Double failure (status:null)** | a chunk failed BOTH MinerU and docling (engine-map `"status":"null"`) | STOP, report the PDF + page range, NO auto-retry | **USER** — better source / accept the gap / re-run |
 
-**Reconvert is NEVER autonomous.** Opus does not tell the worker to reconvert on its own judgment. Any reconvert — whether the conclusion of a Gate-A audit review or triggered by a Gate-B loss — is presented to the USER first (better PDF? accept the loss? split?) and only run on the user's OK. Gate A is the standard always-on oversight gate; Gates B/C/D are conditional and fire only on a bad or scanned PDF, and all three escalate to the user because the call ("better PDF / split / accept loss / cut pages") is a corpus-owner decision.
+**Re-run is NEVER autonomous.** Opus does not tell the worker to re-run `hybrid_driver.py convert` on its own judgment. Any re-run — whether the conclusion of a Gate-A audit review or triggered by a Gate-B loss — is presented to the USER first (better PDF? accept the loss? split?) and only run on the user's OK. The engine-map report + Gate A are the always-on oversight gates; Gates B/D are conditional and escalate to the user because the call ("better PDF / split / accept loss / accept gap") is a corpus-owner decision.
 
-Opus's PDF interventions: Gate A always, Gates B/C/D when they fire, and the final Completion Report. Between gates, same rule as web-md — Opus does NOTHING (no log-polling, no progress probes); the worker owns convert → clean → index.
+Opus's PDF interventions: the engine-map report + Gate A always, Gates B/D when they fire, and the final Completion Report. Between gates, same rule as web-md — Opus does NOTHING (no log-polling, no progress probes); the worker owns convert → clean → index.
