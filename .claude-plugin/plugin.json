@@ -6,5 +6,5 @@
     "name": "Bruno Winter"
   },
   "keywords": ["searxng", "search", "scraper", "cli", "web"],
-  "skills": ["./skills/searxng-cli-web-research/", "./skills/searxng-cli-capture-and-index/"]
+  "skills": ["./skills/searxng-cli-web-research/", "./skills/searxng-cli-capture-and-index/", "./skills/searxng-cli-pdf/"]
 }

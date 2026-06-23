@@ -1,13 +1,31 @@
 ---
 name: searxng-cli-capture-and-index
-description: Discover URLs agentically (write /tmp scripts), select which to scrape, scrape raw/maximal, clean (incl. post-scrape noise drop), and index into RAG. Modes: web-md (Discovery→Select→Scrape→Cleanup→Index), pdf (Acquisition→Cleanup→Index).
+description: Discover URLs agentically (write /tmp scripts), select which to scrape, scrape raw/maximal, clean (incl. post-scrape noise drop), and index into RAG. Web-MD capture only — Discovery→Select→Scrape→Cleanup→Index. PDF conversion lives in the searxng-cli-pdf skill.
 ---
 
 # Capture-and-Index — Skill
 
+## Background-Run Discipline (HARD — scrape, index)
+
+Every long run (scrape / index) is launched as a background Bash call (`run_in_background=true`). After launch you go idle and do **nothing** about that run until you receive the message:
+
+> **`background done — check worker or other process`**
+
+That message is your ONLY trigger to look. It is a push event — it arrives on its own. You never go looking for completion, and you never schedule yourself to look.
+
+Until that message arrives, FORBIDDEN:
+- **setting a timer (`sleep N && echo done`) to wake yourself — a post-launch timer is a poll in disguise. You do NOT set one. The process finishing IS your timer.**
+- reading the scrape log / index log (`logread` included), or `ls` / `wc` / byte-size on the output dir or the redirect targets
+- `ps` / `pgrep` / `top` liveness checks
+- any "early sanity check" that the run started cleanly
+
+These probes are not just forbidden, they are **useless**: stdout/stderr are block-buffered to the redirect files and flushed only at process exit. Mid-run the log is empty and the output dir may hold no md yet. Empty proves nothing (not stalled, not crashed). Nothing to learn → no reason to look.
+
+When `background done — check worker or other process` arrives: read the run's log EXACTLY ONCE, then continue the pipeline on your own. A crash surfaces HERE — as a non-zero `EXIT` + traceback in the log at this same single read; there is no earlier check that would catch it sooner. The ONLY check you run before the background launch is pre-launch validation (binary exists, `--help` parses), in the foreground.
+
 ---
 
-### Mode 1: Web-MD Capture (discovery → select → scrape → clean → index)
+### Web-MD Capture (discovery → select → scrape → clean → index)
 
 Pipeline: Discovery → URL Selection (pre-scrape) → Scrape (raw) → Cleanup (incl. post-scrape drop) → Index.
 
@@ -114,7 +132,7 @@ cd "$SEARXNG" && ./venv/bin/python -m src.crawler.pipe_scraper \
     --output-dir $OUTPUT_DIR > /tmp/<domain>_scrape.log 2>&1
 ```
 
-> You own Scrape → Cleanup → Index end-to-end — never hand back to Opus mid-pipeline. After launch, go idle; do NOT `pgrep`/name-poll/`wait`-loop. When the run completes, read `/tmp/<domain>_scrape.log` ONCE for the `Scraped N/N ok` summary, then continue on your own to Cleanup → Index → final report.
+> You own Scrape → Cleanup → Index end-to-end — never hand back to Opus mid-pipeline. After launch, go idle per **Background-Run Discipline**: no timer, no log/dir probe. ONLY when `background done — check worker or other process` arrives, read `/tmp/<domain>_scrape.log` ONCE for the `Scraped N/N ok` summary, then continue on your own to Cleanup → Index → final report.
 
 The scraper's own output is short: a console line with **success count, error count, and total duration**, plus a full per-URL report written to `/tmp/<domain>_scrape_report.md` (per-URL status + outcome). It does NOT dump a per-URL list to the console — failures live in the report md.
 
@@ -210,242 +228,7 @@ For each detected shape, write ONE small script in `/tmp/clean_<shape>_<COLLECTI
 
 ---
 
-### Mode 2: PDF Capture (download → convert → clean → index)
-
-Input: absolute path to a single PDF file OR a directory of `*.pdf` files.
-
-Pipeline: Acquisition → Cleanup → Index.
-
-#### Phase 0 — Acquisition
-
-**Naming — PDFs carry speaking names, the md inherits them.** A source PDF must have a speaking
-PascalCase name BEFORE conversion (e.g. `NadeauBengio2003InferenceGeneralizationError.pdf`). If a PDF
-has a cryptic name (`6280358.pdf`, `2104.03667v1.pdf`, a libgen / Anna's-Archive string), RENAME it in
-place first — derive the name from the first page / title metadata, sanitize per the char rules below.
-The markdown then simply inherits the PDF's basename: `STEM = basename(PDF without .pdf)`, output =
-`$OUTPUT_DIR/$STEM.md`. PDF name and md name stay identical.
-
-##### Category Check — handled by the driver
-
-The driver categorizes each PDF via `pdfinfo`/`pdfimages` internally — born-digital → MinerU `pipeline` backend; scan → `--scan-backend` (default: `vlm`). No manual pre-check required.
-
-##### Convert — one hybrid-driver call over all PDFs
-
-Set `OUTPUT_DIR` to the collection directory **before** the driver call:
-
-```bash
-RAG_ROOT=~/Documents/ai/Meta/ClaudeCode/cli/rag-cli
-OUTPUT_DIR="$RAG_ROOT/data/documents/$COLLECTION"
-mkdir -p "$OUTPUT_DIR"
-```
-
-Launch as a **background Bash call** (`run_in_background=true`) and go idle:
-
-```bash
-/Users/brunowinter2000/Documents/ai/Docling/venv/bin/python \
-    /Users/brunowinter2000/Documents/ai/Docling/hybrid_driver.py convert \
-    --pdf <pdf1> [<pdf2> ...] \
-    --out-dir "$OUTPUT_DIR" \
-    > /tmp/hybrid_engine_map.json
-```
-
-The driver runs sequentially (MinerU and docling never overlap — Req 3):
-- Categorizes all PDFs; processes born-digital first (Req 2).
-- **Pass 1 — MinerU:** formula-weight chunked, continue-on-failure. Born-digital → `pipeline`; scan → `vlm` (override: `--scan-backend hybrid-engine`).
-- **Pass 2 — docling:** fallback for failed MinerU chunks; full-PDF fallback if MinerU fails catastrophically. Only after Pass 1 fully complete.
-- **Merge:** assembles each PDF's chunks into `$OUTPUT_DIR/<stem>.md`.
-- **Engine map:** JSON printed to stdout (captured to `/tmp/hybrid_engine_map.json`).
-
-Note on naming a cryptic PDF: derive a descriptive PascalCase name from the first page header / title metadata, condensed to ~30 chars (e.g. `AslamMontague2001MetasearchModels`, `ManningRaghavanSchutze2008IRTextbook`), and RENAME the PDF before the driver call. The md inherits the PDF stem. Avoid filename collisions inside one batch — append year or first-author-initial when needed.
-
-**STEM character constraints (hard rules):** alphanumeric + underscore ONLY. NEVER include brackets `[ ]`, parentheses `( )`, dots `.` (other than the trailing `.md` extension), commas, spaces, or any glob metachar. Sanitize at derivation time.
-
-##### Engine-Map Report — MANDATORY before Phase 1 (Req 1)
-
-After the driver completes, read and report the engine map **before** proceeding to Cleanup:
-
-```bash
-cat /tmp/hybrid_engine_map.json
-```
-
-Report to Opus:
-- Which engine (MinerU / docling) handled each chunk and page range for every PDF.
-- Any PDF with `"engine": "docling-full-fallback"` — MinerU failed entirely for that document; docling converted the whole PDF.
-- **Any chunk with `"status": "null"` — both engines failed; that page range is missing from the md.**
-
-**If any `"status": "null"` chunk exists: STOP. Report PDF name + page range to Opus. Do not proceed to Cleanup or Index until Opus decides (accept the gap / retry / other).**
-
-#### Phase 1 — Cleanup
-
-PDFs are produced as Markdown by the hybrid driver (MinerU for most chunks, docling for fallback chunks). Phase 1 opens with a per-md fidelity check that both catches bad converts AND detects the cleanable artifacts. Cleanup itself focuses on inline OCR artifacts, not block chrome. Skip any md where all chunks have `"status": "null"` in the engine map (both engines failed — already reported to Opus before this phase).
-
-##### Audit — systematic fidelity scan (EVERY md, BEFORE cleaning)
-
-Run on EVERY produced md, not a sample. NEVER full-read a book md. Build one `/tmp` scan script that
-tabulates the five classes below per file (count) — then SAMPLE the hit lines with offset-reads. A
-count is a signal, not a verdict: read the actual hits to classify. **Word count is NOT a fidelity
-signal** — a fully garbled scan sits at a normal words-per-page (a 366p scan OCR'd to garbage measured
-530 w/p). The class counts and the samples decide, never the word count.
-
-**Class A — Lost formula content (UNRECOVERABLE → reconvert, do NOT clean):**
-- `??` — failed-OCR symbol(s): `grep -c '??' "$MD"`. Example of the damage: `compute the vector
-  <sup>??</sup>` — a vector symbol gone.
-- `` (U+FFFD) replacement char.
-- garbled `<sub>`/`<sup>` — empty or `?`-containing:
-  `grep -coE '<su[bp]>[[:space:]]*</su[bp]>|<su[bp]>[^<]*\?[^<]*</su[bp]>' "$MD"`.
-  (Plain `<sup>1,*</sup>` author/footnote markers are legitimate — not this.)
-- genuinely empty display math — detect by SPLITTING on `$$` and testing odd segments for
-  whitespace-only (single-quote the `-c` so bash leaves `$$` alone):
-  `python3 -c 'import sys;p=open(sys.argv[1]).read().split("$$");print(sum(1 for i in range(1,len(p),2) if not p[i].strip()))' "$MD"`.
-  Do NOT use a `$$\s*$$` regex — it false-matches the blank gap between two consecutive formula blocks
-  and reports phantom empties.
-- Any Class-A hit = source content is gone, no regex recovers it. Flag the file and report to Opus — re-run `hybrid_driver.py convert` on that PDF to retry. List which symbol/formula is lost.
-
-**Class B — Spaced math (RECOVERABLE → de-space):**
-- spaced sub-/superscripts: `_ {` , `^ {`
-- spaced single-char runs: `([A-Za-z] ){3,}[A-Za-z]` — WARNING: this ALSO matches legitimate math
-  single-letters in running prose ("a K class outcome", "K-medoids is far more"). A high count flags a
-  file for de-spacing; the small residual AFTER de-spacing is mostly these false positives. Sample
-  before calling a residual a defect.
-- spaced command names: `\ [a-z]( [a-z])+`
-- Discriminator: collapsing a run yields a real token (`\mathrm { a r g m i n }` → `\mathrm{argmin}`).
-
-**Class C — Encoding (RECOVERABLE → unescape / re-encode):**
-- HTML entities: `&(amp|lt|gt|quot|apos|nbsp|#[0-9]+|#x[0-9a-fA-F]+);`
-- UTF-8 mojibake: `Ã.` , `â€`
-
-**Class D — Prose char-typos (low-impact, not auto-fixable):**
-- single-char OCR errors ("diferent", "emai1", "BIUE"). No reliable grep — needs a dictionary pass.
-  Negligible for retrieval; do not chase. If a file is PERVASIVELY garbled in prose it is Class A → reconvert.
-
-**Class E — Backmatter (MANDATORY STRIP — every md except web-scraped API docs):**
-
-WHAT goes out — from the first backmatter heading (or, when headingless, the first backmatter entry) through EOF:
-- **References / Bibliography** sections.
-- **Symbols and Abbreviations / Nomenclature / Notation** glossaries.
-- **Index / Author Index / Subject Index / Stichwortverzeichnis** (term + page-number lists).
-
-HOW to find the cut line:
-1. Heading scan — markdown heading lines (`^#{1,6}\s`) whose text matches
-   `references|bibliography|index|symbols|abbreviations|nomenclature`, in the last ~40% of the file.
-2. Headingless backmatter (no heading on the reference list / index) — detect by line-pattern density in 100-line buckets:
-   - reference run = most non-blank lines match `\(\d{4}[a-z]?\)` (year in parens) or `^Surname, Init.`,
-   - index run = most non-blank lines match `,\s*\d+([–-]\d+)?` (term + page number).
-   Cut line = first line of the first sustained reference/index run after the last real-content section.
-
-HOW to cut:
-- Read 3 lines above the cut line (must be real content) + the heading/first-entry line to confirm the boundary.
-- Back up the file; truncate from the cut line through EOF; rstrip trailing blanks.
-- Re-scan: no backmatter heading in the last ~40%, and the new last line is real content.
-
-Do NOT cut these (they are CONTENT, NOT backmatter):
-- **Numbered content subsections** with a keyword in the title (`6.3.4 Discussion and further references`,
-  `3.2.3. Rand index`, `2.11 Discussion and bibliography`) — filter any heading whose text starts with a digit.
-- **Per-chapter "Bibliographic Notes"** (prose, not a list).
-- **Exercises with inline citations** above the reference list (`(Author, year)` + `$$` formulas). The reference LIST
-  starts where entries are alphabetical `Surname, Init. (year). Title…` with no `$$`/`Ex.`/`(a)`. Anchor there.
-
-Owner-decision sections (default: strip as backmatter; ask the corpus owner before keeping):
-- Mid-document per-part **Nomenclature / Notation** boxes (symbol glossaries) — these can sit anywhere, not only at EOF.
-- Front matter **List of Tables / List of Figures**.
-- Resource / software **appendices** (web-site lists, software guides).
-- Inline image refs `![](images/...)`.
-These are not always at EOF — scan the WHOLE file for them, strip each section from its heading to the next real-content heading.
-
-**Class F — Table markup noise (RECOVERABLE → strip to pipe-text):**
-MinerU emits tables as HTML `<table>` blocks; table-dense / OCR'd PDFs carry ~65–80% pure markup
-(`<td>`/`<tr>`/`rowspan`/`colspan`) around the data. ONE treatment for ALL tables, regardless of PDF
-category: strip the HTML to flat pipe-text, cells AS-IS — do NOT fix structure.
-
-- Detect (per `<table>`): markup ratio = chars-in-`<…>` / total table chars, flag at >50% (typical 65–80%);
-  `rowspan`/`colspan` count; secondary signal = merged-value cells (several whitespace-separated values in
-  one `<td>`: `KLIEP KLR KMM OSVM`, `0.919 0.934`).
-- Fix (ad-hoc script, same pattern as Class B/C): per `<table>`, drop every tag + attribute, one row per
-  `</tr>`, cells `|`-separated, content unchanged, full table (no `…` truncation). Header separator after row 0.
-- Validate: cell-text token set unchanged (only tags removed); table-char count drops by the markup fraction.
-  Spot-check 1–2 tables render as readable pipe rows.
-- Limit: strips NOISE, not CONTENT errors. OCR-corrupted cells stay as-is — no strip recovers source content.
-  Source re-extraction (camelot/gmft/pdfplumber, see `dev/table_extraction`) was tested and judged not worth
-  the matching/splice complexity for the marginal gain. Leave such tables de-noised; an LLM consumer can read
-  a flat pipe table even with imperfect structure.
-
-**Prose window — one real prose paragraph per md (MANDATORY, every convert):**
-The class greps catch detectable defects only; wordlike garble passes every one of them — a region OCR'd
-to plausible-but-wrong words ("Ed Formet Yiew Compuurtonel" from a screenshot, "to replaced the data
-samples"). So for EVERY convert, also pull a genuine body prose line and READ it. Extract candidates
-programmatically — a body line with length > 70, starting alphabetic, > 10 spaces, and alpha-ratio
-> 0.78 (this skips formula/table/header lines) — and read 1–2 from the middle third of the file:
-
-```python
-import glob, os
-from pathlib import Path
-for f in sorted(glob.glob(f"{OUTPUT_DIR}/*.md")):
-    lines = Path(f).read_text(errors="replace").splitlines()
-    n = len(lines); hits = []
-    for s in (l.strip() for l in lines[n//3:2*n//3]):
-        if len(s) > 70 and s[:1].isalpha() and s.count(" ") > 10 \
-           and sum(c.isalpha() or c.isspace() for c in s)/len(s) > 0.78:
-            hits.append(s)
-        if len(hits) >= 2: break
-    print(os.path.basename(f), "->", (hits[0][:140] if hits else "NO PROSE WINDOW (formula/table-heavy — inspect manually)"))
-```
-
-Coherent academic prose → pass. Garbled prose → escalate; pervasive prose garble = Class A → reconvert.
-A file that yields no prose window is formula/table-heavy — inspect it by hand.
-
-**Verdict per file:**
-- Class A > 0 → reconvert (hybrid). Do NOT clean a lossy file.
-- Class B / C only → clean (de-space, unescape), then re-scan that class to 0.
-- Class D → policy decision, not a blocker.
-- Class E (backmatter) → MANDATORY strip (see Class E above) for every md except web-scraped API docs.
-- Class F (table markup) → strip to pipe-text (ad-hoc script), all PDFs.
-
-**Limit of this audit:** it catches DETECTABLE losses (`??`, ``, broken markup). A formula that OCR'd
-to valid-but-wrong LaTeX looks clean and is only catchable against the source PDF — no grep finds it.
-A zero Class-A count means "no detectable loss", not "guaranteed perfect".
-
-##### Pre-cleanup: Backup + Baseline
-
-```bash
-cp "$OUTPUT_DIR/$STEM.md" "/tmp/backup_$STEM.md"
-# de-spacing invariant baseline: alphanumeric-char count (NOT word count)
-python3 -c "import sys;print(sum(c.isalnum() for c in open(sys.argv[1]).read()))" "$OUTPUT_DIR/$STEM.md"
-```
-
-##### Artifacts to Detect and Fix
-
-- **LaTeX spaced command name** — `\ f r a c`, `\ s u m`, `\ m a t h r m` → `\frac`, `\sum`, `\mathrm`
-- **LaTeX spaced command contents** — `\mathrm { t h e \ d e s i g n }` → `\mathrm{the design}`; `\operatorname* { m i n }` → `\operatorname*{min}`
-- **Broken images** — `! [ ] ( ... )` with spaces between chars → `![](...)`
-- **Split words** — "mod els", "alg orithm" — fix conservatively via dictionary check (`/usr/share/dict/words` or in-document vocabulary)
-- **HTML entities** — `&amp;`, `&#39;` → unescape
-- **Encoding artifacts** — UTF-8 mojibake (Ã©, Ã¤) → re-encode
-- **Hyphenated line-end splits** — `comput-\ner` → `computer` (only when both halves are dictionary words)
-- **Run-on duplicate headers** — Line N is garbage run-on, Line N+1 is correct → DELETE the garbage line
-
-##### Per-Issue Script Pattern
-
-For each issue type, create `/tmp/fix_<issue>_<STEM>.py`. Run, verify count reaches 0 for that issue, move to next. NOT one mega-script.
-
-##### Validation (MANDATORY after each fix)
-
-- **De-spacing:** alphanumeric-character count must be EXACTLY stable (de-spacing removes only spaces).
-  The word count DROPS — that is intended; NEVER validate de-spacing on word count.
-- **Entity unescape:** entity count must reach 0; each entity collapses to exactly one char.
-- Re-scan the fixed class → must reach 0 (minus the Class-B spaced-run false positives in prose).
-- Spot-check 10-15 prose lines from the middle — natural text, no merged run-ons ("cambridgeuniversitypress").
-- On any anomaly (alnum changed, run-ons appear, class not cleared): ABORT, restore from backup, report.
-
-##### Stop Criteria — "Good Enough"
-
-Don't over-engineer. Stop when:
-- All known issue categories have 0 remaining matches in the file
-- Word count is stable
-- Spot-check 10-15 lines from the middle reads as natural text
-
----
-
-### Index — Final Phase (both modes)
+### Index — Final Phase (web-md)
 
 One script call. `rag-cli index` is incremental (hash-based skip) — re-running only embeds new/changed files.
 
@@ -474,7 +257,7 @@ Done: N files indexed (X chunks), Y skipped, Z adopted
 
 Report `N` (files indexed) and `X` (chunks) from that line — `N` is the **final md** count for the Completion Report.
 
-Launch index as a background Bash call (`run_in_background=true`) and go idle; do NOT `pgrep`/name-poll/`wait`-loop. When it completes, read `/tmp/${COLLECTION}_index.log` ONCE for the summary line, then output the Completion Report.
+Launch index as a background Bash call (`run_in_background=true`) and go idle per **Background-Run Discipline**: no timer, no probe. ONLY when `background done — check worker or other process` arrives, read `/tmp/${COLLECTION}_index.log` ONCE for the summary line, then output the Completion Report.
 
 No separate verify step inside the pipe.
 
@@ -482,9 +265,7 @@ No separate verify step inside the pipe.
 
 ### Completion Report
 
-Output back to Opus when done.
-
-**web-md — the funnel:**
+Output back to Opus when done — the funnel:
 
 ```
 URLs discovered:                    N
@@ -498,7 +279,5 @@ Collection:                         <COLLECTION>
 ```
 
 Keep the two drop reasons separate: scrape errors **E** come from the scraper, thin/noise **D** comes from the cleanup check.
-
-**pdf:** `engine-map: M PDFs (N chunks MinerU, K chunks docling-fallback, J status:null — reported to Opus before cleanup)` · `bad converts excluded (reported, need reconvert): B` · `cleaned: C files` · `indexed: N chunks across M documents`.
 
 End with this report. STOP. No commit needed (output is data files, not code).
