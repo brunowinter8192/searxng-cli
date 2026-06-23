@@ -16,24 +16,22 @@ No worker. Interactive. The USER runs every mineru + docling command. Claude doe
 - COMMAND FILE = `~/Downloads/<batch>_pdf_commands.md`
 
 ## Rule
-Every command that CONVERTS (mineru, docling) → USER runs, from the COMMAND FILE. Claude never runs a convert. Claude runs: `pdfinfo`/`pdfimages` (routing), `summary`, parts.json patch, `merge`, cleanup scripts, `rag-cli index`.
+Every command that CONVERTS (mineru, docling) → USER runs, from the COMMAND FILE. Claude never runs a convert. Claude runs: `summary`, parts.json patch, `merge`, cleanup scripts, `rag-cli index`.
 
-## Phase 0 — Naming + Routing (CLAUDE)
+## Phase 0 — Naming (CLAUDE)
 1. Per PDF: assign a PascalCase STEM, alphanumeric + underscore ONLY — no brackets, parentheses, dots, commas, spaces. Rename the source PDF in place → `<STEM>.pdf`.
-2. Per PDF: pick backend.
-   - `pdfinfo "<pdf>"` → `Pages: N`. Sample pages `P ∈ {N/6, N/3, N/2, 2N/3, 5N/6}` (min 1).
-   - Per P: `pdfimages -list -f P -l P "<pdf>"` → a row whose width (col 4) > 1000 = wide image.
-   - ALL sampled pages have a wide image → `hybrid-engine`. Else → `pipeline`.
-3. Skip any PDF that already has `<OUTPUT_DIR>/<STEM>.md`.
+2. Skip any PDF that already has `<OUTPUT_DIR>/<STEM>.md`.
+
+No backend categorization — that is MinerU's job, not Claude's. Every convert uses `-b pipeline`: MinerU's pipeline runs `method=auto` by default and routes txt-vs-OCR per page from the actual content (a pdfinfo/pdfimages heuristic mis-flags searchable scans — PDFs with a text layer AND page images — so we don't use one). A chunk MinerU can't handle flows to docling in Phase 2.
 
 ## Phase 1 — MinerU convert (USER runs, one PDF at a time)
 Write the COMMAND FILE. Per PDF, one block:
 ```
 mkdir -p <OUTPUT_DIR>
 PYTHONUNBUFFERED=1 ~/Documents/ai/Mineru/venv/bin/python ~/Documents/ai/Mineru/workflow.py convert \
-  --pdf "<PDF>" --chunk-pages 50 -b <backend> -l en 2>&1 | tee /tmp/<STEM>_mineru.log
+  --pdf "<PDF>" --chunk-pages 50 -b pipeline -l en 2>&1 | tee /tmp/<STEM>_mineru.log
 ```
-- Always `--chunk-pages 50`. Continue-on-failure (a failed chunk does not stop the run). Parts land in WORK.
+- Same command for every PDF — `-b pipeline`, MinerU auto-routes txt/OCR per page. Always `--chunk-pages 50`. Continue-on-failure (a failed chunk does not stop the run). Parts land in WORK.
 - USER runs each block, reports done per PDF.
 
 ## Phase 2 — Failed chunks → docling (CLAUDE lists, USER runs)
