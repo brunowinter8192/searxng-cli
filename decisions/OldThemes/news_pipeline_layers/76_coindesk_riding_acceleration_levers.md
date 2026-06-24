@@ -41,7 +41,26 @@ Run the 10k backfill once at `--slots 80` and once at `--slots 120` (`--from 202
 - distribution shifts right → local contention ceiling found → throughput optimum below that.
 Caveat: live-proxy set varies between runs; thousands of OK per run averages it out.
 
+## Empirical: first instrumented run (120 slots, 8 browsers, job 20260624T204129Z)
+
+868 target, 777 OK, **24,238 connect-fails**, fixed cooldown, SIGINT-interrupted. Findings:
+
+- **Concurrency is NOT the throughput lever.** 120 slots → 16.6 OK/min vs the earlier 80-slot ~18.4 OK/min — 120 is *slightly worse*. The live-proxy set is a fixed scarce subset of the pool; more contexts pull+burn it faster, they do not create more live proxies. Raising contexts just front-loads then starves. Supply-via-concurrency refuted.
+- **Pool exhaustion is the cooldown ceiling, not a bug.** "Eligible pool over time": min-eligible 17.6k → 0 over 50 min, in-cooldown → 24k. At 120 slots with ~1-attempt rides + 60-min `fixed` cooldown, burn-rate drains the eligible pool faster than cooldowns expire → slots exit ("pool exhausted"). 120 is unsustainable under fixed-60min. → `exp` cooldown (re-admits productive proxies) is the supply-side lever, same as OT74.
+- **Pool loaded = 20,831 is browser-eligible only.** `_pool_provider` filters to `BROWSER_ELIGIBLE_PROTOS = {http, socks5}`; the ~32.7k full pool includes ~12k socks4 that Chromium/Playwright cannot use. Not a bug — the riding engine runs on ~64% of the pool. (socks4 usable only by curl_cffi / TheBlock.)
+- **CPU at limit at 120** (user-observed) — consistent with CPU-bound post-nav processing (markdown gen), see below. Going down from 120, not up.
+
+## Instrumentation evolution (this session)
+
+Built incrementally on the riding reporter (`src/news/engine/proxy_riding/reporter.py` + `rider.py`):
+1. **Success load-time distribution** — `load_s = max(0, elapsed − DELAY_BEFORE_HTML)`, OK-only; inclusive-quantile percentiles + histogram. **Caveat discovered:** `load_s` is NOT navigation time — it lumps nav (#4, the only phase `page_timeout` bounds) with markdown generation (#7, CPU-bound) + context setup. p50=8.7s / p99=14.6s on the 120 run while `page_timeout`=8s proves a large non-nav component. So `load_s` cannot cleanly tune `page_timeout`.
+2. **Histogram auto-range fix** — x-axis was hard-clipped to `[0, page_timeout_s]`, hiding the >8s bulk; now auto-ranges to data with a `page_timeout` reference line.
+3. **Connect-fail breakdown** — `connect_fail`s previously discarded their timing (`break` before `job_records.append`). Now collected as `(elapsed_s, subtype)` in `state.connect_fail_records`; reporter emits elapsed-percentiles + histogram + subtype counts. Classifier `_classify_connect_fail`: `"ms exceeded"` → `page_timeout` (Playwright nav cap; crawl4ai wraps as RuntimeError), `"net::err_timed_out"` → `net_timed_out` (TCP), `err_proxy|err_tunnel|socks` → `proxy_connect`, else `other`. Discriminator note: `"timeout"` alone is ambiguous (both nav-cap and TCP contain it) — `"ms exceeded"` is the unique Playwright-nav-cap signature.
+
+**Why connect-fail breakdown matters for the timeout question:** live proxies that get cut at the 8s cap are currently INVISIBLE — a nav-timeout errors with "Timeout 8000ms exceeded" → classified `connect_fail`. The `page_timeout` subtype count is the addressable population for "lives cut at 8s" (a mix of dead-no-response + live-slow; the error string can't separate them — a timeout A/B disambiguates). The connect-fail elapsed histogram shows whether dead proxies hang to ~8s (→ lowering frees slots) or fail fast (→ lowering doesn't help cycling).
+
 ## Open
 
-- Actual `page_timeout` value — pending the success-distribution from an instrumented run.
-- Optimal `--slots` — pending the 80-vs-120 comparison.
+- **`page_timeout` raise-vs-lower** — pending an instrumented 1000-on-80 run: read the connect-fail breakdown (page_timeout subtype share + whether cf-elapsed piles at 8s) + success distribution. Big page_timeout bucket → lives may be cut → A/B a higher timeout; near-zero + dead proxies hanging to 8s → lower.
+- **Cooldown policy** — `fixed` exhausts the pool at high concurrency; `exp` is the supply-side lever (separate from timeout). Pending its own run.
+- **Navigation vs markdown split** — `load_s` conflates them; a clean `page_timeout` tune would need nav (#4) isolated from markdown (#7), which crawl4ai does not expose at the `arun` return (would require a two-phase dev probe).
