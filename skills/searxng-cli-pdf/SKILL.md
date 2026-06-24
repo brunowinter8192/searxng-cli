@@ -63,6 +63,17 @@ Per-class detection + action:
 - **F — table markup (RECOVERABLE → pipe-text):** MinerU `<table>` HTML, markup ratio > 50%. Strip
   tags, one row per `</tr>`, cells `|`-separated, content unchanged, no truncation. Validate cell-text
   token set unchanged.
+- **G — image tags (MANDATORY STRIP):** `!\[[^\]]*\]\([^)]*\)` → remove every match. Drop lines
+  emptied by the removal; collapse 3+ consecutive blank lines → 1. Re-scan: count → 0.
+- **H — block noise (MANDATORY STRIP):** consecutive runs ≥ 2 of bare fence lines (line = optional
+  whitespace + 3+ backticks + optional whitespace, nothing else) → remove the whole run. KEEP isolated
+  fences and language-tagged openers (```` ```txt ````, ```` ```csv ````) — real code/data blocks.
+  Separator lines: on the space-stripped line, if the most-common char ∈ `=#-~*_.+` is > 70% of chars
+  AND length ≥ 20 → remove the line. Re-scan: max consecutive bare-fence run = 1.
+- **I — run-on tokens (CONDITIONAL → user decision):** whitespace-split; flag tokens ≥ 46 chars with
+  alpha-ratio > 0.7, excluding tokens containing `\` / `http` / `/`. Any flagged token > 2000 chars →
+  STOP, list doc + token to the user, wait for decision. All flagged ≤ 2000 chars → leave in place, do
+  NOT strip.
 
 Prose window (every md): pull 1–2 body lines (len > 70, starts alpha, > 10 spaces, alpha-ratio > 0.78)
 from the middle third and READ. Coherent → pass; garbled → A → report (unrecoverable).
