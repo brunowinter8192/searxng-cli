@@ -1,5 +1,6 @@
 # INFRASTRUCTURE
 
+import math
 import statistics
 from datetime import datetime, timezone
 from pathlib import Path
@@ -11,11 +12,13 @@ _BACKFILL_TOTAL = 61_000
 
 # ORCHESTRATOR
 
-# Write job.md + cumulative.png for a proxy-riding scrape run to job_dir.
+# Write job.md + cumulative.png + success_load_hist.png for a proxy-riding scrape run to job_dir.
 def write_riding_report(state: RiderState, job_dir: Path, t_job_start: datetime) -> None:
     job_dir.mkdir(parents=True, exist_ok=True)
     stats = _compute_stats(state, t_job_start)
     _write_cumulative_plot(job_dir, stats)
+    if stats["load_perc"] is not None:
+        _write_load_hist(job_dir, stats)
     _write_md(job_dir, state, stats, t_job_start)
 
 
@@ -83,6 +86,21 @@ def _compute_stats(state: RiderState, t_job_start: datetime) -> dict:
                     "peak_cooldown": peak_cooldown,
                 })
 
+    page_timeout_s = state.page_timeout_ms / 1000
+    load_times = [j.load_s for j in jobs if j.status == "ok" and j.load_s is not None]
+    if len(load_times) >= 2:
+        qs = statistics.quantiles(load_times, n=100)
+        load_perc: dict | None = {
+            "p50": round(qs[49], 3),
+            "p90": round(qs[89], 3),
+            "p95": round(qs[94], 3),
+            "p99": round(qs[98], 3),
+            "max": round(max(load_times), 3),
+            "n":   len(load_times),
+        }
+    else:
+        load_perc = None
+
     return {
         "n_ok": n_ok, "n_regwall_fetches": n_regwall_fetches,
         "n_failed": n_failed, "n_connect_fail": n_connect_fail,
@@ -100,6 +118,9 @@ def _compute_stats(state: RiderState, t_job_start: datetime) -> dict:
         "wasted_ratio": wasted_ratio,
         "termination": state.termination,
         "pool_total": pool_total, "pool_windows": pool_windows,
+        "page_timeout_s": page_timeout_s,
+        "load_times": load_times,
+        "load_perc": load_perc,
     }
 
 
@@ -131,6 +152,28 @@ def _write_cumulative_plot(job_dir: Path, stats: dict) -> None:
     ax.grid(True, alpha=0.3)
     fig.tight_layout()
     fig.savefig(job_dir / "cumulative.png", dpi=100)
+    plt.close(fig)
+
+
+# Histogram of OK-fetch load times; x-axis fixed to [0, page_timeout_s] for cross-run comparability.
+def _write_load_hist(job_dir: Path, stats: dict) -> None:
+    import matplotlib.pyplot as plt
+
+    load_times     = stats["load_times"]
+    page_timeout_s = stats["page_timeout_s"]
+
+    n_bins = max(1, math.ceil(page_timeout_s / 0.25))
+    bins   = [i * 0.25 for i in range(n_bins + 1)]
+
+    fig, ax = plt.subplots(figsize=(10, 5))
+    ax.hist(load_times, bins=bins, edgecolor="white", linewidth=0.5)
+    ax.set_xlim(0, page_timeout_s)
+    ax.set_xlabel("Load time (s)  [elapsed − DELAY_BEFORE_HTML 0.5 s]")
+    ax.set_ylabel("OK fetches")
+    ax.set_title("Success load-time distribution")
+    ax.grid(True, alpha=0.3, axis="y")
+    fig.tight_layout()
+    fig.savefig(job_dir / "success_load_hist.png", dpi=100)
     plt.close(fig)
 
 
@@ -226,11 +269,29 @@ def _write_md(
         "",
     ]
 
-    lines += [
-        "## Plots",
-        "",
-        "![Cumulative OK](cumulative.png)",
-        "",
-    ]
+    lines += ["## Success load-time distribution", ""]
+    lp = stats["load_perc"]
+    if lp is None:
+        lines += [
+            f"_Fewer than 2 OK fetches (n={len(stats['load_times'])}) — distribution not available._",
+            "",
+        ]
+    else:
+        lines += [
+            f"n = {lp['n']} OK fetches  ·  timeout = {stats['page_timeout_s']:.1f} s",
+            "",
+            "| Percentile | Load time (s) |",
+            "|---|---|",
+            f"| p50 | {lp['p50']:.3f} |",
+            f"| p90 | {lp['p90']:.3f} |",
+            f"| p95 | {lp['p95']:.3f} |",
+            f"| p99 | {lp['p99']:.3f} |",
+            f"| max | {lp['max']:.3f} |",
+            "",
+        ]
+
+    lines += ["## Plots", "", "![Cumulative OK](cumulative.png)", ""]
+    if lp is not None:
+        lines += ["![Success load-time histogram](success_load_hist.png)", ""]
 
     (job_dir / "job.md").write_text("\n".join(lines), encoding="utf-8")

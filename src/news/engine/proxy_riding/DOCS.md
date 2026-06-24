@@ -73,7 +73,7 @@ Read-only `.policy` property exposes the active policy string for the reporter.
 
 ---
 
-### rider.py (552 LOC)
+### rider.py (554 LOC)
 
 **Purpose:** Browser-per-context proxy rider pool. Manages B `AsyncWebCrawler` instances, N slot
 coroutines, per-URL proxy context (`CrawlerRunConfig.proxy_config`), burn/fail rotation, watchdog,
@@ -95,6 +95,12 @@ Key dataclasses: `RiderState` (shared mutable job state — fields: `output_dir`
 `all_resolved = len(done_urls) >= len(target_urls)`), `JobRecord` (per-URL outcome),
 `RideRecord` (per-proxy-ride summary). `FAIL_THRESHOLD = 2` (failed/empty strikes before drop).
 
+`JobRecord` fields: standard per-URL fields + `load_s: float | None` — navigation load time for OK
+fetches only, computed as `max(0, elapsed_s − DELAY_BEFORE_HTML)`. crawl4ai's `CrawlResult` exposes
+no dedicated nav-timing field; subtracting the fixed 0.5 s post-load delay approximates the
+navigation phase (shifts the curve right by ~constant context-setup overhead, reads the timeout
+conservatively). Non-OK fetches leave `load_s = None`.
+
 `run_riding_pool` signal handler lifecycle: after `state` is constructed, installs
 `loop.add_signal_handler(SIGINT/SIGTERM, _abort_interrupted, state, signum)`. Removed in the
 `finally` block (before `watchdog.cancel()`) so they don't fire during the normal-completion
@@ -113,17 +119,29 @@ Key dataclasses: `RiderState` (shared mutable job state — fields: `output_dir`
 calls `write_riding_report`, `os._exit(130)` for SIGINT / `os._exit(143)` for SIGTERM. Same
 structure and late-import pattern as `_abort_stall` / `_abort_done`.
 
-### reporter.py (236 LOC)
+### reporter.py (297 LOC)
 
 **Purpose:** Job report writer — `job.md` (counts, throughput, proxy-riding stats, eligible-pool-over-time
-table, regwall counts) + `cumulative.png` (step-plot of cumulative OK fetches over time).
+table, regwall counts, success load-time distribution) + `cumulative.png` (step-plot of cumulative OK
+fetches over time) + `success_load_hist.png` (histogram of OK-fetch load times, 0.25 s bins,
+x-axis fixed to `[0, page_timeout_s]` for cross-run comparability).
 **Reads:** `RiderState` (in-memory), `t_job_start` (datetime).
-**Writes:** `{job_dir}/job.md`; `{job_dir}/cumulative.png`.
+**Writes:** `{job_dir}/job.md`; `{job_dir}/cumulative.png`; `{job_dir}/success_load_hist.png`
+(only when ≥2 OK fetches have a `load_s` value — guard prevents crash on stall/abort with 0–1 OK).
 **Called by:** `pipeline.py:run_scrape_only` (normal completion, via `write_riding_report`);
 `rider._abort_stall` (late import, stall abort); `rider._abort_done` (late import, wedge-after-done);
 `rider._abort_interrupted` (late import, SIGINT/SIGTERM abort).
-**Calls out:** `matplotlib` (lazy import inside `_write_cumulative_plot`); `statistics` (stdlib);
+**Calls out:** `matplotlib` (lazy import inside `_write_cumulative_plot` and `_write_load_hist`);
+`statistics` (stdlib, incl. `statistics.quantiles` for p50/p90/p95/p99); `math` (stdlib, bin count);
 `src.news.engine.proxy_riding.rider` (RiderState, FAIL_THRESHOLD).
+
+`_compute_stats` additions: `load_times` (list of `job.load_s` for OK jobs); `load_perc` (dict with
+p50/p90/p95/p99/max/n, or `None` when `<2` samples — `statistics.quantiles` raises on fewer);
+`page_timeout_s` (from `state.page_timeout_ms / 1000`, passed to `_write_load_hist` for axis scale).
+
+job.md section **"Success load-time distribution"**: percentile table (p50/p90/p95/p99/max, n=count)
+computed over OK fetches only; shows `_Fewer than 2 OK fetches_` note when distribution is
+unavailable. Plots section includes histogram link when `load_perc is not None`.
 
 ### scrape.py (113 LOC)
 
