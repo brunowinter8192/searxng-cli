@@ -1,13 +1,13 @@
 ---
 name: searxng-cli-pdf
-description: Convert PDF(s) to Markdown (whole-document, MinerU mlx / vlm-auto-engine) and index into a RAG collection. No worker, fully interactive — the USER runs ONE convert command that processes all PDFs sequentially; Claude does naming, cleanup, index.
+description: Convert PDF(s) to Markdown (whole-document, MinerU mlx / vlm-auto-engine) and index into a RAG collection. Fully interactive — the USER runs ONE convert command that processes all PDFs sequentially; Claude does naming, cleanup, index.
 ---
 
 # PDF → MD → Index — Skill
 
-No worker. Interactive. The USER runs the convert command; Claude does ONLY: naming, cleanup, index.
-ONE command converts ALL PDFs in the batch sequentially — each as a whole document (no chunking),
-MinerU `vlm-auto-engine` (mlx) — the only engine.
+Interactive. The USER runs the convert command; Claude does ONLY: naming, cleanup, index.
+ONE command converts ALL PDFs in the batch sequentially — each as a whole document,
+MinerU `vlm-auto-engine` (mlx).
 
 ## Paths
 - MINERU = `~/Documents/ai/Mineru/venv/bin/python ~/Documents/ai/Mineru/workflow.py`
@@ -16,19 +16,17 @@ MinerU `vlm-auto-engine` (mlx) — the only engine.
 - COMMAND FILE = `~/Downloads/<batch>_pdf_commands.md`
 
 ## Rule
-The CONVERT command → USER runs it. Claude never runs a convert. Claude runs: naming, cleanup
-scripts, `rag-cli index`.
+The CONVERT command → USER runs it. Claude runs: naming, cleanup scripts, `rag-cli index`.
 
 ## Phase 0 — Naming + skip-check (CLAUDE)
 1. Per PDF: assign a PascalCase STEM, alphanumeric + underscore ONLY — no brackets, parentheses,
    dots, commas, spaces. Rename the source PDF in place → `<STEM>.pdf`.
 2. Skip-check: drop any PDF that already has `<OUTPUT_DIR>/<STEM>.md` — only un-converted PDFs go
    into the command.
-3. Backend is always `vlm-auto-engine` (mlx) — the only engine. No backend choice; workflow.py takes
-   no `-b`/`-l`/`--effort` flags.
+3. Backend is always `vlm-auto-engine` (mlx).
 
 ## Phase 1 — MinerU convert (USER runs, ONE command for the whole batch)
-Write the COMMAND FILE: ONE block listing ALL non-skipped PDFs (whole document, no chunks):
+Write the COMMAND FILE: ONE block listing ALL non-skipped PDFs (whole document):
 ```
 mkdir -p <OUTPUT_DIR>
 PYTHONUNBUFFERED=1 ~/Documents/ai/Mineru/venv/bin/python ~/Documents/ai/Mineru/workflow.py convert \
@@ -50,8 +48,7 @@ Per-class detection + action:
 - **A — lost formula (UNRECOVERABLE → do NOT clean):** `??`, `` (U+FFFD), empty/`?`-containing
   `<sub>`/`<sup>` (`<su[bp]>[[:space:]]*</su[bp]>|<su[bp]>[^<]*\?[^<]*</su[bp]>`), whitespace-only
   `$$…$$` blocks (split on `$$`, test odd segments). Any A hit → the output for that doc is
-  gone; cleaning cannot recover it. **Report the symbol/page to the user** — no backend fallback,
-  `vlm-auto-engine` is the only engine.
+  gone; cleaning cannot recover it. **Report the symbol/page to the user.**
 - **B — spaced math (RECOVERABLE → de-space):** `_ {`, `^ {`, `\ [a-z]( [a-z])+`, spaced single-char
   runs `([A-Za-z] ){3,}[A-Za-z]`. Collapse runs to real tokens (`\mathrm { a r g m i n }` →
   `\mathrm{argmin}`). Invariant: alphanumeric-char count EXACTLY stable; word count drops.
