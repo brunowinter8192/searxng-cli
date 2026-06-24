@@ -102,6 +102,7 @@ class RiderState:
     t_job_start:        datetime   = field(default_factory=lambda: datetime.now(timezone.utc))
     pool_samples:       list       = field(default_factory=list)   # (elapsed_s, n_eligible, n_cooldown)
     pool_provider:      object     = None                          # async () -> list[tuple[str,str]] | None = static pool
+    connect_fail_records: list     = field(default_factory=list)  # [(elapsed_s, subtype)] per connect_fail
 
     @property
     def all_resolved(self) -> bool:
@@ -267,6 +268,7 @@ async def _run_slot(slot_id: int, crawler: AsyncWebCrawler, state: RiderState) -
                     if dequeued and url not in state.done_urls:
                         state.url_queue.put_nowait(url)
                     cf_broke = True
+                    state.connect_fail_records.append((round(elapsed, 3), _classify_connect_fail(err)))
                     print(f"[slot {slot_id}] CF  rotating", file=sys.stderr)
                     break
 
@@ -378,6 +380,24 @@ async def _fetch_one_url(
 # Return True if markdown contains any REGWALL_SIGNALS.
 def _is_regwall(markdown: str) -> bool:
     return any(sig in markdown for sig in REGWALL_SIGNALS)
+
+
+# Classify a connect_fail error string into a subtype for reporting.
+# 'page_timeout'  — Playwright nav timeout ("Timeout Nms exceeded"); crawl4ai wraps as RuntimeError.
+# 'net_timed_out' — TCP-level timeout (net::ERR_TIMED_OUT); distinct from Playwright nav cap.
+# 'proxy_connect' — Explicit proxy/tunnel/SOCKS handshake failure.
+# 'other'         — ERR_CONNECTION_REFUSED, ERR_CONNECTION_CLOSED, ERR_EMPTY_RESPONSE, etc.
+def _classify_connect_fail(err: str | None) -> str:
+    if not err:
+        return "other"
+    emsg = err.lower()
+    if "ms exceeded" in emsg:
+        return "page_timeout"
+    if "net::err_timed_out" in emsg:
+        return "net_timed_out"
+    if any(k in emsg for k in ("err_proxy", "err_tunnel", "socks")):
+        return "proxy_connect"
+    return "other"
 
 
 # Write raw HTML to output_dir/raw/{url_hash}.html; return path.
