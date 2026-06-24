@@ -64,3 +64,28 @@ Built incrementally on the riding reporter (`src/news/engine/proxy_riding/report
 - **`page_timeout` raise-vs-lower** — pending an instrumented 1000-on-80 run: read the connect-fail breakdown (page_timeout subtype share + whether cf-elapsed piles at 8s) + success distribution. Big page_timeout bucket → lives may be cut → A/B a higher timeout; near-zero + dead proxies hanging to 8s → lower.
 - **Cooldown policy** — `fixed` exhausts the pool at high concurrency; `exp` is the supply-side lever (separate from timeout). Pending its own run.
 - **Navigation vs markdown split** — `load_s` conflates them; a clean `page_timeout` tune would need nav (#4) isolated from markdown (#7), which crawl4ai does not expose at the `arun` return (would require a two-phase dev probe).
+
+## Empirical: instrumented 1000-on-80 run (job 20260624T223839Z) — timeout question RESOLVED: leans LOWER
+
+1000 target / **1000 OK (all-done)**, 80 slots / 5 browsers, fixed cooldown, 19.4 OK/min, 19,155 connect-fails, pool 21,731.
+
+**Connect-fail breakdown** — p50 8.65s, p90 11.1s, p99 13.3s, max 18.4s. Subtypes: **page_timeout 10,847 (56.6%)**, proxy_connect 6,001 (31.3%), other 2,307 (12.0%). Bimodal: a fast cluster (proxy_connect+other ≈43%, <2-3s) and a slow cluster (page_timeout 56.6%, ~8.5s = 8s cap + overhead).
+
+**Success load-time** — p50 7.08s, p95 11.07s, max 16.07s (load_s, markdown-polluted).
+
+**Interpretation → LOWER, not raise:**
+- The 56.6% page_timeouts hanging to ~8.5s are the dominant time sink (~10.8k × 8.5s ≈ 92k slot-seconds). 
+- They are NOT lost content: all 1000 URLs eventually succeeded on other proxies (1000/1000 all-done; ~19 failed attempts per URL). So page_timeouts = dead/slow PROXIES hanging to the cap, per-proxy not per-URL. The "raise (lives cut at 8s)" scenario is refuted.
+- Successes' high `load_s` (7.08 median) is NOT a near-8s-nav signal: a full success (nav + markdown) totals ~7.6s elapsed while a failing proxy burns 8.5s on nav ALONE → successful navigation is fast (markdown eats a big chunk of the 7.6s). Successes are not bumping the 8s nav cap.
+- ∴ lowering `page_timeout` fails dead/slow proxies faster (saves ~3s on 56.6% of attempts) with little success loss (nav is fast) and zero content loss (URLs succeed elsewhere).
+
+**Caveats / interactions:**
+- Exact safe floor needs the nav-vs-markdown split (load_s can't isolate). The ~7.6s success-total vs ~8.5s fail-nav hints nav ≈ 4-5s → ~5s timeout likely safe — but set it via A/B, not inference.
+- Lower timeout → more attempts/min → faster proxy burn → faster pool drain. At 80@8s the pool drained 16.8k→4k over 60 min but did not exhaust; lowering pushes toward exhaustion → pairs with `exp` cooldown (OT74) for re-supply. Timeout-down + cooldown-exp are complementary.
+- `page_timeout` is NOT exposed in the prod CLI (`python -m src.news` has only --browsers/--slots/--cooldown-policy) — a `--page-timeout` flag is needed to A/B it.
+
+## Open (updated)
+
+- **Timeout A/B** — add `--page-timeout` flag; run 1000@5s vs 8s baseline on fresh untouched years; compare OK count (successes kept?), OK/min (faster?), connect-fail breakdown (page_timeout cluster shrinks to ~5s?).
+- **Cooldown `exp`** — complementary supply lever; run its own A/B (pairs with lower timeout to offset faster burn).
+- 80 slots remains the throughput sweet spot so far (19.4 OK/min > 120's 16.6); concurrency is not the lever (supply-bound).
