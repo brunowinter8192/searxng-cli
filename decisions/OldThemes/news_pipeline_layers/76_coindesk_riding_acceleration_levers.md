@@ -73,6 +73,11 @@ Built incrementally on the riding reporter (`src/news/engine/proxy_riding/report
 
 **Success load-time** — p50 7.08s, p95 11.07s, max 16.07s (load_s, markdown-polluted).
 
+**Plot shapes (the visual proof of LOWER):**
+- connect_fail_hist: bimodal, sharp gap AT the 8s line. Left = fast fails (0.5–6s, peak ~1.5–2.5s, declining to ~0 by 6s); near-empty 6–8s dead zone; right = a massive cap-spike at ~8.5–9s (tallest bar ~2850) tailing to 14s (= 8s cap + overhead). The cap bites the FAILURES hard; ~half of 19k fails are this cap-cluster.
+- success_load_hist: a smooth right-skewed bell (centre ~5–7s, span 2–16s) that flows THROUGH the 8s line with NO cliff/pile-up — successes are not censored at the cap; the >8s mass is markdown on a sub-8s nav. Lives navigate comfortably under 8s.
+- ∴ lowering to **~6s** (first A/B point, not 5s) converts the whole cap-cluster (8.5→~6.5s) while leaving the natural fast-fails (done by 6s) and most successes untouched.
+
 **Interpretation → LOWER, not raise:**
 - The 56.6% page_timeouts hanging to ~8.5s are the dominant time sink (~10.8k × 8.5s ≈ 92k slot-seconds). 
 - They are NOT lost content: all 1000 URLs eventually succeeded on other proxies (1000/1000 all-done; ~19 failed attempts per URL). So page_timeouts = dead/slow PROXIES hanging to the cap, per-proxy not per-URL. The "raise (lives cut at 8s)" scenario is refuted.
