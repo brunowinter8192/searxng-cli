@@ -89,7 +89,7 @@ def _compute_stats(state: RiderState, t_job_start: datetime) -> dict:
     page_timeout_s = state.page_timeout_ms / 1000
     load_times = [j.load_s for j in jobs if j.status == "ok" and j.load_s is not None]
     if len(load_times) >= 2:
-        qs = statistics.quantiles(load_times, n=100)
+        qs = statistics.quantiles(load_times, n=100, method="inclusive")
         load_perc: dict | None = {
             "p50": round(qs[49], 3),
             "p90": round(qs[89], 3),
