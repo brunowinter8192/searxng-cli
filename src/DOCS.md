@@ -4,8 +4,8 @@ Python packages for web search, scraping, crawling, and news ingestion. Utility 
 
 ## log_janitor.py
 
-**Purpose:** 14-day log retention janitor. On-write trigger with 1h marker-throttled slow-path. Three public functions: `get_retention_days()` (env override), `maybe_prune_jsonl(log_path)` (ts-based JSONL filter + atomic rewrite), `maybe_prune_sidecars(sidecar_dir)` (mtime-based `.md` unlink). All failures logged as WARNING and swallowed. Called by `query_logger.py`, `scrape_logger.py`, `download_logger.py`. `cli.py` imports `get_retention_days` for `TimedRotatingFileHandler` backupCount.
-**Called by:** `src/search/query_logger.py`, `src/scraper/scrape_logger.py`, `src/scraper/download_logger.py`, `cli.py`.
+**Purpose:** 14-day log retention janitor. On-write trigger with 1h marker-throttled slow-path. Three public functions: `get_retention_days()` (env override), `maybe_prune_jsonl(log_path)` (ts-based JSONL filter + atomic rewrite), `maybe_prune_sidecars(sidecar_dir)` (mtime-based `.md` unlink). All failures logged as WARNING and swallowed. Called by `query_logger.py`, `scrape_logger.py`. `cli.py` imports `get_retention_days` for `TimedRotatingFileHandler` backupCount.
+**Called by:** `src/search/query_logger.py`, `src/scraper/scrape_logger.py`, `cli.py`.
 
 ## tmux_spawn.sh
 

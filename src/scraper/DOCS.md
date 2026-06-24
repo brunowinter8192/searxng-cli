@@ -1,6 +1,6 @@
 # Scraper Module
 
-URL scraping and PDF download tools powered by Crawl4AI for SearXNG MCP server.
+URL scraping tools powered by Crawl4AI for SearXNG MCP server.
 
 ## scrape_logger.py (88 LOC)
 
@@ -66,41 +66,6 @@ Stub — always returns `""`. Domain blocking removed; no plugin-routing hint is
 - `CONSENT_WORDS` — keyword list for consent density scoring: cookie, consent, einwilligung, tracking, akzeptieren, datenschutz, zweck
 - `CONSENT_DENSITY_THRESHOLD` — 5. Sum of CONSENT_WORDS occurrences in first 3000 chars must exceed this to trigger stripping.
 - `CONSENT_SKIP_OFFSET` — 300 chars. Heading search starts at this offset to skip banner fragments before the actual content starts.
-
-## pdf_chain.py
-
-**Purpose:** PDF URL chain resolution. Utility module used by `download_pdf.py`, `cli.py`, and `dev/search_pipeline/16_search_to_pdf_probe.py`. No I/O except `extract_citation_pdf_url` (sync HTTP hop via requests).
-**Input/Output:** Pure functions (sync); no MCP types.
-
-### Constants
-
-- `HARD_BLACKLIST` — `frozenset[str]` of 11 domains that never yield PDFs (validated in probe 14). Includes `semanticscholar.org` / `openalex.org` (Tier-2 pending engine fix) and `scribd.com` / `nature.com` with caveats documented in module.
-- `TIER1_DOMAINS` — `frozenset[str]`: `arxiv.org`, `aclanthology.org`, `openreview.net`. 100% transform success in probe 14.
-- `CITATION_PDF_RE` — compiled regex matching both attribute orderings of `<meta name="citation_pdf_url" ...>`.
-
-### Functions
-
-- `apply_tier1_transform(url) → str | None` — arxiv `/abs|html/` → `/pdf/`; aclanthology strip-slash+`.pdf`; openreview `/forum` → `/pdf`. Returns transformed URL or None if no transform applies.
-- `is_blacklisted(url) → bool` — True if bare domain is in HARD_BLACKLIST. Strips `www.`.
-- `is_github_blob(url) → bool` — True if `github.com/<owner>/<repo>/blob/` path pattern. GitHub blob viewer returns HTML, not PDF bytes.
-- `should_download_as_pdf(url) → bool` — routing predicate for `cli.py`. True for TIER1 domains or direct `.pdf` suffix URLs (excluding GitHub blob and BLACKLIST). MULTI_STEP candidates → False (scrape_url handles them from CLI; download_pdf_workflow handles them when explicitly invoked).
-- `parse_citation_pdf_url(body) → str | None` — regex search on HTML body string, returns citation_pdf_url value or None.
-- `extract_citation_pdf_url(url) → str | None` — Hop 1: sync `requests.get` with 32KB read cap + 10s timeout, calls `parse_citation_pdf_url`. Returns URL or None on any failure.
-
-## download_logger.py
-
-**Purpose:** Per-URL structured logging for `download_pdf_workflow`. Emits one JSONL record to `src/logs/download_log.jsonl` per call — chain resolution stages attempted, per-stage timings, outcome, http_status, bytes_downloaded. No sidecar files (the PDF is already on disk at `output_path`).
-**Public interface:** `log_download(record: dict)`.
-**Reads:** `SEARXNG_DOWNLOAD_LOG_PATH` env var (fallback `src/logs/download_log.jsonl`).
-**Writes:** `src/logs/download_log.jsonl` (one line per call, gitignored).
-**Called by:** `download_pdf.py` (`download_pdf_workflow` — once per call at every return path).
-**Calls out:** `src/log_janitor.py` (`maybe_prune_jsonl`).
-
-## download_pdf.py
-
-**Purpose:** PDF file download. Uses `requests.get()` with streaming. Chain-resolves the URL via `pdf_chain.py` before downloading: BLACKLIST check → GitHub blob check → TIER1 transform → DIRECT `.pdf` path → MULTI_STEP `citation_pdf_url` two-hop. Also called automatically by `cli.py` when `scrape_url` detects a TIER1 domain or direct `.pdf` URL (`should_download_as_pdf()`).
-**Input:** URL string and optional output directory (default `~/Downloads/`).
-**Output:** TextContent with file path and human-readable file size on success, or error message on failure (blocked domain, GitHub blob, no PDF path, HTTP error). Side effect: writes one JSONL record to `download_log.jsonl` via `download_logger` at every return path.
 
 ## Architecture
 

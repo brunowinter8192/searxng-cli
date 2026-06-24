@@ -33,9 +33,9 @@ import atexit
 from src.search.search_web import search_web_workflow
 from src.search.browser import kill_stale_chrome
 from src.search.cache import cache_key, cache_read, format_engine_pool
+from urllib.parse import urlparse
+
 from src.scraper.scrape_url import scrape_url_workflow
-from src.scraper.download_pdf import download_pdf_workflow
-from src.scraper.pdf_chain import should_download_as_pdf
 
 atexit.register(kill_stale_chrome)
 
@@ -43,7 +43,7 @@ atexit.register(kill_stale_chrome)
 def main():
     parser = argparse.ArgumentParser(
         prog="cli.py",
-        description="SearXNG Web Research CLI — search_web, search_engine_drilldown, scrape_url, download_pdf."
+        description="SearXNG Web Research CLI — search_web, search_engine_drilldown, scrape_url."
     )
     sub = parser.add_subparsers(dest="cmd", required=True)
 
@@ -82,12 +82,6 @@ def main():
     p = sub.add_parser("scrape_url", help="Scrape URL to filtered markdown (PruningContentFilter, 15000 char limit).")
     p.add_argument("url", help="URL to scrape")
 
-    # ── download_pdf ──────────────────────────────────────────────────────────
-    p = sub.add_parser("download_pdf", help="Download PDF file from URL.")
-    p.add_argument("url", help="URL of the PDF to download")
-    p.add_argument("--output-dir", dest="output_dir", default=str(Path.home() / "Downloads"),
-                   help="Directory to save the PDF (default: ~/Downloads)")
-
     # ── Dispatch ──────────────────────────────────────────────────────────────
     args = parser.parse_args()
 
@@ -119,13 +113,11 @@ def main():
         return
 
     elif args.cmd == "scrape_url":
-        if should_download_as_pdf(args.url):
-            result = download_pdf_workflow(args.url, str(Path.home() / "Downloads"))
-        else:
-            result = asyncio.run(scrape_url_workflow(args.url))
-
-    elif args.cmd == "download_pdf":
-        result = download_pdf_workflow(args.url, args.output_dir)
+        url = args.url
+        if urlparse(url).path.lower().endswith(".pdf"):
+            print(f"PDF must be downloaded by the user: {url}")
+            return
+        result = asyncio.run(scrape_url_workflow(url))
 
     print(result[0].text)
 

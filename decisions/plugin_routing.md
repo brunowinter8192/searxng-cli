@@ -2,9 +2,9 @@
 
 ## Status Quo (IST)
 
-**No domain blocking.** `scrape_url` and `scrape_url_raw` attempt to scrape any URL without restriction. The CLI scrape handlers in `cli.py` proceed directly to the scrape workflow after the PDF check — no routing guard. `get_plugin_hint()` in `src/scraper/scrape_url.py` returns `""` unconditionally.
+**No domain blocking.** `scrape_url` attempts to scrape any URL without restriction. `get_plugin_hint()` in `src/scraper/scrape_url.py` returns `""` unconditionally.
 
-**PDF routing is unchanged:** `should_download_as_pdf()` still routes `.pdf`-suffix and TIER1 academic domain URLs to `download_pdf`. See `decisions/scrape_pipeline.md`.
+**PDF URLs:** when a `.pdf`-suffix URL is passed to `scrape_url`, `cli.py` detects it via `urlparse(url).path.lower().endswith(".pdf")` and returns the error `"PDF must be downloaded by the user: <url>"` without scraping. The user downloads PDFs themselves.
 
 **Previously blocked domains** (github.com, raw.githubusercontent.com, reddit.com, arxiv.org, youtube.com, youtu.be) are now scraped like any other domain.
 
@@ -30,4 +30,4 @@ None — prior questions about huggingface.co, gist.github.com, and paperswithco
 
 ## Quellen
 
-- `decisions/scrape_pipeline.md` — PDF routing chain (unchanged)
+None — internal decision, no external sources.
