@@ -68,6 +68,7 @@ class JobRecord:
     t_start:       datetime
     ride_position: int        # which URL on this proxy (1st, 2nd, …)
     proxy_str:     str
+    load_s:        float | None = None  # elapsed_s − DELAY_BEFORE_HTML; crawl4ai exposes no dedicated nav-timing field
 
 
 @dataclass
@@ -235,6 +236,7 @@ async def _run_slot(slot_id: int, crawler: AsyncWebCrawler, state: RiderState) -
                     status=status, char_count=char_count, markdown_len=markdown_len,
                     elapsed_s=round(elapsed, 2), error=err, file=None,
                     t_start=t_url_abs, ride_position=ride_pos, proxy_str=pstr,
+                    load_s=round(max(0.0, elapsed - DELAY_BEFORE_HTML), 3) if status == "ok" else None,
                 )
 
                 if status == "ok":
