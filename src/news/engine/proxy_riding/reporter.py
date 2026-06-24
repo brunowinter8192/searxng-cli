@@ -155,19 +155,24 @@ def _write_cumulative_plot(job_dir: Path, stats: dict) -> None:
     plt.close(fig)
 
 
-# Histogram of OK-fetch load times; x-axis fixed to [0, page_timeout_s] for cross-run comparability.
+# Histogram of OK-fetch load times; x-axis auto-ranges to data (load_s can exceed page_timeout_s
+# due to post-nav processing); vertical line marks page_timeout_s so the nav cap is visible.
 def _write_load_hist(job_dir: Path, stats: dict) -> None:
     import matplotlib.pyplot as plt
 
     load_times     = stats["load_times"]
     page_timeout_s = stats["page_timeout_s"]
 
-    n_bins = max(1, math.ceil(page_timeout_s / 0.25))
+    upper  = math.ceil(max(load_times) / 0.25) * 0.25
+    n_bins = max(1, math.ceil(upper / 0.25))
     bins   = [i * 0.25 for i in range(n_bins + 1)]
 
     fig, ax = plt.subplots(figsize=(10, 5))
     ax.hist(load_times, bins=bins, edgecolor="white", linewidth=0.5)
-    ax.set_xlim(0, page_timeout_s)
+    ax.axvline(page_timeout_s, color="red", linewidth=1.2,
+               label=f"page_timeout {page_timeout_s:.1f} s")
+    ax.legend(fontsize=9)
+    ax.set_xlim(0, upper)
     ax.set_xlabel("Load time (s)  [elapsed − DELAY_BEFORE_HTML 0.5 s]")
     ax.set_ylabel("OK fetches")
     ax.set_title("Success load-time distribution")
