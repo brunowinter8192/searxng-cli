@@ -1,14 +1,13 @@
 ---
 name: searxng-cli-pdf
-description: Convert PDF(s) to Markdown (whole-document, MinerU pipeline backend) and index into a RAG collection. No worker, fully interactive — the USER runs ONE convert command that processes all PDFs sequentially; Claude does naming, cleanup, index. Hybrid (VLM) backend is the per-PDF escalation Claude proposes when cleanup finds unrecoverable corruption.
+description: Convert PDF(s) to Markdown (whole-document, MinerU mlx / vlm-auto-engine) and index into a RAG collection. No worker, fully interactive — the USER runs ONE convert command that processes all PDFs sequentially; Claude does naming, cleanup, index.
 ---
 
 # PDF → MD → Index — Skill
 
 No worker. Interactive. The USER runs the convert command; Claude does ONLY: naming, cleanup, index.
 ONE command converts ALL PDFs in the batch sequentially — each as a whole document (no chunking),
-MinerU `pipeline` backend. Hybrid (VLM) is the per-PDF escalation when cleanup finds the pipeline
-output unrecoverably corrupted.
+MinerU `vlm-auto-engine` (mlx) — the only engine.
 
 ## Paths
 - MINERU = `~/Documents/ai/Mineru/venv/bin/python ~/Documents/ai/Mineru/workflow.py`
@@ -25,16 +24,16 @@ scripts, `rag-cli index`.
    dots, commas, spaces. Rename the source PDF in place → `<STEM>.pdf`.
 2. Skip-check: drop any PDF that already has `<OUTPUT_DIR>/<STEM>.md` — only un-converted PDFs go
    into the command.
-3. Backend is always `pipeline`. MinerU's pipeline runs `method=auto` and routes txt-vs-OCR per page
-   from the actual content — no backend categorization by Claude.
+3. Backend is always `vlm-auto-engine` (mlx) — the only engine. No backend choice; workflow.py takes
+   no `-b`/`-l`/`--effort` flags.
 
 ## Phase 1 — MinerU convert (USER runs, ONE command for the whole batch)
-Write the COMMAND FILE: ONE block listing ALL non-skipped PDFs (pipeline, whole document, no chunks):
+Write the COMMAND FILE: ONE block listing ALL non-skipped PDFs (whole document, no chunks):
 ```
 mkdir -p <OUTPUT_DIR>
 PYTHONUNBUFFERED=1 ~/Documents/ai/Mineru/venv/bin/python ~/Documents/ai/Mineru/workflow.py convert \
   --pdf "<PDF1>" "<PDF2>" "<PDF3>" ... \
-  --out-dir <OUTPUT_DIR> -b pipeline -l en 2>&1 | tee /tmp/<batch>_mineru.log
+  --out-dir <OUTPUT_DIR> 2>&1 | tee /tmp/<batch>_mineru.log
 ```
 - ONE invocation processes all PDFs sequentially — each as a single whole-document mineru process.
 - The mem_watchdog wraps each process and aborts a runaway before it takes the Mac down. A PDF that
@@ -50,20 +49,15 @@ Run on each `<OUTPUT_DIR>/<STEM>.md`. Audit FIRST (counts are signals — sample
 Per-class detection + action:
 - **A — lost formula (UNRECOVERABLE → do NOT clean):** `??`, `` (U+FFFD), empty/`?`-containing
   `<sub>`/`<sup>` (`<su[bp]>[[:space:]]*</su[bp]>|<su[bp]>[^<]*\?[^<]*</su[bp]>`), whitespace-only
-  `$$…$$` blocks (split on `$$`, test odd segments). Any A hit → the pipeline output for that doc is
-  gone; cleaning cannot recover it. **ESCALATE: report symbol/page to the user and propose
-  re-converting THAT PDF with the hybrid (VLM) backend** — slower (~14s/page on this Mac) but higher
-  accuracy, so use it only for the PDFs pipeline corrupted:
-  ```
-  PYTHONUNBUFFERED=1 ~/Documents/ai/Mineru/venv/bin/python ~/Documents/ai/Mineru/workflow.py convert \
-    --pdf "<PDF>" --out-dir <OUTPUT_DIR> -b hybrid-auto-engine 2>&1 | tee /tmp/<STEM>_mineru_hybrid.log
-  ```
+  `$$…$$` blocks (split on `$$`, test odd segments). Any A hit → the output for that doc is
+  gone; cleaning cannot recover it. **Report the symbol/page to the user** — no backend fallback,
+  `vlm-auto-engine` is the only engine.
 - **B — spaced math (RECOVERABLE → de-space):** `_ {`, `^ {`, `\ [a-z]( [a-z])+`, spaced single-char
   runs `([A-Za-z] ){3,}[A-Za-z]`. Collapse runs to real tokens (`\mathrm { a r g m i n }` →
   `\mathrm{argmin}`). Invariant: alphanumeric-char count EXACTLY stable; word count drops.
 - **C — encoding (RECOVERABLE → unescape):** HTML entities
   `&(amp|lt|gt|quot|apos|nbsp|#\d+|#x[0-9a-fA-F]+);`, mojibake `Ã.`/`â€`. Entity count → 0.
-- **D — prose char-typos:** ignore (negligible). Pervasive prose garble = treat as A → escalate to hybrid.
+- **D — prose char-typos:** ignore (negligible). Pervasive prose garble = treat as A → report (unrecoverable).
 - **E — backmatter (MANDATORY STRIP):** from the first
   References/Bibliography/Index/Symbols/Abbreviations/Nomenclature heading in the last ~40% (or
   headingless reference run: most non-blank lines match `\(\d{4}[a-z]?\)`/`^Surname, Init.`; index run:
@@ -74,7 +68,7 @@ Per-class detection + action:
   token set unchanged.
 
 Prose window (every md): pull 1–2 body lines (len > 70, starts alpha, > 10 spaces, alpha-ratio > 0.78)
-from the middle third and READ. Coherent → pass; garbled → A → escalate to hybrid.
+from the middle third and READ. Coherent → pass; garbled → A → report (unrecoverable).
 
 Per-issue scripts: one `/tmp/fix_<issue>_<STEM>.py` each, test on the file, re-scan that class to 0,
 spot-check 10–15 middle lines. Preserve source content; overwrite in place; back up to
