@@ -57,7 +57,17 @@ Built incrementally on the riding reporter (`src/news/engine/proxy_riding/report
 2. **Histogram auto-range fix** — x-axis was hard-clipped to `[0, page_timeout_s]`, hiding the >8s bulk; now auto-ranges to data with a `page_timeout` reference line.
 3. **Connect-fail breakdown** — `connect_fail`s previously discarded their timing (`break` before `job_records.append`). Now collected as `(elapsed_s, subtype)` in `state.connect_fail_records`; reporter emits elapsed-percentiles + histogram + subtype counts. Classifier `_classify_connect_fail`: `"ms exceeded"` → `page_timeout` (Playwright nav cap; crawl4ai wraps as RuntimeError), `"net::err_timed_out"` → `net_timed_out` (TCP), `err_proxy|err_tunnel|socks` → `proxy_connect`, else `other`. Discriminator note: `"timeout"` alone is ambiguous (both nav-cap and TCP contain it) — `"ms exceeded"` is the unique Playwright-nav-cap signature.
 
-**Why connect-fail breakdown matters for the timeout question:** live proxies that get cut at the 8s cap are currently INVISIBLE — a nav-timeout errors with "Timeout 8000ms exceeded" → classified `connect_fail`. The `page_timeout` subtype count is the addressable population for "lives cut at 8s" (a mix of dead-no-response + live-slow; the error string can't separate them — a timeout A/B disambiguates). The connect-fail elapsed histogram shows whether dead proxies hang to ~8s (→ lowering frees slots) or fail fast (→ lowering doesn't help cycling).
+**Why connect-fail breakdown matters for the timeout question:** live proxies that get cut at the 8s cap are currently INVISIBLE — a nav-timeout errors with "Timeout 8000ms exceeded" → classified `connect_fail`. The `page_timeout` subtype is the addressable population for "lives cut at 8s" (a mix of dead-no-response + live-slow; the error string can't separate them — a timeout A/B disambiguates). The connect-fail elapsed histogram shows whether dead proxies hang to ~8s (→ lowering frees slots) or fail fast (→ lowering doesn't help cycling).
+
+## crawl4ai arun phase structure + the connect-fail tail (corrected)
+
+`page_timeout` bounds ONLY `page.goto` (`async_crawler_strategy.py:762-763`, `timeout=config.page_timeout`). Later arun phases are NOT bounded by it — notably a hardcoded `wait_for_selector("body", state="attached", timeout=30000)` at `:812`.
+
+**Retraction:** I initially attributed the connect-fail tail (12-18s) to that 30s body-wait. That is wrong for our config — with `wait_until="domcontentloaded"` the `<body>` attaches at parse, so the body-wait passes ~instantly for a normal page. And with our config there is little post-goto proxy work (0.5s local delay + local markdown), so "fail after a successful goto" is rare — a successful goto already holds the initial document.
+
+**Revised tail hypothesis (UNVERIFIED):** the 12-18s connect-fails are the SAME goto-timeouts, wall-clock STRETCHED by event-loop contention. `DefaultMarkdownGenerator` is sync CPU work that blocks the single asyncio loop; while one coroutine grinds markdown, others (incl. one whose 8s goto-timeout just fired) cannot resume to snapshot `elapsed` → an 8s goto is *measured* as 12-18s. So cap-cluster + tail are largely ONE population (goto-timeouts), smeared right by contention → lowering `page_timeout` shrinks BOTH (better than the earlier "tail won't move" claim). Confirm via per-phase timing (goto vs rest) — a dev probe. Minor edge: malformed HTML where `<body>` never attaches → the 30s body-wait fires.
+
+**Discriminator refinement:** read the timeout A/B off the **histogram cap-cluster peak** (it isolates goto-timeouts at the cap), not the raw `page_timeout` subtype count.
 
 ## Open
 
