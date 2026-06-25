@@ -163,7 +163,7 @@ Raw markdown for pipe-scraping (offline doc indexing): handled by `crawl_site_wo
 
 **Logging:** `logger.warning("Garbage detected [%s]: %s", garbage_type, url)` bei jeder Garbage-Erkennung in `try_scrape()`.
 
-**PDF-URLs:** `download_pdf` CLI command als Lösung — PDFs werden heruntergeladen statt gescrapt. Agent-Instructions verweisen auf `download_pdf` statt "nicht scrapebar".
+**PDF-URLs:** `scrape_url` returns `"PDF must be downloaded by the user: <url>"` when the URL path ends in `.pdf`. The user downloads PDFs themselves — no scrape attempt is made.
 
 **`PLUGIN_HINTS`:** generischer Hint via `get_plugin_hint()` (Stub — gibt immer `""` zurück), wird an Fehlermeldung angehängt wenn Scrape scheitert.
 
@@ -209,7 +209,7 @@ Typisierte Returns ermöglichen differenzierte Fehlermeldungen für den Caller u
 
 `PLUGIN_HINTS` als letzter Ausweg: liefert dem Nutzer einen konkreten Handlungshinweis statt blankem Fehler.
 
-PDF-URLs: `download_pdf` CLI command statt Scraping-Versuch. Agent-Instructions aktualisiert.
+PDF-URLs: `scrape_url` returns an error for `.pdf`-suffix URLs — the user downloads them.
 
 ### Offene Fragen
 

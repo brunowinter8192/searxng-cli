@@ -73,7 +73,7 @@ Read-only `.policy` property exposes the active policy string for the reporter.
 
 ---
 
-### rider.py (552 LOC)
+### rider.py (574 LOC)
 
 **Purpose:** Browser-per-context proxy rider pool. Manages B `AsyncWebCrawler` instances, N slot
 coroutines, per-URL proxy context (`CrawlerRunConfig.proxy_config`), burn/fail rotation, watchdog,
@@ -95,6 +95,23 @@ Key dataclasses: `RiderState` (shared mutable job state — fields: `output_dir`
 `all_resolved = len(done_urls) >= len(target_urls)`), `JobRecord` (per-URL outcome),
 `RideRecord` (per-proxy-ride summary). `FAIL_THRESHOLD = 2` (failed/empty strikes before drop).
 
+`JobRecord` fields: standard per-URL fields + `load_s: float | None` — navigation load time for OK
+fetches only, computed as `max(0, elapsed_s − DELAY_BEFORE_HTML)`. crawl4ai's `CrawlResult` exposes
+no dedicated nav-timing field; subtracting the fixed 0.5 s post-load delay approximates the
+navigation phase (shifts the curve right by ~constant context-setup overhead, reads the timeout
+conservatively). Non-OK fetches leave `load_s = None`.
+
+`RiderState` additional field: `connect_fail_records: list` — list of `(elapsed_s: float, subtype: str)`
+tuples, one per connect_fail fetch, appended in `_run_slot` BEFORE the `break` that exits the proxy
+ride (connect_fail was previously discarded: `break` skips the `job_records.append`). Populated even
+on stall/abort — available in every `write_riding_report` call path.
+
+`_classify_connect_fail(err)` — helper returning one of four subtypes from the raw error string:
+`'page_timeout'` (`"ms exceeded"` — Playwright nav timeout, any value of N in "Timeout Nms exceeded");
+`'net_timed_out'` (`"net::err_timed_out"` — TCP-level timeout, distinct from Playwright cap);
+`'proxy_connect'` (`"err_proxy"` / `"err_tunnel"` / `"socks"` — handshake failure);
+`'other'` — catch-all (ERR_CONNECTION_REFUSED, ERR_CONNECTION_CLOSED, ERR_EMPTY_RESPONSE, etc.).
+
 `run_riding_pool` signal handler lifecycle: after `state` is constructed, installs
 `loop.add_signal_handler(SIGINT/SIGTERM, _abort_interrupted, state, signum)`. Removed in the
 `finally` block (before `watchdog.cancel()`) so they don't fire during the normal-completion
@@ -113,17 +130,37 @@ Key dataclasses: `RiderState` (shared mutable job state — fields: `output_dir`
 calls `write_riding_report`, `os._exit(130)` for SIGINT / `os._exit(143)` for SIGTERM. Same
 structure and late-import pattern as `_abort_stall` / `_abort_done`.
 
-### reporter.py (236 LOC)
+### reporter.py (383 LOC)
 
 **Purpose:** Job report writer — `job.md` (counts, throughput, proxy-riding stats, eligible-pool-over-time
-table, regwall counts) + `cumulative.png` (step-plot of cumulative OK fetches over time).
+table, regwall counts, connect-fail breakdown, success load-time distribution) + `cumulative.png`
+(step-plot of cumulative OK fetches over time) + `success_load_hist.png` (histogram of OK-fetch load
+times) + `connect_fail_hist.png` (histogram of connect-fail elapsed times).
 **Reads:** `RiderState` (in-memory), `t_job_start` (datetime).
-**Writes:** `{job_dir}/job.md`; `{job_dir}/cumulative.png`.
+**Writes:** `{job_dir}/job.md`; `{job_dir}/cumulative.png`;
+`{job_dir}/success_load_hist.png` (only when ≥2 OK `load_s` values);
+`{job_dir}/connect_fail_hist.png` (only when ≥2 `connect_fail_records`).
+All histograms: 0.25 s bins, x-axis auto-ranges to data max, page_timeout_s red vertical line.
 **Called by:** `pipeline.py:run_scrape_only` (normal completion, via `write_riding_report`);
 `rider._abort_stall` (late import, stall abort); `rider._abort_done` (late import, wedge-after-done);
 `rider._abort_interrupted` (late import, SIGINT/SIGTERM abort).
-**Calls out:** `matplotlib` (lazy import inside `_write_cumulative_plot`); `statistics` (stdlib);
-`src.news.engine.proxy_riding.rider` (RiderState, FAIL_THRESHOLD).
+**Calls out:** `matplotlib` (lazy import inside plot functions); `statistics` (stdlib, incl.
+`statistics.quantiles` with `method='inclusive'` — bounds p-values within observed [min, max]);
+`math` (stdlib, bin count); `src.news.engine.proxy_riding.rider` (RiderState, FAIL_THRESHOLD).
+
+`_compute_stats` additions:
+- `load_times` / `load_perc` — OK-fetch load times + inclusive percentiles (None when <2 samples)
+- `cf_times` / `cf_perc` — connect-fail elapsed times + inclusive percentiles (None when <2 samples)
+- `cf_subtype_counts` — dict of subtype → count (`page_timeout`, `net_timed_out`, `proxy_connect`, `other`)
+- `page_timeout_s` — from `state.page_timeout_ms / 1000`, shared axis reference for both histograms
+
+job.md section **"Connect-fail breakdown"** (between Regwall and Success load-time): percentile table
+(p50/p90/p95/p99/max, n=count) + subtype table (count + share) computed over `connect_fail_records`.
+Subtypes shown in fixed order (page_timeout, net_timed_out, proxy_connect, other) for cross-run
+comparability. `_Fewer than 2 connect-fail records_` note + no histogram when <2 samples.
+
+job.md section **"Success load-time distribution"**: percentile table computed over OK fetches only.
+`_Fewer than 2 OK fetches_` note when unavailable.
 
 ### scrape.py (113 LOC)
 

@@ -1,13 +1,13 @@
 ---
 name: searxng-cli-web-research
-description: SearXNG web research — CLI tool reference (search_web, search_engine_drilldown, scrape_url, download_pdf) + permanent-capture worker setup
+description: SearXNG web research — CLI tool reference (search_web, search_engine_drilldown, scrape_url) + permanent-capture worker setup
 ---
 
 <!-- WIP COPY for iteration in trading/dev/skill_wip — edit here, sync back to the plugin skill when finalized. Source: ~/.claude/plugins/cache/brunowinter-plugins/searxng-cli/1.0.0/skills/searxng-cli-web-research/SKILL.md -->
 
 # SearXNG Web Research — Skill
 
-Ad-hoc web research via `searxng-cli`: search across 9 engines, drill into one engine for its URLs, scrape a page to filtered markdown, download a PDF. To permanently capture a whole domain into RAG, use the Permanent Capture Workflow at the bottom — that spawns a worker; this CLI is for in-chat lookups. (PDF → MD conversion is a separate flow — see the `searxng-cli-pdf` skill.)
+Ad-hoc web research via `searxng-cli`: search across 9 engines, drill into one engine for its URLs, scrape a page to filtered markdown. To permanently capture a whole domain into RAG, use the Permanent Capture Workflow at the bottom — that spawns a worker; this CLI is for in-chat lookups. (PDF → MD conversion is a separate flow — see the `searxng-cli-pdf` skill.)
 
 **This is the web-md capture skill Opus activates.** Everything Opus needs to prompt and supervise a web-md capture lives here. The worker activates `searxng-cli-capture-and-index` to execute the pipeline; Opus never reads that skill. (Both sides holding a skill is by design: the worker runs the steps, Opus knows the gates well enough to man them.)
 
@@ -25,9 +25,6 @@ searxng-cli search_engine_drilldown "machine learning retrieval" --engine google
 
 # Scrape a page to filtered markdown
 searxng-cli scrape_url "https://example.com/article"
-
-# Download a PDF
-searxng-cli download_pdf "https://arxiv.org/pdf/2310.01526" --output-dir /tmp/papers/
 ```
 
 On error (missing dependency, engine timeout): prints to stderr, exits non-zero.
@@ -39,7 +36,6 @@ On error (missing dependency, engine timeout): prints to stderr, exits non-zero.
 | search_web | Search across 9 engines. Returns an engine-breakdown table (counts per engine, no URLs) |
 | search_engine_drilldown | URL list for one engine, from the cached search_web results |
 | scrape_url | Page → filtered markdown (15k, PruningContentFilter). For in-chat reading |
-| download_pdf | Download a PDF file to disk |
 
 ## Parameters
 
@@ -90,18 +86,11 @@ Results from lobsters for "rust async runtime"
 
 Returns 15k-capped markdown (PruningContentFilter) with a `# Content from: <url>` header. No options. For raw, full-fidelity capture of a whole domain, use the Permanent Capture Workflow — not this.
 
-### download_pdf
-
-| Parameter | Type | Description |
-|-----------|------|-------------|
-| url | str (required) | PDF URL |
-| --output-dir | str (default ~/Downloads) | Save directory |
-
 ## Search Strategy
 
 1. `search_web` for the engine breakdown. For a deep dive, fire 2–4 parallel calls with query variations.
 2. `search_engine_drilldown` per engine with a useful count to get its URLs. Drilldowns reuse the search_web cache (1h TTL).
-3. `scrape_url` the relevant URLs. If a URL ends in `.pdf`, use `download_pdf` instead.
+3. `scrape_url` the relevant URLs. PDFs and books: give the user the exact URLs from the search results — the user downloads them. Do not `scrape_url` a `.pdf` URL (it returns an error: the PDF must be downloaded by the user).
 
 Write the query in the language you want results in.
 

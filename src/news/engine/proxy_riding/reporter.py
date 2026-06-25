@@ -1,5 +1,6 @@
 # INFRASTRUCTURE
 
+import math
 import statistics
 from datetime import datetime, timezone
 from pathlib import Path
@@ -11,11 +12,15 @@ _BACKFILL_TOTAL = 61_000
 
 # ORCHESTRATOR
 
-# Write job.md + cumulative.png for a proxy-riding scrape run to job_dir.
+# Write job.md + cumulative.png + success_load_hist.png + connect_fail_hist.png for a proxy-riding scrape run to job_dir.
 def write_riding_report(state: RiderState, job_dir: Path, t_job_start: datetime) -> None:
     job_dir.mkdir(parents=True, exist_ok=True)
     stats = _compute_stats(state, t_job_start)
     _write_cumulative_plot(job_dir, stats)
+    if stats["load_perc"] is not None:
+        _write_load_hist(job_dir, stats)
+    if stats["cf_perc"] is not None:
+        _write_cf_hist(job_dir, stats)
     _write_md(job_dir, state, stats, t_job_start)
 
 
@@ -83,6 +88,39 @@ def _compute_stats(state: RiderState, t_job_start: datetime) -> dict:
                     "peak_cooldown": peak_cooldown,
                 })
 
+    page_timeout_s = state.page_timeout_ms / 1000
+    load_times = [j.load_s for j in jobs if j.status == "ok" and j.load_s is not None]
+    if len(load_times) >= 2:
+        qs = statistics.quantiles(load_times, n=100, method="inclusive")
+        load_perc: dict | None = {
+            "p50": round(qs[49], 3),
+            "p90": round(qs[89], 3),
+            "p95": round(qs[94], 3),
+            "p99": round(qs[98], 3),
+            "max": round(max(load_times), 3),
+            "n":   len(load_times),
+        }
+    else:
+        load_perc = None
+
+    cf_times    = [r[0] for r in state.connect_fail_records]
+    cf_subtypes = [r[1] for r in state.connect_fail_records]
+    if len(cf_times) >= 2:
+        qs = statistics.quantiles(cf_times, n=100, method="inclusive")
+        cf_perc: dict | None = {
+            "p50": round(qs[49], 3),
+            "p90": round(qs[89], 3),
+            "p95": round(qs[94], 3),
+            "p99": round(qs[98], 3),
+            "max": round(max(cf_times), 3),
+            "n":   len(cf_times),
+        }
+    else:
+        cf_perc = None
+    cf_subtype_counts: dict[str, int] = {}
+    for st in cf_subtypes:
+        cf_subtype_counts[st] = cf_subtype_counts.get(st, 0) + 1
+
     return {
         "n_ok": n_ok, "n_regwall_fetches": n_regwall_fetches,
         "n_failed": n_failed, "n_connect_fail": n_connect_fail,
@@ -100,6 +138,12 @@ def _compute_stats(state: RiderState, t_job_start: datetime) -> dict:
         "wasted_ratio": wasted_ratio,
         "termination": state.termination,
         "pool_total": pool_total, "pool_windows": pool_windows,
+        "page_timeout_s": page_timeout_s,
+        "load_times": load_times,
+        "load_perc": load_perc,
+        "cf_times": cf_times,
+        "cf_perc": cf_perc,
+        "cf_subtype_counts": cf_subtype_counts,
     }
 
 
@@ -131,6 +175,59 @@ def _write_cumulative_plot(job_dir: Path, stats: dict) -> None:
     ax.grid(True, alpha=0.3)
     fig.tight_layout()
     fig.savefig(job_dir / "cumulative.png", dpi=100)
+    plt.close(fig)
+
+
+# Histogram of OK-fetch load times; x-axis auto-ranges to data (load_s can exceed page_timeout_s
+# due to post-nav processing); vertical line marks page_timeout_s so the nav cap is visible.
+def _write_load_hist(job_dir: Path, stats: dict) -> None:
+    import matplotlib.pyplot as plt
+
+    load_times     = stats["load_times"]
+    page_timeout_s = stats["page_timeout_s"]
+
+    upper  = math.ceil(max(load_times) / 0.25) * 0.25
+    n_bins = max(1, math.ceil(upper / 0.25))
+    bins   = [i * 0.25 for i in range(n_bins + 1)]
+
+    fig, ax = plt.subplots(figsize=(10, 5))
+    ax.hist(load_times, bins=bins, edgecolor="white", linewidth=0.5)
+    ax.axvline(page_timeout_s, color="red", linewidth=1.2,
+               label=f"page_timeout {page_timeout_s:.1f} s")
+    ax.legend(fontsize=9)
+    ax.set_xlim(0, upper)
+    ax.set_xlabel("Load time (s)  [elapsed − DELAY_BEFORE_HTML 0.5 s]")
+    ax.set_ylabel("OK fetches")
+    ax.set_title("Success load-time distribution")
+    ax.grid(True, alpha=0.3, axis="y")
+    fig.tight_layout()
+    fig.savefig(job_dir / "success_load_hist.png", dpi=100)
+    plt.close(fig)
+
+
+# Histogram of connect-fail elapsed times; mirrors _write_load_hist style for direct comparability.
+def _write_cf_hist(job_dir: Path, stats: dict) -> None:
+    import matplotlib.pyplot as plt
+
+    cf_times       = stats["cf_times"]
+    page_timeout_s = stats["page_timeout_s"]
+
+    upper  = math.ceil(max(cf_times) / 0.25) * 0.25
+    n_bins = max(1, math.ceil(upper / 0.25))
+    bins   = [i * 0.25 for i in range(n_bins + 1)]
+
+    fig, ax = plt.subplots(figsize=(10, 5))
+    ax.hist(cf_times, bins=bins, edgecolor="white", linewidth=0.5)
+    ax.axvline(page_timeout_s, color="red", linewidth=1.2,
+               label=f"page_timeout {page_timeout_s:.1f} s")
+    ax.legend(fontsize=9)
+    ax.set_xlim(0, upper)
+    ax.set_xlabel("Elapsed time (s)")
+    ax.set_ylabel("Connect-fail fetches")
+    ax.set_title("Connect-fail elapsed distribution")
+    ax.grid(True, alpha=0.3, axis="y")
+    fig.tight_layout()
+    fig.savefig(job_dir / "connect_fail_hist.png", dpi=100)
     plt.close(fig)
 
 
@@ -226,11 +323,61 @@ def _write_md(
         "",
     ]
 
-    lines += [
-        "## Plots",
-        "",
-        "![Cumulative OK](cumulative.png)",
-        "",
-    ]
+    lines += ["## Connect-fail breakdown", ""]
+    cp       = stats["cf_perc"]
+    n_cf_tot = len(stats["cf_times"])
+    if cp is None:
+        lines += [
+            f"_Fewer than 2 connect-fail records (n={n_cf_tot}) — distribution not available._",
+            "",
+        ]
+    else:
+        lines += [
+            f"n = {cp['n']} connect-fail fetches  ·  timeout = {stats['page_timeout_s']:.1f} s",
+            "",
+            "| Percentile | Elapsed (s) |",
+            "|---|---|",
+            f"| p50 | {cp['p50']:.3f} |",
+            f"| p90 | {cp['p90']:.3f} |",
+            f"| p95 | {cp['p95']:.3f} |",
+            f"| p99 | {cp['p99']:.3f} |",
+            f"| max | {cp['max']:.3f} |",
+            "",
+        ]
+    sc = stats["cf_subtype_counts"]
+    if sc:
+        lines += ["### Subtypes", "", "| Subtype | Count | Share |", "|---|---|---|"]
+        for label in ("page_timeout", "net_timed_out", "proxy_connect", "other"):
+            count = sc.get(label, 0)
+            if count:
+                lines.append(f"| {label} | {count} | {count / max(n_cf_tot, 1):.1%} |")
+        lines += [""]
+
+    lines += ["## Success load-time distribution", ""]
+    lp = stats["load_perc"]
+    if lp is None:
+        lines += [
+            f"_Fewer than 2 OK fetches (n={len(stats['load_times'])}) — distribution not available._",
+            "",
+        ]
+    else:
+        lines += [
+            f"n = {lp['n']} OK fetches  ·  timeout = {stats['page_timeout_s']:.1f} s",
+            "",
+            "| Percentile | Load time (s) |",
+            "|---|---|",
+            f"| p50 | {lp['p50']:.3f} |",
+            f"| p90 | {lp['p90']:.3f} |",
+            f"| p95 | {lp['p95']:.3f} |",
+            f"| p99 | {lp['p99']:.3f} |",
+            f"| max | {lp['max']:.3f} |",
+            "",
+        ]
+
+    lines += ["## Plots", "", "![Cumulative OK](cumulative.png)", ""]
+    if cp is not None:
+        lines += ["![Connect-fail histogram](connect_fail_hist.png)", ""]
+    if lp is not None:
+        lines += ["![Success load-time histogram](success_load_hist.png)", ""]
 
     (job_dir / "job.md").write_text("\n".join(lines), encoding="utf-8")

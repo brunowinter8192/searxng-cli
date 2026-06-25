@@ -89,6 +89,13 @@ def main() -> None:
         default=None,
         help="Proxy cooldown policy for proxy_riding scrape-only: 'fixed' (60-min flat, default) or 'exp' (exponential backoff with jitter).",
     )
+    parser.add_argument(
+        "--page-timeout",
+        dest="page_timeout",
+        type=int,
+        default=None,
+        help="Per-fetch page navigation timeout in ms for proxy_riding scrape-only (default 8000 from RidingScrapeConfig).",
+    )
     args = parser.parse_args()
 
     platform = get(args.source)
@@ -113,6 +120,7 @@ def main() -> None:
             n_browsers=args.browsers,
             n_slots=args.slots,
             cooldown_policy=args.cooldown_policy,
+            page_timeout_ms=args.page_timeout,
         ))
     elif args.discover_only:
         asyncio.run(run_discover_only(platform))
