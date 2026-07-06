@@ -1,7 +1,7 @@
-# 57 — The Block in-pipe clean-pass (Issue #11, C2 + A1)
+# 57 — The Block in-pipe clean-pass
 
 **Date:** 2026-07-06. **Branch:** `theblock-clean-pass`.
-**Prior art:** OT52 (raw-only decoupling), OT54 (cleaner extension over 22,995-file corpus).
+**Prior art:** the raw-only decoupling entry, the cleaner extension over the 22,995-file corpus.
 
 ---
 
@@ -70,7 +70,7 @@ trailing newline. Persisted once at end of the pass (not per-entry write).
 
 ---
 
-## Live logging (C2 — visibility at scale)
+## Live logging (visibility at scale)
 
 Three logging surfaces:
 
@@ -81,7 +81,7 @@ Three logging surfaces:
 
 ---
 
-## Raw retention guarantee (A1)
+## Raw retention guarantee
 
 `_run_clean_pass` only calls `raw_path.read_text()` on each raw file. Zero writes, moves, or
 deletes on anything under `raw_dir/`. No code in the pipeline deleted raw files before this task;
@@ -101,7 +101,7 @@ separate manual step (`rag-cli index --collection theblock`).
 ## Stale docstring fixed
 
 `src/news/engine/proxy_pool/scrape.py` docstring referenced `_run_cleanup in pipeline.py`
-(never existed — removed in OT52). Updated to `_run_clean_pass in pipeline.py`.
+(never existed — removed in the raw-only decoupling stage). Updated to `_run_clean_pass in pipeline.py`.
 
 ---
 
@@ -110,13 +110,13 @@ separate manual step (`rag-cli index --collection theblock`).
 `tests/test_theblock_clean_pass.py` — 6 tests, synthetic HTML fixtures, no corpus, no network.
 
 Uses real `TheBlockPlatform.cleanup()` (crawl4ai available in venv) — tests the wiring, not
-the cleaner rules (those were proven over the 22,995-file corpus in OT54).
+the cleaner rules (those were proven over the 22,995-file corpus in the cleaner extension entry).
 
 | Test | What it verifies |
 |---|---|
 | `test_good_article_clean_file_written` | Correct `theblock__{date}__{hash}.md` written with non-empty content |
 | `test_bodyless_no_clean_file_url_recorded` | No clean file; URL in `bodyless_urls.txt` |
-| `test_raw_files_unchanged_after_pass` | A1: byte-for-byte raw identity after pass |
+| `test_raw_files_unchanged_after_pass` | byte-for-byte raw identity after pass |
 | `test_stats_correct` | `{"n_cleaned":1, "n_bodyless":1, "total":2}` returned |
 | `test_empty_entries_returns_zero_stats` | Empty input → zero stats; `collection_dir` not created |
 | `test_bodyless_urls_union_merged` | Second run union-merges URLs, file stays sorted |

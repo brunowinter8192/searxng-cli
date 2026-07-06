@@ -1,9 +1,9 @@
-# 56 — Proxy-pool scrape loop: global stall-termination (resolves OT51)
+# 56 — Proxy-pool scrape loop: global stall-termination
 
 **Date:** 2026-06-18. **State:** design decided (chat-derived); implementation in `loop.py` by worker.
-**Resolves:** OT51 (`51_theblock_backfill_poison_urls_no_termination.md`) — non-termination on persistent-fail URLs.
+**Resolves:** non-termination on persistent-fail URLs, documented in the poison-URLs backfill entry.
 
-## Problem (OT51 recap)
+## Problem (recap)
 
 `run_loop` (`src/news/engine/proxy_pool/loop.py`) terminates only when every queued URL resolves
 to `done` (fetched) or `dead` (404/410). A failed fetch re-appends the URL to the back of the queue
@@ -41,7 +41,7 @@ The user vetoed proxy-weighting. It also has real downsides the stall-detector a
   because it rotates to the queue tail after each fail; a 1-window time cap would have abandoned most of
   the corpus).
 - **Preserves a slow-but-progressing tail.** As long as ANY remaining URL keeps resolving, `_last_progress`
-  moves and the loop continues — the zähe tail grinds to completion. An attempt-cap would wrongly abandon
+  moves and the loop continues — the stubborn tail grinds to completion. An attempt-cap would wrongly abandon
   a slow-but-fetchable tail URL once it crossed N proxy attempts (the tail-race hammers each leftover URL
   with ~128 proxies/batch, so N is reached in minutes regardless of fetchability).
 - **Minimal + queue-independent.** One global timer, no per-URL bookkeeping, no arbitrary N, no proxy

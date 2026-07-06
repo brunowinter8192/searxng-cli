@@ -1,15 +1,15 @@
 # 59 — TheBlock failure-URL diff exclusion from dedup
 
-**Date:** 2026-07-06. **Branch:** `theblock-clean-pass` (stacked on OT57, OT58).
-**Prior art:** OT51 (poison-URL re-scrape problem), OT56 (failure logging — source of dead/failed lists).
+**Date:** 2026-07-06. **Branch:** `theblock-clean-pass` (stacked on the prior clean-pass + master-list-relocation work).
+**Prior art:** the poison-URL re-scrape problem, the stall-termination entry (failure logging — source of dead/failed lists).
 
 ## Problem
 
 `filter_new_entries(mode="raw")` marks an entry "new" iff `raw/{hash}.md` is absent.
 Failure URLs — `dead` (404/410 from origin) and `failed` (not fetched within the 60-min
-no-progress stall window, OT56) — have no raw MD and therefore surfaced as "new" on EVERY
+no-progress stall window) — have no raw MD and therefore surfaced as "new" on EVERY
 subsequent run, re-consuming the full proxy budget on poison URLs that can never succeed.
-This was the OT51 problem manifesting at dedup time.
+This was the poison-URL problem manifesting at dedup time.
 
 ## Decision
 
@@ -62,7 +62,7 @@ Files are absent on first run — the `if _p.exists()` guard makes first-run saf
 | Status | Source | Meaning | Retry? |
 |--------|--------|---------|--------|
 | `dead` | `dead_urls.txt` | 404/410 from origin — article deleted/never existed | No |
-| `failed` | `failed_urls.txt` | Not fetched within 60-min stall window (OT56) | No |
+| `failed` | `failed_urls.txt` | Not fetched within 60-min stall window | No |
 
 Both are treated identically by the exclusion: permanently out of the diff.
 Re-enabling a URL requires manual removal from the relevant file.

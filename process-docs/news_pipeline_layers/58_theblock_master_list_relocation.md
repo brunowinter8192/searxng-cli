@@ -1,7 +1,7 @@
 # 58 — TheBlock master_urls.txt relocation into discover/
 
-**Date:** 2026-07-06. **Branch:** `theblock-clean-pass` (stacked on OT57).
-**Prior art:** OT55 (single master list introduced).
+**Date:** 2026-07-06. **Branch:** `theblock-clean-pass` (stacked on the in-pipe clean-pass work).
+**Prior art:** the single-master-list entry.
 
 ## Decision
 
@@ -9,7 +9,7 @@
 
 ## Why
 
-OT55 introduced the single master list and explicitly noted that timestamped snapshot JSONs
+The prior stage introduced the single master list and explicitly noted that timestamped snapshot JSONs
 were "write-once read-never". For TheBlock, `uses_master_list=True` means no snapshot is
 ever written to `discover/` — the directory existed only for the (now-suppressed) JSON
 snapshots. `discover/` is therefore the natural home for the master list: it is TheBlock's
