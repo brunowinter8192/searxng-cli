@@ -97,7 +97,7 @@ conclusively ruled out.
 
 ## Next Steps
 
-Pending (bead `searxng-bee`):
+Pending:
 
 - **Confirm multi-engine backoff**: add `backoff_until` state logging per engine per query.
   Run `dev/search_pipeline/acquire_probe.py` variant that also reads `limiter._backoff_until`

@@ -124,7 +124,7 @@ never schedules it.
 
 ## Next Steps
 
-Pending (bead `searxng-bee`):
+Pending:
 - Direct instrumentation of `RateLimiter.acquire()`: timestamp lock-enter, token-append, lock-exit
   per engine per query — distinguish "acquire never started" from "acquire started but blocked".
 - Check Python 3.14 asyncio.Lock cancellation behavior: does `__aexit__` release under

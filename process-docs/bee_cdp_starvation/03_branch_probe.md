@@ -60,7 +60,7 @@ Following a CAPTCHA at Q15, Google's backoff fires (ba=Y, pre_br=30.5→5.4s dec
 
 ## Next Steps
 
-Pending (bead `searxng-bee`):
+Pending:
 - **Fix (tokencap):** token saturation is the root cause. Three fix directions:
   (a) raise per-engine `max_requests` from 4 toward the `MAX_REQUESTS=10` default
       (4 was set by each engine's explicit `RateLimiter(max_requests=4, …)` — it suppresses

@@ -37,7 +37,7 @@ Directory renamed: `skills/cleanup-and-index/` → `skills/capture-and-index/`.
 
 Active references updated: `web-research` skill spawn template, the explore01_discovery status text.
 
-Historical OldThemes narratives that describe past state are preserved intact — do not rewrite history.
+Historical process narratives that describe past state are preserved intact — do not rewrite history.
 
 ### 6. Reference collection: user-named, may be another project's
 
