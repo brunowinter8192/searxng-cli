@@ -3,8 +3,7 @@
 **Date:** 2026-05-21  
 **Verdict:** tokencap  
 **Cascade reproduced:** True (18/30 zero_cascade)  
-**Report:** `dev/search_pipeline/01_reports/branch_probe_20260521_192646.md`  
-**Prior probe:** `decisions/OldThemes/bee_cdp_starvation/02_acquire_probe.md`
+**Report:** `dev/search_pipeline/01_reports/branch_probe_20260521_192646.md`
 
 ---
 

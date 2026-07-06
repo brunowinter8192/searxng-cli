@@ -9,13 +9,13 @@
 
 ## Investigation Arc
 
-### Phase 1 — CDP starvation REFUTED (`01_probe.md`)
+### Phase 1 — CDP starvation REFUTED
 
 **Hypothesis:** Chrome CDP events during CAPTCHA navigation create a near-non-yielding event loop busy-loop that starves all 9 engines' `asyncio.wait_for(acquire(), 5.0)` tasks simultaneously.
 
 **Verdict: REFUTED.** Scheduling latency p99 = 1.4ms during zero_cascade (event loop completely free). Zero CDP events during cascade queries — Chrome is silent between queries. CDP mechanism cannot operate.
 
-### Phase 2 — A-sleep confirmed, backoff-cascade narrative INCORRECT (`02_acquire_probe.md`)
+### Phase 2 — A-sleep confirmed, backoff-cascade narrative INCORRECT
 
 **Hypothesis:** `asyncio.wait_for` timeout fires before acquire() is scheduled (B), OR Python 3.14 `asyncio.Lock.__aexit__` fails to release under CancelledError (A-lock), OR acquire() enters sleep inside the lock (A-sleep).
 
@@ -23,7 +23,7 @@
 
 **Inference in Phase 2:** "multi-engine backoff cascade — non-Google engines hit 429/bot-detect during Q2-Q4 and call `.backoff()`". This was NOT probe-verified. Superseded by Phase 3.
 
-### Phase 3 — Tokencap-path wins (`03_branch_probe.md`)
+### Phase 3 — Tokencap-path wins
 
 **Hypothesis split:** two branches in `acquire()` — backoff (`self._backoff_until > now`) vs tokencap (`len(tokens) >= max_requests`). Phase 2 A-sleep confirmation couldn't distinguish them.
 
@@ -68,5 +68,5 @@ Scholar was dormant in `_DEFAULT_ENGINES` (not in the default fanout) but still 
 ## Remaining open items (not this commit)
 
 - **merge.py hygiene:** `ACADEMIC = {"google_scholar", ...}` and `ACADEMIC_PRIORITY = {"google_scholar": 2, ...}` are inert dead references. Follow-up hygiene pass.
-- **g82 pooling-rework:** Scholar re-integration path. `scholar.py` HTTP logic preserved in tree. See `OldThemes/scholar_decoupling/20260509.md` for pool design notes.
+- **g82 pooling-rework:** Scholar re-integration path. `scholar.py` HTTP logic preserved in tree.
 - **`max_requests` per-engine:** currently 4 (hardcoded in each engine). Module default is 10. With RATE_WAIT_TIMEOUT=60 the tokencap wait is now bounded and recoverable — `max_requests` tuning is a separate optimization, not urgent.

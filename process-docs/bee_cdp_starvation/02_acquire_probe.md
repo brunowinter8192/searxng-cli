@@ -3,8 +3,7 @@
 **Date:** 2026-05-21  
 **Verdict:** A-sleep — acquire() runs, gets lock, blocks on `asyncio.sleep(backoff_s)` for ALL 9 engines  
 **Cascade reproduced:** True (13/30 zero_cascade)  
-**Report:** `dev/search_pipeline/01_reports/acquire_probe_20260521_183226.md`  
-**Prior probe:** `decisions/OldThemes/bee_cdp_starvation/01_probe.md`
+**Report:** `dev/search_pipeline/01_reports/acquire_probe_20260521_183226.md`
 
 ---
 

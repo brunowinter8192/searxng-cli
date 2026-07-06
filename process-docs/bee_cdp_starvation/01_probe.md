@@ -2,8 +2,7 @@
 
 **Date:** 2026-05-21  
 **Verdict:** REFUTED  
-**Report:** `dev/search_pipeline/01_reports/cdp_probe_20260521_174959.md`  
-**Prior diagnosis:** `decisions/OldThemes/pooling/04_zero_query_diagnosis.md`
+**Report:** `dev/search_pipeline/01_reports/cdp_probe_20260521_174959.md`
 
 ---
 

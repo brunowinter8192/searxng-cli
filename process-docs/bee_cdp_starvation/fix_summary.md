@@ -1,6 +1,6 @@
 # bee_fix — RATE_WAIT_TIMEOUT + Bucket-Uniformity + Scholar Removal (2026-05-21)
 
-Three production changes applied 2026-05-21 (commit on branch `engine-uniformity`). This file documents what was changed and why. The IST state resulting from these changes is in `decisions/search_pipeline.md` (engine set) and `decisions/rate_limiting.md` (RATE_WAIT_TIMEOUT + bucket-uniformity policy).
+Three production changes applied 2026-05-21 (commit on branch `engine-uniformity`). This file documents what was changed and why.
 
 ## Production Changes Applied
 
@@ -16,7 +16,7 @@ All 9 active engines fire on every query, regardless of filter mode (`--books`, 
 - `_select_engines()` default path returns full 9-engine set with `excluded={}`
 - `scholar.py` file stays in tree (class + HTTP logic intact) for future re-integration via g82 pooling-rework. The file is inert — nothing imports it.
 
-## Evidenz
+## Evidence
 
 Three probe phases preceding the fix:
 
@@ -44,16 +44,16 @@ Immune engines (crossref, openalex, stack_exchange, open_library) NEVER fired ba
 
 Per-engine status across all 20 queries: crossref 19 OK, duckduckgo 17 OK, google 17 OK, lobsters 10 OK, mojeek 20 OK, open_library 5 OK, openalex 14 OK, semantic_scholar 12 OK, stack_exchange 10 OK. RATE_SKIP = 0 across all engines across all queries. Total wall 294s ≈ 4.9 min (9 engines, 20 queries, zero cascade).
 
-## Offene Fragen
+## Open Questions
 
 - g82 pooling-rework: which pool definitions place Scholar in a Google-free set? What inter-session CAPTCHA behavior is expected at 4/min in a Scholar-only pool?
 - `max_requests` per-engine: currently hardcoded at 4 in each engine constructor call. Phase 3 showed the module default is 10. Should all engines use the module default (wider headroom before tokencap)? Not urgent while RATE_WAIT_TIMEOUT=60 covers the wait correctly.
 
-## Quellen
+## Sources
 
 | Source | Relevance |
 |--------|-----------|
-| `decisions/OldThemes/bee_cdp_starvation/01_probe.md` | Phase 1: CDP starvation REFUTED |
-| `decisions/OldThemes/bee_cdp_starvation/02_acquire_probe.md` | Phase 2: A-sleep confirmed, lock clean |
-| `decisions/OldThemes/bee_cdp_starvation/03_branch_probe.md` | Phase 3: tokencap-path verdict |
-| `decisions/OldThemes/scholar_decoupling/20260509.md` | Scholar HTTP migration + Google decoupling history |
+| Phase 1 probe | CDP starvation REFUTED |
+| Phase 2 probe | A-sleep confirmed, lock clean |
+| Phase 3 probe | tokencap-path verdict |
+| Scholar decoupling investigation (2026-05-09) | Scholar HTTP migration + Google decoupling history |
