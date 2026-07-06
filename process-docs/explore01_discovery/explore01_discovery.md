@@ -1,5 +1,7 @@
 # Explore Pipeline Step 1: Site Discovery
 
+*Snapshot as of 2026-06 — historical process record; the live current state is the source code, not this file.*
+
 ## Current State
 
 **Code:** `src/crawler/crawl_site.py` — `discover_urls_playwright()` (BFS engine) + `crawl_site_workflow()` (CLI entry point + content crawl). `explore_site.py` and `filter_urls.py` were removed; `discover_urls_playwright` is now an internal function of `crawl_site.py` only, not exposed as a CLI tool.
@@ -55,7 +57,6 @@ Post-run diagnostic on seed page `/de/rest`: only 35 `/de/rest/*` links in rende
 
 Script: `dev/explore_pipeline/06_nextdata_probe.py`  
 Report: `dev/explore_pipeline/06_reports/gh_live_discovery_20260531_0256.md`  
-Method narrative: `decisions/OldThemes/agentic_discovery/01_gh_live_experiment.md`  
 Dataset: `dev/explore_pipeline/goldstandard/docs_github_rest.txt` (305 URLs)
 
 | Strategy | Recall % | Matched | Time | Mechanism |
@@ -95,6 +96,4 @@ HEAD-request before BFS. Fixes domain-mismatch for redirect chains (e.g. `docs.a
 - `dev/explore_pipeline/04_render_recall.py` — Phase A HTTP BFS baseline
 - `dev/explore_pipeline/06_nextdata_probe.py` — __NEXT_DATA__ discovery implementation
 - `dev/explore_pipeline/06_reports/gh_live_discovery_20260531_0256.md` — __NEXT_DATA__ run report (305/305)
-- `decisions/OldThemes/agentic_discovery/01_gh_live_experiment.md` — full method narrative
-- `decisions/OldThemes/crawler_js_render_discovery/` — full investigation arc (A_recall_probe.md, B_playwright_bfs_probe.md, 00_design_decisions_and_levers.md)
 - Crawl4AI issue #1665 — BFSDeepCrawlStrategy captures page before JavaScript loads
