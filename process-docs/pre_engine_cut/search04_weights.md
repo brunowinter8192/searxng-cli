@@ -1,6 +1,6 @@
 # Search Pipeline Step 4: Engine Weights
 
-> **⚠️ Superseded (2026-04-15 engine-cut):** This file documents per-engine weights in the SearXNG-Docker settings.yml. That config (src/searxng/settings.yml, deleted 2026-04-15) no longer exists. Current ranking is slot-based (12 general / 6 academic / 2 Q&A) with overlap-counting, documented in `decisions/search_pipeline.md`.
+> **⚠️ Superseded (2026-04-15 engine-cut):** This file documents per-engine weights in the SearXNG-Docker settings.yml. That config (src/searxng/settings.yml, deleted 2026-04-15) no longer exists. As of 2026-04-15, ranking moved to a slot-based scheme (12 general / 6 academic / 2 Q&A) with overlap-counting.
 
 ## Status Quo (Historical, pre-engine-cut)
 
@@ -26,7 +26,7 @@
 
 Weight rationale (initial): Google and Brave assigned weight=2 as highest-quality web engines; Scholar engines (Google Scholar, Semantic Scholar) weight=2 for academic coverage; discovery-only plugin engines lower.
 
-## Evidenz
+## Evidence
 
 _Pending — consensus evaluation script was never built (planned as 10_engine_consensus.py but not implemented)._
 
@@ -40,16 +40,15 @@ Metrics to collect per engine:
 
 Pending — needs consensus evaluation (script not built yet).
 
-## Offene Fragen
+## Open Questions
 
 - Do high-weight engines (google, brave) dominate consensus, or do lower-weight engines contribute disproportionate unique value?
 - Is Crossref weight=1 too low given its role in academic queries?
 - SearXNG score formula: `weight = Π(engine_weights) × len(positions)`, `score = Σ(weight / position_i)` — does weight amplification warrant non-linear scaling?
 - Plugin engines (arxiv, github, reddit) are discovery-only; their weight affects ranking of the discovery URL. Is weight=2 for arxiv appropriate?
 
-## Quellen
+## Sources
 
 - src/searxng/settings.yml (deleted 2026-04-15) — historical weight configuration
 - dev/search_pipeline/10_engine_consensus.py (not built) — planned consensus evaluation script
-- `decisions/search_pipeline.md` — engine selection rationale
 - `searxng/searxng` GitHub Repo (`searx/results.py`) — score formula

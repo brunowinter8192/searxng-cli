@@ -5,9 +5,9 @@
 ## Status Quo (Historical, pre-engine-cut)
 
 **Code:** src/searxng/settings.yml (deleted 2026-04-15) — `outgoing` + per-Engine `proxies`/`using_tor_proxy`
-**Method:** Split-Routing: Default Tor, Ausnahmen direkt für Engines die Tor-Exit-Nodes blockieren
+**Method:** Split routing: Tor by default, direct exceptions for engines that block Tor exit nodes
 
-### Globaler Tor-Default
+### Global Tor Default
 
 ```yaml
 outgoing:
@@ -22,31 +22,31 @@ outgoing:
 
 ### Per-Engine Routing
 
-**DIREKT (Tor-Bypass via `proxies: {}` + `using_tor_proxy: false`):**
+**DIRECT (Tor bypass via `proxies: {}` + `using_tor_proxy: false`):**
 
-| Engine | Kategorie | Grund |
+| Engine | Category | Reason |
 |--------|-----------|-------|
-| Google | general | Blockiert Tor-Exit-Nodes (CAPTCHA/403) |
-| Bing | general | Blockiert Tor-Exit-Nodes wie Google |
-| DuckDuckGo | general | Blockiert Tor-Exit-Nodes (Bing-Backend) |
-| Mojeek | general | Kleinere Engine, Tor-Exit-Nodes vermutlich geblockt |
+| Google | general | Blocks Tor exit nodes (CAPTCHA/403) |
+| Bing | general | Blocks Tor exit nodes like Google |
+| DuckDuckGo | general | Blocks Tor exit nodes (Bing backend) |
+| Mojeek | general | Smaller engine, Tor exit nodes presumably blocked |
 
-**TOR (erbt globalen Default — kein Override nötig):**
+**TOR (inherits global default — no override needed):**
 
-| Engine | Kategorie | Grund |
+| Engine | Category | Reason |
 |--------|-----------|-------|
-| Brave | general | Toleriert Tor, profitiert von IP-Rotation |
-| Startpage | general | Google-Proxy über Tor, IP-Rotation |
-| Google Scholar | general | API-Endpunkt, seltener Tor-Blocking als Consumer-Google |
-| Semantic Scholar | general | API-basiert, kein Tor-Blocking bekannt |
-| CrossRef | general | API-basiert, kein Tor-Blocking |
-| ArXiv | plugin | API-basiert, kein Tor-Blocking |
-| GitHub | plugin | API-basiert |
-| Reddit | plugin | Scraper, Tor-Kompatibilität ungetestet |
+| Brave | general | Tolerates Tor, benefits from IP rotation |
+| Startpage | general | Google proxy over Tor, IP rotation |
+| Google Scholar | general | API endpoint, less Tor-blocking than consumer Google |
+| Semantic Scholar | general | API-based, no known Tor blocking |
+| CrossRef | general | API-based, no Tor blocking |
+| ArXiv | plugin | API-based, no Tor blocking |
+| GitHub | plugin | API-based |
+| Reddit | plugin | Scraper, Tor compatibility untested |
 
 ### Suspension Times
 
-| Fehlertyp | Sperrzeit |
+| Error Type | Suspension |
 |-----------|-----------|
 | SearxEngineAccessDenied | 600s (10 min) |
 | SearxEngineCaptcha | 600s (10 min) |
@@ -55,72 +55,72 @@ outgoing:
 | cf_SearxEngineAccessDenied | 600s (10 min) |
 | recaptcha_SearxEngineCaptcha | 3600s (60 min) |
 
-### Timeout-Kaskade
+### Timeout Cascade
 
-- `request_timeout: 5.0` — normaler Engine-Timeout
-- `max_request_timeout: 15.0` — absolutes Maximum
-- `extra_proxy_timeout: 10` — zusätzlicher Buffer für Tor-Latenz
-- `timeout: 10` auf Google Scholar — Scholar-spezifischer Override
+- `request_timeout: 5.0` — normal engine timeout
+- `max_request_timeout: 15.0` — absolute maximum
+- `extra_proxy_timeout: 10` — additional buffer for Tor latency
+- `timeout: 10` on Google Scholar — Scholar-specific override
 
-## Evidenz
+## Evidence
 
-### Tor-Exit-Nodes — Aggressive Blockierung
-Google, Bing, DuckDuckGo und wahrscheinlich Mojeek blockieren bekannte Tor-Exit-Nodes zuverlässig mit CAPTCHA oder sofortigem 403. Direktverbindung ist die einzige funktionierende Option. Per-Engine `proxies: {}` und `using_tor_proxy: false` überschreiben den globalen Tor-Default.
+### Tor Exit Nodes — Aggressive Blocking
+Google, Bing, DuckDuckGo, and likely Mojeek reliably block known Tor exit nodes with CAPTCHA or immediate 403. Direct connection is the only working option. Per-engine `proxies: {}` and `using_tor_proxy: false` override the global Tor default.
 
-**CRITICAL:** Beide Felder müssen gesetzt werden. `using_tor_proxy: false` allein deaktiviert nur die Tor-Verification, nicht den Proxy. `proxies` wird unabhängig von `using_tor_proxy` aus `outgoing.proxies` geerbt (SearXNG network.py initialize function).
+**CRITICAL:** Both fields must be set. `using_tor_proxy: false` alone only disables Tor verification, not the proxy. `proxies` is inherited from `outgoing.proxies` independent of `using_tor_proxy` (SearXNG network.py initialize function).
 
-### Brave + Startpage — Tor-Benefit
-Brave und Startpage blockieren keine Tor-Exit-Nodes. Tor-Routing bietet IP-Rotation bei Rate-Limiting und verhindert Session-Tracking über Queries hinweg.
+### Brave + Startpage — Tor Benefit
+Brave and Startpage do not block Tor exit nodes. Tor routing provides IP rotation under rate-limiting and prevents session tracking across queries.
 
-### API-Engines — Tor unproblematisch
-Semantic Scholar, CrossRef, ArXiv und GitHub nutzen offizielle APIs. Diese blockieren in der Regel keine Tor-Exit-Nodes, da sie für programmatischen Zugriff ausgelegt sind. Tor bietet hier zusätzlichen Anonymitäts-Schutz ohne Nachteil.
+### API Engines — Tor Unproblematic
+Semantic Scholar, CrossRef, ArXiv, and GitHub use official APIs. These generally do not block Tor exit nodes, as they are designed for programmatic access. Tor provides additional anonymity protection here without downside.
 
-### Reddit — Ungetestet
-Reddit Engine ist ein Scraper (nicht API). Tor-Kompatibilität muss empirisch getestet werden. Fallback: `proxies: {}` + `using_tor_proxy: false` wenn Tor-Blocking auftritt.
+### Reddit — Untested
+The Reddit engine is a scraper (not API). Tor compatibility needed empirical testing. Fallback: `proxies: {}` + `using_tor_proxy: false` if Tor blocking occurs.
 
 ### extra_proxy_timeout
-Tor-Routing fügt ~1-3s Latenz pro Hop hinzu. `extra_proxy_timeout: 10` erweitert das effektive Timeout für Tor-Engines, ohne den normalen `request_timeout` zu erhöhen.
+Tor routing adds ~1-3s latency per hop. `extra_proxy_timeout: 10` extends the effective timeout for Tor engines without raising the normal `request_timeout`.
 
-### Suspension Times — Cloudflare-Sonderbehandlung
-Cloudflare-geschützte Sites haben aggressiveres Rate-Limiting. 1800s (30 min) für `cf_SearxEngineCaptcha` verhindert wiederholtes Triggern. recaptcha = härtester Blocker → 3600s.
+### Suspension Times — Cloudflare Special Handling
+Cloudflare-protected sites have more aggressive rate-limiting. 1800s (30 min) for `cf_SearxEngineCaptcha` prevents repeated triggering. recaptcha = hardest blocker → 3600s.
 
-## Entscheidung
+## Decision
 
-Split-Routing-Architektur: **Default Tor, Ausnahmen direkt.** Rationale:
-- Globaler Tor-Default schützt alle Engines mit IP-Rotation ohne Einzelkonfiguration
-- Gezielter Bypass für 4 Engines (Google, Bing, DDG, Mojeek) die Tor blockieren
-- API-basierte Engines (Scholar, Semantic Scholar, CrossRef, ArXiv, GitHub) profitieren von Tor ohne Nachteile
-- Reddit-Engine als Scraper noch ungetestet — bei Problemen auf DIREKT umstellen
-- Tor-Container läuft als Docker-Service (`tor:9150`), keine externe Abhängigkeit
+Split-routing architecture: **Tor by default, direct exceptions.** Rationale:
+- Global Tor default protects all engines with IP rotation without per-engine config
+- Targeted bypass for 4 engines (Google, Bing, DDG, Mojeek) that block Tor
+- API-based engines (Scholar, Semantic Scholar, CrossRef, ArXiv, GitHub) benefit from Tor with no downside
+- Reddit engine as scraper still untested — switch to DIRECT if problems arise
+- Tor container runs as a Docker service (`tor:9150`), no external dependency
 
-## Offene Fragen
+## Open Questions
 
-- Reddit via Tor: Empirisch testen ob Reddit-Scraper über Tor funktioniert
-- Google Scholar via Tor: Nicht explizit getestet ob Scholar Tor-Exit-Nodes blockiert
-- Startpage via Tor: Startpage ist ein Google-Proxy — unklar ob Google-Sperren durchschlagen
-- Mojeek Tor: ANNAHME dass Tor geblockt wird (nicht verifiziert). Bei Bedarf testen.
-- Tor-Container Failover: Kein Fallback wenn Tor-Container down — alle Tor-Engines fallen gleichzeitig aus
+- Reddit via Tor: empirically test whether the Reddit scraper works over Tor
+- Google Scholar via Tor: not explicitly tested whether Scholar blocks Tor exit nodes
+- Startpage via Tor: Startpage is a Google proxy — unclear whether Google blocks propagate through
+- Mojeek Tor: ASSUMPTION that Tor is blocked (not verified). Test if needed.
+- Tor container failover: no fallback if the Tor container is down — all Tor engines fail simultaneously
 
-## Quellen
+## Sources
 
-- src/searxng/settings.yml (deleted 2026-04-15) — Routing-Konfiguration
-- `searxng/searxng` GitHub Repo (`searx/network.py`) — Proxy-Inheritance-Logik
-- SearXNG Docs (RAG Collection: searxng) — outgoing, proxy, suspended_times Parameter
-- search_pipeline.md — Engine-Auswahl und Kategorie-Zuordnung
+- src/searxng/settings.yml (deleted 2026-04-15) — routing configuration
+- `searxng/searxng` GitHub Repo (`searx/network.py`) — proxy inheritance logic
+- SearXNG Docs (RAG Collection: searxng) — outgoing, proxy, suspended_times parameters
+- engine selection and category assignment rationale (search pipeline)
 
-## Implementiert (Session 2026-04-03)
+## Implemented (Session 2026-04-03)
 
 ### Engine Suspension Disabled
 
-Alle `suspended_times`-Werte und `ban_time_on_fail` auf `0` gesetzt.
+All `suspended_times` values and `ban_time_on_fail` set to `0`.
 
-**Rationale:** SearXNG's internes Suspension-System war kontraproduktiv. Wenn eine Engine rate-limited wird, sperrt SearXNG sie zusätzlich für 300–3600 Sekunden — doppelte Bestrafung:
-1. Engine ist ohnehin temporär blockiert (Google-seitige 403, Tor-Blocking, etc.)
-2. SearXNG-Suspension verhindert Recovery ohne Docker-Restart
+**Rationale:** SearXNG's internal suspension system was counterproductive. When an engine gets rate-limited, SearXNG additionally suspends it for 300–3600 seconds — double penalty:
+1. Engine is already temporarily blocked (Google-side 403, Tor blocking, etc.)
+2. SearXNG suspension prevents recovery without a Docker restart
 
-Engines sollen ihre eigene Rate-Limiting-Logik handhaben. SearXNG greift nicht ein.
+Engines are meant to handle their own rate-limiting logic. SearXNG does not intervene.
 
-**Konfiguration in `settings.yml`:**
+**Configuration in `settings.yml`:**
 ```yaml
 search:
   suspended_times:
@@ -135,39 +135,39 @@ search:
 
 ### SearXNG 2026.4.3 — GSA iPhone UA Fix
 
-Update von 2026.3.10 → 2026.4.3 behebt Blocking für Google, Brave, Google Scholar durch neuen GSA iPhone User-Agent. Diese 3 Engines liefern seitdem wieder stabile Ergebnisse.
+Update from 2026.3.10 → 2026.4.3 fixed blocking for Google, Brave, Google Scholar via a new GSA iPhone User-Agent. These 3 engines delivered stable results again afterward.
 
 ### TLS Fingerprint Investigation
 
-Skripte `20_tls_fingerprint.py` + `21_cipher_shuffle_verify.py` entwickelt (legacy — aus dem SearXNG-Proxy-Stack, inzwischen gelöscht).
+Scripts `20_tls_fingerprint.py` + `21_cipher_shuffle_verify.py` developed (legacy — from the SearXNG proxy stack, since deleted).
 
-**Ergebnisse:**
-- JA3 Hash: `cdb8399d0ce47cc19f2ef0756148891e` (gemessen via tls.browserleaks.com)
-- Cipher Shuffling wirksam: 12/12 Requests produzieren unterschiedliche JA3-Hashes ✓
-- Gap identifiziert: `Accept: */*` Header fehlt in SearXNG-Requests (kein unmittelbarer Blocking-Grund)
+**Results:**
+- JA3 Hash: `cdb8399d0ce47cc19f2ef0756148891e` (measured via tls.browserleaks.com)
+- Cipher shuffling effective: 12/12 requests produced distinct JA3 hashes ✓
+- Gap identified: `Accept: */*` header missing from SearXNG requests (not an immediate blocking cause)
 
-### Mojeek Patch — .pyc Cache Lektion
+### Mojeek Patch — .pyc Cache Lesson
 
-Mojeek-Patch (src/searxng/patches/mojeek.py, deleted 2026-04-15) hatte Stale `.pyc` Cache im Docker-Container — aktualisierter Patch wurde ignoriert.
+Mojeek patch (src/searxng/patches/mojeek.py, deleted 2026-04-15) had a stale `.pyc` cache in the Docker container — the updated patch was ignored.
 
-**Lösung:** `docker compose build --no-cache` löscht `.pyc` Files und erzwingt Re-Kompilierung.
+**Fix:** `docker compose build --no-cache` clears `.pyc` files and forces recompilation.
 
-**Lesson:** Docker volume-mounted Patches können durch stale `.pyc` ignoriert werden. Bei Patch-Updates immer Container neu bauen.
+**Lesson:** Docker volume-mounted patches can be ignored due to stale `.pyc`. Always rebuild the container on patch updates.
 
-**Fix:** `arc=none` hardcoded (statt `arc=us` aus Default-Engine) — behebt Bot-Detection.
+**Fix:** `arc=none` hardcoded (instead of `arc=us` from the default engine) — resolved bot detection.
 
-### Semantic Scholar — Direktrouting + Session Cookies
+### Semantic Scholar — Direct Routing + Session Cookies
 
-Semantic Scholar von Tor auf DIREKT umgestellt (`proxies: {}` + `using_tor_proxy: false`). Session-Cookie-Tracking inkompatibel mit Tor-IP-Rotation.
+Semantic Scholar switched from Tor to DIRECT (`proxies: {}` + `using_tor_proxy: false`). Session-cookie tracking is incompatible with Tor IP rotation.
 
-**Patch:** src/searxng/patches/semantic_scholar.py (deleted 2026-04-15) — Cookies (`s2Exp`, `tid`) wurden 300s gecacht und bei nachfolgenden Requests mitgesendet.
+**Patch:** src/searxng/patches/semantic_scholar.py (deleted 2026-04-15) — cookies (`s2Exp`, `tid`) were cached for 300s and resent on subsequent requests.
 
-**Einschränkung:** Soft-Limit ~6 Requests/Session. Nach ~6 Queries liefert Semantic Scholar 0 Ergebnisse. Kein Hard-Block — Recovery durch SearXNG-Restart oder Session-Rotation.
+**Limitation:** Soft limit ~6 requests/session. After ~6 queries, Semantic Scholar returned 0 results. No hard block — recovery via SearXNG restart or session rotation.
 
-## Resolved Offene Fragen (2026-04-03)
+## Resolved Open Questions (2026-04-03)
 
-- ✅ **Google Scholar via Tor:** Scholar via SearXNG 2026.4.3 wieder funktional; läuft direkt (kein Tor)
-- ✅ **Mojeek Tor:** Mojeek stabil über Direktverbindung mit arc=none Patch
-- ✅ **Startpage via Tor:** Funktioniert stabil über Tor nach SearXNG 2026.4.3 Update
-- ⏳ **Reddit via Tor:** Noch offen — nicht getestet
-- ⏳ **Tor-Container Failover:** Noch offen — kein Fallback implementiert
+- ✅ **Google Scholar via Tor:** Scholar functional again via SearXNG 2026.4.3; runs direct (no Tor)
+- ✅ **Mojeek Tor:** Mojeek stable over direct connection with the arc=none patch
+- ✅ **Startpage via Tor:** Worked stably over Tor after the SearXNG 2026.4.3 update
+- ⏳ **Reddit via Tor:** Still open — not tested
+- ⏳ **Tor container failover:** Still open — no fallback implemented
