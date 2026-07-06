@@ -57,7 +57,7 @@ No regression on static sites. chroma_docs C result (1.09s/URL) is an interestin
 
 ## Decision / Next
 
-**Original SOLL (change wait_until to networkidle): INVALID.** Changing `wait_until` in `BFSDeepCrawlStrategy` has no effect since BFS is HTTP-based.
+**Original target (change wait_until to networkidle): INVALID.** Changing `wait_until` in `BFSDeepCrawlStrategy` has no effect since BFS is HTTP-based.
 
 **Actual fix direction: Playwright-per-page BFS.** Replace or supplement `BFSDeepCrawlStrategy` with a custom BFS that uses `crawler.arun()` per URL and extracts `result.links.internal`. With `wait_until="networkidle"`, `links.internal` is populated from the fully rendered DOM — including the React sidebar navigation — which would reveal the missing category pages and their children.
 

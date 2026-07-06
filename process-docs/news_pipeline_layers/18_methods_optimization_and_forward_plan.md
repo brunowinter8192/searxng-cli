@@ -13,7 +13,7 @@
 
 ---
 
-## Status Quo (IST after this session)
+## State (after this session)
 
 - **Discovery method validated.** monosans neutral pool (free datacenter proxies) + `curl_cffi impersonate="chrome"` → **80/425 (18.8%)** pass a real `/post/` sub-sitemap (`sitemap_tbco_post_type_post_0.xml`). Verdict **(a)**: the rustls TLS signature was the blocker behind monosans' 0/17202; chrome JA3 fixes it. (Full evidence: the monosans pool-evidence entry established the rustls 0-result; the curl_cffi passability-discriminator entry established the 18.8% pass rate.)
 - **Both CF mechanisms confirmed real and orthogonal:** signature-gate (mechanism 1, fixed by curl_cffi) + IP-reputation-gate (mechanism 2 — 66/425 still got 403 WITH correct JA3). Signature is the **necessary precondition**; among signature-correct requests, the acceptable-reputation subset of IPs passes. The earlier prior "all DC IPs → blocked" is **falsified** for theblock.co.

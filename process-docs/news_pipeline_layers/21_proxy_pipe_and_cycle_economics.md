@@ -42,7 +42,7 @@ Backfill = 27k pages, `cycles = 27,000 / (CF_per_cycle × B)`:
 2. **Backfill is proxy-GENERATION-bound, not scrape-bound** — ~17 min gen : ~30 s scrape ≈ 17:1. Speed levers = hit-rate (source curation: drop the ~23% protocol-mislabel junk, esp. MuRongPIG) + B. NOT scrape optimization.
 3. **Parallelizing gen + scrape saves only ~3%** (scrape is tiny vs gen) and both contend on the router. Worth it as architecture (continuous producer/consumer, resume-safe, peak-freshness) and for short jobs (discovery), NOT as a backfill speed lever.
 
-## Recommendation (SOLL)
+## Recommendation
 
 Build the pipe in `dev/` (neutral-check → CF-check → fetch), 5k batches, funnel-logged (neutral-alive + CF-pass + per-IP-budget per run). Run on The Block sitemap FIRST — this completes the open discovery (~43 missing sub-sitemaps, per the general-roadmap entry) AND gathers the current CF-rate + B organically from the real fetch. Source curation (per-source alive-rate ranking) is the parallel generation-speed lever.
 
@@ -145,7 +145,7 @@ Curating MuRongPIG (+ the many 0-CF, 0-unique sources) out should lift the effec
 
 **Caveat:** CF-n is still small (~8 CF-passers over 2 runs). The MuRongPIG-0-CF signal is robust (n~1,400); the ~11% non-MuRongPIG estimate is not yet (small n). The decisive test: re-run the pipe on a CURATED source set and measure the curated CF-rate directly.
 
-### Recommendation (SOLL update)
+### Recommendation (update)
 
 1. Build a curated source set — drop the MuRongPIG mega-files + sources with 0 CF-hits and 0 uniqueness; keep the CF-yielding socks5/http sources + the high-exclusivity ones.
 2. Re-run the pipe on the curated set → measure curated CF-rate. If it jumps toward ~5–11%, backfill is feasible again.
