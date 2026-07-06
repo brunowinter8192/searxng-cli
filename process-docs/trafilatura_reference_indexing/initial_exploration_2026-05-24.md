@@ -14,7 +14,7 @@ The indexing is **independent of any benchmarking concern** — clarified mid-se
 
 ## Why Trafilatura specifically
 
-- Tagged "Zum Indexieren" in `decisions/scrape_pipeline.md` Quellen for months as future-work
+- Tagged as a future-work indexing target for months
 - THE library we will benchmark `PruningContentFilter` against eventually (separate scope, not this work)
 - Test-bed for the consolidated `web-research` SKILL Mode 1 (Web-MD Capture) — first end-to-end run since the cleanup-and-index merger
 - Sphinx-generated docs trigger our empirically-validated 5-shape cleanup profile (Sphinx-Specific: header avg 10.7 LOC, footer 52.6 LOC, 37% noise) — high-confidence cleanup path
@@ -77,7 +77,7 @@ Absolute URL form: prefix each line with `https://trafilatura.readthedocs.io/en/
 The bead `<bead-id-tbd>` carries the resume pointer. Concrete steps to execute next session:
 
 1. **Re-generate filtered URL list if /tmp got wiped** — run `searxng-cli explore_site "https://trafilatura.readthedocs.io/en/latest/" --output /tmp/trafilatura_urls.txt`, then filter to 28 per the table above (or grep-out `_modules` and `genindex` mechanically).
-2. **Spawn worker with the consolidated web-research SKILL Mode 1 Web-MD** — see `skills/web-research/SKILL.md` "Permanent Capture Workflow → Mode 1: Web-MD Capture". Worker prompt is short (per skill template): activate `web-research` skill, MODE=`web-md`, INPUT=`<absolute path to filtered url list>`, COLLECTION=`Trafilatura_Reference`, OUTPUT_DIR=`~/Documents/ai/Meta/ClaudeCode/MCP/RAG/data/documents/Trafilatura_Reference/`.
+2. **Spawn worker with the consolidated web-research skill Mode 1 Web-MD Capture.** Worker prompt is short (per skill template): activate `web-research` skill, MODE=`web-md`, INPUT=`<absolute path to filtered url list>`, COLLECTION=`Trafilatura_Reference`, OUTPUT_DIR=`~/Documents/ai/Meta/ClaudeCode/MCP/RAG/data/documents/Trafilatura_Reference/`.
 3. **Worker executes** Phase 0 (crawl all 28 URLs via crawl_site `--url-file`), Phase 1 (Sphinx cleanup profile — should be a clean trigger, ~37% noise stripped per empirical baseline), Phase 2 (index into `Trafilatura_Reference`, lock-aware polling).
 4. **Verify** via `rag-cli search_hybrid "url discovery sitemap" Trafilatura_Reference --top-k 3` — top hit should be `sources.html` or `url-management.html`.
 
@@ -91,12 +91,9 @@ All design questions are resolved:
 
 ## Sources cited
 
-- `decisions/scrape_pipeline.md` — Quellen section names Trafilatura as future indexing target
-- `decisions/explore01_discovery.md` — sitemap → BFS cascade architecture
-- `skills/web-research/SKILL.md` — Mode 1 Web-MD pipeline (consolidated 2026-05-23 from former `cleanup-and-index` skill)
-- `decisions/logging.md` — central FileHandler-only config that ensures the upcoming worker run won't pollute stdout with crawl4ai or per-engine warnings (2026-05-24)
-- This file's RAG location: `searxng-docs` collection (indexed automatically by `rag-cli update_docs`)
+- `src/explore/explore_site.py` — sitemap → BFS cascade discovery architecture
+- Central FileHandler-only logging config ensures the upcoming worker run won't pollute stdout with crawl4ai or per-engine warnings (2026-05-24)
 
 ---
 
-**Superseded 2026-05-24:** collection name corrected from `Trafilatura_Reference` to `searxng_reference` per project convention. See `02_collection_naming_recovery_2026-05-24.md`.
+**Superseded 2026-05-24:** collection name corrected from `Trafilatura_Reference` to `searxng_reference` per project convention.

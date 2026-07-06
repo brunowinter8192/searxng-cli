@@ -2,7 +2,7 @@
 
 ## What happened
 
-Phase 4 of bead `searxng-2rt` was executed end-to-end: 25 Trafilatura URLs filtered, crawled, Sphinx-cleaned (5-shape profile, validated), and indexed. The indexing target was `Trafilatura_Reference` (159 chunks produced) — WRONG. The project's convention (one `<project>_reference` collection per project) was violated because the prior session's OldTheme decided `Trafilatura_Reference` without cross-checking the `web-research/SKILL.md` Line 446 convention.
+Phase 4 of bead `searxng-2rt` was executed end-to-end: 25 Trafilatura URLs filtered, crawled, Sphinx-cleaned (5-shape profile, validated), and indexed. The indexing target was `Trafilatura_Reference` (159 chunks produced) — WRONG. The project's convention (one `<project>_reference` collection per project) was violated because the prior session decided `Trafilatura_Reference` without cross-checking the naming convention documented in the web-research skill.
 
 ## Recovery
 
@@ -17,8 +17,8 @@ Phase 4 of bead `searxng-2rt` was executed end-to-end: 25 Trafilatura URLs filte
 
 ## Skill fix
 
-- `web-research/SKILL.md` Line 434 was contradicting Line 446. Line 434 said `PascalCase, descriptive: SearXNG_Docs, Crawl4AI_Reference, RAG_Survey_2024` — directly contradicting the `<project>_reference` (lowercase, underscore) convention at Line 446. Replaced with explicit "Confirm Collection Target with User (MANDATORY ASK)" block requiring Opus to ask the user before picking a collection name.
-- `cleanup-and-index/SKILL.md` Phase 2 — added prominent `### CRITICAL` block at the top of Phase 2 describing hash-based incremental skip-logic: skipped/adopted/to_index buckets, additive-by-default behavior, `--force` flag. Prevents future workers from assuming index-dir wipes existing chunks.
+- `skills/web-research/` naming-convention guidance was internally contradictory — one line said `PascalCase, descriptive: SearXNG_Docs, Crawl4AI_Reference, RAG_Survey_2024`, directly contradicting the `<project>_reference` (lowercase, underscore) convention stated elsewhere. Replaced with an explicit "Confirm Collection Target with User (MANDATORY ASK)" block requiring Opus to ask the user before picking a collection name.
+- `skills/cleanup-and-index/` Phase 2 — added a prominent `### CRITICAL` block at the top of Phase 2 describing hash-based incremental skip-logic: skipped/adopted/to_index buckets, additive-by-default behavior, `--force` flag. Prevents future workers from assuming index-dir wipes existing chunks.
 
 ## Closes
 
