@@ -1,7 +1,9 @@
-# decisions/pipe_scraper.md — Pipe-Scraper Configuration
+# Pipe-Scraper Configuration
+
+*Snapshot as of 2026-06 — historical process record; the live current state is the source code, not this file.*
 
 Covers `src/crawler/pipe_scraper.py` — the production capture-pipeline scrape step.  
-Separate from `decisions/scrape_pipeline.md` (filter/garbage/browser config for the ad-hoc CLI scraper).
+Separate scope from the ad-hoc CLI scraper's filter/garbage/browser config.
 
 **Note:** `crawl_urls()` in `src/crawler/crawl_site.py` is out of scope here — it serves the BFS-discovery workflow (`crawl_site_workflow`) and is unchanged.
 
@@ -41,7 +43,7 @@ Output contract:
 
 ### Phase 1–3 — Concurrency, Delay, Full-Run Sweeps (old batch/sleep config)
 
-See `decisions/OldThemes/pipe_scraper/pipe_scraper_time_levers.md` — historical eval establishing WAF characterization and the ~1 req/s safe rate. Batch pacing (batch_size=30, inter_batch_sleep=30s) superseded by Scrapy-style gate.
+A prior historical eval established WAF characterization and the ~1 req/s safe rate. Batch pacing (batch_size=30, inter_batch_sleep=30s) superseded by Scrapy-style gate.
 
 ### Validation — Scrapy-style gate on 316 URLs
 
@@ -75,5 +77,4 @@ The WAF is NOT a pure concurrency cap. It is a rate/burst budget over time with 
 
 ## Sources
 
-- `decisions/OldThemes/pipe_scraper/pipe_scraper_time_levers.md` — Phase 1/2/3 sweep history + old batch config
 - Scrapy source reference: `scrapy/core/downloader/__init__.py` (per-domain slot, delay gate, RANDOMIZE_DOWNLOAD_DELAY, CONCURRENT_REQUESTS_PER_DOMAIN)

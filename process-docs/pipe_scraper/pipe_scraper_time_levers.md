@@ -50,7 +50,7 @@ The batch-stop-and-go achieves ~1 req/s sustained, but via burst+pause rather th
 
 ---
 
-## Phase 2 — Scrapy-Style Gate (current production)
+## Phase 2 — Scrapy-Style Gate (shipped as of 2026)
 
 **Status:** shipped, validated on 316 URLs.
 
@@ -79,7 +79,7 @@ Sleep-inside-lock is intentional: it serializes starts per domain. Event loop ha
 
 `_scrape_one` flow: `sem.acquire` → `_gate_domain` → `crawler.arun()` (outside lock, inside sem slot).
 
-### Config (current production)
+### Config (as shipped)
 
 | Knob | Value | Meaning |
 |---|---|---|
@@ -103,9 +103,8 @@ No dead 30s pauses → 27% faster at identical WAF safety.
 
 ---
 
-## Quellen
+## Sources
 
-- `decisions/pipe_scraper.md` — current IST/Evidenz/SOLL
 - `dev/scrape_pipeline/p1_pipe_scraper.py` — probe (batch/sleep knobs)
 - `dev/scrape_pipeline/A_pipe_scrape_eval.py` — Phase 1/2/3 sweep harness
 - `dev/scrape_pipeline/A_pipe_scrape_eval_reports/` — Phase 1/2/3 reports (concurrency_sweep, delay_sweep, full_run)
