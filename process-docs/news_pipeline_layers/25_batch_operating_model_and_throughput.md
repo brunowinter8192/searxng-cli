@@ -4,7 +4,7 @@
 **State:** Design crystallized in-session (chat brainstorm). The alive-check operating model for prod/backfill: hard-capped batches cycling the pool, run-time held constant. Throughput re-confirmed router-bound. Implementation pending (a `--limit` cap + funnel metrics); TheSpeedX standalone eval in flight.
 
 ## Throughput facts (concurrency 128, timeout 5s/5s)
-Measured: curated run = 3508 proxies in 255s pure check-time → **~13.8/s**; OldThemes 20 sweep @128 ≈ 11/s; OldThemes 21 baseline 11.4/s. Operating figure: **~12-14 proxies/s**.
+Measured: curated run = 3508 proxies in 255s pure check-time → **~13.8/s**; the prior concurrency-sweep entry @128 ≈ 11/s; the pipe/cycle-economics baseline 11.4/s. Operating figure: **~12-14 proxies/s**.
 
 Linear cost model:
 
@@ -17,7 +17,7 @@ Linear cost model:
 | 320.000 (full raw set) | ~7-8 h |
 
 ## Concurrency is router-bound, NOT a free speed lever [corrects an in-session error]
-A mid-session suggestion to raise concurrency 128→512 for speed was WRONG. The measured downward sweep (OldThemes 20, bookended, churn≈0) shows alive% COLLAPSES with concurrency: 64=9.3%, 128=7.9%, 256=4.0%, 512=1.7%. Raising to 512 would have cut found-alive ~4.6×.
+A mid-session suggestion to raise concurrency 128→512 for speed was WRONG. The measured downward sweep (from the prior concurrency-sweep entry, bookended, churn≈0) shows alive% COLLAPSES with concurrency: 64=9.3%, 128=7.9%, 256=4.0%, 512=1.7%. Raising to 512 would have cut found-alive ~4.6×.
 
 **Mechanism — home-router NAT/conntrack saturation.** Each check is an outbound connection through a mostly-dead proxy, occupying a conntrack slot on the home router; a dead proxy holds its slot until the 12s timeout fires. At high concurrency, hundreds of slots are tied up by timing-out-dead connections, so a genuinely-alive proxy's response cannot be forwarded in time → it false-times-out (`hard_timeout`) → counted dead. Signal: `hard_timeout%` balloons (93% @512 → 60% @128 → 51% @64); at low concurrency the dead-taxonomy shifts to GENUINE failures (`proxy_handshake_error`, `connection_refused`). The Mac is far from its own limits at 512 (FD ~1M, ephemeral ports ~16k) → the saturating resource is the external NAT = the router.
 
@@ -39,7 +39,7 @@ With B=1000, X=60 min, cadence=5 min: 1000 × 12 = **12.000**. A 12k pool gets e
 ## Funnel metrics (per-run logging) + %-gating
 Log per run the full funnel: **raw total → after dedup → after log-diff → evaluated → alive-of-evaluated**. Currently `sweep_log` records n (post-filter) + skipped + alive%; the raw-total and dedup-drop are NOT yet logged → gap to close.
 
-**Per-repo include/exclude by marginal alive% — resolves the "no scoreboard" tension.** A persistent per-source scoreboard is pointless because lists overlap (OldThemes 24). But a one-time MARGINAL measurement is clean: add a repo ONE AT A TIME; because the existing pool is fresh-skipped by the log-diff, the run's newly-evaluated set ≈ the new repo's unique contribution, and its alive% ≈ the repo's marginal yield. Low marginal alive% or few unique proxies → drop; high unique-alive → keep. The funnel metrics are the decision instrument. The cap-model and the %-gating are the SAME mechanism (capped batches right after adding a repo are automatically that repo's proxies). Decision is by **alive %, not absolute count**.
+**Per-repo include/exclude by marginal alive% — resolves the "no scoreboard" tension.** A persistent per-source scoreboard is pointless because lists overlap (per the curated-source-set entry). But a one-time MARGINAL measurement is clean: add a repo ONE AT A TIME; because the existing pool is fresh-skipped by the log-diff, the run's newly-evaluated set ≈ the new repo's unique contribution, and its alive% ≈ the repo's marginal yield. Low marginal alive% or few unique proxies → drop; high unique-alive → keep. The funnel metrics are the decision instrument. The cap-model and the %-gating are the SAME mechanism (capped batches right after adding a repo are automatically that repo's proxies). Decision is by **alive %, not absolute count**.
 
 ## Standalone vs marginal eval
 Two ways to measure a new repo, both valid:
@@ -47,5 +47,5 @@ Two ways to measure a new repo, both valid:
 - **Marginal** (in-pool): add the repo to the curated source, run capped batches; the log-diff makes the batch ≈ the repo's unique contribution. Gives marginal yield net of overlap.
 
 ## Open / deferred
-- 2D timeout×concurrency sweep — deferred until pool > ~20k (intra-sweep decay: sweep exceeds the ~30 min pool-stability window from the OldThemes 20 bookend) / ~43k (full sweep > X=1h → the staleness filter can no longer keep the pool fresh; the delta-trick breaks).
+- 2D timeout×concurrency sweep — deferred until pool > ~20k (intra-sweep decay: sweep exceeds the ~30 min pool-stability window from the prior concurrency-sweep entry's bookend) / ~43k (full sweep > X=1h → the staleness filter can no longer keep the pool fresh; the delta-trick breaks).
 - Cap default B=1000 (~75s/batch, ~1.2 min — matches the "grab proxies fast, feed CF, repeat" loop).

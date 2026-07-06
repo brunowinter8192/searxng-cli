@@ -1,7 +1,7 @@
 # 22 — Proxy Exploration: Clean Slate + Script Map
 
 **Date:** 2026-06-12
-**State:** All measurement OUTPUTS from the proxy exploration (OldThemes 14–21) wiped. Scripts kept. No current measurements exist — measurement restarts from zero with explicit provenance.
+**State:** All measurement OUTPUTS from the proxy exploration (the prior 8 entries covering theblock discovery through pipe/cycle economics) wiped. Scripts kept. No current measurements exist — measurement restarts from zero with explicit provenance.
 
 ## Why a clean slate
 
@@ -9,8 +9,8 @@ The exploration accumulated measurement artifacts whose numbers got quoted acros
 
 | Figure | What it actually was | Scope |
 |---|---|---|
-| ~11% | extrapolated CF-rate for the NON-MuRongPIG remainder (4 passers / ~35 non-MuRongPIG alive) | estimate, small-n, OldThemes 21 |
-| 0.8% | measured CF-pass rate of the WHOLE 5k sample (MuRongPIG-diluted) | pipe run, OldThemes 21 |
+| ~11% | extrapolated CF-rate for the NON-MuRongPIG remainder (4 passers / ~35 non-MuRongPIG alive) | estimate, small-n, prior pipe/cycle-economics entry |
+| 0.8% | measured CF-pass rate of the WHOLE 5k sample (MuRongPIG-diluted) | pipe run, prior pipe/cycle-economics entry |
 | 0 | `cf_passed=0` for monosans in the scoreboard | monosans contributed ~0 proxies to the 5k sample → never CF-tested, not "failed" |
 
 None of the three is a clean "monosans CF-pass rate". Mixing them is the data-provenance problem. The fix is to delete the muddled outputs and re-measure with each number tied to (script, run, scope).
@@ -47,9 +47,9 @@ Consumption rule: read monosans via the JSON and **keep the protocol**. Do NOT r
 
 Expansion comes only after monosans gives solid numbers. The broader source set (ErcinDedeoglu, mzyui, TheSpeedX, dpangestuw, r00tee, proxyscrape, ALIILAPRO, iplocate — historically the CF-yielders) is parked until then. Source-count is deliberately 1 to remove pool-composition / dilution as a variable while we re-establish trustworthy measurement.
 
-## OldThemes 14–21 status
+## Prior exploration entries status
 
-Kept as process history. **Every measured number in 14–21 is HISTORICAL, not current state.** Post-clean-slate there are no current measurements. Treat 14–21 as the record of how the landscape was explored, not as a source of live figures.
+Kept as process history. **Every measured number in the prior entries is HISTORICAL, not current state.** Post-clean-slate there are no current measurements. Treat those entries as the record of how the landscape was explored, not as a source of live figures.
 
 ## Script Map (`dev/news_pipeline/theblock/`)
 
@@ -75,7 +75,7 @@ Async liveness checker + concurrency sweep. `--freeze` fetches the 68 sources (l
 Measures theblock.co discovery coverage **from our home IP** (subprocess `curl`, NO proxies). Fetches the full sitemap union, news sitemap, RSS, and a bounded UI crawl. Hits CF IP-block (429) after ~25 sequential fetches; per-sub backoff retry (60/120/180s). Resume-safe via per-sub JSON in `cache/`. Answers "what article URLs exist", not "which proxies work" — separate concern from the proxy machinery.
 
 ### probe_curl_cffi_discriminator.py
-The a/b/c discriminator (OldThemes 17). Re-tests neutral-alive proxies with `curl_cffi impersonate=chrome` against a real theblock sitemap to decide whether the TLS signature (a), IP reputation (b), or pool staleness (c) was the blocker.
+The a/b/c discriminator (from the passability-discriminator entry). Re-tests neutral-alive proxies with `curl_cffi impersonate=chrome` against a real theblock sitemap to decide whether the TLS signature (a), IP reputation (b), or pool staleness (c) was the blocker.
 
 ### probe_monosans.sh
 Runs the `monosans/proxy-scraper-checker` TOOL (Docker image, pinned SHA) to produce a checked proxy pool under a neutral `check_url` vs a theblock.co `check_url`. Configs: `monosans_cfg_neutral.toml` / `monosans_cfg_theblock.toml`. This is the TOOL (scrapes + checks many upstream lists), distinct from the `monosans/proxy-list` text repo.

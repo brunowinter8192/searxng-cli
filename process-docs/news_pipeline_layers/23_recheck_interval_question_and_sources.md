@@ -1,7 +1,7 @@
 # 23 — Re-Check Interval: The Question + Where to Source It
 
 **Date:** 2026-06-12
-**State:** Alive-recheck mechanism IMPLEMENTED + merged to dev (2026-06-12). The alive-check now skips proxies checked within a window X; baseline **X = 1 h** via `--recheck-window`. First snapshot taken (109 proxies, 21.1% alive). Next: survival-curve tuning of X from the log. Source since expanded to `--source curated` (monosans + proxifly) — combined-run snapshot + source details in OldThemes 24; the recheck mechanism here is unchanged and source-agnostic. Strand B (CF docs) captured to `searxng-cli-reference` as background evidence; CF-cooldown + the per-IP burn budget are deferred; ML IP-reputation is out of scope.
+**State:** Alive-recheck mechanism IMPLEMENTED + merged to dev (2026-06-12). The alive-check now skips proxies checked within a window X; baseline **X = 1 h** via `--recheck-window`. First snapshot taken (109 proxies, 21.1% alive). Next: survival-curve tuning of X from the log. Source since expanded to `--source curated` (monosans + proxifly) — combined-run snapshot + source details in the following entry; the recheck mechanism here is unchanged and source-agnostic. Strand B (CF docs) captured to `searxng-cli-reference` as background evidence; CF-cooldown + the per-IP burn budget are deferred; ML IP-reputation is out of scope.
 
 ## The question
 
@@ -39,7 +39,7 @@ NOTE: the current log only knows neutral alive/dead (from `probe_liveness`). CF-
 - **Cloudflare rate-limiting docs** — documented block/counting windows + durations.
 - **Web-scraping vendor engineering blogs** (ScrapeOps, ZenRows, Scrapfly) — empirical CF-ban-duration findings from scale.
 - **r/webscraping** — practitioner reports on real CF cooldowns. → reddit-cli.
-- **Our own OldThemes 15** — `probe_discovery` observed 429 persisting >5 min; the "1–2h recovery" there was an unmeasured guess.
+- **Our own earlier CF-block entry** — `probe_discovery` observed 429 persisting >5 min; the "1–2h recovery" there was an unmeasured guess.
 
 ## Captured evidence — Strand B, Cloudflare's own docs [searxng-cli-reference, indexed 2026-06-12]
 
@@ -49,7 +49,7 @@ Source: `developers.cloudflare.com` WAF rate-limiting-rules + challenge clearanc
 - **Counting window = `period`** — 10 s up to 1 h (10/60/120/300/600/3600; footnote up to 65535 s). The window over which requests are tallied before the rule trips.
 - **Challenge path:** if the action is a challenge (not a hard block), solving it sets a `cf_clearance` cookie — **default lifetime 30 min** (CF recommends 15–45). A challenge-gated proxy that solves once is clear ~30 min; one that cannot solve is re-challenged every request.
 
-**Grounds the old guesses:** OldThemes 15's "1–2h recovery" guess and its observed "429 persisting >5 min" are consistent with standard `mitigation_timeout` values (600 s / 3600 s). → defensible **CF-burned recheck SEED ≈ 1 h** (covers the common 600–3600 s configs), 10 min as an aggressive floor.
+**Grounds the old guesses:** the earlier CF-block entry's "1–2h recovery" guess and its observed "429 persisting >5 min" are consistent with standard `mitigation_timeout` values (600 s / 3600 s). → defensible **CF-burned recheck SEED ≈ 1 h** (covers the common 600–3600 s configs), 10 min as an aggressive floor.
 
 **Gap NOT closed by CF docs:** the IP-reputation / Bot-Management (ML) cooldown — CF deliberately does not document its decay; the `/bots/` docs likely won't carry a number either. theblock.co's specific config is unknown (empirical only). These need a vendor-blog empirical figure (ZenRows / Bright Data) or direct measurement in our CF stage — NOT more CF docs.
 
