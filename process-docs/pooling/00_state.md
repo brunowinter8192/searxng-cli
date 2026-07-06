@@ -27,7 +27,7 @@ Both fail under filter-flag mode (e.g. `--books` restricts to general engines, `
 
 ---
 
-## IST Production State (post 2026-05-09)
+## Production State (post 2026-05-09)
 
 `src/search/`:
 - `merge.py` — `_merge_and_rank` with class bucketing + hard slots (UNCHANGED, target of rework)
