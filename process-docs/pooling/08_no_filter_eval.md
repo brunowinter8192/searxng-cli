@@ -1,7 +1,6 @@
 # Pooling Phase 12 — No-Filter V2 Eval, Algorithmic Backlog
 
 **Date:** 2026-05-23
-**Bead:** searxng-g82 (open, umbrella) / searxng-y6e (open, drill-down feature deferred)
 **Predecessor:** companion value-eval entry (Phase 11, 8-engine eval blocked by backoff cascade)
 **Probe artifacts:**
 - `dev/search_pipeline/stage1_pool_fetch.py` — Stage 1, no URL filter
@@ -46,7 +45,7 @@ Each stage stops at a natural review point. v1 `value_eval_probe.py` + `value_ev
 | open_library | 16 | 25% | EMPTY (69%, books-specific) | 16 |
 | **google** | 16 | **6%** | **EMPTY_BLOCK (94%, IP-CAPTCHA escalation)** | **11** |
 
-Effective eval ran on 8 engines (Google de facto out). Six engines (crossref, ddg, lobsters, mojeek, openalex, plus partial SS/SE/OL) carried the entire pool fanout. Pool sizes per pair 40-76 URLs (mean ~57). Phase 11's "Google CAPTCHA'd on all 16 pairs" returns under a different mechanism — not the exponential backoff cascade (removed by bead searxng-781, commit `c7b71b5`) but IP-level reputation degradation from cumulative same-IP queries during the day.
+Effective eval ran on 8 engines (Google de facto out). Six engines (crossref, ddg, lobsters, mojeek, openalex, plus partial SS/SE/OL) carried the entire pool fanout. Pool sizes per pair 40-76 URLs (mean ~57). Phase 11's "Google CAPTCHA'd on all 16 pairs" returns under a different mechanism — not the exponential backoff cascade (removed, commit `c7b71b5`) but IP-level reputation degradation from cumulative same-IP queries during the day.
 
 ---
 
@@ -128,7 +127,7 @@ Four algorithmic options that have NOT been systematically tested. Ordered by en
 
 ---
 
-## Y6E Drill-Down Feature Status
+## Drill-Down Feature Status
 
 **Not implemented yet.** The cache schema in `src/search/cache.py` stores per-URL `engines` (list of engine names that surfaced the URL) and `snippets` (dict per-engine snippet text). This is sufficient for an MVP drill-down command:
 
@@ -138,7 +137,7 @@ searxng-cli search_engine_tail <query> --engine <name>
 
 Reads the cached pool, filters URLs where `<name> in engines`, returns all such URLs that were not in the user-visible Top-N. Per-engine position (rank within each engine's original output) is NOT stored — that's a future schema extension if richer drill-down semantics turn out to be useful in practice.
 
-Deferred along with the merge.py migration — both wait for the algorithmic selection question to settle. Tracked in bead `searxng-y6e`.
+Deferred along with the merge.py migration — both wait for the algorithmic selection question to settle.
 
 ---
 
@@ -151,11 +150,3 @@ DB-state unchanged from Phase 11 cleanup (2026-05-09): Croft 2010 (868 chunks) +
 | Cormack et al. SIGIR 2009 — Reciprocal Rank Fusion outperforms Condorcet | Paper | Foundational RRF formula for backlog option (2) | Indexed (RAG: searxng_reference) |
 | Croft / Metzler / Strohman 2010 — Search Engines IR in Practice | Book | Source-selection / fusion synthesis | Indexed (RAG: searxng_reference) |
 
----
-
-## Related Beads
-
-- **searxng-g82** (open) — umbrella for pooling rework, this work
-- **searxng-y6e** (open) — drill-down feature, deferred with migration
-- **searxng-781** (closed 2026-05-22) — rate-limiter fail-fast prerequisite
-- **searxng-f3i** (closed 2026-05-09) — Scholar HTTP migration + Google decoupling

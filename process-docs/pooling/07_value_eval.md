@@ -1,7 +1,6 @@
 # Pooling Phase 11 — LLM-Oracle Value-Eval, Mode-Spanning
 
 **Date:** 2026-05-22
-**Bead:** searxng-g82 (open, umbrella) / searxng-y6e (open, working)
 **Predecessor:** companion Q14-pool-dump entry (Phase 10 — top-source-recall finding, blocked migration)
 **Probe artifacts:**
 - `dev/search_pipeline/value_eval_probe.py` (369 LOC) — Stage 1+2 fetch + score
@@ -10,9 +9,9 @@
 
 ---
 
-## Bead-y6e Session Setup — Three Directions Rejected First
+## Session Setup — Three Directions Rejected First
 
-Bead y6e originally proposed three approaches for the top-URL-identification automation that blocks g82's migration:
+Three approaches were originally proposed for the top-URL-identification automation that blocks the pooling migration:
 
 1. **Authority-domain lookup per topic area.** User rejected: brittle, per-topic maintenance, doesn't scale.
 2. **LLM-as-quality-judge per URL.** User rejected: too slow / heavy for runtime — would add an LLM call per pool URL per query.
@@ -20,7 +19,7 @@ Bead y6e originally proposed three approaches for the top-URL-identification aut
 
 A fourth direction emerged during the session — **structural-feature mining** (slug-length, listicle-verb-counts, query-token-density, date-in-path patterns). User rejected as too query-specific: works for the Phase-10 PostgreSQL pathology but doesn't generalize.
 
-**Final user-driven architecture decision:** keep the ranker simple (one of the C-methods), add a **runtime LLM-driven engine-drill-down tool** that lets the calling LLM (the searcher) query for engine-X URLs that were not in the merged top-N. The ranker stays cheap; topic-awareness for engine selection lives in the LLM, not in the ranker. This is the actual y6e architecture going forward.
+**Final user-driven architecture decision:** keep the ranker simple (one of the C-methods), add a **runtime LLM-driven engine-drill-down tool** that lets the calling LLM (the searcher) query for engine-X URLs that were not in the merged top-N. The ranker stays cheap; topic-awareness for engine selection lives in the LLM, not in the ranker. This is the actual architecture going forward.
 
 **Dependency chain for that architecture:**
 

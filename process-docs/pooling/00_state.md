@@ -1,8 +1,6 @@
 # Pooling Feature — Investigation State
 
 **Date:** 2026-05-09 (continuously updated)
-**Bead:** searxng-g82 (open)
-**Related beads:** searxng-bzh (--pdf widening), searxng-b1j (layer inventory), searxng-cuh (research questions)
 
 ---
 
@@ -315,12 +313,3 @@ DB-state after cleanup 2026-05-09 (only sources actually extracted from):
 
 Other initially-indexed pooling-research papers (Lillis 2006, Santos 2010, Baeza-Yates, Liu, Aslam-Montague, Renda, Wu, Akritidis, Ogilvie-Callan, Amin, MMMORRF, Trinity Thesis, Mourao Slides, Kafi WeightedRRF, UWaterloo TREC, Hu, Zhu, Zheng, He, Minack) were removed in the 2026-05-09 cleanup because they did not yield direct content extraction for the source-selection or result-fusion synthesis.
 
----
-
-## Related Beads
-
-- **searxng-g82** (active) — this work, pooling rework
-- **searxng-f3i** (closed 2026-05-09) — Scholar HTTP migration + Google decoupling, prerequisite for clean pooling design
-- **searxng-bzh** — `--pdf` pool widening (admit landing pages); independent but related
-- **searxng-b1j** — Layer-based improvement inventory (broader context)
-- **searxng-cuh** — Research questions per priority lever (related research backlog)

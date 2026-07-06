@@ -1,7 +1,6 @@
 # Rerank Validation — 20-Query Extended Probe
 
 **Date:** 2026-05-20  
-**Bead:** searxng-g82 (open)  
 **Probe script:** `dev/search_pipeline/rerank_probe_smoke.py` (updated for this run)  
 **Raw report:** `dev/search_pipeline/01_reports/rerank_probe_20260520_190340.md`  
 **Preceding phase:** companion rerank-findings entry in this folder (n=4, Cross-Encoder first beat Hard-Slot on Q1)

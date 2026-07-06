@@ -1,7 +1,6 @@
 # Pooling Phase 10 — Single-Query Pool Dump (Q14 postgresql index types)
 
 **Date:** 2026-05-21  
-**Bead:** searxng-g82 (open)  
 **Predecessor:** companion capped-pool-probe entry (Phase 9 — 20-query garbage-floor verdict)  
 **Probe artifacts:** `dev/search_pipeline/single_query_pool_dump.py` (385 LOC) + `dev/search_pipeline/01_reports/single_query_pool_postgresql_index_types_btree_g_20260521_231405.md` (878 lines)
 

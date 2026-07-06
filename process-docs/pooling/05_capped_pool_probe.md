@@ -1,7 +1,6 @@
 # Capped-Pool Probe — Phase 9 Resolution (Pooling Strategy Comparison)
 
 **Date:** 2026-05-21  
-**Bead:** searxng-g82 (open)  
 **Verdict:** C2 BM25 / C3 Cross-Encoder / C4 Embedding-Cosine all equivalent on obvious-garbage-criterion (0 / 20 queries each). C1 Overlap-Count produces 12 obvious-garbage across 20 queries (rate 5.9%), concentrated in one product query.  
 **Report:** `dev/search_pipeline/01_reports/pooling_probe_20260521_215844.md`  
 **Prior probes:** companion rerank-findings entry (4-query Cross-Encoder verdict), companion rerank-validation entry (bee-corrupted predecessor)
