@@ -1,5 +1,7 @@
 # Rate Limiter — Fail-Fast Policy
 
+*Snapshot as of 2026-06 — historical process record; the live current state is the source code, not this file.*
+
 ## Current State
 
 `src/search/rate_limiter.py` (52 LOC) implements `RateLimiter` as a **pure token-bucket**. Exponential backoff removed 2026-05-22 (this branch).
@@ -10,7 +12,7 @@
 
 **Fail-fast on CAPTCHA/429/Block:** engine detects failure → returns `([], S.EMPTY_BLOCK)` or analogous status immediately → `_engine_with_timing` in `search_web.py` records it in `engine_stats` → query log captures it. No retry, no session-scoped memory of the failure. Next query tries the engine again from scratch.
 
-**`RATE_WAIT_TIMEOUT = 60.0`** (defined in `search_web.py`): outer `asyncio.wait_for` guard on `acquire()` calls. Fires if the token-bucket wait exceeds 60s → engine returns `RATE_SKIP` for that query. Under normal 4 req/min load this is dormant; it guards against genuine bucket saturation and asyncio event-loop starvation. Raised from 5.0 → 60.0 on 2026-05-21 after Phase 3 probe identified tokencap-wait (not backoff) as the primary cascade mechanism (see `decisions/OldThemes/bee_cdp_starvation/fix_summary.md`).
+**`RATE_WAIT_TIMEOUT = 60.0`** (defined in `search_web.py`): outer `asyncio.wait_for` guard on `acquire()` calls. Fires if the token-bucket wait exceeds 60s → engine returns `RATE_SKIP` for that query. Under normal 4 req/min load this is dormant; it guards against genuine bucket saturation and asyncio event-loop starvation. Raised from 5.0 → 60.0 on 2026-05-21 after a Phase 3 probe identified tokencap-wait (not backoff) as the primary cascade mechanism.
 
 **Bucket-uniformity invariant:** All 9 active engines fire on every query. `apply_filter_mode()` in `filter_modes.py` never restricts which engines participate — `excluded={}` in all code paths. Filter modes (`--books`, `--pdf`, `--docs`) apply per-engine query modifiers and post-merge URL filtering only.
 
@@ -30,7 +32,7 @@ Removed from all 9 engine files: every `limiter.backoff()`, `limiter.reset_backo
 | 7 | yes | 244s (attempt 3: 240 + 4 jitter) | google=0 |
 | 8-16 | (all waited 60s) | — | google=0 |
 
-Net waste ≈466s; net benefit zero — Google's bot-detection state does not decay in seconds. Source: `decisions/OldThemes/pooling/04_zero_query_diagnosis.md` (cascade mechanism diagnosis, 2026-05-20).
+Net waste ≈466s; net benefit zero — Google's bot-detection state does not decay in seconds. Cascade mechanism diagnosed 2026-05-20.
 
 **Post-rip — pipeline smoke baseline (2026-05-22, `dev/search_pipeline/11_pipeline_smoke.py`, 30 queries, language=en, engine_timeout=None):**
 Report: `dev/search_pipeline/01_reports/no_backoff_baseline_20260522_211439.md`
@@ -71,12 +73,8 @@ Top-3 bottleneck engines (highest search_ms per query): semantic_scholar (11×),
 ## Open Questions
 
 - **Should we add an explicit "engine-failed-this-query" status that propagates to the query log?** Currently `EMPTY_BLOCK` is the umbrella reason (covers both CAPTCHA and HTTP-429 block-page detection). Per-type sub-statuses would help debugging without re-introducing retry logic.
-- **Do the cross-encoder service (port 8082) and other downstream HTTP services follow the same fail-fast policy?** The project-wide no-backoff principle in `decisions/OldThemes/no_backoff_retry.md` applies to every external service call; whether any retry-with-backoff has crept into the RAG-server-call paths (`search_web.py` / `preview.py`) is unverified.
+- **Do the cross-encoder service (port 8082) and other downstream HTTP services follow the same fail-fast policy?** The project-wide no-backoff principle applies to every external service call; whether any retry-with-backoff has crept into the RAG-server-call paths (`search_web.py` / `preview.py`) is unverified.
 
 ## Sources
 
-- Diagnosed failure mode + formula derivation: `decisions/OldThemes/pooling/04_zero_query_diagnosis.md`
-- Reproduced in value-eval: `decisions/OldThemes/pooling/07_value_eval.md` (Caveats section, Google CAPTCHA)
-- Cascade probe phases (RATE_WAIT_TIMEOUT=60 rationale): `decisions/OldThemes/bee_cdp_starvation/fix_summary.md`
 - Probe-run evidence: `/tmp/value_eval_probe_run.log`
-- Project-wide principle: `decisions/OldThemes/no_backoff_retry.md`
