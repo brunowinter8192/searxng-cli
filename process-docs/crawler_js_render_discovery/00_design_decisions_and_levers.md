@@ -1,6 +1,6 @@
 # crawler_js_render_discovery — Design Decisions & Lever Trade-offs
 
-Framing doc for the topic. Empirical phase results: `A_recall_probe.md` (Phase A, HTTP BFS), `B_playwright_bfs_probe.md` (Phase B, Playwright-per-page). This file = architectural decisions + time↔completeness lever analysis + hard constraints + open points, captured from the design discussion.
+Framing doc for the topic. Empirical phase results: Phase A (HTTP BFS), Phase B (Playwright-per-page). This file = architectural decisions + time↔completeness lever analysis + hard constraints + open points, captured from the design discussion.
 
 ## Problem
 
@@ -8,8 +8,8 @@ Framing doc for the topic. Empirical phase results: `A_recall_probe.md` (Phase A
 
 ## Investigation arc
 
-1. No sitemap on docs.github.com (`/sitemap.xml` → 404) → falls to prefetch BFS → SPA (Next.js) nav links are client-rendered → `BFSDeepCrawlStrategy` extracts links via HTTP (proven: 0.18s/page) → JS-rendered links never seen → ~67–75% ceiling (`A_recall_probe.md`). External convergence: crawl4ai issue #1665 + IR textbook.
-2. Playwright-per-page BFS (`crawler.arun()` + `result.links.internal` from rendered DOM) → 81.3% (248/305), +14pp, 0×429 sequential (`B_playwright_bfs_probe.md`). Rendering mechanism confirmed (single-page check: the link IS in the rendered DOM).
+1. No sitemap on docs.github.com (`/sitemap.xml` → 404) → falls to prefetch BFS → SPA (Next.js) nav links are client-rendered → `BFSDeepCrawlStrategy` extracts links via HTTP (proven: 0.18s/page) → JS-rendered links never seen → ~67–75% ceiling (Phase A). External convergence: crawl4ai issue #1665 + IR textbook.
+2. Playwright-per-page BFS (`crawler.arun()` + `result.links.internal` from rendered DOM) → 81.3% (248/305), +14pp, 0×429 sequential (Phase B). Rendering mechanism confirmed (single-page check: the link IS in the rendered DOM).
 3. Remaining ~19% gap is NOT rendering — it is navigation topology (section-scoped sidebar; categories not linked from seed). See critical open point 1.
 
 ## Decisions
@@ -89,6 +89,6 @@ Shipped at concurrency=1 (WAF-safe). 305 pages × ~3.6s (3s delay + render/nav) 
 
 ## Cross-refs
 
-- `A_recall_probe.md` — Phase A empirical (HTTP BFS, 67.2%, the HTTP-link-extraction finding).
-- `B_playwright_bfs_probe.md` — Phase B empirical (Playwright, 81.3%, topology root-cause).
-- `dev/explore_pipeline/04_render_recall.py`, `05_playwright_bfs.py`, `05_reports/docs_github_rest_20260529.md`, `goldstandard/docs_github_rest.txt`.
+- Phase A empirical (HTTP BFS, 67.2%, the HTTP-link-extraction finding).
+- Phase B empirical (Playwright, 81.3%, topology root-cause).
+- `dev/explore_pipeline/04_render_recall.py`, `05_playwright_bfs.py`, `dev/explore_pipeline/05_reports/docs_github_rest_20260529.md`, `goldstandard/docs_github_rest.txt`.

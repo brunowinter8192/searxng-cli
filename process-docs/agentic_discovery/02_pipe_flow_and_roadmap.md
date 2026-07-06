@@ -63,7 +63,7 @@ and recommend a drop, without Opus having known a pattern beforehand.
 
 ## Open Decision (next session): Skill / Toolkit Structure
 
-**RESOLVED** — see `03_skill_structure_resolved.md`
+**RESOLVED** — resolved in the following session.
 
 Two existing pipeline skills (historical context, decision resolved below):
 - **web-research** (Opus-side): discovery + optional filtering, hands off crawled URLs

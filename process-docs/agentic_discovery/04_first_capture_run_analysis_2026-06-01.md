@@ -1,6 +1,6 @@
 # First Capture Run — Analysis & Skill-Hardening Mapping (2026-06-01)
 
-Roadmap step 2 from `03_skill_structure_resolved.md` (first end-to-end capture) executed: `docs.github.com/en/rest` (+ all enterprise versions) → collection `gh_reference` (307 files / 7146 chunks). Run succeeded but surfaced 2 bugs + 1 design gap + 1 worker-discipline issue. This file = analysis + concrete change mapping. Implementation pending (no skill edited yet).
+Roadmap step 2 (first end-to-end capture) executed: `docs.github.com/en/rest` (+ all enterprise versions) → collection `gh_reference` (307 files / 7146 chunks). Run succeeded but surfaced 2 bugs + 1 design gap + 1 worker-discipline issue. This file = analysis + concrete change mapping. Implementation pending (no skill edited yet).
 
 ## Run Result
 - 309 discovered, 307 scraped, 2 thin dropped, 307 indexed, 7146 chunks, 51.8% nav-chrome stripped. Scrape 313s. Total ~150min (embedding-bound) — `index-dir` blocked RAG **globally for all projects** the whole time.
@@ -17,7 +17,7 @@ Polling blunders already caught by `block_polling_loop.py` (Monitor_CC), purpose
 ## Root Causes
 1. **Skill-load failure** — `Skill(skill="capture-and-index")` → "Unknown skill" in the worker's worktree session. REFUTED: not plugin-scope (searxng `@brunowinter-plugins: true` in `~/.claude/settings.json` enabledPlugins; both searxng skills load in main github session), not version (worker + main both CC 2.1.149, confirmed). Worktree-launch-specific. **ROOT CAUSE = MUST-FIX** — fresh-worker test then real fix. NO fallback (user directive 2026-06-01): the skill MUST load; a "read SKILL.md from cache" fallback is explicitly rejected (papering over the bug). W1 below is therefore DROPPED.
 2. **Scrape-step venv path (BUG)** — `capture-and-index` skill Phase 2 (~line 97): `./venv/bin/python -m src.crawler.pipe_scraper` is plugin-relative. Plugin cache has NO venv; `./` resolves to the worktree cwd → fails. Source venv `/Users/.../MCP/searxng/venv/bin/python3` exists. Caused the ~7-call venv hunt (Calls 19–28). Stale note "finalized when src/ port lands" — port HAS landed: `src/crawler/pipe_scraper.py` (183 LOC, validated 316/316).
-3. **No Opus-reviewed cull (DESIGN GAP)** — `02_pipe_flow_and_roadmap.md` design = worker post-crawl *content*-drop (drops only empty/redirect/nav pages). Cannot cull "irrelevant-but-non-empty" pages (enterprise-admin / scim / actions vs our search / contents / git-trees focus) — that needs USER-CONTEXT the worker lacks. Result: 0 URLs dropped pre-scrape, 307 indexed incl. bloat → longer scrape+index, 2.5h global RAG block, diluted retrieval.
+3. **No Opus-reviewed cull (DESIGN GAP)** — the prior worker post-crawl *content*-drop design (drops only empty/redirect/nav pages). Cannot cull "irrelevant-but-non-empty" pages (enterprise-admin / scim / actions vs our search / contents / git-trees focus) — that needs USER-CONTEXT the worker lacks. Result: 0 URLs dropped pre-scrape, 307 indexed incl. bloat → longer scrape+index, 2.5h global RAG block, diluted retrieval.
 
 ## Change Mapping
 
@@ -48,4 +48,4 @@ Block-detection is fold-in (worker's diagnose pass, phrases from the skill) — 
 - Hook: `Monitor_CC/src/hooks/block_polling_loop.py`.
 - Scraper: `searxng src/crawler/pipe_scraper.py`.
 - Plugin enablement: `~/.claude/settings.json` enabledPlugins (`searxng@brunowinter-plugins: true`).
-- Prior design: `02_pipe_flow_and_roadmap.md` (post-crawl content-drop), `03_skill_structure_resolved.md` (roadmap step 2 = this run).
+- Prior design: post-crawl content-drop decision (roadmap step 2 = this run).

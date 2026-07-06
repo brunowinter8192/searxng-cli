@@ -1,6 +1,6 @@
 # pgrep-Race → background+idle Orchestration (2026-06-02)
 
-Continuation of `04_first_capture_run_analysis_2026-06-01.md`. Triggered by the GitHub GraphQL-docs capture run (Mode web-md, collection `gh-cli-reference`).
+Continuation of the first capture run analysis (2026-06-01). Triggered by the GitHub GraphQL-docs capture run (Mode web-md, collection `gh-cli-reference`).
 
 ## Problem observed
 

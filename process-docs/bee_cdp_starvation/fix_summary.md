@@ -20,13 +20,13 @@ All 9 active engines fire on every query, regardless of filter mode (`--books`, 
 
 Three probe phases preceding the fix:
 
-**Phase 1 — CDP starvation REFUTED** (`01_probe.md`, report `dev/search_pipeline/01_reports/cdp_probe_20260521_174959.md`)
+**Phase 1 — CDP starvation REFUTED** (report `dev/search_pipeline/01_reports/cdp_probe_20260521_174959.md`)
 Scheduling latency p99 = 1.4ms during zero_cascade (vs 3.0ms normal). Event loop completely free. CDP events = 0 during cascade. Starvation mechanism excluded.
 
-**Phase 2 — A-sleep confirmed, backoff-cascade narrative INCORRECT** (`02_acquire_probe.md`, report `dev/search_pipeline/01_reports/acquire_probe_20260521_183226.md`)
+**Phase 2 — A-sleep confirmed, backoff-cascade narrative INCORRECT** (report `dev/search_pipeline/01_reports/acquire_probe_20260521_183226.md`)
 All 9 engines enter `acquire()`, acquire lock, sleep in `asyncio.sleep(wait)`, cancelled at ~5001ms. Lock released cleanly under CancelledError (Python 3.14 asyncio.Lock regression excluded). Phase 2 inferred "multi-engine backoff cascade" — this inference was not probe-verified and was superseded by Phase 3.
 
-**Phase 3 — Tokencap-path wins** (`03_branch_probe.md`, report `dev/search_pipeline/01_reports/branch_probe_20260521_192646.md`)
+**Phase 3 — Tokencap-path wins** (report `dev/search_pipeline/01_reports/branch_probe_20260521_192646.md`)
 18/30 zero_cascade queries measured. Two cascade types:
 - **Type 1 (12/18):** pure tokencap — all 9 engines hit `len(tokens) >= max_requests` branch (NOT backoff). After 4 successful queries in <60s, the 5th acquire() waits `60s − age_of_oldest_token` (38.5s at Q5 → 8.4s at Q11) → cancelled at 5s by `asyncio.wait_for`. Recovery is natural: cascade lasts until oldest token expires.
 - **Type 2 (6/18):** tokencap (8 engines) + Google backoff (1 engine). Following a CAPTCHA, Google-only fires backoff; other 8 hit tokencap independently.

@@ -79,7 +79,7 @@ CDP starvation hypothesis not supported. Alternative root cause required.
 
 ## New Observations From This Probe
 
-Two findings that weren't in `04_zero_query_diagnosis.md` and constrain the next hypothesis:
+Two findings that constrain the next hypothesis:
 
 **1. Zero CDP events during zero_cascade queries.** CDP counter shows exactly 0 events for
 every zero_cascade query (Q5, Q7-Q9, Q14-Q16, Q18). Chrome is completely silent — it is not

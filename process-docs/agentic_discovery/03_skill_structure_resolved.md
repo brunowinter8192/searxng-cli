@@ -1,8 +1,7 @@
 # Agentic Discovery — Skill Structure Resolution
 
 **Session:** 2026-06-01  
-**Status:** RESOLVED — closes the open decision from `02_pipe_flow_and_roadmap.md`  
-**Source decisions:** `01_gh_live_experiment.md`, `02_pipe_flow_and_roadmap.md`
+**Status:** RESOLVED — closes the open decision from the prior pipe-flow session
 
 ---
 
@@ -38,7 +37,7 @@ Directory renamed: `skills/cleanup-and-index/` → `skills/capture-and-index/`.
 
 Active references updated: `web-research` skill spawn template, the explore01_discovery status text.
 
-Historical OldThemes narratives that describe past state (e.g. `skill_consolidation_split/01_re_split_2026-05-24.md`) are preserved intact — do not rewrite history.
+Historical OldThemes narratives that describe past state are preserved intact — do not rewrite history.
 
 ### 6. Reference collection: user-named, may be another project's
 
@@ -46,7 +45,7 @@ Old convention: "always `<current_project>_reference`, never per-source." Relaxe
 
 ---
 
-## Open Questions Resolved (from `02_pipe_flow_and_roadmap.md`)
+## Open Questions Resolved
 
 | Q# | Question | Resolution |
 |---|---|---|
