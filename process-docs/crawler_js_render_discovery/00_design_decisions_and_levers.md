@@ -51,7 +51,7 @@ Two different clocks, two phases — NOT contradictory:
 
 docs.github.com sits behind Cloudflare. WAF returns 429 on parallel HTTP load (`prefetch=True` → 429 after ~100 reqs/session in Phase A; sequential survived; Playwright sequential = 0×429 in Phase B). Stealth (`enable_stealth=True` + `UndetectedAdapter` + `AsyncPlaywrightCrawlerStrategy`) exists in `src/scraper/scrape_url.py` (Phase-2 scrape fallback), now available as the crawler `--stealth` toggle.
 
-Single-page scrape of a docs.github.com page verified clean post plugin-routing-unblock — see `decisions/plugin_routing.md`. Per-page SCRAPING is solved; the open problem is purely URL DISCOVERY completeness. The scrape phase shares only the volume-429 concern, not the completeness one.
+Single-page scrape of a docs.github.com page verified clean post plugin-routing-unblock. Per-page SCRAPING is solved; the open problem is purely URL DISCOVERY completeness. The scrape phase shares only the volume-429 concern, not the completeness one.
 
 ## Saturation message spec
 
@@ -81,7 +81,7 @@ Shipped at concurrency=1 (WAF-safe). 305 pages × ~3.6s (3s delay + render/nav) 
 - D1 Playwright-per-page BFS: chosen + ported to src/ as the single discovery method.
 - D2/D2a sitemap: cascade removed; sitemap dropped ENTIRELY (additive-union kept as a future lever).
 - D3/D4: domcontentloaded + delay + page_timeout, no networkidle; 429 back-off-once-then-stop.
-- Plugin-routing blocking removed (separate topic, `decisions/plugin_routing.md`) — enabled scraping docs.github.com at all.
+- Plugin-routing blocking removed (separate topic) — enabled scraping docs.github.com at all.
 
 ## Still-open (non-critical)
 
@@ -91,6 +91,4 @@ Shipped at concurrency=1 (WAF-safe). 305 pages × ~3.6s (3s delay + render/nav) 
 
 - `A_recall_probe.md` — Phase A empirical (HTTP BFS, 67.2%, the HTTP-link-extraction finding).
 - `B_playwright_bfs_probe.md` — Phase B empirical (Playwright, 81.3%, topology root-cause).
-- `decisions/explore01_discovery.md` — production discovery IST (updated to single Playwright-per-page BFS at the src-port).
-- `decisions/plugin_routing.md` — plugin-routing blocking removal (this session).
 - `dev/explore_pipeline/04_render_recall.py`, `05_playwright_bfs.py`, `05_reports/docs_github_rest_20260529.md`, `goldstandard/docs_github_rest.txt`.
