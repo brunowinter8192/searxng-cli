@@ -36,7 +36,7 @@ Metrics to collect per engine:
 - Avg Position in combined ranking
 - Top-20 Coverage
 
-## Recommendation (SOLL)
+## Recommendation
 
 Pending — needs consensus evaluation (script not built yet).
 
