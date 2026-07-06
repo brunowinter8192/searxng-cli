@@ -34,7 +34,7 @@ needed both, plus H1-anchor chrome-stripping). The Block path: proxy_http fetch 
   overlap → completeness; filename-existence dedup drops the overlap. Exactly the CoinDesk pattern,
   recency sourced from `<lastmod>` instead of feed order.
 
-## Probe process notes (errors → see OT38)
+## Probe process notes (errors from the same investigation)
 
 - The first probe version full-scanned all 27 `post_type_post` sub-sitemaps to "confirm" the ascending
   pagination — wasteful, the pagination was already established from a raw sitemap, and the run was

@@ -1,21 +1,21 @@
 # 34 — Orchestration errors + open items (session 2026-06-14)
 
 Honest record of Opus-side process/orchestration mistakes this session, so next session learns from
-them. The technical build is documented in OT29-33; THIS file is the process retrospective. All four
+them. THIS file is the process retrospective. All four
 errors below are Opus's, not the workers' — the workers were plan-gated (every stage: plan → Opus review
 → Go) and implemented cleanly; the failures are in orchestration and verification.
 
-## Error 1 — Kill-before-finalize → lost proxy economics (OT29 → OT30)
+## Error 1 — Kill-before-finalize → lost proxy economics
 On the first sitemap dev-run, Opus told the worker to KILL the process when it stalled on the straggler
 tail — before `logger.finalize()` ran. The 5 logging surfaces (B-per-proxy, fail/success) lived only in
 the in-memory logger and were written ONLY at finalize() → all lost. Only the `.xml` mtimes survived
 (wall-time, no economics).
 - **Cause:** judged the stall "not worth waiting"; did not account for finalize() being the sole
   persistence point.
-- **Consequence:** a full re-run was needed; it produced OT30 (the streaming logger, kill-safe).
+- **Consequence:** a full re-run was needed; it produced the streaming logger (kill-safe).
 - **Lesson:** know WHERE a process persists its data before killing it.
 
-## Error 2 — Under-specified run parameter (`--max_hours`) (OT33 64er run)
+## Error 2 — Under-specified run parameter (`--max_hours`) (64er run)
 Opus gave the Stage-E "Go" without specifying `--max_hours`; the worker defaulted to 0.5h (30 min). With
 a 60-min cooldown, a 30-min cap means wait-on-exhaustion can NEVER resume — the cap fires before any
 cooled-down proxy becomes eligible again. Nonsensical for testing the sustained behavior.

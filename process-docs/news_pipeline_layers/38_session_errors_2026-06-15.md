@@ -17,7 +17,7 @@ Two recurring failure modes, both mine:
 The agreed change was surgical: *fire 128 always, race the tail* — a delta to `run_loop`, keeping
 buffer / working-set / 2-strikes / proxy-reuse / cooldown. Instead I scoped a full rewrite
 (`run_loop` → `run_race`, `p4_race.py`), dropping proxy-reuse. Reuse was load-bearing: a good proxy
-fetched many sub-sitemaps. Result: 64er regressed **64/64 → 2/64** (OT36).
+fetched many sub-sitemaps. Result: 64er regressed **64/64 → 2/64**.
 - **Cause:** the diff-size did not match the concept-size. I wrote a worker prompt that said "replace
   run_loop with a new continuous-dispatch model" for something we both called a small change.
 - **Prevention:** a "small change" must be a surgical delta that NAMES what stays unchanged (which
@@ -51,14 +51,14 @@ killed the send before it delivered — silent message loss.
 
 ## What survived (not in the trash)
 
-- Probe findings (OT37): The Block is server-rendered, JSON-LD `articleBody` + `datePublished`, no
+- Probe findings: The Block is server-rendered, JSON-LD `articleBody` + `datePublished`, no
   browser needed — real, reusable progress.
-- The whole sustained design (OT28-33): intact on disk; `acquire_pipe` reverted to `run_loop`.
+- The whole sustained design: intact on disk; `acquire_pipe` reverted to `run_loop`.
 - The tail-race idea: `p4_race.py` kept as the reference for the surgical port.
 
 ## Next session (clean start from the above)
 
-1. Port the tail-race into `run_loop` as a surgical delta (OT36 "correct next step").
+1. Port the tail-race into `run_loop` as a surgical delta (the "correct next step" from the tail-race regression).
 2. Re-run the 64er; verify 64/64 + no straggler tail; inspect results.
-3. Port the 48h-delta path (OT37) into `src/news/` as a new platform.
+3. Port the 48h-delta path into `src/news/` as a new platform.
 4. Set up the one-time 27k backfill in `dev/`.

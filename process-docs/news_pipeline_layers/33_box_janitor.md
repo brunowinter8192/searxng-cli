@@ -4,7 +4,7 @@
 
 Three interlocking changes implemented together as Stages A–E:
 
-1. **Cooldown → in-memory** (Stage A): reverts the persistent `cooled_at` store from OldThemes 32 Stage 1/4.
+1. **Cooldown → in-memory** (Stage A): reverts the persistent `cooled_at` store from the prior sustained-loop stage.
 2. **Global single-job lock** (Stage B): `box_lock.py`, Mineru flock pattern.
 3. **Janitor** (Stage C/D/E): job lifecycle management — wipe transient logs at start, derive persistent MD+plot at end.
 
@@ -12,9 +12,9 @@ Three interlocking changes implemented together as Stages A–E:
 
 ## Stage A — Cooldown revert: persistent → in-memory
 
-### Supersedes OldThemes 32 Stage 1 + Stage 4
+### Supersedes prior persistent-cooldown Stage 1 + Stage 4
 
-Stage 1 of OldThemes 32 added `load_cooled_at()` + `mark_cooled_batch()` to `proxy_status_log.py`
+Stage 1 of the prior sustained-loop stage added `load_cooled_at()` + `mark_cooled_batch()` to `proxy_status_log.py`
 and built `PersistentCooldownManager` on top. Stage 4 wired `cm.flush()` into `run_loop`.
 
 **Rationale for revert:** with the JOB model (one bounded target run = one job), persistence across

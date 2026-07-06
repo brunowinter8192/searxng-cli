@@ -1,8 +1,8 @@
-# 39 — Tail-race: surgical delta to run_loop (OT36 correct next step)
+# 39 — Tail-race: surgical delta to run_loop (correct next step)
 
 ## Origin
 
-OT36 documented the intended surgical fix and why the earlier rewrite-attempt (OT36 itself) regressed
+Prior process history documented the intended surgical fix and why the earlier rewrite-attempt regressed
 to 2/64. The correct next step was quoted verbatim: "Port ONLY the tail-race into `run_loop` as a
 surgical delta." This file documents that delta.
 

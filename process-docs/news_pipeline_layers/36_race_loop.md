@@ -2,7 +2,7 @@
 
 ## The intended change (small)
 
-The sustained batch loop (`p4_loop.run_loop`, OT32-33) had a **straggler tail**: batch-synchronous
+The sustained batch loop (`p4_loop.run_loop`) had a **straggler tail**: batch-synchronous
 (each round waits for its slowest of 128 before the next), and one-proxy-per-URL-per-round. At the
 tail, when 1-2 sub-sitemaps remained, only 1-2 of 128 slots were used — a stubborn sitemap got one
 proxy per ≤15s round, strictly sequential. On the 64er this dragged the total to ~18.6 min.
@@ -10,14 +10,14 @@ proxy per ≤15s round, strictly sequential. On the 64er this dragged the total 
 The agreed fix was **surgical**: *fire the 128 always, distribute over the targets, and at the tail
 let surplus slots race the remaining URLs (multiple proxies per remaining URL).* One behavior. The
 buffer, working-set, 2-strikes, proxy-reuse, cooldown — all of that was working (it got 64/64 on the
-curated pool) and was to STAY.
+curated pool) and was intended to STAY.
 
 ## What was actually done (the error)
 
 Instead of a delta to `run_loop`, the whole loop was **rewritten**: `run_loop` replaced by `run_race`
 (`p4_race.py`), and the load-bearing machinery dropped — no working-set, no 2-strikes, no reuse, no
 cooldown. **Each proxy used at most once.** A from-scratch new design, where only a surgical patch
-was wanted. Full retrospective: `decisions/OldThemes/news_pipeline_layers/38_session_errors_2026-06-15.md`.
+was wanted. Full retrospective covers the session errors of 2026-06-15.
 
 ## Result — REGRESSION
 
@@ -36,7 +36,7 @@ SMALLER curated pool 3396). Pool 20478, exhausted in 20s.
   before completion. The smaller curated pool WITH reuse beat the larger backfill pool WITHOUT reuse,
   decisively. Reuse was load-bearing.
 
-## Current state (reverted)
+## State as of this stage (reverted)
 
 - `acquire_pipe.py` reverted to `run_loop` (sustained, working) — point restored.
 - `p4_race.py` kept on disk as the continuous-dispatch / tail-race REFERENCE (the "128er" idea).

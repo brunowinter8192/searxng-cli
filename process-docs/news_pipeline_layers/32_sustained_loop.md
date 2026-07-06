@@ -2,13 +2,13 @@
 
 ## Problem
 
-The built `p4_loop` (OldThemes 29/30) was a SINGLE-PASS loop with an IN-PROCESS cooldown
+The built `p4_loop` was a SINGLE-PASS loop with an IN-PROCESS cooldown
 (`p2_cooldown.CooldownManager`, `time.monotonic()`, resets each run). It drained the readily
-available proxies once, then gapped — the 61/64 gap on the sitemap dev-run (OldThemes 30) was
+available proxies once, then gapped — the 61/64 gap on the sitemap dev-run was
 exactly this: within an 11-min run nothing ever became re-eligible (60-min cooldown never elapses
 in-run), and there was no persistent state, no pool refresh, no wait.
 
-The OldThemes-28 design intent was always a SUSTAINED drain-cooldown machine
+The original design intent was always a SUSTAINED drain-cooldown machine
 ("candidate → working/drained → burned → 60min cooldown → eligible again"). The implementation
 fell short of the design. This theme builds the sustained machine.
 
@@ -26,7 +26,7 @@ fell short of the design. This theme builds the sustained machine.
    now-eligible set (cooled proxies whose 60 min elapsed are back in).
 5. **Wait-on-exhaustion** — when buffer + working-set are empty, do NOT gap; SLEEP until the earlier
    of (next cooldown expiry, next refresh), then continue. Hard wall-time safety cap.
-6. **Logging** — the streaming JSONL (OldThemes 30) stays; `proxy_status_log.json` additionally
+6. **Logging** — the streaming JSONL stays; `proxy_status_log.json` additionally
    carries `cooled_at` = the cooldown source of truth.
 
 Resolved parameters: extend `proxy_status_log.json` (not a 2nd log); 1280 = 10× concurrency;

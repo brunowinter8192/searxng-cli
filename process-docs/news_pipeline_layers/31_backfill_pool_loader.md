@@ -4,7 +4,7 @@
 
 Built the 22k-candidate backfill proxy pool into `curated_sources.py` and wired a
 `--pool` CLI flag into `acquire_pipe.py`. The pool selection (curated vs backfill)
-was decided in OldThemes 28 (top-13 survey repos by CF-passability rank); this session
+uses the top-13 survey repos by CF-passability rank; this session
 implements the loader and verifies the pool size.
 
 ## Design
@@ -80,4 +80,4 @@ the raw volume.
 The backfill pool loader is complete. Next step: run the 64-sub-sitemap loop with
 `--pool backfill` to measure B-per-proxy and fail/success ratio on the 22k pool.
 That is the proxy-economics measurement that determines whether the backfill wall-time
-is tractable (open point from OldThemes 30).
+is tractable (open point as of this stage).
