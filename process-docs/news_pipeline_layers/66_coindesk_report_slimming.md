@@ -1,8 +1,8 @@
 # 66 — CoinDesk proxy-riding report slimming
 
 **Branch:** `riding-report-trim`.
-Cross-reference: OT64 (`64_coindesk_watchdog_report_path.md`) — originally added `remaining_urls.txt`
-write and the three-plot report to the watchdog abort path.
+A prior session originally added `remaining_urls.txt` write and the three-plot report to the watchdog
+abort path.
 
 ## Removals
 

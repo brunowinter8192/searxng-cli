@@ -1,9 +1,8 @@
 # 68 — CoinDesk job.md reshape: trim + eligible-pool-over-time
 
 **Branch:** `riding-report-trim`.
-Cross-reference: OT66 (`66_coindesk_report_slimming.md`) — prior round that dropped two plots and
-`remaining_urls.txt`. This round trims five more noisy sections and adds the first exhaustion-relevant
-time-series metric.
+A prior round dropped two plots and `remaining_urls.txt`. This round trims five more noisy sections
+and adds the first exhaustion-relevant time-series metric.
 
 ## Part A — Trim
 

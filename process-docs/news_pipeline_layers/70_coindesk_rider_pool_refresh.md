@@ -1,9 +1,8 @@
 # 70 — CoinDesk rider: pool refresh (60 min → 30 min)
 
 **Branch:** `riding-report-trim`.
-Cross-reference: OT65 (`65_coindesk_rider_tail_race.md`) — initial pool load + scrape.py structure.
-OT68 (`68_coindesk_jobmd_reshape.md`) — eligible-pool-over-time metric added to job.md; the refresh
-will now appear as eligible-pool jumps in the 10-min window table.
+A prior session set up the initial pool load + scrape.py structure and added the eligible-pool-over-time
+metric to job.md; the refresh will now appear as eligible-pool jumps in the 10-min window table.
 
 ## Problem
 
@@ -25,8 +24,8 @@ degrades. A 60-min re-fetch re-aligns the pool with the current live source-list
 that died and fell off the lists, adds new ones), holding the live fraction up. The eligible-pool
 metric (OT68) makes this visible: each refresh shows as an eligible jump in the 10-min window table.
 
-TheBlock's `proxy_pool` engine refreshes every 60 min via `pool_provider()` in `run_loop` (OT reference:
-`src/news/engine/proxy_pool/loop.py`, `REFRESH_INTERVAL_S = 3600`). The rider had no equivalent.
+TheBlock's `proxy_pool` engine refreshes every 60 min via `pool_provider()` in `run_loop`
+(`src/news/engine/proxy_pool/loop.py`, `REFRESH_INTERVAL_S = 3600`). The rider had no equivalent.
 
 ## Mechanism
 
@@ -97,7 +96,7 @@ run normally. Stall detection is time-based — a 1 s delay in one poll iteratio
 **Empty pool guard:** `if new_pool:` — if all sources fail (network outage), skip assignment, log
 warning, keep current pool. Prevents a failed refresh from clearing the pool.
 
-### Eligible-pool metric (OT68)
+### Eligible-pool metric
 
 `state.pool_samples` is appended BEFORE the refresh check (step 1). The pre-refresh eligible count
 is recorded; the new count appears in the NEXT poll sample. In the 10-min window table the refresh

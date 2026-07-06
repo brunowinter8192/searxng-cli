@@ -1,12 +1,12 @@
 # 69 — CoinDesk watchdog: all_resolved hang regression + fix
 
 **Branch:** `riding-report-trim`.
-Cross-reference: OT65 (`65_coindesk_rider_tail_race.md`) — the tail-race change that introduced the
-regression. OT64 (`64_coindesk_watchdog_report_path.md`) — original watchdog + `_abort_stall` design.
+An earlier tail-race change introduced this regression; a prior session designed the original
+watchdog + `_abort_stall`.
 
 ## Regression
 
-The tail-race PR (OT65) redefined `RiderState.all_resolved` from:
+The tail-race PR redefined `RiderState.all_resolved` from:
 
 ```python
 url_queue.empty() and in_flight == 0   # OLD
@@ -67,7 +67,7 @@ refresh-if-interval → stall-check`. The `all_resolved` handling block remains 
 ## Test
 
 `test_6_watchdog_wedge_after_all_resolved` added to
-`dev/news_pipeline/coindesk_proxy_riding/test_tail_race.py` (alongside OT65's tail-race cases, same
+`dev/news_pipeline/coindesk_proxy_riding/test_tail_race.py` (alongside the earlier tail-race cases, same
 src/ import pattern):
 
 - `RiderState` with `target_urls = frozenset(["url_a"])`, `done_urls = {"url_a"}` → `all_resolved = True`.
