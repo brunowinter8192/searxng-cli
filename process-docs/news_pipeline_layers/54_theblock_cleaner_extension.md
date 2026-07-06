@@ -1,7 +1,7 @@
 # 54 — The Block cleaner extension: Stage 1 + Stage 2 + Stage 3
 
 **Date:** 2026-06-18. **Commits:** Stage 1 `48d08d5`, A5-fix `9608bc8`, Stage 2 `da28de4`.
-**Branch:** `theblock-cleaner`. **Staged from:** OT53 audit (see `53_theblock_cleanup_audit.md`).
+**Branch:** `theblock-cleaner`. **Staged from:** the prior cleanup audit.
 
 ---
 

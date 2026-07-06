@@ -4,7 +4,7 @@
 
 ## Context
 
-After the raw-only decoupling (OT52), the existing cleaned corpus in
+After the raw-only decoupling, the existing cleaned corpus in
 `rag-cli/data/documents/theblock/` (3952 `.md` files, 2018-08 → 2026-06, 13.4 MB) is the
 only indexed content. Before deciding whether to re-clean from raw or patch-and-re-index,
 we audited what the current cleaner (`src/news/platforms/theblock/cleanup.py`) actually produced.
@@ -13,7 +13,7 @@ we audited what the current cleaner (`src/news/platforms/theblock/cleanup.py`) a
 
 Script: `/tmp/theblock_audit.py`. Report: `/tmp/theblock_cleanup_audit.md`.
 
-**Cleaner recipe (IST at audit time):**
+**Cleaner recipe (as of audit date):**
 1. Parse JSON-LD `NewsArticle.articleBody` from raw HTML via `_find_news_article()` (flat 2-level scan, accepts plain dict, `@graph` list, top-level list). On miss → `""`.
 2. `_html_to_markdown()` via crawl4ai html2text (`body_width=0`, `ignore_images=True`).
 3. `_post_clean()`:
@@ -126,7 +126,7 @@ Schema is `NewsArticle` throughout (not `@type:"Article"`). True root cause: the
 - **0 / 66 recoverable** — the `fallback-content` SSR div carries no prose for ANY of them (51 empty/boilerplate div, 15 no div).
 
 `cleanup.py` is CORRECT to emit `""` here — there is nothing to index. These are NOT content
-loss: no retrievable text exists. Implication for C2 (issue #11): 0-byte = a legitimate
+loss: no retrievable text exists. 0-byte = a legitimate
 body-less post, must be LOGGED/LISTED (not silently dropped), but is not a failure needing recovery.
 
 **G4 update for the 3952-corpus zero-bytes:** same class (body-less posts), not `@type`, not gated.

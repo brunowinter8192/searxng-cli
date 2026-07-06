@@ -102,7 +102,7 @@ imports removed from `pipeline.py`. `_clear_working_dirs()` and `_check_precondi
 
 `cleanup.py` and `publish.py` kept on disk (not deleted) — available to future skill.
 
-## Relationship to prior OTs
+## Relationship to prior process history
 
-- OT50 (`50_coindesk_scrape_job.md`) — Stage 2a introduced `scrape_chunks()` (scrape→clean→publish per chunk) and chunked crash-safety. Stage A of this decoupling replaced `scrape_chunks` with `scrape_chunks_raw` in `run_scrape_only`.
-- OT51 (`51_theblock_backfill_poison_urls_no_termination.md`) — The Block's 21h stuck-loop (8 poison URLs, no per-URL cap) and the 22,995 raw files stranded in scrape/ because cleanup ran only after the scrape completed. Stage B's raw-only decoupling means future The Block runs accumulate raw files incrementally — even if the proxy loop terminates early, whatever scrape succeeded is durable in raw/. The poison-URL fix (per-URL attempt cap) remains a separate session.
+- The earlier CoinDesk scrape-job entry — Stage 2a introduced `scrape_chunks()` (scrape→clean→publish per chunk) and chunked crash-safety. Stage A of this decoupling replaced `scrape_chunks` with `scrape_chunks_raw` in `run_scrape_only`.
+- The Block poison-URLs entry — The Block's 21h stuck-loop (8 poison URLs, no per-URL cap) and the 22,995 raw files stranded in scrape/ because cleanup ran only after the scrape completed. Stage B's raw-only decoupling means future The Block runs accumulate raw files incrementally — even if the proxy loop terminates early, whatever scrape succeeded is durable in raw/. The poison-URL fix (per-URL attempt cap) remains a separate session.

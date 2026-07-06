@@ -1,7 +1,7 @@
 # 50 — CoinDesk Scrape Job (Stage 2: decoupled backfill + per-job report)
 
 **Date:** 2026-06-18.
-**Upstream:** OT49 (`49_coindesk_discovery_src_port.md`) — inventory in place before Stage 2 starts.
+**Upstream:** the discovery src/ port — inventory in place before Stage 2 starts.
 
 ## What we built
 
@@ -37,9 +37,9 @@ Produces:
 
 Wired into `run_scrape_only()` in `pipeline.py`: `job_dir = DATA_ROOT / platform.name / "scrape_jobs" / job_id` created and passed to reporter after `scrape_chunks()` returns.
 
-## Resumability lesson (same as OT51's The Block finding)
+## Resumability lesson (same as a later Block finding)
 
-OT51 documents The Block's monolithic scrape-all → clean-all → publish-all design: when the proxy loop
+A later entry documents The Block's monolithic scrape-all → clean-all → publish-all design: when the proxy loop
 stalls on 8 poison URLs for 21h, all 22,995 raw scrapes are unprocessed at kill time (clean/ empty,
 collection unchanged). The same lesson applies to CoinDesk backfill at 61 k URLs: a monolithic single-
 pass with one terminal publish would strand all output on any crash or RegwallGuardError.
