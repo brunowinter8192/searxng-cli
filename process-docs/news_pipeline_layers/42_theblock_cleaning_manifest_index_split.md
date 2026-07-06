@@ -1,6 +1,6 @@
 # 42 — The Block index-readiness: articleBody-completeness, cleaning, URL-manifest, scrape/index split, collection rename
 
-Post-Stage-B finalization (builds on OT41). Four changes + one empirical verification, all merged on dev,
+Post-Stage-B finalization, building on the platform's Stage-B work. Four changes + one empirical verification, all merged on dev,
 to make The Block's output index-ready and the per-domain model consistent — before the big backfill.
 
 ## articleBody completeness — VERIFIED (no content loss)
@@ -57,11 +57,11 @@ if the platform has a `timeframe` attr and it is NOT `"48h"` → force `skip_ind
 
 ## Collection rename searxng_crypto → coindesk (per-domain consistency)
 
-OT41 decided per-domain collections. CoinDesk's collection was still the legacy shared name `searxng_crypto`.
+A prior stage decided per-domain collections. CoinDesk's collection was still the legacy shared name `searxng_crypto`.
 Renamed: data (Opus — `cp` dir → `rag-cli index --collection coindesk` (68 articles, 195 chunks) → `rag-cli
 delete --collection searxng_crypto`; old dir + DB collection gone) + source refs (`coindesk/__init__.py`
-`collection="coindesk"`, `platform.py` comment, dev `04_dedup`/`05_publish`, dev DOCS). Historical OldThemes
-(10/13) left as-is (record of when searxng_crypto was current).
+`collection="coindesk"`, `platform.py` comment, dev `04_dedup`/`05_publish`, dev DOCS). Earlier process history
+left as-is (dated record of when searxng_crypto was the collection name).
 
 ## Open
 - The actual backfill: `python -m src.news --source theblock --timeframe full` (auto-skip-index) → inspect →

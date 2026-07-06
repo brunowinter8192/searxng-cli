@@ -1,12 +1,12 @@
 # 45 — CoinDesk backfill traversal: false-DISABLED fix + DOM-growth measurement
 
-Builds on OT44 (timeline API confirmed as the right pagination surface). This entry covers the
+Builds on the timeline API confirmed as the right pagination surface. This entry covers the
 first implementation of the uncapped browser-driven backfill traversal, the premature termination
 bug encountered in Stage A, the fix, and the open performance problem before a full run.
 
-**NOT the chosen method — superseded by OT47.** The browser DOM-scrape traversal works but is O(n)-bound
+**NOT the chosen method — superseded by later HTTP-based work.** The browser DOM-scrape traversal works but is O(n)-bound
 by the growing DOM (the perf problem below was never fully beaten). The chosen discovery method calls the
-SAME timeline API directly over plain HTTP (no browser, no DOM, no O(n)) — see OT47. This entry is kept for
+SAME timeline API directly over plain HTTP (no browser, no DOM, no O(n)) — a later stage in this area. This entry is kept for
 the false-DISABLED-race finding and the DOM-growth measurement.
 
 ## Script
@@ -21,7 +21,7 @@ Output shape: identical to `build_entries()` — `{url, lastmod, publication_dat
 First bounded run (cap=400) stopped at click 127 with `button DISABLED` and oldest=2026-03-10
 (~3 months back). Checkpoint had 2031 URLs, 24 live-blog URLs filtered, 2007 entries output.
 
-**This was a false stop.** OT44 depth probe ran 150 clicks → 2414 URLs, oldest 2026-01-23
+**This was a false stop.** An earlier depth probe ran 150 clicks → 2414 URLs, oldest 2026-01-23
 (~5 months back), button still ACTIVE. Same feed, same day. If 2026-03-10 were a genuine floor,
 the depth probe could not have gone deeper.
 
@@ -55,7 +55,7 @@ Re-run with 160-click cap after fix:
 | Wall-clock | 10m 3s |
 
 No DISABLED seen at all — not at click 127, not anywhere. Zero retry recoveries. The fix
-prevents false stops structurally. Oldest date (2026-01-23) exactly matches OT44 depth probe,
+prevents false stops structurally. Oldest date (2026-01-23) exactly matches the earlier depth probe,
 confirming consistency.
 
 **Button still active at click 160** — feed floor not yet reached. Depth is deeper than 5 months.

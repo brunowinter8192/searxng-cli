@@ -2,8 +2,8 @@
 
 Decides the discovery surface for CoinDesk's backfill + delta. Conclusion: **UI pagination, driven by a
 cursor-based timeline API, is denser AND deeper than CoinDesk's article-sitemap.** The sitemap is dropped
-as the backfill surface. Builds on the URL-set + hash-dedup convention (OldThemes 43, established for The
-Block) — CoinDesk gets the same "fetch the URL set, dedup, scrape the difference" model, with the timeline
+as the backfill surface. Builds on the URL-set + hash-dedup convention established for The
+Block — CoinDesk gets the same "fetch the URL set, dedup, scrape the difference" model, with the timeline
 API as the URL source.
 
 ## Question
@@ -18,7 +18,7 @@ discovery surface for a CoinDesk backfill — the article-sitemap or (un-capped)
 dropped). All 19 article sitemaps fetched + aggregated:
 - **9499 total `<loc>`, only 1198 UNIQUE** (87% duplication — articles-2..19 are overlapping rolling
   windows, ~90% pairwise overlap; articles-1 is the freshest ~500, mostly distinct).
-- Unique URL-date range: **2025-06-16 … 2026-06-15 (~1 year floor)**. `articles-20.xml` = 404 (also OT09).
+- Unique URL-date range: **2025-06-16 … 2026-06-15 (~1 year floor)**. `articles-20.xml` = 404 (consistent with earlier findings).
 - 1198 unique for a full year ≈ 3/day — implausibly sparse for CoinDesk → the sitemap is incomplete even
   within its 1-year window.
 
@@ -50,7 +50,7 @@ pagination through the browser.
 
 - Opus first recommended "switch CoinDesk to sitemap discovery like The Block" without checking the dev/
   record — wrong; corrected by the user (pagination was already found more comprehensive vs the 25-cap
-  Google-News sitemap, OT04/05). The deep sitemap-vs-pagination question, however, was genuinely unsettled
+  Google-News sitemap, per earlier findings). The deep sitemap-vs-pagination question, however, was genuinely unsettled
   until this probe.
 - The probe's Stage-1 (5 clicks) concluded "no API, all pre-embedded" — premature, an artifact of staying
   inside the SSR buffer. The depth run (150 clicks) revealed the timeline API. Lesson: the API only appears

@@ -87,7 +87,7 @@ network). Staged coverage:
 
 ---
 
-## Swap empirisch verifiziert
+## Swap empirically verified
 
 The 60-min pool swap in `run_loop` had never been exercised before a full prod run — no prior test
 crossed the refresh boundary. Two integration tests added to `tests/test_proxy_pool.py` (23 total,

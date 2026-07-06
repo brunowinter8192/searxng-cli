@@ -8,11 +8,11 @@ day-precise date and URL.
 
 ## The journey (three surfaces, two dead ends)
 
-1. **Browser UI-pagination** (OT45) — clicking "More stories" drives the timeline API internally; reading
+1. **Browser UI-pagination** (earlier stage) — clicking "More stories" drives the timeline API internally; reading
    article URLs from the DOM. WORKS but the DOM grows unbounded → per-click time climbs O(n²)→O(n) (0.6s →
    3s+ over ~600 clicks); neither delta-extraction nor href-strip-pruning flattened it (the browser holding
    a 9k-node DOM is the wall, not our scan). Abandoned as the backfill surface — too slow at depth.
-2. **Wayback CDX archive** (OT46) — enumerate old article URLs from the Internet Archive. Measured:
+2. **Wayback CDX archive** (earlier stage) — enumerate old article URLs from the Internet Archive. Measured:
    ~15,500 clean date-path articles, **incomplete** (≈20% of CoinDesk's real output; 2017–2019 nearly empty
    at ~700/yr) and **dirty** (line-wrapped/truncated slugs like `busi-ness`). Dead end as a backbone.
 3. **Timeline API direct HTTP** (this doc) — the winner. The same API the browser fires, called directly.

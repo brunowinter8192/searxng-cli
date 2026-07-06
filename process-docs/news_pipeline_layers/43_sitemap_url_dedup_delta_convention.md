@@ -1,6 +1,6 @@
 # 43 — Discovery convention: sitemap-URL-set + hash-dedup, no lastmod date filtering
 
-Supersedes the `48h` mode and the `lastmod`-range mode (OT41/42) for The Block. Origin: a 2018
+Supersedes the `48h` mode and the `lastmod`-range mode from prior stages for The Block. Origin: a 2018
 backfill test returned only 19 articles for the whole year, which forced the question of what date
 info the sitemaps actually carry.
 

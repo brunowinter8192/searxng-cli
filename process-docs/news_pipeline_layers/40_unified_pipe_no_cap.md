@@ -3,8 +3,8 @@
 Crystallizes the proxy-pipe into one coherent model. Origin: the user observed the pipe was "splintered"
 (pool selection an opt-in flag, a time cap, socks4 heuristics nobody asked for) and set a clear premise —
 **a pipe runs to completion; we never cap time.** This session reworked the dev acquire-pipe
-(`dev/news_pipeline/theblock/acquire_pipe/`) to that model. Builds on OT36 (tail-race) + OT38 (the
-over-scope retrospective).
+(`dev/news_pipeline/theblock/acquire_pipe/`) to that model. Builds on the tail-race work and the
+over-scope retrospective.
 
 ## Principle
 
@@ -38,9 +38,9 @@ run; they only cause waiting and retrying. No `max_wall_s`, no `--max_hours`, no
 - `concurrency = 128` (fire 128 (proxy,URL) pairs per round, always), `buffer_size = 1280` (10× concurrency
   eligible buffer, topped up).
 - Working-set reuse: proven-good proxies are tried first each round and reused until they 2-strike out
-  (a success resets the consecutive-fail counter). This is load-bearing — dropping it caused the OT36
+  (a success resets the consecutive-fail counter). This is load-bearing — dropping it caused a prior
   regression.
-- Tail-race (OT36/39): when pending URLs < free slots, surplus proxies race the same leftover URLs,
+- Tail-race: when pending URLs < free slots, surplus proxies race the same leftover URLs,
   first-success-wins.
 - Exhaustion (all eligible burned + buffer empty): sleep via `_compute_sleep` until the earlier of
   (next per-proxy cooldown expiry, next scheduled pool refresh), rebuild buffer from the EXISTING pool
