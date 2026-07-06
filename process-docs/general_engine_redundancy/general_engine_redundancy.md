@@ -53,7 +53,7 @@ Operationally relevant: **`--docs` is NOT the remedy for academic noise** — it
 
 ### A) Engine pool — more GENERAL redundancy
 - **Marginalia** (`search.marginalia.nu`) — already noted as "Pending — Marginalia probe: try-or-drop ... when there is a concrete use-case gap" as of the prior engine-expansion research. **This session IS that use-case gap** → prioritize the probe.
-- Evaluate further GENERAL candidates (Brave Search API / Startpage / possibly Scholar in a Google-free pool, blocked on the g82 pooling rework).
+- Evaluate further GENERAL candidates (Brave Search API / Startpage / possibly Scholar in a Google-free pool, blocked on the pooling rework).
 - Target: when Google=0, at least **2 qualitatively usable** GENERAL engines remain (not just ddg + Mojeek junk).
 
 ### B) Skill guidance — make the fallback explicit
@@ -75,6 +75,6 @@ Operationally relevant: **`--docs` is NOT the remedy for academic noise** — it
 - No global cross-engine ranking (pooling rework abandoned).
 
 ## Sources
-- 9-engine baseline, "Pending — Marginalia probe", g82 pooling rework, K=google_count cap — per the search-pipeline design as of this session.
+- 9-engine baseline, "Pending — Marginalia probe", pooling rework, K=google_count cap — per the search-pipeline design as of this session.
 - Google 73% OK / 23% CAPTCHA, fail-fast, no-backoff rationale — per the rate-limiting decision as of this session.
 - `src/search/filter_modes.py` — bucket-uniformity invariant (`excluded={}`), mode-modifier sets.

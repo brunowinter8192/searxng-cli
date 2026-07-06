@@ -149,7 +149,7 @@ Effective sample: 11/20 queries with valid data:
 
 ## Next Steps
 
-Pending (to be addressed in bead g82 or a follow-up):
+Pending (to be addressed in the pooling rework or a follow-up):
 
 - **Fix for probe**: add a Google CAPTCHA detection check early in `_run_one_query`; if Google returns CAPTCHA, insert a sleep to clear the Chrome event backlog before proceeding to the next query. This would convert the zero cascade into single-query gaps.
 - **Investigate mechanism**: add pydoll CDP event counter probe to confirm event loop starvation hypothesis.

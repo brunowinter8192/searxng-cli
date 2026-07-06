@@ -12,4 +12,4 @@
 
 **Smoke baseline:** `dev/search_pipeline/01_reports/scholar_smoke_*.md` (2026-05-03).
 
-**Subsequent removal (2026-05-21):** Scholar fully removed from ENGINES dict as part of the bee_fix cascade resolution (CDP-starvation investigation). Scholar re-integration deferred to g82 pooling-rework (Google-free pool). `src/search/engines/scholar.py` retained in tree, inert.
+**Subsequent removal (2026-05-21):** Scholar fully removed from ENGINES dict as part of the CDP-starvation cascade resolution investigation. Scholar re-integration deferred to pooling-rework (Google-free pool). `src/search/engines/scholar.py` retained in tree, inert.

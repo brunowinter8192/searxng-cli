@@ -90,7 +90,7 @@ This run was the reference baseline at the time. (Report deleted, see git histor
 
 **As of 2026-05-04:** 8 active engines in a uniform 4 req/min rate-limit pool — Google, DuckDuckGo, Mojeek, Lobsters (browser via pydoll); Google Scholar (browser, JS fix 2026-05-04); CrossRef, OpenAlex, Stack Exchange (HTTP API). Bing: src/search/engines/bing.py deleted 2026-05-04 (DOM-drift, no added value over DDG). HN dropped 2026-05-04 (rate-limit-cascade-hostile).
 
-**Update 2026-05-09:** Google Scholar browser → HTTP migration (bead `searxng-f3i`). Scholar excluded from `_DEFAULT_ENGINES` due to Google co-fire decoupling — dormant in default queries until pooling-rework. Plus Semantic Scholar (browser, added 2026-05-07) and Open Library (HTTP, 2026-05-08). Engine set at that point: 9 engines (Google, DDG, Mojeek, Lobsters, SemScholar via browser; CrossRef, OpenAlex, StackExchange, Open Library via HTTP).
+**Update 2026-05-09:** Google Scholar browser → HTTP migration. Scholar excluded from `_DEFAULT_ENGINES` due to Google co-fire decoupling — dormant in default queries until pooling-rework. Plus Semantic Scholar (browser, added 2026-05-07) and Open Library (HTTP, 2026-05-08). Engine set at that point: 9 engines (Google, DDG, Mojeek, Lobsters, SemScholar via browser; CrossRef, OpenAlex, StackExchange, Open Library via HTTP).
 
 ### Brave — Drop Decision & Rationale
 

@@ -30,7 +30,7 @@
 
 **Bucket-uniformity invariant:** All 9 engines fire on every query regardless of filter mode. `--books` / `--pdf` / `--docs` apply only per-engine query modifiers and post-merge URL filtering — never restrict which engines participate. `apply_filter_mode()` in `filter_modes.py` returns `excluded={}` in all code paths.
 
-**Inert engine:** `src/search/engines/scholar.py` — file present but nothing imports it. Not in `ENGINES`, `_DEFAULT_ENGINES`, or `ENGINE_WATCHDOG_OVERRIDE`. Parked for g82 pooling-rework re-integration (Google-free pool design required; see Open Questions).
+**Inert engine:** `src/search/engines/scholar.py` — file present but nothing imports it. Not in `ENGINES`, `_DEFAULT_ENGINES`, or `ENGINE_WATCHDOG_OVERRIDE`. Parked for pooling-rework re-integration (Google-free pool design required; see Open Questions).
 
 **Plugin engines** (not in `ENGINES` dict, not in this pipeline): ArXiv, GitHub, Reddit — URL discovery via MCP plugins; content fetched by dedicated plugin.
 
@@ -63,7 +63,7 @@ Per-engine implementation probes and smoke baselines (2026-05):
 
 ### Open Questions
 
-- **g82 pooling-rework:** which pool definition places Scholar in a Google-free set? What inter-session CAPTCHA behavior is expected at 4/min in a Scholar-only pool?
+- **Pooling-rework:** which pool definition places Scholar in a Google-free set? What inter-session CAPTCHA behavior is expected at 4/min in a Scholar-only pool?
 - **SE API quota:** 300 req/day anonymous vs 10k/day with free registered key — sufficient for agentic-search volume?
 - **`open_library` sub-status labelling:** `ERROR_OTHER` returned for non-book queries (HTTP engine returning `[]`). `search_with_reason()` could provide finer sub-status; not blocking current operation.
 

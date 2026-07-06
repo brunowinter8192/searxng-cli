@@ -50,7 +50,7 @@ Structural prevention for future filter-mode regressions. `apply_filter_mode()` 
 
 ### 3. Scholar fully removed
 
-Scholar was dormant in `_DEFAULT_ENGINES` (not in the default fanout) but still registered in `ENGINES` and `_limiters`. The `_limiters["google_scholar"]` line in `scholar.py` fired at module import (triggered by `search_web.py` importing `ScholarEngine`). With Scholar in `ENGINES` but not in `_DEFAULT_ENGINES`, its limiter was registered but never used — harmless in isolation, but a latent co-fire trigger if `_DEFAULT_ENGINES` is ever widened. Fully removed to give g82 pooling-rework a clean slate.
+Scholar was dormant in `_DEFAULT_ENGINES` (not in the default fanout) but still registered in `ENGINES` and `_limiters`. The `_limiters["google_scholar"]` line in `scholar.py` fired at module import (triggered by `search_web.py` importing `ScholarEngine`). With Scholar in `ENGINES` but not in `_DEFAULT_ENGINES`, its limiter was registered but never used — harmless in isolation, but a latent co-fire trigger if `_DEFAULT_ENGINES` is ever widened. Fully removed to give pooling-rework a clean slate.
 
 ---
 
@@ -68,5 +68,5 @@ Scholar was dormant in `_DEFAULT_ENGINES` (not in the default fanout) but still 
 ## Remaining open items (not this commit)
 
 - **merge.py hygiene:** `ACADEMIC = {"google_scholar", ...}` and `ACADEMIC_PRIORITY = {"google_scholar": 2, ...}` are inert dead references. Follow-up hygiene pass.
-- **g82 pooling-rework:** Scholar re-integration path. `scholar.py` HTTP logic preserved in tree.
+- **Pooling-rework:** Scholar re-integration path. `scholar.py` HTTP logic preserved in tree.
 - **`max_requests` per-engine:** currently 4 (hardcoded in each engine). Module default is 10. With RATE_WAIT_TIMEOUT=60 the tokencap wait is now bounded and recoverable — `max_requests` tuning is a separate optimization, not urgent.

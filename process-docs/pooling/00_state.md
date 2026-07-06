@@ -27,7 +27,7 @@ Both fail under filter-flag mode (e.g. `--books` restricts to general engines, `
 
 ---
 
-## IST Production State (post 2026-05-09, bead f3i closed)
+## IST Production State (post 2026-05-09)
 
 `src/search/`:
 - `merge.py` — `_merge_and_rank` with class bucketing + hard slots (UNCHANGED, target of rework)
@@ -35,7 +35,7 @@ Both fail under filter-flag mode (e.g. `--books` restricts to general engines, `
 - `search_web.py` — `_select_engines` returns `(selected, excluded)`, fan-out via `_query_engines_concurrent`, ranking via `_merge_and_rank`
 - `query_logger.py` — `engines_excluded` field added with reason enum
 
-10 engines registered in `ENGINES`, 9 in `_DEFAULT_ENGINES` (Scholar dormant per bead f3i).
+10 engines registered in `ENGINES`, 9 in `_DEFAULT_ENGINES` (Scholar dormant, decoupled from Google).
 
 ---
 
@@ -267,7 +267,7 @@ All 16 pairs output as `<pair>_oracle_v3clean.json` in `value_eval_v2_20260523_0
 
 LLM-as-Oracle value-eval — 4 modes (general/pdf/books/docs) × 4 queries (strict from canonical 20) × 4 C-methods (C1 Overlap, C2 BM25, C2' BM25-Capped, C3 Cross-Encoder). Worker (Sonnet) reads each pool independently, picks Top-10, scripted Jaccard computes overlap with each C-method.
 
-**Architecture pivot before the eval:** all three y6e-bead-proposed directions rejected by user (authority-domain list / LLM-judge / Lobsters-boost) plus structural-feature mining as too query-specific. Final architecture: keep ranker simple (one C-method), add runtime LLM-driven engine-drill-down on the cached pool. Phase 11 picks the ranker; the drill-down tool follows after migration.
+**Architecture pivot before the eval:** all three originally-proposed directions rejected by user (authority-domain list / LLM-judge / Lobsters-boost) plus structural-feature mining as too query-specific. Final architecture: keep ranker simple (one C-method), add runtime LLM-driven engine-drill-down on the cached pool. Phase 11 picks the ranker; the drill-down tool follows after migration.
 
 **Results:**
 

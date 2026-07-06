@@ -14,7 +14,7 @@ All 9 active engines fire on every query, regardless of filter mode (`--books`, 
 - `src/search/engines/scholar.py` L35 `_limiters["google_scholar"] = ...` removed — no limiter registration at import
 - `src/search/search_web.py`: `ScholarEngine` import removed; `"google_scholar": 6.0` removed from `ENGINE_WATCHDOG_OVERRIDE`; `"google_scholar": 20` removed from `ENGINE_MAX_RESULTS`; `"google scholar": ScholarEngine()` removed from `ENGINES` dict
 - `_select_engines()` default path returns full 9-engine set with `excluded={}`
-- `scholar.py` file stays in tree (class + HTTP logic intact) for future re-integration via g82 pooling-rework. The file is inert — nothing imports it.
+- `scholar.py` file stays in tree (class + HTTP logic intact) for future re-integration via pooling-rework. The file is inert — nothing imports it.
 
 ## Evidence
 
@@ -46,7 +46,7 @@ Per-engine status across all 20 queries: crossref 19 OK, duckduckgo 17 OK, googl
 
 ## Open Questions
 
-- g82 pooling-rework: which pool definitions place Scholar in a Google-free set? What inter-session CAPTCHA behavior is expected at 4/min in a Scholar-only pool?
+- Pooling-rework: which pool definitions place Scholar in a Google-free set? What inter-session CAPTCHA behavior is expected at 4/min in a Scholar-only pool?
 - `max_requests` per-engine: currently hardcoded at 4 in each engine constructor call. Phase 3 showed the module default is 10. Should all engines use the module default (wider headroom before tokencap)? Not urgent while RATE_WAIT_TIMEOUT=60 covers the wait correctly.
 
 ## Sources

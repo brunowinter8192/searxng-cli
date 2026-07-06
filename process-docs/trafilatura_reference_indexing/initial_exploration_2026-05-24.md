@@ -74,7 +74,7 @@ Absolute URL form: prefix each line with `https://trafilatura.readthedocs.io/en/
 
 ## Next-Session Workflow
 
-The bead `<bead-id-tbd>` carries the resume pointer. Concrete steps to execute next session:
+Concrete steps to execute next session:
 
 1. **Re-generate filtered URL list if /tmp got wiped** — run `searxng-cli explore_site "https://trafilatura.readthedocs.io/en/latest/" --output /tmp/trafilatura_urls.txt`, then filter to 28 per the table above (or grep-out `_modules` and `genindex` mechanically).
 2. **Spawn worker with the consolidated web-research skill Mode 1 Web-MD Capture.** Worker prompt is short (per skill template): activate `web-research` skill, MODE=`web-md`, INPUT=`<absolute path to filtered url list>`, COLLECTION=`Trafilatura_Reference`, OUTPUT_DIR=`~/Documents/ai/Meta/ClaudeCode/MCP/RAG/data/documents/Trafilatura_Reference/`.

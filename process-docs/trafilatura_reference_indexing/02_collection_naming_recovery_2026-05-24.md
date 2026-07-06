@@ -2,7 +2,7 @@
 
 ## What happened
 
-Phase 4 of bead `searxng-2rt` was executed end-to-end: 25 Trafilatura URLs filtered, crawled, Sphinx-cleaned (5-shape profile, validated), and indexed. The indexing target was `Trafilatura_Reference` (159 chunks produced) — WRONG. The project's convention (one `<project>_reference` collection per project) was violated because the prior session decided `Trafilatura_Reference` without cross-checking the naming convention documented in the web-research skill.
+Phase 4 of Trafilatura Reference Indexing was executed end-to-end: 25 Trafilatura URLs filtered, crawled, Sphinx-cleaned (5-shape profile, validated), and indexed. The indexing target was `Trafilatura_Reference` (159 chunks produced) — WRONG. The project's convention (one `<project>_reference` collection per project) was violated because the prior session decided `Trafilatura_Reference` without cross-checking the naming convention documented in the web-research skill.
 
 ## Recovery
 
@@ -22,4 +22,4 @@ Phase 4 of bead `searxng-2rt` was executed end-to-end: 25 Trafilatura URLs filte
 
 ## Closes
 
-Bead `searxng-2rt` — Trafilatura Reference Indexing — complete. Cleaned files in `searxng_reference/`, 159 Trafilatura chunks in `searxng_reference` collection alongside pre-existing 875 chunks.
+Trafilatura Reference Indexing — complete. Cleaned files in `searxng_reference/`, 159 Trafilatura chunks in `searxng_reference` collection alongside pre-existing 875 chunks.
