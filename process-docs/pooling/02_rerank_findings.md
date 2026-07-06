@@ -2,7 +2,7 @@
 
 **Bead:** searxng-g82 (open)  
 **Scope:** Does URL-filter + BM25-retrieve + semantic rerank beat Hard-Slot 12/6/2 on 4 representative queries?  
-**Outcome:** Cross-Encoder (Qwen3-Reranker-0.6B) ties Hard-Slot at **35/40** and **wins on Q1** (9 vs 8) — first config in this investigation to outperform Hard-Slot on the pathology query. Embedding-Cosine (Qwen3-Embedding-0.6B bi-encoder) underperforms at **26/40**. Preceding BM25 investigation → `01_bm25_evaluation_findings.md` (best BM25: 34/40). Phases 1–7 history → `00_state.md`.
+**Outcome:** Cross-Encoder (Qwen3-Reranker-0.6B) ties Hard-Slot at **35/40** and **wins on Q1** (9 vs 8) — first config in this investigation to outperform Hard-Slot on the pathology query. Embedding-Cosine (Qwen3-Embedding-0.6B bi-encoder) underperforms at **26/40**. Preceding BM25 investigation (best BM25: 34/40) and Phases 1–7 history recorded in companion entries in this folder.
 
 ---
 
@@ -55,7 +55,7 @@ Source: probe report global summary table.
 
 ## Eyeball Quality Scores — Top-10 per Query
 
-**Method:** count URLs in top-10 clearly topical for the query intent. Excludes: query-echo URLs (`scholar?q=`, `/search?q=`), false friends (PV-cell-defect paper, WSD paper), academic DOIs of unknown topical relevance. Judgment is Opus eyeball, not automated. Same methodology as `01_bm25_evaluation_findings.md`.
+**Method:** count URLs in top-10 clearly topical for the query intent. Excludes: query-echo URLs (`scholar?q=`, `/search?q=`), false friends (PV-cell-defect paper, WSD paper), academic DOIs of unknown topical relevance. Judgment is Opus eyeball, not automated. Same methodology as the companion BM25-evaluation-findings entry.
 
 | Config | Q1 transformer | Q2 espresso | Q3 asyncio | Q4 k8s mesh | Sum |
 |---|---|---|---|---|---|
@@ -128,7 +128,7 @@ Embed: ~1050–1300ms for 51 inputs (1 query + 50 docs) in single batch POST to 
 
 4-query sample is insufficient to commit to production migration. CE's Q1 win is real but n=1 on the pathology category. A larger probe (10–20 diverse queries: academic, product, technical, mixed-intent, including multiple academic-noise cases) is the logical next step before `src/search/merge.py` is touched.
 
-RAG's reranker eval (`decisions/retrieval04_reranking.md` in `/RAG/`) shows cross-encoders are domain-dependent: help on academic text, hurt on technical docs. Our snippet-rerank case differs from full-document indexing (shorter docs, ephemeral per-query pool), but the warning applies — Q2 score 8/10 vs BM25-Capped's 10/10 hints at a possible consumer-query penalty worth probing at scale.
+A separate RAG-project reranker eval shows cross-encoders are domain-dependent: help on academic text, hurt on technical docs. Our snippet-rerank case differs from full-document indexing (shorter docs, ephemeral per-query pool), but the warning applies — Q2 score 8/10 vs BM25-Capped's 10/10 hints at a possible consumer-query penalty worth probing at scale.
 
 ---
 

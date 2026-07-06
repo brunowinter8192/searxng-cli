@@ -4,7 +4,7 @@
 **Bead:** searxng-g82 (open)  
 **Probe script:** `dev/search_pipeline/rerank_probe_smoke.py` (updated for this run)  
 **Raw report:** `dev/search_pipeline/01_reports/rerank_probe_20260520_190340.md`  
-**Preceding phase:** `02_rerank_findings.md` (n=4, Cross-Encoder first beat Hard-Slot on Q1)
+**Preceding phase:** companion rerank-findings entry in this folder (n=4, Cross-Encoder first beat Hard-Slot on Q1)
 
 ---
 
@@ -30,7 +30,7 @@
 - Technical: 2/5 (T1–T2; missing T3–T5)
 - Mixed-pathology: 3/5 (M3–M5; missing M1 original Q1 anchor, M2)
 
-Critical loss: **M1 "transformer attention mechanism"** (the original Q1 pathology anchor from `02_rerank_findings.md`) is among the zero-result queries. The n=1 Q1 result from the initial probe **cannot be re-confirmed in this run.** Validation of the canonical pathology case remains n=1.
+Critical loss: **M1 "transformer attention mechanism"** (the original Q1 pathology anchor from the companion rerank-findings entry) is among the zero-result queries. The n=1 Q1 result from the initial probe **cannot be re-confirmed in this run.** Validation of the canonical pathology case remains n=1.
 
 ---
 
@@ -90,7 +90,7 @@ All four queries (BERT fine-tuning, knowledge graph embedding, contrastive learn
 - A3 (contrastive learning): 5 named-host URLs + 3 paper DOIs + 1 arxiv + 1 ieeexplore. CE does not fully eliminate DOI flood on this query.
 - A4 (variational autoencoder): 8 named-host tutorial URLs + 1 semscholar false-friend (`High-Dimensional Analog Circuit Sizing` — BayesOpt paper, not VAE) + 1 CrossRef DOI.
 
-**Embedding-Cosine top-10 composition (all 4 queries):** Heavy DOI flooding confirmed at scale. A1: 7/10 are CrossRef DOIs. A2: 4/10 are DOIs. A3: 6/10 are DOIs. A4: 3/10 are DOIs. The bi-encoder academic-register amplification effect from `02_rerank_findings.md` is consistent across all 4 academic queries.
+**Embedding-Cosine top-10 composition (all 4 queries):** Heavy DOI flooding confirmed at scale. A1: 7/10 are CrossRef DOIs. A2: 4/10 are DOIs. A3: 6/10 are DOIs. A4: 3/10 are DOIs. The bi-encoder academic-register amplification effect from the companion rerank-findings entry is consistent across all 4 academic queries.
 
 **Hard-Slot top-10 composition:** For academic queries, general slots (12) are filled by Mojeek+DDG tutorial pages; academic slots (6) pull CrossRef/OpenAlex by position. Hard-Slot consistently surfaces `openlibrary.org/works/...` at positions 3–5 for academic queries (Open Library receives 1 result per query in its general-class slot, ranks high on overlap). Whether `openlibrary.org/works/OL27086886W` is useful for "bert fine-tuning NLP" is the quality question — flagged for scorer.
 

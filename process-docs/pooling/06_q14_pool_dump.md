@@ -2,14 +2,14 @@
 
 **Date:** 2026-05-21  
 **Bead:** searxng-g82 (open)  
-**Predecessor:** `05_capped_pool_probe.md` (Phase 9 — 20-query Müll-floor verdict)  
+**Predecessor:** companion capped-pool-probe entry (Phase 9 — 20-query garbage-floor verdict)  
 **Probe artifacts:** `dev/search_pipeline/single_query_pool_dump.py` (385 LOC) + `dev/search_pipeline/01_reports/single_query_pool_postgresql_index_types_btree_g_20260521_231405.md` (878 lines)
 
 ---
 
 ## Motivation
 
-Phase 9 verdict: C2 BM25, C3 Cross-Encoder, C4 Embedding-Cosine all produce 0 obvious-Müll across 20 queries × Top-google_count slots. The Müll-Eyeball methodology was floor-tied for the three text-scoring strategies — could not discriminate them. Open question: do the rankers differ on **what they MISS** (Blind Spot B from the Phase 9 narrative — Pool-URLs that don't make Top-N)?
+Phase 9 verdict: C2 BM25, C3 Cross-Encoder, C4 Embedding-Cosine all produce 0 obvious-garbage across 20 queries × Top-google_count slots. The garbage-Eyeball methodology was floor-tied for the three text-scoring strategies — could not discriminate them. Open question: do the rankers differ on **what they MISS** (Blind Spot B from the Phase 9 narrative — Pool-URLs that don't make Top-N)?
 
 Phase 10 takes one technical query, dumps the full capped pool alongside each config's Top-N picks, and compares URL-by-URL via a comparison matrix.
 
@@ -79,7 +79,7 @@ The official PostgreSQL docs (canonical answer) are #1 only for C1. C2/C4 demote
 
 ## Methodological Conclusion
 
-**Müll-Eyeball is a floor test, not a quality discriminator.** It measures "did the ranker produce obviously-wrong URLs" (= the negative-quality floor). For finer differentiation between rankers, a **top-quality-recall test** is needed: define the high-signal URLs in the pool (per query), measure how many each ranker surfaces in Top-N.
+**garbage-Eyeball is a floor test, not a quality discriminator.** It measures "did the ranker produce obviously-wrong URLs" (= the negative-quality floor). For finer differentiation between rankers, a **top-quality-recall test** is needed: define the high-signal URLs in the pool (per query), measure how many each ranker surfaces in Top-N.
 
 The bottleneck for automating this: identifying "high-signal URLs in the pool" is itself a judgment call. Phase 10 did it via human spot-check (Opus reading the dump + recognizing PostgreSQL expert names). To automate:
 
@@ -91,18 +91,18 @@ Direction (1) is cheapest, direction (2) is most general, direction (3) is most 
 
 ## Status of `_merge_and_rank` Production Migration
 
-**Migration is BLOCKED on this finding.** Phase 9 suggested "BM25 wins, migrate now" because Müll was floor-tied. Phase 10 reveals that the Müll-floor masked a more important quality dimension: top-source recall, where all 4 strategies are demonstrably suboptimal. Migrating to BM25 now would lock in a strategy that misses Lobsters-curated expert content.
+**Migration is BLOCKED on this finding.** Phase 9 suggested "BM25 wins, migrate now" because garbage was floor-tied. Phase 10 reveals that the garbage-floor masked a more important quality dimension: top-source recall, where all 4 strategies are demonstrably suboptimal. Migrating to BM25 now would lock in a strategy that misses Lobsters-curated expert content.
 
 Next session: solve top-URL-identification automation first (Lobsters boost prototype + reference-set methodology), THEN migrate `_merge_and_rank` with the improved ranking strategy.
 
 ## Open Questions for Next Session
 
-- Lobsters-as-curation-signal: implement a ranking-bonus for Lobsters origin and measure whether expert-recall improves (in Top-N) and whether Müll-rate stays low
+- Lobsters-as-curation-signal: implement a ranking-bonus for Lobsters origin and measure whether expert-recall improves (in Top-N) and whether garbage-rate stays low
 - Reference-set methodology: for a small query set (5-10 queries), manually define "the top-5 URLs in the pool" per query, measure each ranker's Recall@5 against that set. Build the eval as a probe.
 - Per-engine-cap revisit: does K=google_count make sense if Lobsters routinely surfaces expert content in positions 1-6? Maybe a larger K for trusted-curator engines (= "give Lobsters the full 6 it returned, not capped to google's 10").
 
-## Quellen
+## Sources
 
-- Phase 9 predecessor: `05_capped_pool_probe.md`
+- Phase 9 predecessor: companion capped-pool-probe entry
 - Phase 10 probe artifacts: `dev/search_pipeline/single_query_pool_dump.py`, `dev/search_pipeline/01_reports/single_query_pool_postgresql_index_types_btree_g_20260521_231405.md`
-- Bee resolution (= pool integrity precondition): `decisions/OldThemes/bee_cdp_starvation/fix_summary.md`
+- Bee resolution (= pool integrity precondition) recorded separately in the bee_cdp_starvation area

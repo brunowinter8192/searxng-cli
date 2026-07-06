@@ -2,7 +2,7 @@
 
 **Date:** 2026-05-22
 **Bead:** searxng-g82 (open, umbrella) / searxng-y6e (open, working)
-**Predecessor:** `06_q14_pool_dump.md` (Phase 10 — top-source-recall finding, blocked migration)
+**Predecessor:** companion Q14-pool-dump entry (Phase 10 — top-source-recall finding, blocked migration)
 **Probe artifacts:**
 - `dev/search_pipeline/value_eval_probe.py` (369 LOC) — Stage 1+2 fetch + score
 - `dev/search_pipeline/value_eval_aggregate.py` (333 LOC, after B2 fixes) — Stage 4 Jaccard + MDs
@@ -36,7 +36,7 @@ Phase 11 closes step 1.
 
 ## Methodology — LLM-as-Oracle, Scripted Comparison
 
-**Why not Müll-Eyeball at scale.** Phase 9 (`05_capped_pool_probe.md`) showed Müll-Eyeball as a floor metric only: C2/C2'/C3 all 0 Müll across 20 queries, no discrimination. Phase 10 showed that the more important quality dimension (top-source recall) is not Müll-bounded — all 4 methods missed the same expert URLs. Continuing with the same eyeball methodology would have produced more null results.
+**Why not garbage-Eyeball at scale.** Phase 9 (companion capped-pool-probe entry) showed garbage-Eyeball as a floor metric only: C2/C2'/C3 all 0 garbage across 20 queries, no discrimination. Phase 10 showed that the more important quality dimension (top-source recall) is not garbage-bounded — all 4 methods missed the same expert URLs. Continuing with the same eyeball methodology would have produced more null results.
 
 **Why not LLM-runtime-quality-judge.** Same reason it's rejected for production: too slow for per-URL per-query judgment. But the same primitive — LLM judgment — is acceptable as a **one-time eval signal** if the LLM doesn't see C-method outputs and picks Top-N independently.
 
@@ -137,7 +137,7 @@ PDF and books are dominated by oracle-saturation pathology (pool ≤ 10): all me
 
 ### Google CAPTCHA — Out on All 16 Pairs
 
-`/tmp/value_eval_probe_run.log` shows 4 Google CAPTCHA events (pairs 1, 2, 4, 7) with escalating backoffs: 34s, 65s, 123s, 244s. Once the first CAPTCHA triggered the rate_limiter's exponential backoff, subsequent pairs within the backoff window all hit `RATE_WAIT_TIMEOUT=60s` (see `decisions/rate_limiting.md`) and got RATE_SKIP for Google. Total: google=0 across all 16 pairs.
+`/tmp/value_eval_probe_run.log` shows 4 Google CAPTCHA events (pairs 1, 2, 4, 7) with escalating backoffs: 34s, 65s, 123s, 244s. Once the first CAPTCHA triggered the rate_limiter's exponential backoff, subsequent pairs within the backoff window all hit `RATE_WAIT_TIMEOUT=60s` and got RATE_SKIP for Google. Total: google=0 across all 16 pairs.
 
 **The eval ran as 8-engine, not 9-engine.** All 4 C-methods saw the same reduced pool, so the **method comparison is internally fair** — the winner is who-ranks-the-reduced-pool-best, and that's still C3. But Google's deep-tail (which Phase 10 showed contributes unique expert URLs not surfaced by other engines) is missing, so this eval cannot definitively claim C3 is the best in a 9-engine production scenario. A re-run with Google in the pool (after rate-limiter fail-fast cleanup + pacing strategy) would tighten the conclusion.
 
@@ -152,11 +152,11 @@ This is a known limitation of running the canonical 20-query set against narrow 
 
 Worker B2 flagged three concrete engine-level issues during oracle selection (not eval-blocking, but Future Work):
 
-1. **books mode is broken for ML/DL queries.** Open Library returns Husserl Cartesian Meditations, 1893 World's Fair history, 19th-century philosophy — zero ML relevance — for transformer/postgresql/contrastive queries. Only `books × asyncio` returned a coherent pool, and it collapsed to one Fowler book replicated across 7 retailer/platform pages. The BOOK_WHITELIST may be over-restrictive; Open Library may need topic-filtering. Separate baustelle.
+1. **books mode is broken for ML/DL queries.** Open Library returns Husserl Cartesian Meditations, 1893 World's Fair history, 19th-century philosophy — zero ML relevance — for transformer/postgresql/contrastive queries. Only `books × asyncio` returned a coherent pool, and it collapsed to one Fowler book replicated across 7 retailer/platform pages. The BOOK_WHITELIST may be over-restrictive; Open Library may need topic-filtering. Separate work item.
 
-2. **Open Library pollutes general/docs pools too.** Same Husserl/Rosmini entries appear in `docs × transformer` pool. Open Library isn't restricted to books-mode in the engine fanout. Separate baustelle.
+2. **Open Library pollutes general/docs pools too.** Same Husserl/Rosmini entries appear in `docs × transformer` pool. Open Library isn't restricted to books-mode in the engine fanout. Separate work item.
 
-3. **docs mode has academic-engine precision noise.** `docs × asyncio` pool contains 8+ off-topic papers from OpenAlex/Semantic Scholar matching "asyncio"/"concurrency" as incidental keywords — Julia HEP performance, RFSoC SDR, autonomous driving digital twins, Power HiL, Smart City IoT. `docs × postgresql` pool contains "Performance of the Bispectral Index During Electrocautery" (medical paper matching `index`, `performance`, partial `btree`/`bispectral`). Classic academic title-word matching noise. Separate baustelle (academic engine over-eager keyword matching).
+3. **docs mode has academic-engine precision noise.** `docs × asyncio` pool contains 8+ off-topic papers from OpenAlex/Semantic Scholar matching "asyncio"/"concurrency" as incidental keywords — Julia HEP performance, RFSoC SDR, autonomous driving digital twins, Power HiL, Smart City IoT. `docs × postgresql` pool contains "Performance of the Bispectral Index During Electrocautery" (medical paper matching `index`, `performance`, partial `btree`/`bispectral`). Classic academic title-word matching noise. Separate work item (academic engine over-eager keyword matching).
 
 ---
 
@@ -166,22 +166,22 @@ Worker B2 flagged three concrete engine-level issues during oracle selection (no
 
 **Migration remains BLOCKED on the following dependencies (none are pure code refactors of `merge.py`):**
 
-1. **rate_limiter fail-fast cleanup** (separate scope, new bead created). Without it, Google CAPTCHA cascades will keep the eval inconclusive and any 16+-query rapid-fire batch in production will produce wasted wallclock + no Google results. Decision: remove exponential backoff entirely (per session decision `decisions/rate_limiting.md`).
+1. **rate_limiter fail-fast cleanup** (separate scope, new work item created). Without it, Google CAPTCHA cascades will keep the eval inconclusive and any 16+-query rapid-fire batch in production will produce wasted wallclock + no Google results. Decision: remove exponential backoff entirely (per session decision, recorded separately in the rate_limiting area).
 
 2. **Cache format extension for per-engine position** (small additive change to `merge.py` + `cache.py`). Needed for the engine-drill-down tool that follows the ranker migration. Not blocking the migration itself.
 
 3. **Optional: 9-engine re-eval** with Google included (rate-limiter cleanup + mode-spacing pacing) to tighten confidence in the general-mode margin. Sound migration cause to want this; not strictly required if C3's lead is accepted as robust.
 
-4. **Cross-encoder service operational concerns** — `reranker-0.6b` on port 8082. Currently runs as ad-hoc llama-server in some sessions. Needs SERVERS-dict registration in RAG infrastructure for production reliability (open item from 02 / from the bead g82 comment 2026-05-09).
+4. **Cross-encoder service operational concerns** — `reranker-0.6b` on port 8082. Currently runs as ad-hoc llama-server in some sessions. Needs SERVERS-dict registration in RAG infrastructure for production reliability (open item flagged since 2026-05-09).
 
 ---
 
-## Quellen
+## Sources
 
-- Phase 8 (predecessor with rubric scoring, n=4): `02_rerank_findings.md`
-- Phase 9 (Müll-floor): `05_capped_pool_probe.md`
-- Phase 10 (top-source-recall, Q14 single-query): `06_q14_pool_dump.md`
+- Phase 8 (predecessor with rubric scoring, n=4): companion rerank-findings entry
+- Phase 9 (garbage-floor): companion capped-pool-probe entry
+- Phase 10 (top-source-recall, Q14 single-query): companion Q14-pool-dump entry
 - Probe scripts: `dev/search_pipeline/value_eval_probe.py`, `value_eval_aggregate.py`
 - Result artifacts: `dev/search_pipeline/01_reports/value_eval_summary_20260522_021950.md` + 14 per-query MDs same prefix
 - Probe-run log: `/tmp/value_eval_probe_run.log` (Google CAPTCHA timeline)
-- Rate-limiter decision (resulting from session diagnosis): `decisions/rate_limiting.md`
+- Rate-limiter decision (resulting from session diagnosis) recorded separately in the rate_limiting area

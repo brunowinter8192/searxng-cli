@@ -151,7 +151,7 @@ Worker `pooling-probe` killed at user direction. Branch + worktree removed. GPU 
 
 Five BM25-family probes run: parameter sweep (16+4 configs), 5-config side-by-side compare, IDF + engine-weighting variants, per-engine top-K cap. Best BM25 config 34/40 quality vs Hard-Slot 34/40 — no BM25 variant decisively beat the production baseline. `k1` had zero effect on short docs, `b` dominant axis with peak at 0.75, IDF didn't help on small-pool short-doc data, engine-inverse-weighting bipolar (helped Q2/Q3 by surfacing multi-engine consensus, over-rewarded sparse engines on Q4 — stack_exchange with 2 URLs got weight 0.5 → SO question floated to #1), per-engine top-K cap shrinks pool 5-7× without changing top-K quality (cap removes depth-tail noise but not engine-top-K noise like semscholar's PV-cell-defect false friend).
 
-Detailed findings + eyeball quality table → `01_bm25_evaluation_findings.md`.
+Detailed findings + eyeball quality table recorded in a companion BM25-evaluation entry in this folder.
 
 ### Phase 8 — URL-Filter + BM25-Retrieve + Semantic Rerank (executed 2026-05-09)
 
@@ -159,7 +159,7 @@ Pivot to retrieve-then-rerank architecture. Pipeline: URL-pattern filter (search
 
 **Cross-Encoder is the first method in this investigation to outperform Hard-Slot.** Aggregate quality 35/40 (ties Hard-Slot) AND wins on Q1 with 9/10 vs Hard-Slot's 8/10 — semantic disambiguation eliminates the PV-cell/WSD/scholar-echo false-friends that BM25 cannot filter. Embedding-Cosine bi-encoder underperforms at 26/40 — architectural limitation of separate query/doc encoding on short snippets, not parameter count (8B bi-encoder ruled out earlier on latency). Latency cost: ~1.7s per query for 50 docs (rerank only); total per-query wallclock ~5s.
 
-Detailed findings → `02_rerank_findings.md`. GitHub research note: SearXNG upstream's ranking formula is `score = num_engines × Σ(1/position_i)` — directly encodes multi-engine-overlap signal, similar to ranx CombMNZ. Independent confirmation that overlap signal matters, but our cross-encoder approach captures it via different mechanism (semantic match on jointly-encoded query+doc).
+Detailed findings recorded in a companion rerank-findings entry in this folder. GitHub research note: SearXNG upstream's ranking formula is `score = num_engines × Σ(1/position_i)` — directly encodes multi-engine-overlap signal, similar to ranx CombMNZ. Independent confirmation that overlap signal matters, but our cross-encoder approach captures it via different mechanism (semantic match on jointly-encoded query+doc).
 
 ---
 
@@ -167,7 +167,7 @@ Detailed findings → `02_rerank_findings.md`. GitHub research note: SearXNG ups
 
 | Approach | Method | Latency | Quality | Status |
 |---|---|---|---|---|
-| Hard-Slot 12/6/2 | class-bucket + slots | ~1 ms | 34-35/40 | current production baseline |
+| Hard-Slot 12/6/2 | class-bucket + slots | ~1 ms | 34-35/40 | production baseline as of 2026-05-09 |
 | RRF | Σ 1/(60+pos_i) over engines | ~1 ms | DOI-flood on Q1 | dropped Phase 3 |
 | Embedding-Cosine (8B) | cos_sim, Qwen3-Embedding-8B | ~169 s | not quality-eval'd | DROPPED Phase 6 (latency) |
 | Hybrid (Embedding+SPLADE+Rerank, 8B) | Dense+Sparse+Cross-Encoder | ~184 s | not eval'd | DROPPED Phase 6 (latency) |
@@ -182,7 +182,7 @@ Detailed findings → `02_rerank_findings.md`. GitHub research note: SearXNG ups
 
 ## Next Iteration (planned)
 
-20-query validation probe before committing to production migration. Cross-Encoder's Q1 win is real but n=1 on the pathology category. Larger query set spanning academic / product / technical / mixed-intent (including multiple academic-noise cases) needed. Reranker domain-dependency warning from RAG eval (`/RAG/decisions/retrieval04_reranking.md`) applies — cross-encoders help on academic text but hurt on technical docs in full-document indexing; our snippet-rerank case differs but the warning stands.
+20-query validation probe before committing to production migration. Cross-Encoder's Q1 win is real but n=1 on the pathology category. Larger query set spanning academic / product / technical / mixed-intent (including multiple academic-noise cases) needed. A reranker domain-dependency warning from a separate RAG-project reranking eval applies — cross-encoders help on academic text but hurt on technical docs in full-document indexing; our snippet-rerank case differs but the warning stands.
 
 If validation confirms: production migration design — modify `src/search/merge.py` to call the reranker via HTTP, register cross-encoder as managed service in RAG SERVERS dict (currently runs as one-off llama-server background process on port 8092 because port 8082 is occupied by Monitor_CC mitmdump session-proxy).
 
@@ -192,9 +192,9 @@ If validation confirms: production migration design — modify `src/search/merge
 
 20-query validation on capped pool — 4 ranking strategies (C1 Overlap-Count, C2 BM25, C3 Cross-Encoder direct, C4 Embedding-Cosine direct). Hard-Slot dropped from comparison per user direction.
 
-Verdict: C2/C3/C4 all floor-tied at 0 obvious-Müll across 20 queries × ~210 URL slots. C1 produces 12 Müll (5.9% rate), all clustered in one discriminating query (Q6 espresso machine where "500" keyword-matches academic papers).
+Verdict: C2/C3/C4 all floor-tied at 0 obvious-garbage across 20 queries × ~210 URL slots. C1 produces 12 garbage (5.9% rate), all clustered in one discriminating query (Q6 espresso machine where "500" keyword-matches academic papers).
 
-Detailed findings → `05_capped_pool_probe.md`. Initially suggested BM25 migration as cheapest equivalent; Phase 10 then revealed this conclusion was premature.
+Detailed findings recorded in a companion capped-pool-probe entry in this folder. Initially suggested BM25 migration as cheapest equivalent; Phase 10 then revealed this conclusion was premature.
 
 ## Phase 10 (executed 2026-05-21)
 
@@ -207,7 +207,7 @@ Critical findings:
 - Lobsters surfaced 4 of 8 experts; Google had 3 in deep-tail (positions 4-10); Mojeek 1
 - Lobsters is structurally penalized: single-engine origin → engine_count=1 → C1 demotes; terse snippets → C2/C3/C4 demote on text content
 
-Detailed findings → `06_q14_pool_dump.md`. Production migration BLOCKED — Müll-floor masked top-source-recall failure.
+Detailed findings recorded in a companion Q14-pool-dump entry in this folder. Production migration BLOCKED — garbage-floor masked top-source-recall failure.
 
 Next-session direction: solve top-URL identification automation first. Lobsters-boost as structural prior is the leading hypothesis (cheap, broadly applicable).
 
@@ -215,7 +215,7 @@ Next-session direction: solve top-URL identification automation first. Lobsters-
 
 No-filter v2 eval — URL filter removed from Stage 1 (BM25/Cross-Encoder handle relevance from title+snippet; filter was host/path-based only, query-blind). Methodology refactored from combined `value_eval_probe.py` into three separate scripts: `stage1_pool_fetch.py` (pool fetch), `stage3_method_run.py` (C-methods), `stage4_aggregate.py` (Jaccard). Dynamic reranker URL via `ensure_ready/find_server_url`. Google CAPTCHA'd all 16 pairs again (backoff cascade); 8-engine eval (same as Phase 11 in practice). C3 Cross-Encoder wins all 4 modes.
 
-Full methodology + findings → `08_no_filter_eval.md`.
+Full methodology + findings recorded in a companion no-filter-eval entry in this folder.
 
 ## Phase 13-Prep (executed 2026-05-23)
 
@@ -223,7 +223,7 @@ Pre-work for 8-method extended eval (Methods 2-5 RRF variants need per-engine po
 
 **Schema extension (stage1 v3):** `stage1_pool_fetch.py` updated — `_attach_positions()` computes `{engine: rank}` from raw results after `_build_pool()`, attaches to each entry in both `pool` and `pool_full`. Invariants: `set(engines)==set(positions.keys())`, `min_position==min(positions.values())`. 16-pair re-fetch → `value_eval_v3_20260523_021216/`. Pool-diff vs v2 (`pool_diff_v2_v3.py`): mean URL-overlap **80.0%** (0 pairs below 50%). Key engine deltas: Google 6%→**81%** OK (CAPTCHA cascade from v2 resolved), Semantic Scholar 56%→**100%** OK. Pool-diff artifacts: `pool_diff_v2_vs_v3.md`.
 
-**SS+Google identified as session-variant:** Phase 11 and 12 both had Google CAPTCHA'd; Phase 13-Prep v3 run shows recovery. SS similarly variable. For a stable 7-engine eval (drop `{google, semantic_scholar}`), 5 oracle picks were lost across 4 pairs (3.1% of 160 total — 12 pairs unbeschadet).
+**SS+Google identified as session-variant:** Phase 11 and 12 both had Google CAPTCHA'd; Phase 13-Prep v3 run shows recovery. SS similarly variable. For a stable 7-engine eval (drop `{google, semantic_scholar}`), 5 oracle picks were lost across 4 pairs (3.1% of 160 total — 12 pairs unaffected).
 
 **Oracle cleanup:** `clean_pool.py` — importable `filter_pool(pool, drop_engines)` + script mode. Backfill on 4 loss-pairs (replacement picks from filtered pool, same oracle criterion: authoritative/canonical, not SEO):
 - `general_transformer_attention_mechanis`: deeprevision.github.io (rank 9), aman.ai (rank 10)
@@ -237,7 +237,7 @@ All 16 pairs output as `<pair>_oracle_v3clean.json` in `value_eval_v2_20260523_0
 
 ## Phase 13 (executed 2026-05-23)
 
-12-method eval — 16 pairs (4 modes × 4 queries), 7-engine pool (google+SS filtered via `clean_pool.py`), `oracle_v3clean.json` as ground truth. Scripts: `stage3_method_run_v3.py` + `stage4_aggregate_v3.py`. Artifacts in `value_eval_v3_20260523_021216/`. Detailed findings → `09_12_method_eval.md`.
+12-method eval — 16 pairs (4 modes × 4 queries), 7-engine pool (google+SS filtered via `clean_pool.py`), `oracle_v3clean.json` as ground truth. Scripts: `stage3_method_run_v3.py` + `stage4_aggregate_v3.py`. Artifacts in `value_eval_v3_20260523_021216/`. Detailed findings recorded in a companion 12-method-eval entry in this folder.
 
 **Results (overall mean Jaccard):**
 
@@ -283,9 +283,9 @@ LLM-as-Oracle value-eval — 4 modes (general/pdf/books/docs) × 4 queries (stri
 
 C3 wins overall and in both reliable modes. PDF and books are noise (pool sizes ≤ 10 = trivial Jaccard).
 
-**Caveats:** Google was out on all 16 pairs due to CAPTCHA + exponential-backoff cascade (3 backoff events, 466s wasted, google=0 throughout). 8-engine eval, not 9-engine. Method-comparison is internally fair (all 4 saw same pool) but Google's absence in general-mode means the +0.121 margin could shift in a 9-engine re-eval. Books mode broken for ML/DL queries (Open Library returns philosophy classics), docs mode has academic-engine precision noise — separate engine-coverage baustellen.
+**Caveats:** Google was out on all 16 pairs due to CAPTCHA + exponential-backoff cascade (3 backoff events, 466s wasted, google=0 throughout). 8-engine eval, not 9-engine. Method-comparison is internally fair (all 4 saw same pool) but Google's absence in general-mode means the +0.121 margin could shift in a 9-engine re-eval. Books mode broken for ML/DL queries (Open Library returns philosophy classics), docs mode has academic-engine precision noise — separate engine-coverage work items.
 
-Detailed findings → `07_value_eval.md`. Migration recommended-but-still-BLOCKED on: (1) rate-limiter fail-fast refactor (`decisions/rate_limiting.md` + `decisions/OldThemes/no_backoff_retry.md`, new bead created for the work), (2) optional 9-engine re-eval, (3) cache format extension for per-engine position (prerequisite for drill-down tool), (4) cross-encoder SERVERS-dict registration in RAG infra.
+Detailed findings recorded in a companion value-eval entry in this folder. Migration recommended-but-still-BLOCKED on: (1) rate-limiter fail-fast refactor (new work item created for it), (2) optional 9-engine re-eval, (3) cache format extension for per-engine position (prerequisite for drill-down tool), (4) cross-encoder SERVERS-dict registration in RAG infra.
 
 ---
 
@@ -293,7 +293,7 @@ Detailed findings → `07_value_eval.md`. Migration recommended-but-still-BLOCKE
 
 | Approach | Method | Latency | Quality (overall Jaccard) | Status |
 |---|---|---|---|---|
-| Hard-Slot 12/6/2 (= C1 Overlap as ranker key) | class-bucket + slots | ~1 ms | 0.498 (worst in Phase 11) | current production baseline |
+| Hard-Slot 12/6/2 (= C1 Overlap as ranker key) | class-bucket + slots | ~1 ms | 0.498 (worst in Phase 11) | production baseline as of 2026-05-22 |
 | RRF | Σ 1/(60+pos_i) over engines | ~1 ms | DOI-flood on Q1 | dropped Phase 3 |
 | Embedding-Cosine (8B) | cos_sim Qwen3-Embedding-8B | ~169 s | not eval'd at scale | DROPPED Phase 6 (latency) |
 | Hybrid (Emb+SPLADE+Rerank 8B) | Dense+Sparse+Cross | ~184 s | not eval'd | DROPPED Phase 6 (latency) |
@@ -313,7 +313,7 @@ DB-state after cleanup 2026-05-09 (only sources actually extracted from):
 | Croft, Metzler, Strohman 2010 — Search Engines: Information Retrieval in Practice | Book | Indexed (RAG: searxng_reference, 868 chunks) |
 | Cormack et al. SIGIR 2009 — Reciprocal Rank Fusion outperforms Condorcet | Paper | Indexed (RAG: searxng_reference, 7 chunks) |
 
-Other initially-indexed pooling-research papers (Lillis 2006, Santos 2010, Baeza-Yates, Liu, Aslam-Montague, Renda, Wu, Akritidis, Ogilvie-Callan, Amin, MMMORRF, Trinity Thesis, Mourao Slides, Kafi WeightedRRF, UWaterloo TREC, Hu, Zhu, Zheng, He, Minack) were removed in the 2026-05-09 cleanup because they did not yield direct content extraction for the source-selection or result-fusion synthesis. See `sources/sources.md` for complete tracking.
+Other initially-indexed pooling-research papers (Lillis 2006, Santos 2010, Baeza-Yates, Liu, Aslam-Montague, Renda, Wu, Akritidis, Ogilvie-Callan, Amin, MMMORRF, Trinity Thesis, Mourao Slides, Kafi WeightedRRF, UWaterloo TREC, Hu, Zhu, Zheng, He, Minack) were removed in the 2026-05-09 cleanup because they did not yield direct content extraction for the source-selection or result-fusion synthesis.
 
 ---
 

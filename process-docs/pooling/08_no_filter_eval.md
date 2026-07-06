@@ -2,7 +2,7 @@
 
 **Date:** 2026-05-23
 **Bead:** searxng-g82 (open, umbrella) / searxng-y6e (open, drill-down feature deferred)
-**Predecessor:** `07_value_eval.md` (Phase 11, 8-engine eval blocked by backoff cascade)
+**Predecessor:** companion value-eval entry (Phase 11, 8-engine eval blocked by backoff cascade)
 **Probe artifacts:**
 - `dev/search_pipeline/stage1_pool_fetch.py` — Stage 1, no URL filter
 - `dev/search_pipeline/stage3_method_run.py` — Stage 3, dynamic reranker URL via RAG `ensure_ready/find_server_url`
@@ -142,7 +142,7 @@ Deferred along with the merge.py migration — both wait for the algorithmic sel
 
 ---
 
-## Quellen
+## Sources
 
 DB-state unchanged from Phase 11 cleanup (2026-05-09): Croft 2010 (868 chunks) + Cormack 2009 RRF paper (7 chunks) in `searxng_reference` collection. No new sources extracted in Phase 12.
 

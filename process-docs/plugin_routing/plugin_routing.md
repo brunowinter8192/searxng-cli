@@ -1,5 +1,7 @@
 # Plugin Routing
 
+*Snapshot as of 2026-06 — historical process record; the live current state is the source code, not this file.*
+
 ## Current State
 
 **No domain blocking.** `scrape_url` attempts to scrape any URL without restriction. `get_plugin_hint()` in `src/scraper/scrape_url.py` returns `""` unconditionally.
