@@ -9,7 +9,7 @@ No code written this session. Decisions captured here as the resume anchor for t
 
 - **Path:** `/Users/brunowinter2000/Documents/ai/Meta/ClaudeCode/MCP/RAG/data/documents/crypto_news/`
 - **Collection name:** `crypto_news` (= directory name; RAG's `index-dir` defaults collection to dir basename)
-- **Rationale:** RAG repo is data-storage-only; searxng owns all pipeline logic + state. Collection scoped to Layer 1 (crypto-native), separate from parked Layer 2 (macro) / Layer 3 (sentiment) which need different filter strategies per OldThemes 01.
+- **Rationale:** RAG repo is data-storage-only; searxng owns all pipeline logic + state. Collection scoped to Layer 1 (crypto-native), separate from parked Layer 2 (macro) / Layer 3 (sentiment) which need different filter strategies.
 - **Subdirectories:** flat. Existing collections (`reddit_posts`, `searxng_reference`) are all flat — source encoded in filename via `__` separator.
 
 ## Filename Convention
@@ -95,7 +95,7 @@ Promotion `dev/news_pipeline/` → `src/news/` (or similar) is NOT part of this 
 
 ## Next-Site Discovery — Deferred
 
-After CoinDesk runs end-to-end in prod, next Layer-1 site selected per Channel-Independence-Criterion (OldThemes 07). Candidates per OldThemes 01 active layer: The Block, CoinTelegraph, Decrypt, CryptoSlate, Bitcoin Magazine, NewsBTC, AmbCrypto, BeInCrypto, CoinGape, Crypto Briefing, Bankless, The Defiant, U.Today, BTC-ECHO.
+After CoinDesk runs end-to-end in prod, next Layer-1 site selected per the channel-independence criterion. Candidates from the active-layer list: The Block, CoinTelegraph, Decrypt, CryptoSlate, Bitcoin Magazine, NewsBTC, AmbCrypto, BeInCrypto, CoinGape, Crypto Briefing, Bankless, The Defiant, U.Today, BTC-ECHO.
 
 ## Open Questions
 

@@ -8,7 +8,7 @@
 
 Rewrote `01_coindesk_discover.py` from scratch. Prior implementation fetched the Google News Sitemap
 (`/arc/outboundfeeds/news-sitemap-index`) via stdlib HTTP, parsed XML, and filtered to the last 24h. Two
-known deficiencies (documented in iter 3 / OldThemes 04):
+known deficiencies (documented in iter 3):
 
 1. 25-URL hard cap — sitemap only carries the most recent 25 entries
 2. Yesterday gap — sitemap frequently omits articles from the previous calendar day

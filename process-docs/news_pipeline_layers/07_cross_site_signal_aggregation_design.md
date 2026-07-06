@@ -2,7 +2,7 @@
 
 ## Scope of this note
 
-Forward-looking design decisions for the news_pipeline architecture as we expand beyond CoinDesk to multiple news sources. Not yet implemented — captures the design intent before we commit to it in code. Sister-note to OldThemes 01 (parked layers) and 04-06 (CoinDesk single-site iterations).
+Forward-looking design decisions for the news_pipeline architecture as we expand beyond CoinDesk to multiple news sources. Not yet implemented — captures the design intent before we commit to it in code.
 
 ## Decision: No cross-site URL-dedup
 
@@ -36,7 +36,7 @@ If 10+ independent sources report the same story, is that signal or noise? Proba
 
 ## Trigger for next session
 
-This OldThemes was written at end-of-session as the CoinDesk single-site dev pipeline reached milestone-complete state. Next session work guided by this design:
+This note was written at end-of-session as the CoinDesk single-site dev pipeline reached milestone-complete state. Next session work guided by this design:
 
 1. Promote CoinDesk dev/news_pipeline to prod (decide MD storage location, build RAG vector collection, build per-site URL-dedup module, full indexed run)
 2. Discover and add the next Layer-1 site applying the channel-independence criterion above
