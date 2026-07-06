@@ -1,6 +1,6 @@
 # Plugin Routing
 
-## Status Quo (IST)
+## Current State
 
 **No domain blocking.** `scrape_url` attempts to scrape any URL without restriction. `get_plugin_hint()` in `src/scraper/scrape_url.py` returns `""` unconditionally.
 
@@ -8,7 +8,7 @@
 
 **Previously blocked domains** (github.com, raw.githubusercontent.com, reddit.com, arxiv.org, youtube.com, youtu.be) are now scraped like any other domain.
 
-## Evidenz
+## Evidence
 
 **Root cause of removal:**
 
@@ -18,16 +18,10 @@
 
 3. **Product decision:** unrestricted scraping is the correct default. Plugin tools remain available and are often superior for their specific use cases (structured data, auth, large files), but the scraper must not preempt the choice.
 
-## Recommendation (SOLL)
-
-Blocking removed, no change needed.
-
-If a future need arises to guide tool selection for specific domains, the appropriate mechanism is SKILL.md guidance (prose recommendations, not CLI enforcement).
-
-## Offene Fragen
+## Open Questions
 
 None — prior questions about huggingface.co, gist.github.com, and paperswithcode.com routing are moot given unrestricted scraping.
 
-## Quellen
+## Sources
 
 None — internal decision, no external sources.

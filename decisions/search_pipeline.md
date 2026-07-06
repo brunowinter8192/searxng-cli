@@ -2,7 +2,7 @@
 
 ## Engines
 
-### Status Quo (IST)
+### Current State
 
 **Code:** `src/search/search_web.py` (`ENGINES` dict, `ENGINE_WATCHDOG_OVERRIDE`, `RATE_WAIT_TIMEOUT`); `src/search/filter_modes.py` (`_DEFAULT_ENGINES`, `apply_filter_mode()`); `src/search/engines/` (9 active engine files)
 
@@ -28,7 +28,7 @@
 
 **Bucket-uniformity invariant:** All 9 engines fire on every query regardless of filter mode. `--books` / `--pdf` / `--docs` apply only per-engine query modifiers and post-merge URL filtering — never restrict which engines participate. `apply_filter_mode()` in `filter_modes.py` returns `excluded={}` in all code paths.
 
-**Inert engine:** `src/search/engines/scholar.py` — file present but nothing imports it. Not in `ENGINES`, `_DEFAULT_ENGINES`, or `ENGINE_WATCHDOG_OVERRIDE`. Parked for g82 pooling-rework re-integration (Google-free pool design required; see Offene Fragen).
+**Inert engine:** `src/search/engines/scholar.py` — file present but nothing imports it. Not in `ENGINES`, `_DEFAULT_ENGINES`, or `ENGINE_WATCHDOG_OVERRIDE`. Parked for g82 pooling-rework re-integration (Google-free pool design required; see Open Questions).
 
 **Plugin engines** (not in `ENGINES` dict, not in this pipeline): ArXiv, GitHub, Reddit — URL discovery via MCP plugins; content fetched by dedicated plugin.
 
@@ -36,7 +36,7 @@
 
 **`_diagnose_empty` title-keyword check:** Removed from `google.py`, `duckduckgo.py`, `semantic_scholar.py` (dead code for modern reCAPTCHA Enterprise; prior robust block-detection runs before `_diagnose_empty` in all three). Retained in `mojeek.py`, `lobsters.py` (sole `EMPTY_BLOCK` detection path).
 
-### Evidenz
+### Evidence
 
 Per-engine implementation probes and smoke baselines — `decisions/OldThemes/engine_expansion_2026-05/`:
 
@@ -57,17 +57,9 @@ Per-engine implementation probes and smoke baselines — `decisions/OldThemes/en
 
 **Scholar removal + uniformity invariant rationale:** `decisions/OldThemes/bee_cdp_starvation/fix_summary.md` — Phase 3 probe identified tokencap-path as primary cascade mechanism. RATE_WAIT_TIMEOUT=60 + Scholar removal + bucket-uniformity eliminated RATE_SKIP cascade. 20-query smoke post-fix: 0 RATE_SKIP events, 294s total wall (9 engines × 20 queries).
 
-**No-backoff baseline (post-removal, 2026-05-22):** `dev/search_pipeline/01_reports/no_backoff_baseline_20260522_211439.md` — 30/30 queries with results, 0 RATE_SKIP events. See `decisions/rate_limiting.md` Evidenz.
+**No-backoff baseline (post-removal, 2026-05-22):** `dev/search_pipeline/01_reports/no_backoff_baseline_20260522_211439.md` — 30/30 queries with results, 0 RATE_SKIP events. See `decisions/rate_limiting.md` Evidence.
 
-### Recommendation (SOLL)
-
-**Keep** — current 9-engine set stable post-bee_fix. 30/30 queries OK, 0 RATE_SKIP events (30-query baseline 2026-05-22).
-
-**Pending — Scholar re-integration:** requires g82 pooling-rework. `scholar.py` logic intact and ready; blocked on pool constant design in `filter_modes.py`.
-
-**Pending — Marginalia probe:** try-or-drop at hosted endpoint `search.marginalia.nu` when there is a concrete use-case gap in the current pool. See `decisions/OldThemes/engine_expansion_2026-05/00_research_context.md`.
-
-### Offene Fragen
+### Open Questions
 
 - **g82 pooling-rework:** which pool definition places Scholar in a Google-free set? What inter-session CAPTCHA behavior is expected at 4/min in a Scholar-only pool?
 - **SE API quota:** 300 req/day anonymous vs 10k/day with free registered key — sufficient for agentic-search volume?
@@ -77,7 +69,7 @@ Per-engine implementation probes and smoke baselines — `decisions/OldThemes/en
 
 ## Ranking & Pool Architecture
 
-### Status Quo (IST)
+### Current State
 
 **Architecture:** Two-call drilldown. `search_web` returns an engine-breakdown table (URL counts per engine, no URLs shown). URLs retrieved via `search_engine_drilldown` subcommand per engine from cache.
 
@@ -144,7 +136,7 @@ Use `searxng-cli search_engine_drilldown "rust async runtime" --engine <name>` t
 
 **Output format (`search_engine_drilldown`):** numbered list in engine's native position order, stripped snippet per URL, position gaps allowed.
 
-### Evidenz
+### Evidence
 
 **Pivot rationale:** `decisions/OldThemes/pooling/10_eyeball_engine_provenance.md` (Phase 13.5) — 12-method eval with M11 winner (Jaccard 0.259). Eyeball test showed 30/39 useful (77%) but general-mode worst-case 5/10 useful + 2 SEO-Spam. Engine-provenance analysis showed per-engine signal varies dramatically (DDG 24.4% signal%, Lobsters 0% in the probe). Pooling-as-unified-ranking aborted; pivot to engine-breakdown + drilldown for user-driven engine selection.
 
@@ -159,18 +151,14 @@ Use `searxng-cli search_engine_drilldown "rust async runtime" --engine <name>` t
 
 Engine snippet quality differences now visible to the user via drilldown (they choose which engine's snippets to see).
 
-### Recommendation (SOLL)
-
-Keep — new IST matches the chosen architecture from `decisions/OldThemes/pooling/10_eyeball_engine_provenance.md`.
-
-### Offene Fragen
+### Open Questions
 
 - **Dedup fairness for engines with many results:** engines with high result-count ceilings (openalex: 200, crossref: 200) win more URLs by position-race vs. engines capped at 10 (duckduckgo, mojeek, semantic_scholar). Whether this is correct behavior or needs a per-engine normalization step is an open question — addressable if user feedback shows certain engines consistently empty in drilldown.
 - **Engine result ceilings in breakdown display:** the breakdown table currently shows owned URLs after dedup. A "raw results before dedup" column could help users understand how many URLs each engine contributed before losing URLs to other engines. Not in current scope.
 
 ---
 
-## Quellen
+## Sources
 
 | Source | Notes |
 |--------|-------|

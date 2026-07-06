@@ -1,6 +1,6 @@
 # decisions/logging.md — Python Logger Setup
 
-## Status Quo (IST)
+## Current State
 
 `cli.py` installs a `FileHandler`-only logging config at startup, before any `src.*` imports:
 
@@ -38,7 +38,7 @@ Standalone invocations (`python src/crawler/crawl_site.py`) call `logging.basicC
 
 **Janitor (since 2026-05-24):** 14-day uniform retention, on-write trigger only, 1h marker throttle on slow-path. `SEARXNG_LOG_RETENTION_DAYS` env override (read at call time, not module load). `cli.log` uses `TimedRotatingFileHandler` (daily rotation, `backupCount=get_retention_days()`, stdlib auto-deletes older rotated files). Three JSONL surfaces (`query_log.jsonl`, `scrape_log.jsonl`, `download_log.jsonl`) use `maybe_prune_jsonl()` — ts-based filter, atomic rewrite via `.tmp + os.replace`. Sidecar dir (`scrape_content/`) uses `maybe_prune_sidecars()` — file-level mtime-based `unlink`. All failures logged as WARNING and swallowed — calling logger never receives an exception.
 
-## Evidenz
+## Evidence
 
 Symptom observed: `searxng-cli search_web "X"` produced warning lines before the breakdown table in tool_result (Claude Code Bash merges stdout+stderr):
 
@@ -57,17 +57,13 @@ Key findings from audit:
 - 13 INFO verbose progress calls → reclassified DEBUG (per-URL/per-iteration crawler+scraper traces)
 - 93 calls unchanged (already correct level or genuine WARNING/ERROR/INFO)
 
-Options evaluated: see `decisions/OldThemes/logging_isolation/initial_audit_2026-05-24.md`.
+Options evaluated: see `decisions/OldThemes/logging/initial_audit_2026-05-24.md`.
 
-## Recommendation (SOLL)
-
-Keep (matches IST after migration).
-
-## Offene Fragen
+## Open Questions
 
 None currently. Rate-limited (HTTP 429) calls stay WARNING — distinct from "engine empty" (no results, normal operation). If 429s become frequent enough to be noise, revisit.
 
-## Quellen
+## Sources
 
 Internal architectural decision — no external references.
 

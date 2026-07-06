@@ -1,6 +1,6 @@
 # Rate Limiter — Fail-Fast Policy
 
-## Status Quo (IST)
+## Current State
 
 `src/search/rate_limiter.py` (52 LOC) implements `RateLimiter` as a **pure token-bucket**. Exponential backoff removed 2026-05-22 (this branch).
 
@@ -16,7 +16,7 @@
 
 Removed from all 9 engine files: every `limiter.backoff()`, `limiter.reset_backoff()`, orphan `limiter = get_limiter(self.name)` assignments, and `get_limiter` imports where no longer used.
 
-## Evidenz
+## Evidence
 
 **Pre-rip — backoff waste (2026-05-22, `value_eval_probe.py` 16-pair batch):**
 
@@ -68,18 +68,12 @@ Top-3 bottleneck engines (highest search_ms per query): semantic_scholar (11×),
 
 **Comparison:** pre-rip, 466s was spent exclusively in backoff sleeps inside a 16-pair batch, yielding 0 Google results. Post-rip, ~434s is the total wallclock for 30 complete queries (30/30 with results, zero wasted in sleep-on-failure). The backoff pattern consumed more total time than 30 actual queries now take.
 
-## Recommendation (SOLL)
+## Open Questions
 
-**Keep — current state matches the `no_backoff_retry` project principle.**
+- **Should we add an explicit "engine-failed-this-query" status that propagates to the query log?** Currently `EMPTY_BLOCK` is the umbrella reason (covers both CAPTCHA and HTTP-429 block-page detection). Per-type sub-statuses would help debugging without re-introducing retry logic.
+- **Do the cross-encoder service (port 8082) and other downstream HTTP services follow the same fail-fast policy?** The project-wide no-backoff principle in `decisions/OldThemes/no_backoff_retry.md` applies to every external service call; whether any retry-with-backoff has crept into the RAG-server-call paths (`search_web.py` / `preview.py`) is unverified.
 
-Token-bucket pacing + fail-fast is the correct architecture. No further changes needed to the rate-limiter or engine backoff paths.
-
-## Offene Fragen
-
-- **Should we add an explicit "engine-failed-this-query" status that propagates to the query log?** Currently `EMPTY_BLOCK` is the umbrella reason (covers both CAPTCHA and HTTP-429 block-page detection). Per-type sub-statuses would help debugging without re-introducing retry logic. Not blocking the cleanup itself; can follow in a subsequent commit.
-- **Should the cross-encoder service (port 8082) and other downstream HTTP services follow the same fail-fast policy?** Yes — the project-wide principle in `decisions/OldThemes/no_backoff_retry.md` applies to every external service call. Concrete change to RAG-server-call paths in `search_web.py` / `preview.py` if any retry-with-backoff has crept in.
-
-## Quellen
+## Sources
 
 - Diagnosed failure mode + formula derivation: `decisions/OldThemes/pooling/04_zero_query_diagnosis.md`
 - Reproduced in value-eval: `decisions/OldThemes/pooling/07_value_eval.md` (Caveats section, Google CAPTCHA)

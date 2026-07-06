@@ -5,7 +5,7 @@ Separate from `decisions/scrape_pipeline.md` (filter/garbage/browser config for 
 
 **Note:** `crawl_urls()` in `src/crawler/crawl_site.py` is out of scope here — it serves the BFS-discovery workflow (`crawl_site_workflow`) and is unchanged.
 
-## Status Quo (IST)
+## Current State
 
 `scrape_urls_workflow()` in `src/crawler/pipe_scraper.py`:
 
@@ -37,11 +37,11 @@ Output contract:
 
 `scrape_urls_workflow()` also importable — capture-and-index skill Phase 2 calls it directly.
 
-## Evidenz
+## Evidence
 
 ### Phase 1–3 — Concurrency, Delay, Full-Run Sweeps (old batch/sleep config)
 
-See `decisions/OldThemes/pipe_scraper_time_levers.md` — historical eval establishing WAF characterization and the ~1 req/s safe rate. Batch pacing (batch_size=30, inter_batch_sleep=30s) superseded by Scrapy-style gate.
+See `decisions/OldThemes/pipe_scraper/pipe_scraper_time_levers.md` — historical eval establishing WAF characterization and the ~1 req/s safe rate. Batch pacing (batch_size=30, inter_batch_sleep=30s) superseded by Scrapy-style gate.
 
 ### Validation — Scrapy-style gate on 316 URLs
 
@@ -68,16 +68,12 @@ The WAF is NOT a pure concurrency cap. It is a rate/burst budget over time with 
 - c=10 → 20×429, c=5 = WAF-safe ceiling
 - ~1 req/s sustained = fully safe
 
-## Recommendation (SOLL)
-
-**Keep** — IST = SOLL. Scrapy-style gate validated at full scale (316/316, 0×429, 319s).
-
-## Offene Fragen
+## Open Questions
 
 - Is `delay_s=0.5` (delay_before_return_html) sufficient for client-side-rendered (CSR) sites? Proven for Next.js SSR; heavy CSR may need more.
 - What pacing parameters are appropriate for other target hosts (SearXNG result sites vary in WAF aggressiveness)?
 
-## Quellen
+## Sources
 
-- `decisions/OldThemes/pipe_scraper_time_levers.md` — Phase 1/2/3 sweep history + old batch config
+- `decisions/OldThemes/pipe_scraper/pipe_scraper_time_levers.md` — Phase 1/2/3 sweep history + old batch config
 - Scrapy source reference: `scrapy/core/downloader/__init__.py` (per-domain slot, delay gate, RANDOMIZE_DOWNLOAD_DELAY, CONCURRENT_REQUESTS_PER_DOMAIN)

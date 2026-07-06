@@ -2,7 +2,7 @@
 
 ## Per-URL Scrape Log
 
-### Status Quo (IST)
+### Current State
 
 **Architecture:** Sidecar split. Every `scrape_url` call emits two artifacts:
 1. One structured JSONL record → `src/logs/scrape_log.jsonl` (append-only, gitignored)
@@ -72,20 +72,16 @@
 
 **ts sanitization for filenames:** replace `:` with `-` (so `2026-05-23T22:30:01.234Z` → `2026-05-23T22-30-01.234Z`).
 
-### Evidenz
+### Evidence
 
 Design session 2026-05-23. No dev/ probe — this is a logging-emission feature with no empirical tradeoffs to measure. The sidecar split (structured analytics vs. raw content) mirrors the pattern used in `src/search/query_logger.py` (structured JSONL only, no content). Goal: build a data basis over weeks/months to (a) find scraping problems systematically and (b) enable future benchmarks of current Crawl4AI+PruningContentFilter vs. alternatives (Trafilatura, Mozilla Readability) without re-scraping.
 
-### Recommendation (SOLL)
-
-Keep — architecture is the IST.
-
-### Offene Fragen
+### Open Questions
 
 - **Rotation policy:** The per-scrape content sidecar directory grows unboundedly (gitignored, not committed). No rotation or cleanup logic exists. To be addressed if storage becomes uncomfortable (> N GB). Options: TTL-based cleanup script, size cap with LRU eviction, move old sidecars to cold storage.
 - **Schema versioning:** no version field in the record schema. If future analysis surfaces fields to add/rename, existing records won't have the new fields. Options: add `"schema_v": 1` to all records, or handle missing fields in analysis scripts. Unresolved.
 - **Garbage outcome vs empty:** `try_scrape` uses `is_garbage_content()` and returns `""` for garbage (with `garbage_type` populated in meta). If all phases exhaust with garbage, `outcome` is the last `garbage_type` string (not `"empty"`). Distinction is intentional — `"empty"` means no content AND no garbage detected.
 
-## Quellen
+## Sources
 
 None — internal design decision, no external sources.

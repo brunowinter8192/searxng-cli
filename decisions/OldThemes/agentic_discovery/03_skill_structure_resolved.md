@@ -65,4 +65,4 @@ Old convention: "always `<current_project>_reference`, never per-source." Relaxe
 | 2 | End-to-end capture run of 305 docs.github.com/de/rest URLs | After pipe-scraper lands |
 | 3 | Second website as generalizability proof | After (2) — test `__NEXT_DATA__` approach on an unknown Next.js doc site |
 
-See `decisions/explore01_discovery.md` SOLL for the current production state and remaining migration.
+See `decisions/explore01_discovery.md` for the current production state.

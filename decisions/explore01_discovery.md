@@ -1,6 +1,6 @@
 # Explore Pipeline Step 1: Site Discovery
 
-## Status Quo (IST)
+## Current State
 
 **Code:** `src/crawler/crawl_site.py` — `discover_urls_playwright()` (BFS engine) + `crawl_site_workflow()` (CLI entry point + content crawl). `explore_site.py` and `filter_urls.py` were removed; `discover_urls_playwright` is now an internal function of `crawl_site.py` only, not exposed as a CLI tool.
 
@@ -28,7 +28,7 @@ wait_until = "domcontentloaded"  # fixed, not configurable
 
 **Skill integration:** URL discovery is governed by the `capture-and-index` skill Phase 0 (worker-side guideline: `__NEXT_DATA__`-first → sitemap if usable → Playwright BFS fallback; worker writes /tmp scripts situationally). `discover_urls_playwright()` in `crawl_site.py` serves as the BFS implementation backing that fallback path.
 
-## Evidenz
+## Evidence
 
 ### Playwright-per-page BFS vs HTTP BFS — Phase B recall probe
 
@@ -83,22 +83,12 @@ Phase A proof: `BFSDeepCrawlStrategy` with `wait_until="networkidle"` or `prefet
 
 HEAD-request before BFS. Fixes domain-mismatch for redirect chains (e.g. `docs.anthropic.com` → `platform.claude.com`). Still required since `discover_urls_playwright`'s domain filter uses the resolved domain.
 
-## Recommendation (SOLL)
-
-**Change: `discover_urls_playwright()` (Playwright BFS) → `__NEXT_DATA__` nav-tree extraction as primary discovery path for Next.js SSR doc-sites; Playwright BFS as fallback.**
-
-Evidenz: `__NEXT_DATA__` union achieves 100% recall in 1.6s vs 81.3% BFS in ~18 min on docs.github.com/de/rest. The BFS gap is structural (version-scoped nav), not fixable by tuning. The `__NEXT_DATA__` approach is deterministic, requires no browser, and generalizes to any Next.js SSR site.
-
-**Skill structure resolved:** `capture-and-index` skill encodes the discovery cascade as Phase 0. No `src/` change needed for the discovery guideline itself — it lives in the skill. Remaining work: (1) src/ pipe-scraper implementation for Phase 1 Scrape (separate later task); (2) end-to-end capture run of the 305 docs.github.com/de/rest URLs to validate the full pipe. See `decisions/OldThemes/agentic_discovery/03_skill_structure_resolved.md`.
-
-**Playwright BFS retained as fallback** (Path C in the skill) for non-Next.js sites and sites without embedded nav data.
-
-## Offene Fragen
+## Open Questions
 
 - Concurrency >1 WAF behavior: does `--concurrency 3` on docs.github.com trigger 429 without stealth?
 - `__NEXT_DATA__` key-path portability: `props.pageProps.mainContext.sidebarTree` is GitHub-Docs-specific — what's the discovery heuristic for the nav-tree key on an unknown Next.js site?
 
-## Quellen
+## Sources
 
 - `dev/explore_pipeline/05_playwright_bfs.py` — Phase B probe implementation
 - `dev/explore_pipeline/05_reports/docs_github_rest_20260529.md` — Phase B run report
