@@ -1,7 +1,7 @@
 # 62 — TheBlock dead_urls.txt + failed_urls.txt relocation into discover/
 
 **Date:** 2026-06-19. **Branch:** `errorurl-reloc`.
-**Prior art:** OT58 (master_urls.txt moved to discover/).
+**Prior art:** master_urls.txt moved to discover/ in a prior session.
 
 ## Decision
 
@@ -11,8 +11,8 @@
 ## Why
 
 Both files were buried in `raw/` alongside ~27k raw HTML files, making them invisible to
-anyone inspecting the per-platform data layout. `discover/` already holds `master_urls.txt`
-(OT58) — it is the natural home for all TheBlock discover-stage / pipeline-control artifacts.
+anyone inspecting the per-platform data layout. `discover/` already holds `master_urls.txt` —
+it is the natural home for all TheBlock discover-stage / pipeline-control artifacts.
 Co-locating the failure lists there makes the layout self-evident.
 
 ## What changed

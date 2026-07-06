@@ -1,16 +1,16 @@
 # 61 — CoinDesk backfill: browser proxy-riding engine (IP rotation against the regwall)
 
-Process doc for the CoinDesk 61k article-body backfill. Discovery is done (OT47, timeline API → inventory
+Process doc for the CoinDesk 61k article-body backfill. Discovery is done (timeline API → inventory
 `data/news/coindesk/inventory/coindesk_{year}.txt`, 61,628 URLs). The blocker is the **scrape**: CoinDesk's
-regwall is IP-rate metered, so a single-IP browser scrape (current prod `src/news/engine/scrape.py`) cannot
-finish the corpus — the IP goes "hot". This theme builds the IP-rotating backfill engine. All work lives in
-`dev/news_pipeline/coindesk_proxy_riding/`; `src/` is UNCHANGED.
+regwall is IP-rate metered, so a single-IP browser scrape (`src/news/engine/scrape.py` as of this session)
+cannot finish the corpus — the IP goes "hot". This theme builds the IP-rotating backfill engine. All work
+lives in `dev/news_pipeline/coindesk_proxy_riding/`; `src/` is UNCHANGED.
 
 ## Premise (user-decided, fixed)
 
 - Keep the **crawl4ai browser** fetcher (CoinDesk's body is JS-rendered). Browser path is fixed.
 - Defeat the regwall by **riding proxies**: a proxy rides URLs; **fresh cookie context per URL on the same
-  IP** (keeps OT03 cookie-fix, so the only regwall signal is IP-rate); burn the proxy at a cumulative
+  IP** (keeps the cookie-fix, so the only regwall signal is IP-rate); burn the proxy at a cumulative
   regwall threshold (default 2) → rotate IP.
 - Regwall detection on `result.markdown.raw_markdown` (visible text), NOT `result.html` (the regwall marker
   `"Create a FREE account…"` is a hidden React component present on EVERY page's raw HTML). Store full
@@ -94,7 +94,7 @@ once we go multi-browser-pool.
   20-smoke's 27 "failures" were ALL 403 anti-bot marked terminal — a 403 is IP-specific, succeeds on a fresh
   IP, so terminal-fail was wrong.)
 
-## Current dev state
+## Dev state as of this session
 
 `dev/news_pipeline/coindesk_proxy_riding/` on `dev`: `p0_pool` (pool + 60-min cooldown via
 `PersistentCooldownManager`, `COOLDOWN_S=3600`, The-Block-copied), `p2_browser_rider` (**multi-browser pool**:
@@ -314,7 +314,7 @@ are the follow-up. Adding `wait_for` before seeing the failure log is speculativ
 
 After the watchdog (Iteration 4) made runs hang-safe, this iteration measured the load-vs-concurrency
 curve and the real verified-URL throughput, and decided the production config. (Engine still dev-only
-here; the src/ port is OT63.)
+here; the src/ port is covered in a later session.)
 
 ### Hang corrected, not a stall
 
@@ -366,4 +366,4 @@ concurrency-bound** — the 2×8 smoke already projected ~33 h, so higher C buys
 - **Alive-feeder NOT reintroduced** — alive ≠ delivers-the-target (rejected earlier, also dropped for
   The Block); drive proxy throughput at the target directly.
 
-These values become the `RidingScrapeConfig` defaults in the src/ port (OT63).
+These values become the `RidingScrapeConfig` defaults in the src/ port.
