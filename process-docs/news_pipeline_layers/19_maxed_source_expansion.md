@@ -53,7 +53,7 @@ Low-yield: monosans static GitHub files (http: 76, socks4: 1, socks5: 4 = 81 tot
 
 | | Raw | Unique |
 |---|---|---|
-| OldThemes 16 (monosans single-source, Docker scraper) | ~17,202 | not measured |
+| Prior monosans single-source Docker scraper run | ~17,202 | not measured |
 | This run (68 sources, corrected parser) | 428,500 | 118,701 |
 | Expansion | **24.9×** raw | — |
 
@@ -69,4 +69,4 @@ Line formats handled: bare `host:port`, `proto://host:port`, `proto://user:pass@
 
 ## Next Step
 
-This unique count (118,701 global) is the input to the liveness filter. The curl_cffi-chrome pass rate was measured at 18.8% of a neutral pool (OldThemes 17). Projected CF-passing pool: ~22,000 proxies if the rate holds at this scale.
+This unique count (118,701 global) is the input to the liveness filter. The curl_cffi-chrome pass rate was measured at 18.8% of a neutral pool in the prior discriminator entry. Projected CF-passing pool: ~22,000 proxies if the rate holds at this scale.

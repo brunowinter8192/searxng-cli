@@ -31,7 +31,7 @@ Config files committed: `dev/news_pipeline/theblock/monosans_cfg_neutral.toml`, 
 
 ## 2. Signature Micro-Test
 
-**Goal:** verify the mechanism-1 (client-signature) and mechanism-2 (IP-level block) observations from OldThemes 15 still hold from our IP this session.
+**Goal:** verify the mechanism-1 (client-signature) and mechanism-2 (IP-level block) observations from the prior CF-block investigation still hold from our IP this session.
 
 **Test:** 2 requests to `https://www.theblock.co/sitemap_tbco_news.xml` from our host IP.
 
@@ -40,7 +40,7 @@ Config files committed: `dev/news_pipeline/theblock/monosans_cfg_neutral.toml`, 
 | `urllib` (Python default) | **403** |
 | `curl` 8.7.1 | **403** |
 
-**OldThemes 15 established:** curl→200 on a fresh IP (mechanism 1 passes curl; mechanism 1 blocks urllib). Current result curl→403 is INCONSISTENT with a fresh-IP baseline — this means our IP is currently in the mechanism-2 blocked state from the previous discovery session. Mechanism-2 block persists across sessions (confirmed >hours, previously unquantified). Mechanism-1 distinction (urllib vs curl) remains the established reference from OldThemes 15; it cannot be re-isolated while mechanism-2 is active.
+**The prior investigation established:** curl→200 on a fresh IP (mechanism 1 passes curl; mechanism 1 blocks urllib). Current result curl→403 is INCONSISTENT with a fresh-IP baseline — this means our IP is currently in the mechanism-2 blocked state from the previous discovery session. Mechanism-2 block persists across sessions (confirmed >hours, previously unquantified). Mechanism-1 distinction (urllib vs curl) remains the established reference from that prior session; it cannot be re-isolated while mechanism-2 is active.
 
 **Rustls signature micro-test:** no Rust toolchain present → standalone reqwest/rustls probe not buildable. See §4 for inference path.
 
@@ -97,7 +97,7 @@ Confirms these sources yield a live pool: 494 proxies can connect to the interne
 
 **Use neutral `check_url` only (e.g. `https://ipv4.icanhazip.com`); do NOT use theblock.co as `check_url`.**
 
-Rationale: theblock check_url produces 0 passing proxies — either because rustls is blocked, or DC IPs are blocked, or both. Either way, the filter produces no pool. A neutral check_url yields a live pool of 494 proxies. Validation against theblock.co is then the responsibility of the `curl_cffi impersonate="chrome"` fetch loop (OldThemes 15 §Anti-CF Method), which uses a browser TLS fingerprint and can handle per-proxy retry on 403/429. This separation is cleaner: monosans screens for liveness, curl_cffi screens for CF-passability.
+Rationale: theblock check_url produces 0 passing proxies — either because rustls is blocked, or DC IPs are blocked, or both. Either way, the filter produces no pool. A neutral check_url yields a live pool of 494 proxies. Validation against theblock.co is then the responsibility of the `curl_cffi impersonate="chrome"` fetch loop (the anti-CF method from the prior CF-block investigation), which uses a browser TLS fingerprint and can handle per-proxy retry on 403/429. This separation is cleaner: monosans screens for liveness, curl_cffi screens for CF-passability.
 
 **Check-url-as-proxy-pool-filter is not a viable strategy against this CF configuration** with these free proxy sources — the 0-from-17202 result shows the filter would discard every proxy before the real test. The two-stage approach (alive-filter → curl_cffi validation loop) is the correct architecture.
 
@@ -105,7 +105,7 @@ Rationale: theblock check_url produces 0 passing proxies — either because rust
 
 ## 6. Scope — This Is the Discovery-Stage Proxy Problem Only
 
-This probe addresses **one specific question**: can free proxies from monosans' default sources get past theblock.co's CF to fetch the ~43 remaining sub-sitemaps (≈64 small XML files, ~25s of requests per run, ~11MB total). That is the open discovery problem from OldThemes 14.
+This probe addresses **one specific question**: can free proxies from monosans' default sources get past theblock.co's CF to fetch the ~43 remaining sub-sitemaps (≈64 small XML files, ~25s of requests per run, ~11MB total). That is the open discovery problem from the general-roadmap entry.
 
 **This probe does NOT address:**
 
@@ -113,4 +113,4 @@ This probe addresses **one specific question**: can free proxies from monosans' 
 
 - **The recurring 48h pipe:** same scalability concern. The 48h window is smaller (41 URLs per news-sitemap cycle), so the budget concern is lower — but the IP quality question remains.
 
-**Implications for next steps:** if the curl_cffi loop with the neutral-filtered pool (494 proxies) can successfully fetch the ~43 missing subs, discovery is complete. If the neutral pool's DC IPs are all CF-reputation-blocked against theblock.co (as the 0-result suggests), then residential proxies are the next lever to test (Swiftproxy 500MB free trial — OldThemes 15 §Next-Session Test Plan point 5).
+**Implications for next steps:** if the curl_cffi loop with the neutral-filtered pool (494 proxies) can successfully fetch the ~43 missing subs, discovery is complete. If the neutral pool's DC IPs are all CF-reputation-blocked against theblock.co (as the 0-result suggests), then residential proxies are the next lever to test (Swiftproxy 500MB free trial, per the test plan from the prior CF-block entry).

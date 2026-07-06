@@ -51,7 +51,7 @@ Levers map ONLY to the two observed mechanisms. **JS-challenge tools (patchright
 
 ## Next-Session Test Plan
 
-1. Resume from the worker cache (~43 subs missing — OldThemes 14).
+1. Resume from the worker cache (~43 subs missing, per the prior entry's discovery status).
 2. monosans with `check_url` = a theblock.co sitemap → filtered free-proxy pool (or start from `monosans/proxy-list`).
 3. Worker: `curl_cffi` `impersonate="chrome"` + proxy rotation + retry over the ~43 missing subs; validate 200+XML.
 4. Opus verifies the worker's code against the two GH references (monosans `config.toml`, cURLsolverr `main.py`) per the orchestration model.

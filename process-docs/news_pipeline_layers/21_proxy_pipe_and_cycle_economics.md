@@ -1,22 +1,22 @@
 # Iteration 21 — Proxy Pipe + Cycle Economics
 
 **Date:** 2026-06-11
-**State:** Economics + knowns crystallized from the liveness-sweep session (OldThemes 19+20). Pipe build = next.
+**State:** Economics + knowns crystallized from the liveness-sweep session (the source-expansion and concurrency-sweep entries). Pipe build = next.
 
 ## What We Concretely Know (measured this session)
 
 | Quantity | Value | Source |
 |---|---|---|
-| Raw pool (this run) | ~118k unique host:port / ~320k protocol-tagged | OldThemes 19 |
+| Raw pool (this run) | ~118k unique host:port / ~320k protocol-tagged | prior source-expansion entry |
 | Neutral-alive rate @ optimal concurrency | **9.2%** (919/10k @ conc 128) | `sweep_log.md` baseline 2026-06-11T21:15Z |
-| Optimal check concurrency | **~128** (router-limited) | OldThemes 20 downward sweep |
+| Optimal check concurrency | **~128** (router-limited) | prior concurrency-sweep entry, downward sweep |
 | alive/s @ 128 | ~1.0/s (10k → 919 in 878.8s) | baseline |
-| Pool churn | start-512 = end-512 (51 = 51 over 30 min) → stable over the window | OldThemes 20 bookend |
+| Pool churn | start-512 = end-512 (51 = 51 over 30 min) → stable over the window | prior concurrency-sweep entry, bookend |
 | Dead taxonomy @ 128 | 60% hard_timeout, 23.3% proxy_handshake (mislabels), 13% refused | baseline histogram |
 
 ## What We DON'T Know (the gates)
 
-- **CF-pass rate on the CURRENT pool** — the 18.8% is from OldThemes 17 (older, different pool). Must re-measure.
+- **CF-pass rate on the CURRENT pool** — the 18.8% is from the earlier curl_cffi discriminator entry (older, different pool). Must re-measure.
 - **Per-IP budget B** — fetches a CF-passing proxy completes before CF mechanism-2 (403/429) trips. The single number gating backfill feasibility. Hint 1–21, unmeasured.
 
 ## Router = Master Constraint
@@ -44,11 +44,11 @@ Backfill = 27k pages, `cycles = 27,000 / (CF_per_cycle × B)`:
 
 ## Recommendation (SOLL)
 
-Build the pipe in `dev/` (neutral-check → CF-check → fetch), 5k batches, funnel-logged (neutral-alive + CF-pass + per-IP-budget per run). Run on The Block sitemap FIRST — this completes the open discovery (OldThemes 14, ~43 missing sub-sitemaps) AND gathers the current CF-rate + B organically from the real fetch. Source curation (per-source alive-rate ranking) is the parallel generation-speed lever.
+Build the pipe in `dev/` (neutral-check → CF-check → fetch), 5k batches, funnel-logged (neutral-alive + CF-pass + per-IP-budget per run). Run on The Block sitemap FIRST — this completes the open discovery (~43 missing sub-sitemaps, per the general-roadmap entry) AND gathers the current CF-rate + B organically from the real fetch. Source curation (per-source alive-rate ranking) is the parallel generation-speed lever.
 
-## Quellen
+## Sources
 
-Internal: OldThemes 14–20 (theblock discovery + proxy method + liveness sweep), `dev/news_pipeline/theblock/probe_liveness_logs/sweep_log.md`.
+Internal: the prior theblock discovery + proxy method + liveness sweep entries, `dev/news_pipeline/theblock/probe_liveness_logs/sweep_log.md`.
 
 ---
 
@@ -73,9 +73,9 @@ Internal: OldThemes 14–20 (theblock discovery + proxy method + liveness sweep)
 
 ### Stage 2 — CF-Pass Rate: 0.8% (vs old 18.8%)
 
-OldThemes 17 measured 18.8% (80/425) on a smaller, older pool with `probe_curl_cffi_discriminator`. This run: **0.8% (4/488)** on a fresh 5k sample from the full 68-source pool. The collapse is real:
+The earlier curl_cffi discriminator entry measured 18.8% (80/425) on a smaller, older pool with `probe_curl_cffi_discriminator`. This run: **0.8% (4/488)** on a fresh 5k sample from the full 68-source pool. The collapse is real:
 - Pool is now 24.9× larger (118k unique); dilution with low-quality IP ranges is substantial
-- Time gap between OldThemes 17 run and this run — IP reputation may have shifted for the specific IPs in the older pool
+- Time gap between that earlier run and this run — IP reputation may have shifted for the specific IPs in the older pool
 - The 4 CF-passing proxies ARE genuine (they successfully fetched sub-sitemaps in Stage 3)
 
 Absolute yield: 4 CF-passing proxies per 5k sample ≈ ~0.26 CF-passing per 1k raw. At 118k pool, estimated ~31 CF-passing total in the live pool (single check cycle).

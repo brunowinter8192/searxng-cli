@@ -1,7 +1,7 @@
 # 18 — Free-Proxy Method Optimization + Forward Plan (toward determinism)
 
 **Date:** 2026-06-11
-**State:** Discovery method validated (OldThemes 16+17). This note captures the method-optimization landscape, the determinism framing, the throughput/lever analysis, external (Reddit) research, and the exact forward plan for the next session. No code written here — synthesis + plan only.
+**State:** Discovery method validated (per the prior two entries: monosans pool evidence + curl_cffi discriminator). This note captures the method-optimization landscape, the determinism framing, the throughput/lever analysis, external (Reddit) research, and the exact forward plan for the next session. No code written here — synthesis + plan only.
 
 ---
 
@@ -15,8 +15,8 @@
 
 ## Status Quo (IST after this session)
 
-- **Discovery method validated.** monosans neutral pool (free datacenter proxies) + `curl_cffi impersonate="chrome"` → **80/425 (18.8%)** pass a real `/post/` sub-sitemap (`sitemap_tbco_post_type_post_0.xml`). Verdict **(a)**: the rustls TLS signature was the blocker behind monosans' 0/17202; chrome JA3 fixes it. (Full evidence: OldThemes 16 = monosans rustls 0-result; OldThemes 17 = curl_cffi discriminator.)
-- **Both CF mechanisms confirmed real and orthogonal:** signature-gate (mechanism 1, fixed by curl_cffi) + IP-reputation-gate (mechanism 2 — 66/425 still got 403 WITH correct JA3). Signature is the **necessary precondition**; among signature-correct requests, the acceptable-reputation subset of IPs passes. The OldThemes-16 prior "all DC IPs → blocked" is **falsified** for theblock.co.
+- **Discovery method validated.** monosans neutral pool (free datacenter proxies) + `curl_cffi impersonate="chrome"` → **80/425 (18.8%)** pass a real `/post/` sub-sitemap (`sitemap_tbco_post_type_post_0.xml`). Verdict **(a)**: the rustls TLS signature was the blocker behind monosans' 0/17202; chrome JA3 fixes it. (Full evidence: the monosans pool-evidence entry established the rustls 0-result; the curl_cffi passability-discriminator entry established the 18.8% pass rate.)
+- **Both CF mechanisms confirmed real and orthogonal:** signature-gate (mechanism 1, fixed by curl_cffi) + IP-reputation-gate (mechanism 2 — 66/425 still got 403 WITH correct JA3). Signature is the **necessary precondition**; among signature-correct requests, the acceptable-reputation subset of IPs passes. The earlier prior "all DC IPs → blocked" is **falsified** for theblock.co.
 - **Our own home IP still mechanism-2-blocked across sessions (>hours).** Observed: urllib→403 AND curl→403 this session (curl gave 200 on a fresh IP last session). The block is long-lived / cumulative, NOT a short rate-window. Implication: single-IP pacing cannot beat it.
 - **`/post/` sub-sitemap URL format (corrected, verified):** `sitemap_tbco_post_type_post_N.xml` (NOT `sitemap_tbco_post_N.xml`). 64 subs in `sitemap_tbco_index.xml`.
 
@@ -29,7 +29,7 @@ Determinism = **(a) convergence guarantee + (b) bounded, predictable cycle count
 - **(a) is already structural:** the fetch loop is **resume-safe** — cache every fetched page, only fetch the still-missing ones. → guaranteed eventual completion, never loses progress. This alone makes the process *converge*.
 - **(b) = total_pages / (working_proxies_per_cycle × requests_per_IP_budget).** Two unknowns to MEASURE:
   - `working_proxies_per_cycle` — lever: expand sources (see below).
-  - `requests_per_IP_budget` — requests one DC proxy IP tolerates before mechanism-2 trips. Observed hint (OldThemes 17): of 80 passing proxies, 10 got 403 on a 2nd request seconds later; 53 tolerated ≥2. Real budget unknown — must be measured.
+  - `requests_per_IP_budget` — requests one DC proxy IP tolerates before mechanism-2 trips. Observed hint (from the curl_cffi discriminator run): of 80 passing proxies, 10 got 403 on a 2nd request seconds later; 53 tolerated ≥2. Real budget unknown — must be measured.
   - Plus **yield STABILITY** across cycles (variance matters as much as the mean for determinism).
 
 After A+B measured → discovery determinism is trivial (80 >> 43 subs); backfill determinism is projectable (27k / (yield × budget)).
@@ -42,7 +42,7 @@ After A+B measured → discovery determinism is trivial (80 >> 43 subs); backfil
 - **Sources — BIGGEST lever.** Currently ~7 default lists. 12+ more public list-repos addable as config URLs (see Source Expansion). More sources → more scraped → more alive → more theblock-passing.
 - `max_concurrent_checks` (512) — check throughput.
 - `timeout` / `connect_timeout` (10s / 5s) — **dead-proxy timeout dominates avg check-time**; lowering it speeds throughput by discarding junk faster.
-- `max_proxies_per_source` (100k, non-limiting). `check_url` (neutral icanhazip — keep; theblock as check_url is dead per OldThemes 16).
+- `max_proxies_per_source` (100k, non-limiting). `check_url` (neutral icanhazip — keep; theblock as check_url is dead per the prior monosans pool-evidence entry).
 
 ### Our curl_cffi fetch loop (separate from monosans)
 - **Concurrency:** discriminator used `ThreadPoolExecutor(max_workers=20)` → SLOW (~3.4 proxies/s). Blocking OS threads, only 20 in-flight.

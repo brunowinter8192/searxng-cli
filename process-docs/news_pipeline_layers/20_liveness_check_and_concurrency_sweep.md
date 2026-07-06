@@ -23,7 +23,7 @@ FD soft: 1,048,576 / hard: unlimited. Ephemeral ports: 49152–65535 (16,384). 1
 
 ## Frozen Pool
 
-Re-frozen 2026-06-11 (same day as predecessor). Fetched from the same 68 sources as OldThemes 19. Written to `frozen_pool/` (gitignored, regenerated on demand):
+Re-frozen 2026-06-11 (same day as predecessor). Fetched from the same 68 sources as the prior source-expansion entry. Written to `frozen_pool/` (gitignored, regenerated on demand):
 
 | Bucket | Unique entries |
 |---|---|

@@ -7,7 +7,7 @@
 
 ## Context
 
-OldThemes 16 left the 0/17202 monosans result AMBIGUOUS: either (a) rustls TLS signature blocked by CF, or (b) all DC proxy IPs CF-reputation-blocked. This probe discriminates by re-testing with curl_cffi impersonate=chrome — the correct browser TLS/JA3 that monosans' rustls lacked.
+The prior monosans pool-evidence session left the 0/17202 result AMBIGUOUS: either (a) rustls TLS signature blocked by CF, or (b) all DC proxy IPs CF-reputation-blocked. This probe discriminates by re-testing with curl_cffi impersonate=chrome — the correct browser TLS/JA3 that monosans' rustls lacked.
 
 **Decision logic recap:**
 - Pass count > 0 → (a): signature was the issue; curl_cffi works; free loop viable
@@ -18,7 +18,7 @@ OldThemes 16 left the 0/17202 monosans result AMBIGUOUS: either (a) rustls TLS s
 
 ## Setup
 
-**Pool:** fresh monosans neutral run (2026-06-11T00:11Z), `check_url = https://ipv4.icanhazip.com`, concurrency 512. Yielded **425 proxies** (http 104, socks4 103, socks5 218), 131s wall-clock. Pool composition: overwhelmingly datacenter ASNs (Global Connectivity Solutions Llp, DigitalOcean, Oracle, Timeweb, Contabo, IONOS, etc.) — this was documented as a prior for (b) in OldThemes 16. Proxies had been alive for ~1h when discriminator was run.
+**Pool:** fresh monosans neutral run (2026-06-11T00:11Z), `check_url = https://ipv4.icanhazip.com`, concurrency 512. Yielded **425 proxies** (http 104, socks4 103, socks5 218), 131s wall-clock. Pool composition: overwhelmingly datacenter ASNs (Global Connectivity Solutions Llp, DigitalOcean, Oracle, Timeweb, Contabo, IONOS, etc.) — this was documented as a prior for (b) in the prior monosans pool-evidence entry. Proxies had been alive for ~1h when discriminator was run.
 
 **Target URL issue (observed, resolved):** Prompt specified "a real /post/ sub-sitemap." First attempt used `sitemap_tbco_post_0.xml` (inferred from `_reconstruct_sub_urls_from_cache()` naming convention). Run 1 returned 87/425 HTTP 404 errors, inconsistent with a CF block (CF returns 403/429, not 404). 404 via SOCKS5 proxy is end-to-end encrypted — theblock.co origin returned 404, meaning URL doesn't exist. Correct URL recovered by bootstrapping: used one of the pool proxies to fetch `sitemap_tbco_index.xml`, parsed `<loc>` entries. Actual post sub URL format: **`sitemap_tbco_post_type_post_N.xml`** (not `sitemap_tbco_post_N.xml`). 64 sub-sitemaps confirmed in index. Bootstrap proxy: `http://217.154.155.115:8080` (IONOS SE, DE) → 200+XML from index on first successful attempt.
 
@@ -85,7 +85,7 @@ The 10 that passed post_0 but got 403 on the index suggest some proxies hit a pe
 
 **Secondary confirmation:** 66/425 (15.5%) got CF-blocked (403) despite using the correct chrome JA3. This shows CF's mechanism-2 IP-reputation filtering IS active — it rejects some DC IPs regardless of TLS fingerprint. The two mechanisms are orthogonal and both real; (a) and partial-(b) co-exist. What (a) means is that the signature check is the NECESSARY precondition: fix the signature, and the subset of DC IPs with acceptable reputation then passes.
 
-**Pool composition note:** the passing proxies span DC providers (Global Connectivity Solutions, Aeza Group LLC, DigitalOcean, Microsoft Azure, Oracle Cloud, Timeweb, IONOS) AND telecom/ISP proxies (Telefonica DE ES, TIM IT, SK Broadband KR, PT Telekomunikasi Indonesia, Iran Telecom, etc.). The telecom IPs represent quasi-residential addresses less likely to be CF-reputation-blocked. Passing ≠ residential-only; a meaningful subset of DC IPs also pass. The prior "all DC → blocked" assumption from OldThemes 16 is falsified.
+**Pool composition note:** the passing proxies span DC providers (Global Connectivity Solutions, Aeza Group LLC, DigitalOcean, Microsoft Azure, Oracle Cloud, Timeweb, IONOS) AND telecom/ISP proxies (Telefonica DE ES, TIM IT, SK Broadband KR, PT Telekomunikasi Indonesia, Iran Telecom, etc.). The telecom IPs represent quasi-residential addresses less likely to be CF-reputation-blocked. Passing ≠ residential-only; a meaningful subset of DC IPs also pass. The prior "all DC → blocked" assumption from the earlier monosans pool-evidence entry is falsified.
 
 ---
 
@@ -104,7 +104,7 @@ The 10 that passed post_0 but got 403 on the index suggest some proxies hit a pe
 3. Per-fetch: retry on 403/429 with next proxy; validate 200+XML per response
 4. Resume-safe: existing cache (from probe_discovery.py) means only the missing subs are fetched
 
-**Discovery-stage scope boundary (repeat from OldThemes 16):** this evidence solves the ~43-sub discovery gap (64 small XML files, ~11MB total, one-off run). The BACKFILL (~27k article pages, GB-scale, ~1300 IP rotations) and the RECURRING 48h pipe are separate problems with different scale constraints. The free pool approach is validated ONLY for the discovery use case.
+**Discovery-stage scope boundary (repeat from the prior entry):** this evidence solves the ~43-sub discovery gap (64 small XML files, ~11MB total, one-off run). The BACKFILL (~27k article pages, GB-scale, ~1300 IP rotations) and the RECURRING 48h pipe are separate problems with different scale constraints. The free pool approach is validated ONLY for the discovery use case.
 
 ---
 
@@ -114,5 +114,3 @@ The 10 that passed post_0 but got 403 on the index suggest some proxies hit a pe
 |---|---|
 | `dev/news_pipeline/theblock/probe_curl_cffi_discriminator.py` | discriminator probe script |
 | `dev/news_pipeline/theblock/probe_curl_cffi_discriminator_reports/` | per-run report MDs (gitignored) |
-| `decisions/OldThemes/news_pipeline_layers/16_monosans_pool_evidence.md` | OldThemes 16: monosans rustls 0/17202 result |
-| `decisions/OldThemes/news_pipeline_layers/17_curl_cffi_passability_discriminator.md` | this file |
