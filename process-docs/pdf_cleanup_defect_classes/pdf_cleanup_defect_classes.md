@@ -32,7 +32,7 @@ Math example that came out clean after de-space: `s_{T,2}\sum_{t=1}^{T}K_{h}\lef
 | Lahiri2003 | 9 791 | 52 | 1 (References) | 0 | 0 |
 | Kou2002 | 708 | 6 | 0 (appendix) | 0 | 0 |
 | PolitisRomano1994 | 543 | 10 | 0 (appendix=proofs) | 0 | 0 |
-| Tetlock2007 | 453 | 2 | 0 (appendix=methodik) | 0 | 0 |
+| Tetlock2007 | 453 | 2 | 0 (appendix=methodology) | 0 | 0 |
 | Merton1976 | 484 | 0 | 0 | 0 | 0 |
 
 *Scanner over-counted by including `Appendix`. Appendices are CONTENT (proofs/methodology) — must NOT be stripped. Real strip targets (References/Bibliography/Index/Exercises) were almost entirely Tsay + one each in Lahiri/LopezLira.

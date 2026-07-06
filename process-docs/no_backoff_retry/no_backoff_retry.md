@@ -27,7 +27,7 @@ Sleep-on-failure also tends to recur in code because it *looks* like the safe / 
 ## What Stays Allowed
 
 - **Token-bucket pacing** for preventive rate management: sliding-window caps (e.g. 4 req/min) that pace OUTGOING requests to stay under known provider limits. This is rate-management before failure, not retry after failure. See `src/search/rate_limiter.py:39-51` (the `acquire()` token-bucket logic, which stays).
-- **Watchdog timeouts** on individual calls (e.g. `asyncio.wait_for(call, timeout=N)`) to prevent a single stuck call from blocking a pipeline. Timeouts replace blocking calls with explicit failure — fail-fast, not retry-with-backoff. See `RATE_WAIT_TIMEOUT = 60.0` in `search_web.py` engine fanout (`decisions/rate_limiting.md`).
+- **Watchdog timeouts** on individual calls (e.g. `asyncio.wait_for(call, timeout=N)`) to prevent a single stuck call from blocking a pipeline. Timeouts replace blocking calls with explicit failure — fail-fast, not retry-with-backoff. See `RATE_WAIT_TIMEOUT = 60.0` in `search_web.py` engine fanout.
 - **Application-level immediate-retry** for genuinely transient failures (e.g., one TCP RST, one DNS hiccup): retry immediately, max 1 retry, no doubling delay. Failures that persist past one immediate re-try are real failures and go to the fail-fast handler.
 
 ## Anti-Pattern Catalog (Forbidden)
@@ -73,10 +73,10 @@ if status == Status.BLOCKED:
 
 Applies to every external service call in this project: search engines (`src/search/engines/*`), RAG GPU services (cross-encoder at port 8082, embedding at 8084, splade at 8083), preview HTTP calls (`src/search/preview.py`), Crawl4AI calls (`src/scraper/*`), MCP tool invocations, any third-party endpoint.
 
-The canonical IST/SOLL decision file `decisions/rate_limiting.md` documents the specific implementation state and the concrete code-cleanup recommendation against `src/search/rate_limiter.py` and its callers in `google.py`.
+As of 2026-05-22, the implementation state and code-cleanup recommendation targeted `src/search/rate_limiter.py` and its callers in `google.py`.
 
 ## History
 
-- **2026-05-09 / 2026-05-21:** `RATE_WAIT_TIMEOUT=60s` cap added on `acquire()` calls (see `decisions/OldThemes/bee_cdp_starvation/fix_summary.md` for full cascade-fix history). This made the `acquire()` watchdog work as fail-fast for asyncio cascades; it did NOT remove the exponential backoff itself (`backoff()` still escalated `30 × 2^attempt + jitter` until 2026-05-22 rip).
-- **2026-05-20:** validation run 2 documented the cascade mechanism in `decisions/OldThemes/pooling/04_zero_query_diagnosis.md` — Google CAPTCHA + escalating backoff = same engine locked out across batch.
-- **2026-05-22:** value_eval probe reproduced the cascade (4 backoffs, 466s wasted) → user-binding decision to remove the backoff entirely. This rule + `decisions/rate_limiting.md` created.
+- **2026-05-09 / 2026-05-21:** `RATE_WAIT_TIMEOUT=60s` cap added on `acquire()` calls (full cascade-fix history covered a session investigating asyncio-cascade starvation). This made the `acquire()` watchdog work as fail-fast for asyncio cascades; it did NOT remove the exponential backoff itself (`backoff()` still escalated `30 × 2^attempt + jitter` until 2026-05-22 rip).
+- **2026-05-20:** validation run 2 documented the cascade mechanism — Google CAPTCHA + escalating backoff = same engine locked out across batch.
+- **2026-05-22:** value_eval probe reproduced the cascade (4 backoffs, 466s wasted) → user-binding decision to remove the backoff entirely. This rule created as a result.
