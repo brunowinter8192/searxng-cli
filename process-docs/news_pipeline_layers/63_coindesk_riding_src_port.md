@@ -1,8 +1,7 @@
 # 63 — CoinDesk proxy-riding engine: src/ port (Stage 1)
 
-Cross-reference: OT61 (`61_coindesk_browser_proxy_riding.md`) — the dev engine that is ported here.
-All design decisions (per-context proxy, multi-browser pool, fail-rotation, watchdog) were resolved in
-OT61. This file covers ONLY the src/ port mechanics.
+The dev engine ported here had all design decisions (per-context proxy, multi-browser pool,
+fail-rotation, watchdog) resolved in a prior session. This file covers ONLY the src/ port mechanics.
 
 ## Decision
 
@@ -104,15 +103,15 @@ monosans → roosterkid → databay → …). **TheBlock unaffected** — TheBlo
 
 ## RidingScrapeConfig Defaults
 
-Production-validated values from OT61 Iteration 3 + 4 runs:
+Values validated in the dev-engine Iteration 3 + 4 runs (see the browser proxy-riding process doc):
 
 | Param | Default | Rationale |
 |---|---|---|
-| `n_browsers` | 4 | Validated multi-browser pool design (OT61); keeps per-browser C well under 82 renderer ceiling |
+| `n_browsers` | 4 | Validated multi-browser pool design; keeps per-browser C well under 82 renderer ceiling |
 | `n_slots` | 64 | 4 browsers × 16 contexts; below single-browser deadlock threshold (128 hangs, 20 works) |
-| `stall_timeout_s` | 300.0 | 5 min; tighter than OT61 dev default (3600s) — catches wedge faster |
-| `burn_threshold` | 2 | Regwall hits before proxy rotate; validated in OT61 |
-| `page_timeout_ms` | 8_000 | Validated in OT61 Iteration 3 runs |
+| `stall_timeout_s` | 300.0 | 5 min; tighter than the dev default (3600s) — catches wedge faster |
+| `burn_threshold` | 2 | Regwall hits before proxy rotate; validated in dev runs |
+| `page_timeout_ms` | 8_000 | Validated in dev Iteration 3 runs |
 
 ## Known Stage-2 Reconciliation Items
 
@@ -189,7 +188,7 @@ Key design decisions:
 `coindesk/__init__.py`:
 - `scrape_engine = "proxy_riding"` (was `"browser"`)
 - `riding_scrape_config = RidingScrapeConfig()` — production defaults (C=64, 4 browsers, 300s stall,
-  burn=2, 8s page timeout) validated in OT61 Iterations 3+4. No custom values needed.
+  burn=2, 8s page timeout) validated in the dev-engine Iterations 3+4. No custom values needed.
 
 ### Dedup raw_ext mechanism
 
@@ -203,8 +202,8 @@ browser `.md` dedup unchanged.
 ### _run_clean_pass scope
 
 `_run_clean_pass` is called ONLY from `run_pipeline`'s `proxy_pool` branch (line 218). CoinDesk uses
-`run_scrape_only` exclusively — `_run_clean_pass` is never reached in CoinDesk's prod path. OT63
-(Stage 1) flagged it as a reconciliation item; confirmed out of scope for Stage 2. It would only
+`run_scrape_only` exclusively — `_run_clean_pass` is never reached in CoinDesk's prod path. Stage 1
+flagged it as a reconciliation item; confirmed out of scope for Stage 2. It would only
 matter if CoinDesk gained a clean-pass step (not planned).
 
 ### Prod-path smoke result
@@ -230,7 +229,7 @@ Stage 3 = operator prod 500-run validation with full proxy pool.
 The operator launched the prod 500-run at session end:
 `python -m src.news --source coindesk --scrape-only --year 2024 --limit 500`. To verify next session,
 read `data/news/coindesk/scrape_jobs/<job_id>/job.md`: the measured OK/min + 61k projection (expect
-~23-30/min per OT61 Iter 5), that the riding branch dispatched (no "chunked plan"), that CPU stayed
+~23-30/min per the dev-engine Iter 5 measurement), that the riding branch dispatched (no "chunked plan"), that CPU stayed
 ~50-60% at C=64, and that a re-run reports `dedup → 0 new` (resumability at scale). The Stage-2 5-URL
 smoke already confirmed dispatch + `.html` dedup; this is the scale-confidence check.
 
@@ -238,12 +237,12 @@ smoke already confirmed dispatch + `.html` dedup; this is the scale-confidence c
 
 - **Error-URL permanent exclusion.** The watchdog writes un-scraped URLs to `remaining_urls.txt`, which
   re-queue on the next run. URLs that ALWAYS fail (dead / genuine errors) must NOT re-queue every run —
-  they need permanent exclusion (the OT59 dead/failed-exclusion pattern from The Block), wired into the
+  they need permanent exclusion (the same dead/failed-exclusion pattern used for The Block), wired into the
   riding/CoinDesk dedup before the standing 61k backfill. Out of scope for the port; required before the
   recurring backfill.
 - **dev/ engine cleanup.** `dev/news_pipeline/coindesk_proxy_riding/` is now duplicated by the canonical
-  `src/news/engine/proxy_riding/`. The dev/ copy can be removed (investigation record lives in OT61/OT63)
-  — deferred.
+  `src/news/engine/proxy_riding/`. The dev/ copy can be removed (investigation record lives in this and
+  the prior process doc) — deferred.
 
 ## Stage-1 Smoke Result
 
@@ -257,5 +256,5 @@ Run: `cd searxng-cli && ./venv/bin/python .claude/worktrees/riding-port/dev/…/
 | Live run (10 URLs, 2 slots, 1 browser, 300s stall) | PASS — manifest shape ok (10 entries, all 6 keys, statuses in `{"ok","failed"}`); pool 19,630 browser-eligible; shuffle confirmed; elapsed 305s |
 
 Live run: `ok=0, failed=10` — all free proxies dead at time of run with only 2 slots. Expected at
-this scale (free proxies are unreliable; validated throughput in OT61 used 20×6 = 120 slots). Not a
+this scale (free proxies are unreliable; validated throughput in the dev-engine session used 20×6 = 120 slots). Not a
 bug; the manifest shape, watchdog, and shuffle are the acceptance criteria, not individual ok counts.

@@ -1,6 +1,6 @@
 # 64 — CoinDesk watchdog abort report path fix
 
-**Branch:** `coindesk-watchdog`. Cross-reference: OT63 (`63_coindesk_riding_src_port.md`) — the src/ port whose watchdog this corrects.
+**Branch:** `coindesk-watchdog`. This corrects the watchdog in the CoinDesk proxy-riding src/ port.
 
 ## Bug
 
