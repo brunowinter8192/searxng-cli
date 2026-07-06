@@ -4,7 +4,7 @@
 **State:** Strategy decision. After standalone-evaluating six GitHub proxy LISTS (all low-yield for our network), the direction pivots from "pull more lists" to adopting a self-maintaining scraper-checker TOOL. jhao104/proxy_pool is the lead candidate; setup + CF-targeted run deferred to a dedicated next session.
 
 ## Why the pivot — list expansion is futile for quality
-The standalone evals (OldThemes 24) measured every realistic list candidate against our own neutral check @128:
+The standalone evals (from the curated-source-set entry) measured every realistic list candidate against our own neutral check @128:
 
 | Source | alive% |
 |---|---|
@@ -24,7 +24,7 @@ Two hard lessons: (1) **validation claims do not predict our alive%** — jetkai
 | constverum/ProxyBroker | 4151 | finder + checker (Python) | OUT — README 404, original unmaintained |
 | mubeng/mubeng | 2114 | checker + IP-rotator (Go) | OUT for our goal — does NOT scrape (needs external lists) |
 | monosans/proxy-scraper-checker | 1275 | lean one-shot scraper + checker (Rust), custom check_url | **BENCHMARK** — known, we orchestrate it ourselves |
-| iw4p/proxy-scraper | 594 | scraper (Python) | weaker than monosans (OldThemes 18) |
+| iw4p/proxy-scraper | 594 | scraper (Python) | weaker than monosans (per the methods-optimization entry) |
 
 The architectural fork: a **lean tool we orchestrate** (monosans — outputs a list, we keep our recheck/cap/feed logic) vs a **full pool-server that subsumes our machinery** (jhao104/haipproxy bring scheduler + scoring + API).
 
@@ -44,13 +44,13 @@ HTTPS_URL = "https://www.qq.com"   # ← set to a theblock URL
 ```
 Point it at theblock → the pool self-maintains a CF-passing proxy set.
 
-**It subsumes our hand-built system:** their re-validate + evict = our staleness filter (OldThemes 23); their scheduler = our cap-cadence (OldThemes 25); their fail-count eviction = our scoring; their API = our feed-to-CF.
+**It subsumes our hand-built system:** their re-validate + evict = our staleness filter (per the recheck-interval entry); their scheduler = our cap-cadence (per the batch-operating-model entry); their fail-count eviction = our scoring; their API = our feed-to-CF.
 
 ## jhao104 validator — code-checked [helper/validator.py, helper/check.py]
 - `httpTimeOutValidator` / `httpsTimeOutValidator`: `r = head(conf.httpsUrl, ...); return True if r.status_code == 200 else False`. **Pass criterion is `status_code == 200`** → a CF 403/503/challenge ≠ 200 → fails. So out-of-the-box, pointing the check at theblock correctly rejects CF-blocked proxies. ✓
 - Caveats: it is a **HEAD request, status-only** (no body check) — weaker than our GET + 200 + XML-body; a (rare) CF 200-challenge-page would falsely pass.
 - **Explicitly extensible**: `@ProxyValidator.addHttpValidator` decorator + a `customValidatorExample` stub. The clean path is to ADD a theblock validator (GET + 200 + XML), matching our current rigorous check. The framework is designed for this.
-- `DoValidator.validator` (check.py): fail_count ++/--; with `MAX_FAIL_COUNT = 0` a single fail evicts. **Given our home-router false-death finding (OldThemes 25), set `MAX_FAIL_COUNT > 0` or `MAX_FAIL_RATE`** so transient NAT-saturation false-deaths do not evict good proxies. Our own measurement tells us how to tune the tool.
+- `DoValidator.validator` (check.py): fail_count ++/--; with `MAX_FAIL_COUNT = 0` a single fail evicts. **Given our home-router false-death finding (per the batch-operating-model entry), set `MAX_FAIL_COUNT > 0` or `MAX_FAIL_RATE`** so transient NAT-saturation false-deaths do not evict good proxies. Our own measurement tells us how to tune the tool.
 
 ## Next session — the comparison
 1. Set up jhao104 via OrbStack (Docker). The TTY/headless issue is solved: macOS Tahoe `open -g` opens the window in the background.
@@ -61,4 +61,4 @@ Point it at theblock → the pool self-maintains a CF-passing proxy set.
 Decision after the comparison: adopt jhao104 (drop most of our `dev/news_pipeline/theblock/` proxy machinery) vs keep monosans + our own orchestration.
 
 ## Status
-Pivot decided; tool setup + run is the next-session task. Resume anchor for issue #5.
+Pivot decided; tool setup + run is the next-session task.

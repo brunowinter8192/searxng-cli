@@ -1,10 +1,10 @@
 # 27 — jhao104 Adoption Decided + Recently-Evicted Dedup Patch
 
 **Date:** 2026-06-13
-**State:** Architectural fork from OldThemes 26 resolved (chat decision, setup/benchmark pending → worker). Direction: ADOPT jhao104/proxy_pool as the self-maintaining pool; do NOT revert to monosans + own orchestration. Add exactly ONE mechanism on top — a recently-evicted dedup at the scrape-insert step.
+**State:** Architectural fork from the prior tool-pivot entry resolved (chat decision, setup/benchmark pending → worker). Direction: ADOPT jhao104/proxy_pool as the self-maintaining pool; do NOT revert to monosans + own orchestration. Add exactly ONE mechanism on top — a recently-evicted dedup at the scrape-insert step.
 
 ## Fork resolution
-OldThemes 26 left two paths: (A) lean tool we orchestrate (monosans + our recheck/cap/feed logic) vs (B) full pool-server that subsumes our machinery (jhao104). Resolved to **B with one patch**.
+The prior tool-pivot entry left two paths: (A) lean tool we orchestrate (monosans + our recheck/cap/feed logic) vs (B) full pool-server that subsumes our machinery (jhao104). Resolved to **B with one patch**.
 
 Opus initially leaned A (drop jhao104), on the grounds that jhao104's continuous daemon fights synchronized passes + has a re-scrape churn gap + doesn't match our operating-model control. User overruled with a better synthesis: keep jhao104's three strengths and patch only the churn. Accepted — the patch resolves the churn objection more cleanly than swapping the whole tool.
 
@@ -16,28 +16,28 @@ Opus initially leaned A (drop jhao104), on the grounds that jhao104's continuous
 ## The one addition — recently-evicted dedup (60min cooldown)
 **Problem it closes (the churn):** jhao104's fetchers do not remember what they evicted. On a high dead/CF-block ratio (the normal case — most scraped proxies fail theblock CF), the auto-replenish re-scrapes the same just-evicted proxies, which get re-validated and re-evicted → endless churn on the same garbage.
 
-**Mechanism:** this is our OldThemes 23 staleness-filter (the 1h `--recheck-window`) ported onto jhao104's scrape-insert step. When a scraped proxy is one that hit `MAX_FAIL_COUNT` (= got evicted) within the last 60min → skip it, take the next. Redis-native: write an eviction-record key per proxy with `EXPIRE 3600` at eviction time; at scrape-insert do an `EXISTS` check; the key auto-expires after 60min so the proxy is eligible again (in case it recovered).
+**Mechanism:** this is our recheck-interval-entry staleness-filter (the 1h `--recheck-window`) ported onto jhao104's scrape-insert step. When a scraped proxy is one that hit `MAX_FAIL_COUNT` (= got evicted) within the last 60min → skip it, take the next. Redis-native: write an eviction-record key per proxy with `EXPIRE 3600` at eviction time; at scrape-insert do an `EXISTS` check; the key auto-expires after 60min so the proxy is eligible again (in case it recovered).
 
 **Scope — narrower than our `partition_fresh`, deliberately:** we block ONLY the recently-evicted, NOT all recently-checked. jhao104 keeps alive proxies in the pool and re-validates them on its own schedule — they are never re-scraped, so they need no dedup. The only thing a re-scrape would wrongly re-introduce is the freshly-evicted dead. That is exactly the set the cooldown gates.
 
 **Implementation reality:** a real (small, contained) code patch to jhao104's proxy-add path + one Redis structure — not a config line. The config-only parts are separate (see below).
 
-## Config + extension decisions (carried from OldThemes 26)
+## Config + extension decisions (carried from the prior tool-pivot entry)
 - **Check target:** `setting.py` `HTTPS_URL` → a theblock sitemap URL.
 - **Custom validator:** add a theblock validator (GET + 200 + XML-body) via the `@ProxyValidator.addHttpValidator` decorator, instead of relying on the default HEAD-status-only check (which would falsely pass a rare CF 200-challenge page). Matches our existing rigorous check.
-- **Fail tolerance:** `MAX_FAIL_COUNT > 0` (or `MAX_FAIL_RATE`) — required because of the home-router NAT false-death finding (OldThemes 25): a single failed check is frequently a transient router-saturation false-death, not a genuine death. `MAX_FAIL_COUNT = 0` would evict good CF-passing proxies on a blip.
-- **Concurrency:** the measured ~128 clean zone (OldThemes 20/25) was against a LIGHT neutral endpoint and an ASYNC checker. jhao104 hardcodes **20 sync threads** (`range(20)` in `helper/check.py`) — not configurable, must be patched to tune. The theblock check is heavier / longer-lived per connection → optimal concurrency against theblock must be re-measured, do not assume 128. See code-read section below.
+- **Fail tolerance:** `MAX_FAIL_COUNT > 0` (or `MAX_FAIL_RATE`) — required because of the home-router NAT false-death finding (per the batch-operating-model entry): a single failed check is frequently a transient router-saturation false-death, not a genuine death. `MAX_FAIL_COUNT = 0` would evict good CF-passing proxies on a blip.
+- **Concurrency:** the measured ~128 clean zone (per the concurrency-sweep and batch-operating-model entries) was against a LIGHT neutral endpoint and an ASYNC checker. jhao104 hardcodes **20 sync threads** (`range(20)` in `helper/check.py`) — not configurable, must be patched to tune. The theblock check is heavier / longer-lived per connection → optimal concurrency against theblock must be re-measured, do not assume 128. See code-read section below.
 
 ## jhao104 code-read — actual mechanics + insertion points [2026-06-13, full source read]
-Local clone: `dev/news_pipeline/theblock/jhao104/upstream/` (588K, ~50 py files). Corrects/sharpens the OldThemes 26 summary.
+Local clone: `dev/news_pipeline/theblock/jhao104/upstream/` (588K, ~50 py files). Corrects/sharpens the prior tool-pivot entry's summary.
 
 **Scheduler cadence** (`helper/scheduler.py`): two apscheduler interval jobs — `__runProxyFetch` every **5 min** (scrape → "raw" check → passing proxies `put` into pool), `__runProxyCheck` every **2 min** (if pool < `POOL_SIZE_MIN` trigger a fetch, then re-validate the WHOLE pool = "use" check → keep/evict). One fetch runs immediately on startup.
 
 **Concurrency hardcoded at 20 sync threads** — NOT configurable, NOT in `setting.py`. `Checker()` (`helper/check.py` ~line 150) spawns `for index in range(20)` `_ThreadChecker` threads using blocking `requests.head`; scheduler executor also `max_workers=20`. DIVERGENCE: our measured ~128 clean-zone was async + a LIGHT endpoint; jhao104 is 20 sync threads. For theblock (heavy GET + CF) 20 may even be high — must be measured. To tune: patch `range(20)` → a `setting.py` value.
 
-**HTTP-list vs HTTPS-list gating** (`helper/check.py` `DoValidator.validator`, lines 42-47): the eviction-driving `last_status` = `http_r` (the HTTP-validator list result) ONLY; the HTTPS-validator result merely sets the `proxy.https` flag. CONSEQUENCE: our theblock validator MUST register in the **HTTP** list (`@ProxyValidator.addHttpValidator`) so it drives keep/evict — even though theblock is an https URL (the validator does the https GET internally). AND the two existing http-list defaults must be disabled: `httpTimeOutValidator` (HEAD to httpbin) + `customValidatorExample` (returns True) — else they co-gate. OldThemes 26 named the right decorator but missed the disable-defaults + gating-list subtlety.
+**HTTP-list vs HTTPS-list gating** (`helper/check.py` `DoValidator.validator`, lines 42-47): the eviction-driving `last_status` = `http_r` (the HTTP-validator list result) ONLY; the HTTPS-validator result merely sets the `proxy.https` flag. CONSEQUENCE: our theblock validator MUST register in the **HTTP** list (`@ProxyValidator.addHttpValidator`) so it drives keep/evict — even though theblock is an https URL (the validator does the https GET internally). AND the two existing http-list defaults must be disabled: `httpTimeOutValidator` (HEAD to httpbin) + `customValidatorExample` (returns True) — else they co-gate. The prior tool-pivot entry named the right decorator but missed the disable-defaults + gating-list subtlety.
 
-**Validators use plain `requests` → will NOT pass CF.** `validator.py` validators call `requests.head(...)`. Our theblock validator MUST use `curl_cffi` `impersonate="chrome"` (anti-CF method, OldThemes 15/17) + GET + status 200 + XML-body check. This is the integration crux — a plain-`requests` theblock check fails CF signature-gating regardless of proxy quality.
+**Validators use plain `requests` → will NOT pass CF.** `validator.py` validators call `requests.head(...)`. Our theblock validator MUST use `curl_cffi` `impersonate="chrome"` (the anti-CF method established in the earlier CF-block and discriminator entries) + GET + status 200 + XML-body check. This is the integration crux — a plain-`requests` theblock check fails CF signature-gating regardless of proxy quality.
 
 **Recently-evicted dedup — exact two hooks:**
 - WRITE (mark on evict): `helper/check.py` `_ThreadChecker.__ifUse`, eviction branch (`if proxy.fail_count > maxFailCount: ... delete`, lines ~130-134) — also write Redis `SETEX evicted:<proxy> 3600 1`.
@@ -55,7 +55,7 @@ Probe location: `dev/news_pipeline/theblock/jhao104/` (next to the monosans mach
 1. Clone jhao104, bring the daemon loop up clean against a NEUTRAL target first (verify scrape → store → re-validate → API at all).
 2. Point check at theblock + custom theblock validator (GET+200+XML) + `MAX_FAIL_COUNT > 0`.
 3. Add the recently-evicted dedup (Redis key + `EXPIRE 3600` at scrape-insert) + alive/dead-per-cycle logging.
-4. Benchmark vs monosans (`check_url = theblock`): **CF-passing proxies per cycle + cycle time**. This run also produces the long-open CF-pass-rate gate for the current network path (OldThemes 21).
+4. Benchmark vs monosans (`check_url = theblock`): **CF-passing proxies per cycle + cycle time**. This run also produces the long-open CF-pass-rate gate for the current network path (per the pipe/cycle-economics entry).
 
 ## Stage 1 results — neutral baseline [2026-06-13, worker jhao104-probe]
 Probe brought up from source (**Python 3.12** — 3.14 breaks the `lxml`/`APScheduler`/`gunicorn` pins), Redis via Docker, run against the DEFAULT neutral targets (httpbin HTTP / qq.com HTTPS). Reproducible via `dev/news_pipeline/theblock/jhao104/setup.sh`; full detail in `dev/news_pipeline/theblock/jhao104/NOTES.md`.
@@ -66,7 +66,7 @@ Probe brought up from source (**Python 3.12** — 3.14 breaks the `lxml`/`APSche
 - Confirms (for Stage 2/3 tuning): `MAX_FAIL_COUNT=0` evicts on first fail (too aggressive → set >0); `PROXY_REGION=True` fires a ~2s geo-lookup per new proxy (latency → consider disabling).
 - jhao104 operates on small fresh per-cycle batches (~540), NOT a large frozen pool like our monosans path — a different operating profile to weigh in the benchmark.
 
-Comparison context: our curated monosans+proxifly neutral-alive = 15.6% (OldThemes 24) but on a 320k frozen pool. jhao104's 22.2% is on its own 540-proxy fresh batch from a different (Chinese-heavy) source set — not directly comparable. The apples-to-apples number is the theblock-CF pass rate (Stage 4 benchmark).
+Comparison context: our curated monosans+proxifly neutral-alive = 15.6% (per the curated-source-set entry) but on a 320k frozen pool. jhao104's 22.2% is on its own 540-proxy fresh batch from a different (Chinese-heavy) source set — not directly comparable. The apples-to-apples number is the theblock-CF pass rate (Stage 4 benchmark).
 
 ## Stage 2 results — theblock CF-pass rate [2026-06-13, worker jhao104-probe]
 Implemented the theblock gating check via a curl_cffi overlay validator (tracked `dev/news_pipeline/theblock/jhao104/patches/helper/validator.py`, copied into `upstream/` by setup.sh). Sole http-list gate = `theblockValidator` (curl_cffi `impersonate="chrome"` GET `https://www.theblock.co/sitemap_tbco_index.xml`; pass = 200 + XML marker in first 500B). The 3 stock validators disabled (decorator omitted). `MAX_FAIL_COUNT=2` via env override (ConfigHandler reads `os.getenv` first — no setting.py patch). Validator verified correct by Opus (diff review) — it found a real passer, so the result is genuine, not a bug.
@@ -75,9 +75,9 @@ Implemented the theblock gating check via a curl_cffi overlay validator (tracked
 - **Verdict: jhao104's OWN sources yield essentially zero theblock-CF proxies — unusable for a backfill as-configured.**
 
 **Confounds before concluding jhao104 is unviable (the Stage 4 benchmark must control these):**
-1. **http-only scheme.** The validator (and jhao104's whole model) addresses proxies as http-CONNECT (`http://host:port`). The 18.8% discriminator (OldThemes 17) ran on a MIXED http/socks pool with per-protocol schemes. If CF-passing free proxies are predominantly socks, jhao104 structurally misses them (it stores bare ip:port, validates as http → socks wasted).
+1. **http-only scheme.** The validator (and jhao104's whole model) addresses proxies as http-CONNECT (`http://host:port`). The 18.8% discriminator (from the passability-discriminator entry) ran on a MIXED http/socks pool with per-protocol schemes. If CF-passing free proxies are predominantly socks, jhao104 structurally misses them (it stores bare ip:port, validates as http → socks wasted).
 2. **Source-set.** jhao104's fetchers are China-heavy (scdn, daili66, geonode, kuaidaili...); the monosans path uses TheSpeedX/proxifly/roosterkid/sunny9577/hookzof. Different IP-reputation.
-3. **Temporal/IP-reputation drift.** CF-pass measured 18.8% (OldThemes 17), 0.8% (later live pipe, dev/DOCS), now 0.085% — extremely volatile.
+3. **Temporal/IP-reputation drift.** CF-pass measured 18.8% (earlier discriminator entry), 0.8% (later live pipe, per the pipe/cycle-economics entry), now 0.085% — extremely volatile.
 
 ## Benchmark result — curated list DIRECT theblock-CF + home-IP [2026-06-13, worker jhao104-probe]
 Ran `dev/news_pipeline/theblock/probe_curated_theblock_cf.py` (committed): the monosans+proxifly curated list straight against the curl_cffi theblock check, NO alive pre-filter, CORRECT per-protocol scheme (http/socks4/socks5) — identical gate to jhao104 Stage 2 except the scheme. Concurrency 50 (conservative for heavy theblock GETs vs the ~128 light-check clean zone). Probe code reviewed by Opus — sound.
@@ -89,10 +89,10 @@ Ran `dev/news_pipeline/theblock/probe_curated_theblock_cf.py` (committed): the m
   | http | 20 | 2119 | 0.944% |
   | socks5 | 4 | 573 | 0.698% |
 - **Both jhao104 confounds CONFIRMED:** (1) source-set — curated (international) is 17.6× jhao104 (China-heavy); (2) http-only — socks4 is the BEST cohort (3.8× http), exactly what jhao104's http-CONNECT-only model structurally discarded. jhao104's 0.085% was bad-sources AND missed-socks combined.
-- **Home-IP gating check: 200 + sitemap XML, DIRECT (no proxy), curl_cffi-chrome.** Our home IP is currently CF-reputation-CLEAR — the persistent mechanism-2 flag from OldThemes 16 has decayed. The home-IP + pacing approach is on the table (the gating request works). Open: theblock's safe req/min rate; asymmetric risk (home IP is our only IP, cannot rotate; an overrun → persistent block).
+- **Home-IP gating check: 200 + sitemap XML, DIRECT (no proxy), curl_cffi-chrome.** Our home IP is currently CF-reputation-CLEAR — the persistent mechanism-2 flag from the earlier monosans pool-evidence entry has decayed. The home-IP + pacing approach is on the table (the gating request works). Open: theblock's safe req/min rate; asymmetric risk (home IP is our only IP, cannot rotate; an overrun → persistent block).
 
 ## Survey results — per-repo theblock-CF [2026-06-13, worker repo-survey]
-Ran `dev/news_pipeline/theblock/probe_repo_cf_survey.py`: all 22 candidate repos (the 68-source set grouped by repo) sampled ~1250 each against the curl_cffi theblock check (concurrency 50), per-protocol, with cross-repo cumulative dedup. Resolves the OldThemes 26 "which sources" question with data.
+Ran `dev/news_pipeline/theblock/probe_repo_cf_survey.py`: all 22 candidate repos (the 68-source set grouped by repo) sampled ~1250 each against the curl_cffi theblock check (concurrency 50), per-protocol, with cross-repo cumulative dedup. Resolves the prior tool-pivot entry's "which sources" question with data.
 
 **Ranked by CF-rate (full 22):** themiralay 15.21% (217, http-only), roosterkid 10.83% (240, socks4 15.33%), monosans 10.20% (98, http), databay-labs 6.00% (1630, socks4 9.97%), r00tee 2.56% (14487), iplocate 2.32% (2384), sunny9577 2.24% (1894), ALIILAPRO 2.08% (3558), dpangestuw 2.08% (11570), Zaeem20 1.76% (1292), zloi-user 1.60% (1556, socks4 10.29%), hookzof 1.50% (732, socks5), TheSpeedX 1.36% (9791), proxyscrape 1.36% (8842), proxifly 1.28% (3735), mmpx12 1.20% (1377), ShiftyTR 0.92% (983), ErcinDedeoglu 0.56% (45436), mzyui 0.56% (24535), jetkai 0.32% (4643), **MuRongPIG 0.08% (291993 — the junk flood)**, clarketm 0.00% (400).
 
@@ -108,4 +108,4 @@ Ran `dev/news_pipeline/theblock/probe_repo_cf_survey.py`: all 22 candidate repos
 ## Verdict + Status
 **jhao104 DROPPED** (bad sources + http-only handicap; Stage 3 dedup permanently off). Probe artifacts stay under `dev/news_pipeline/theblock/jhao104/`.
 
-Direction chosen: the **proxy-pool path** (home-IP-pacing is fragile, see above). The forward pipe is being built — see **OldThemes 28** (acquire-pipe design + build). Backfill candidate pool = the **top 13 survey repos (~22k unique)**. Stages 1-4 built; Stage 5 (orchestrator) + the 64-sitemap testlauf pending next session.
+Direction chosen: the **proxy-pool path** (home-IP-pacing is fragile, see above). The forward pipe is being built — see the following acquire-pipe design entry. Backfill candidate pool = the **top 13 survey repos (~22k unique)**. Stages 1-4 built; Stage 5 (orchestrator) + the 64-sitemap test run pending next session.
