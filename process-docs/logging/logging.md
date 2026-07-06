@@ -1,4 +1,6 @@
-# decisions/logging.md — Python Logger Setup
+# Python Logger Setup
+
+*Snapshot as of 2026-06 — historical process record; the live current state is the source code, not this file.*
 
 ## Current State
 
@@ -57,7 +59,7 @@ Key findings from audit:
 - 13 INFO verbose progress calls → reclassified DEBUG (per-URL/per-iteration crawler+scraper traces)
 - 93 calls unchanged (already correct level or genuine WARNING/ERROR/INFO)
 
-Options evaluated: see `decisions/OldThemes/logging/initial_audit_2026-05-24.md`.
+Options evaluated: see the initial logging audit (2026-05-24) in this folder.
 
 ## Open Questions
 
@@ -67,4 +69,4 @@ None currently. Rate-limited (HTTP 429) calls stay WARNING — distinct from "en
 
 Internal architectural decision — no external references.
 
-Implementation: `src/log_janitor.py`, `dev/log_janitor/01_prune_test.py`, `dev/log_janitor/DOCS.md`.
+Implementation: `src/log_janitor.py`, `dev/log_janitor/01_prune_test.py`.
