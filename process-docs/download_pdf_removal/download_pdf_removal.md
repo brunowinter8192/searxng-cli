@@ -1,6 +1,6 @@
 # download_pdf — Removal (2026-06)
 
-Process record for retiring the `download_pdf` feature. Crystallized IST lives in `decisions/scrape_pipeline.md` (PDF-URL handling) and `decisions/plugin_routing.md` (scrape routing).
+Process record for retiring the `download_pdf` feature.
 
 ## Decision
 
@@ -18,7 +18,7 @@ Process record for retiring the `download_pdf` feature. Crystallized IST lives i
 | `src/scraper/pdf_chain.py` | chain primitives: `HARD_BLACKLIST`, `TIER1_DOMAINS`, `apply_tier1_transform`, `is_blacklisted`, `is_github_blob`, `should_download_as_pdf`, `parse_citation_pdf_url`, `extract_citation_pdf_url` |
 | `src/scraper/download_logger.py` | per-call JSONL log (`download_log.jsonl`) — built to measure chain effectiveness over weeks; never reached a verdict before removal |
 | `cli.py` | `download_pdf` subcommand + the `should_download_as_pdf` auto-routing weiche in the `scrape_url` handler |
-| `decisions/scrape_logging.md` | the entire `## Per-URL Download Log` section (obsolete with the logger) |
+| Per-URL Download Log documentation | obsolete with the logger, removed |
 
 ## New behavior
 
