@@ -24,7 +24,7 @@ if overrides:
 keys replaced; all other fields (`burn_threshold`, `page_timeout_ms`, `stall_timeout_s`) keep
 their config-default values. A flag left as `None` is excluded from `overrides` → the field
 is untouched. No flags → `overrides` is empty → `dataclasses.replace` never called → byte-identical
-to current behaviour (4 browsers × 16 slots/browser = 64 slots total).
+to the pre-change behavior (4 browsers × 16 slots/browser = 64 slots total).
 
 ## Backward compat
 

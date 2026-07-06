@@ -1,17 +1,17 @@
 # 71 — CoinDesk error-URL logic (deferred — post-backfill)
 
 **Status:** PLANNED, deferred until after the 61k backfill. NOT implemented.
-Cross-reference: OT66 (`66_coindesk_report_slimming.md`) — removed `remaining_urls.txt` in anticipation
-of this structured layer. OT56 / OT59 / OT62 — TheBlock's dead/failed-URL mechanism, the reference design.
+A prior session removed `remaining_urls.txt` in anticipation of this structured layer. TheBlock's
+dead/failed-URL mechanism is the reference design.
 
-## Current state (IST)
+## State as of this session
 
 CoinDesk's riding scrape (`run_scrape_only`, proxy_riding branch) is **retry-everything**:
 `load_scrape_entries` reads the inventory shards, `filter_new_entries` dedups against `raw/{hash}.html`,
 scrapes the rest. A URL that fails (regwall / connect_fail / failed / caught in a stall-abort) gets NO
 raw file → on the next run it is simply re-attempted. There is no dead/failed distinction, no permanent
-exclusion, no error-URL file. The watchdog's `remaining_urls.txt` was removed (OT66) precisely because it
-was a throwaway snapshot meant to be superseded by this layer.
+exclusion, no error-URL file. The watchdog's `remaining_urls.txt` was removed in a prior session precisely
+because it was a throwaway snapshot meant to be superseded by this layer.
 
 ## Why deferred (the design rationale)
 
@@ -38,6 +38,6 @@ excluded from future dedup). This is the structured replacement for the removed 
 - The exact dead-vs-failed split for CoinDesk (origin 404/410 vs persistent-unreachable) and how the
   riding engine surfaces origin status — it currently maps everything non-ok to `"failed"`, with no
   origin-status channel.
-- Where the error-URL files live after the inventory→discover rename (OT67) lands — `discover/`.
+- Where the error-URL files live after the inventory→discover rename lands — `discover/`.
 - Whether the re-pass is a distinct CLI mode or just a relaxed-config run (`--browsers`/`--slots`/longer
   `stall_timeout_s`) over the remainder.

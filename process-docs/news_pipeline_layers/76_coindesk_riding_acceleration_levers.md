@@ -46,7 +46,7 @@ Caveat: live-proxy set varies between runs; thousands of OK per run averages it 
 868 target, 777 OK, **24,238 connect-fails**, fixed cooldown, SIGINT-interrupted. Findings:
 
 - **Concurrency is NOT the throughput lever.** 120 slots → 16.6 OK/min vs the earlier 80-slot ~18.4 OK/min — 120 is *slightly worse*. The live-proxy set is a fixed scarce subset of the pool; more contexts pull+burn it faster, they do not create more live proxies. Raising contexts just front-loads then starves. Supply-via-concurrency refuted.
-- **Pool exhaustion is the cooldown ceiling, not a bug.** "Eligible pool over time": min-eligible 17.6k → 0 over 50 min, in-cooldown → 24k. At 120 slots with ~1-attempt rides + 60-min `fixed` cooldown, burn-rate drains the eligible pool faster than cooldowns expire → slots exit ("pool exhausted"). 120 is unsustainable under fixed-60min. → `exp` cooldown (re-admits productive proxies) is the supply-side lever, same as OT74.
+- **Pool exhaustion is the cooldown ceiling, not a bug.** "Eligible pool over time": min-eligible 17.6k → 0 over 50 min, in-cooldown → 24k. At 120 slots with ~1-attempt rides + 60-min `fixed` cooldown, burn-rate drains the eligible pool faster than cooldowns expire → slots exit ("pool exhausted"). 120 is unsustainable under fixed-60min. → `exp` cooldown (re-admits productive proxies) is the supply-side lever, same as the cooldown-policy rethink from an earlier session.
 - **Pool loaded = 20,831 is browser-eligible only.** `_pool_provider` filters to `BROWSER_ELIGIBLE_PROTOS = {http, socks5}`; the ~32.7k full pool includes ~12k socks4 that Chromium/Playwright cannot use. Not a bug — the riding engine runs on ~64% of the pool. (socks4 usable only by curl_cffi / TheBlock.)
 - **CPU at limit at 120** (user-observed) — consistent with CPU-bound post-nav processing (markdown gen), see below. Going down from 120, not up.
 
@@ -96,7 +96,7 @@ Built incrementally on the riding reporter (`src/news/engine/proxy_riding/report
 
 **Caveats / interactions:**
 - Exact safe floor needs the nav-vs-markdown split (load_s can't isolate). The ~7.6s success-total vs ~8.5s fail-nav hints nav ≈ 4-5s → ~5s timeout likely safe — but set it via A/B, not inference.
-- Lower timeout → more attempts/min → faster proxy burn → faster pool drain. At 80@8s the pool drained 16.8k→4k over 60 min but did not exhaust; lowering pushes toward exhaustion → pairs with `exp` cooldown (OT74) for re-supply. Timeout-down + cooldown-exp are complementary.
+- Lower timeout → more attempts/min → faster proxy burn → faster pool drain. At 80@8s the pool drained 16.8k→4k over 60 min but did not exhaust; lowering pushes toward exhaustion → pairs with `exp` cooldown (see the cooldown-policy process doc) for re-supply. Timeout-down + cooldown-exp are complementary.
 - `page_timeout` is NOT exposed in the prod CLI (`python -m src.news` has only --browsers/--slots/--cooldown-policy) — a `--page-timeout` flag is needed to A/B it.
 
 ## Open (updated)

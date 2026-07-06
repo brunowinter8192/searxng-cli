@@ -7,7 +7,7 @@ written to `data/news/coindesk/scrape_jobs/{job_id}/`) is the ONLY serialisation
 `RiderState` — including the `pool_samples` time-series `(elapsed_s, n_eligible, n_cooldown)` the
 watchdog accumulates each poll. A manual abort (Ctrl-C or `kill <pid>`) lost the report entirely.
 
-## IST Before Fix — Two Distinct Failure Modes
+## State Before Fix — Two Distinct Failure Modes
 
 **SIGINT (Ctrl-C):**
 Python installs a default SIGINT handler that raises `KeyboardInterrupt` in the running thread.

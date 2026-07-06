@@ -4,7 +4,7 @@ Scope: the riding engine's dead/burned-proxy handling. Reconsiders the fixed 60-
 external practice, converges on a **selectable** policy (`--cooldown-policy fixed|exp`, default `fixed` =
 byte-identical) for an A/B experiment. Implementation in progress (worker on `dev`).
 
-## IST before (the fixed cooldown)
+## State before this change (the fixed cooldown)
 
 - `PersistentCooldownManager` (`src/news/engine/proxy_pool/cooldown.py`, **SHARED** with theblock's
   proxy_pool engine): in-memory per-job (fresh `_burned_utc` dict each process — NOT persistent across
@@ -13,15 +13,15 @@ byte-identical) for an A/B experiment. Implementation in progress (worker on `de
 - Ride loop (`rider.py`): a proxy rides URLs while succeeding; `connect_fail` → immediate burn (1 attempt);
   `regwall` → burn after `burn_threshold = 2`; `failed/empty` → burn after `FAIL_THRESHOLD = 2`. Ride-end →
   `mark_burned` → 60-min cooldown.
-- Selection (`_next_proxy`): cursor over `eligible_candidates(current_pool)`. 30-min pool refresh (OT70)
-  atomically swaps the list; cooldown NOT reset on refresh; a cooled proxy that fell off the new list is
-  naturally excluded (it is not in `pool`, so never a candidate — eligibility is a filter on the current
-  list, not a queue).
+- Selection (`_next_proxy`): cursor over `eligible_candidates(current_pool)`. The 30-min pool refresh (from a
+  prior session) atomically swaps the list; cooldown NOT reset on refresh; a cooled proxy that fell off the
+  new list is naturally excluded (it is not in `pool`, so never a candidate — eligibility is a filter on the
+  current list, not a queue).
 
 ## Question driving this
 
 Is the 60-min/2-strike construct evidence-based or gut feeling? And: do pre-checks (alive-feeders) pay off?
-(The alive-feeder was already dropped in OT61; this re-validates that against external practice.)
+(The alive-feeder was already dropped in a prior session; this re-validates that against external practice.)
 
 ## External evidence (GitHub, read this session via gh-cli-search)
 
@@ -41,9 +41,9 @@ Two shipped schools:
   validating against httpbin does not predict CoinDesk-regwall success (target-specific IP-rate metering),
   and we run no shared pool service.
 
-Conclusion on pre-checks: the scraper-side practice confirms OT61 — for a target-specific regwall the real
-fetch IS the check; pre-validation only exists in the service model, and there against generic judges that
-would not predict our target. Pre-checks rejected (again).
+Conclusion on pre-checks: the scraper-side practice confirms the earlier decision — for a target-specific
+regwall the real fetch IS the check; pre-validation only exists in the service model, and there against
+generic judges that would not predict our target. Pre-checks rejected (again).
 
 ## Design convergence
 
@@ -76,8 +76,8 @@ would not predict our target. Pre-checks rejected (again).
 - 20k-run throughput (raw-mtime reconstruction, `dev/news_pipeline/coindesk_proxy_riding/analyze_write_times.py`,
   `--since 2026-06-20 03:45`): two-phase depletion — ~25-40/min fresh for ~3h, then ~5-15/min for ~10h;
   9,644 files over 12h51m; longest gap 4m21s (no stall). The eligible/cooldown time-series for the 20k run
-  was lost to the manual Ctrl-C (now fixed by SIGINT/SIGTERM report-on-abort, OT73) — the A/B runs will
-  capture it.
+  was lost to the manual Ctrl-C (now fixed by SIGINT/SIGTERM report-on-abort, added in a prior session) —
+  the A/B runs will capture it.
 
 ## A/B approach (implemented; runs pending)
 

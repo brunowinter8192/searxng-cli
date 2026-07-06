@@ -40,7 +40,7 @@ source read corrected it.)
   exclusion — justified by the current goal: maximise validated supply against the eligible-pool depletion.
 - Fix the stale proxifly docstring → make the source inventory comment reflect reality (the actual backfill set).
 - Add four more SOURCE-VALIDATED (pre-filtered) sources, deliberately small for high live-fraction / low churn
-  (user: "am besten vorgefiltert ... so klein dass selbst wenn Trash, verwässert den Pool nicht arg"):
+  (user: "ideally pre-filtered ... small enough that even if it's trash, it doesn't dilute the pool much"):
   - **prxchk/proxy-list** — validated ("highly anonymous, accuracy"), refreshed EVERY 10 MIN; ~58 http / ~10 socks5.
   - **ShiftyTR/Proxy-List** — updated hourly; ~40 http / ~279 socks5.
   - **vakhov/fresh-proxy-list** — "fresh, working"; ~528 http / ~21 socks5.
@@ -61,12 +61,12 @@ source read corrected it.)
 
 Source-side validation = FREE validation: the maintainer already dropped dead IPs, directly attacking our
 dominant failure mode (93% `connect_fail` on dead proxies, per job `20260620T010358Z`) WITHOUT costing us a
-CoinDesk regwall-budget request per proxy. This is DISTINCT from the alive-feeder dropped in OT61 (which cost
-one CoinDesk request per proxy). Caveat: source validation proves "proxy alive", not "passes CoinDesk's
-IP-rate regwall" — but the connect_fail axis is exactly what it reduces, and the regwall axis we handle
-ourselves via backoff (OT74).
+CoinDesk regwall-budget request per proxy. This is DISTINCT from the alive-feeder dropped in a prior session
+(which cost one CoinDesk request per proxy). Caveat: source validation proves "proxy alive", not "passes CoinDesk's
+IP-rate regwall" — but the connect_fail axis is exactly what it reduces, and the regwall axis is handled
+via the cooldown backoff policy (see the cooldown-policy process doc).
 
-## IST after change
+## State after this change
 
 `load_backfill_pool()` source set after change (18 sources, 46 URLs): monosans, roosterkid, TheSpeedX,
 themiralay, r00tee, iplocate, sunny9577, ALIILAPRO, dpangestuw, Zaeem20, zloi-user, hookzof (the surviving
