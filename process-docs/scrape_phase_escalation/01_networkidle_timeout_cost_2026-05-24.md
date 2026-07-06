@@ -5,7 +5,6 @@
 
 ## Sources
 
-- `decisions/scrape_pipeline.md` — current 3-phase pipeline IST + per-phase configuration
 - `src/scraper/scrape_url.py:71-138` — phase escalation code (fastpath → browser_1a → browser_1b → browser_2_stealth)
 - `src/logs/scrape_log.jsonl` — per-scrape timing record schema (timings_ms.fastpath / browser_1a / browser_1b / browser_2_stealth / filter / total_wall)
 - Live observation: 2026-05-24 session, BfN.de scrape, 90s wall time
@@ -66,11 +65,11 @@ None implemented. All are future-work options pending measurement.
 
 ## Hamster-Wheel Risk
 
-User observation (2026-05-24):
+User observation (2026-05-24, translated from German):
 
-> "kommt man da aber auch wieder schnell in ein websitespezifisches hamsterrad in dem man ewig finetunen muss und am ende doch genauso schlau ist wie vorher"
+> "This quickly turns into a website-specific hamster wheel where you have to fine-tune endlessly and end up no smarter than before."
 
-*(Per-domain or per-pattern tuning of scrape behavior tends to be a hamster wheel — fine-tune for site A, site B regresses, fine-tune for site B, site C surfaces a new edge case. Without a domain-agnostic strategic win, time invested in fine-tuning doesn't accumulate.)*
+Per-domain or per-pattern tuning of scrape behavior tends to be a hamster wheel — fine-tune for site A, site B regresses, fine-tune for site B, site C surfaces a new edge case. Without a domain-agnostic strategic win, time invested in fine-tuning doesn't accumulate.
 
 This concern targets candidate **#1 (Domain allowlist)** specifically — it is explicitly per-domain by design. Candidates **#2 (timeout reduction)** and **#3 (concurrent fastpath+1a)** are domain-agnostic and do not fall into this trap. They are the only structurally sound options if optimization is pursued.
 

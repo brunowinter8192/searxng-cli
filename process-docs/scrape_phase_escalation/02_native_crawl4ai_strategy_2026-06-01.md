@@ -1,50 +1,48 @@
 # Scrape Phase-Escalation: Native Crawl4AI Strategy
 
 **Date:** 2026-06-01
-**Topic:** Ablösung der hand-gebauten 4-Phasen-Kette durch einen einzigen crawl4ai-Browser-Call mit dokumentierter Anti-Bot-Baseline.
+**Topic:** Replacing the hand-built 4-phase chain with a single crawl4ai browser call with a documented anti-bot baseline.
 
 ## Sources
 
-- `decisions/scrape_pipeline.md` — IST before/after this migration
-- `decisions/OldThemes/scrape_phase_escalation/01_networkidle_timeout_cost_2026-05-24.md` — Vorgänger-Analyse: networkidle-Timeout-Kosten + Hamster-Wheel-Risiko
-- `src/scraper/scrape_url.py` — Code vor und nach der Migration
-- `venv/lib/python3.14/site-packages/crawl4ai/async_configs.py:1399–1519` — CrawlerRunConfig 0.8.6 Konstruktor
-- `venv/lib/python3.14/site-packages/crawl4ai/async_crawler_strategy.py:76,117,762–763` — UndetectedAdapter-Wiring, page_timeout
-- `venv/lib/python3.14/site-packages/crawl4ai/browser_manager.py:95,763` — enable_stealth GPU-Flags + StealthAdapter-Bedingung
+- `src/scraper/scrape_url.py` — code before and after the migration
+- `venv/lib/python3.14/site-packages/crawl4ai/async_configs.py:1399–1519` — CrawlerRunConfig 0.8.6 constructor
+- `venv/lib/python3.14/site-packages/crawl4ai/async_crawler_strategy.py:76,117,762–763` — UndetectedAdapter wiring, page_timeout
+- `venv/lib/python3.14/site-packages/crawl4ai/browser_manager.py:95,763` — enable_stealth GPU flags + StealthAdapter condition
 
-## Ausgangslage
+## Starting Point
 
-Die alte Kette (`fastpath → browser_1a/networkidle → browser_1b/domcontentloaded → browser_2_stealth`) hatte drei strukturelle Schwächen:
+The old chain (`fastpath → browser_1a/networkidle → browser_1b/domcontentloaded → browser_2_stealth`) had three structural weaknesses:
 
-1. **Nicht-deterministisch in der Laufzeit.** networkidle-Timeout von 60s war der Worst Case auf tracker-heavy Sites (BfN.de: 90s total wall, `01_networkidle_timeout_cost_2026-05-24.md`). Keine harte Navigationsgrenze — nur ein implizierter Crawl4AI-Default.
-2. **Kaskadierender Overhead.** Jede Phase startet eine neue `AsyncWebCrawler`-Instanz. Bei fastpath-Miss + networkidle-Timeout + domcontentloaded-Fallback wurden drei Browser-Prozesse gestartet, bevor überhaupt die Stealth-Phase erreicht wurde.
-3. **Komplexität ohne strategischen Gewinn.** Per-Phase-Tuning (welche Wait-Strategie für welchen Site-Typ?) ist der Hamster-Wheel-Anteil: fine-tune für Site A, Site B regrediert. Die Erkenntnis aus 01 war, dass nur domain-agnostische Optimierungen strukturell sinnvoll sind.
+1. **Non-deterministic runtime.** networkidle timeout of 60s was the worst case on tracker-heavy sites (BfN.de: 90s total wall, per an earlier analysis of networkidle timeout cost, 2026-05-24). No hard navigation limit — only an implied Crawl4AI default.
+2. **Cascading overhead.** Every phase starts a new `AsyncWebCrawler` instance. On fastpath-miss + networkidle-timeout + domcontentloaded-fallback, three browser processes were started before the stealth phase was even reached.
+3. **Complexity without strategic gain.** Per-phase tuning (which wait strategy for which site type?) is the hamster-wheel component: fine-tune for site A, site B regresses. The earlier finding was that only domain-agnostic optimizations are structurally sound.
 
-## Ziel-Config und Herleitung
+## Target Config and Derivation
 
-**Einzelner Call, vier Parameter-Entscheidungen:**
+**Single call, four parameter decisions:**
 
-### `wait_until="load"` statt networkidle/domcontentloaded-Kaskade
+### `wait_until="load"` instead of the networkidle/domcontentloaded cascade
 
-`networkidle` wartet auf 500ms Zero-Netzwerk-Aktivität — auf tracker-heavy Sites (Analytics, Social Pixels) nie erreicht → 60s Timeout unausweichlich. `domcontentloaded` feuert zu früh, verpasst JS-injected Content bei echten SPAs. `load` ist der Mittelweg: fired when the page and all subresources (images, scripts) have loaded — vollständig genug für die meisten Sites, aber ohne den Idle-Wait von networkidle. Weniger hängeanfällig bei Polling-Heavy-Sites.
+`networkidle` waits for 500ms of zero network activity — on tracker-heavy sites (analytics, social pixels) never reached → 60s timeout inevitable. `domcontentloaded` fires too early, misses JS-injected content on real SPAs. `load` is the middle ground: fired when the page and all subresources (images, scripts) have loaded — complete enough for most sites, but without the idle wait of networkidle. Less prone to hanging on polling-heavy sites.
 
-### `page_timeout=60000` (explizit)
+### `page_timeout=60000` (explicit)
 
-Harte Navigationsgrenze. Bestätigt als Navigations-Timeout in `async_crawler_strategy.py:762–763`:
+Hard navigation limit. Confirmed as the navigation timeout in `async_crawler_strategy.py:762–763`:
 ```python
 response = await page.goto(url, wait_until=config.wait_until, timeout=config.page_timeout)
 ```
-Worst Case: 60s Navigation + kurze Crawl4AI-Overhead = ~64s/URL. Determinismus: der Call scheitert sauber mit einem bekannten Timeout statt unendlich zu hängen.
+Worst case: 60s navigation + short Crawl4AI overhead = ~64s/URL. Determinism: the call fails cleanly with a known timeout instead of hanging indefinitely.
 
 ### `magic=True`
 
-crawl4ai-Dokumentation: "attempts automatic handling of overlays/popups". Ergänzt `excluded_selector=COOKIE_CONSENT_SELECTOR` auf JS-Ebene: der Selector entfernt DOM-Nodes vor dem Crawl, `magic` dismissed dynamisch erzeugte Overlays, die kein statisches DOM-Markup haben. Zusammen: No-Blocking-Baseline ohne per-Site-JS-Code.
+crawl4ai documentation: "attempts automatic handling of overlays/popups". Complements `excluded_selector=COOKIE_CONSENT_SELECTOR` at the JS level: the selector removes DOM nodes before the crawl, `magic` dismisses dynamically generated overlays that have no static DOM markup. Together: a no-blocking baseline without per-site JS code.
 
-### `enable_stealth=True` + `UndetectedAdapter` — Kohärenz und #1959
+### `enable_stealth=True` + `UndetectedAdapter` — coherence and #1959
 
-Die ursprüngliche Frage war: ist `enable_stealth=True` in 0.8.6 ein No-Op, wenn `UndetectedAdapter` bereits verwendet wird?
+The original question was: is `enable_stealth=True` in 0.8.6 a no-op when `UndetectedAdapter` is already used?
 
-**Code-Analyse 0.8.6:**
+**Code analysis 0.8.6:**
 
 `browser_manager.py:763`:
 ```python
@@ -58,9 +56,9 @@ if self.config.enable_stealth and not self.use_undetected:
 use_undetected=isinstance(self.adapter, UndetectedAdapter)
 ```
 
-Wenn `UndetectedAdapter` verdrahtet ist, ist `use_undetected=True` → die Bedingung in `browser_manager.py:763` ist `True and not True = False` → `StealthAdapter` (playwright-stealth) wird NICHT geladen. Das ist kein Bug — es ist beabsichtigt: `UndetectedAdapter` (Patchright) ist der stärkere Mechanismus, playwright-stealth wäre redundant.
+When `UndetectedAdapter` is wired, `use_undetected=True` → the condition in `browser_manager.py:763` is `True and not True = False` → `StealthAdapter` (playwright-stealth) is NOT loaded. This is not a bug — it is intentional: `UndetectedAdapter` (Patchright) is the stronger mechanism, playwright-stealth would be redundant.
 
-**`enable_stealth=True` trägt trotzdem bei** via `browser_manager.py:95`:
+**`enable_stealth=True` still contributes** via `browser_manager.py:95`:
 ```python
 if not config.enable_stealth:
     flags.extend([
@@ -69,30 +67,30 @@ if not config.enable_stealth:
         "--disable-software-rasterizer",
     ])
 ```
-Mit `enable_stealth=True` werden diese Flags weggelassen → WebGL bleibt aktiv → Anti-Bot-Sensoren, die GPU-Abwesenheit als Headless-Signal verwenden, finden kein Signal. Komplementär zu Patchright, nicht redundant.
+With `enable_stealth=True`, these flags are omitted → WebGL stays active → anti-bot sensors that use GPU absence as a headless signal find no signal. Complementary to Patchright, not redundant.
 
-**Verhältnis zu GitHub Issue #1959:** #1959 betrifft den Fall, dass `enable_stealth` in bestimmten 0.8.x-Versionen ein vollständiger No-Op war (playwright-stealth wurde nicht korrekt geladen). Auf 0.8.6 trifft uns das NICHT: der playwright-stealth-Pfad über `StealthAdapter` wird bewusst übersprungen (weil `use_undetected=True`), aber der WebGL-GPU-Flags-Effekt von `enable_stealth` ist aktiv. Der UndetectedAdapter liefert die primäre Evasion via Patchright; `enable_stealth=True` ist ein kohärenter Zusatz, keine leere Annotation.
+**Relation to GitHub Issue #1959:** #1959 concerns the case where `enable_stealth` in certain 0.8.x versions was a complete no-op (playwright-stealth was not loaded correctly). On 0.8.6 this does NOT apply to us: the playwright-stealth path via `StealthAdapter` is deliberately skipped (because `use_undetected=True`), but the WebGL/GPU-flags effect of `enable_stealth` is active. UndetectedAdapter provides the primary evasion via Patchright; `enable_stealth=True` is a coherent addition, not an empty annotation.
 
-## Fastpath-Wegfall
+## Fastpath Removal
 
-Der httpx-Fastpath (`fetch_markdown_fastpath`) wurde entfernt. Begründung des Users: der Adoption-Probe (Mai 2026) hat gezeigt, dass die Adoption gering ist (~0% bei Nicht-Cloudflare-CF-Kunden). Use-Case des Scrapers ist ad-hoc Agent-Recherche mit 2-3 URLs — Zeit ist NICHT das Kriterium. Der zusätzliche `httpx`-Import und die HTTP-Round-Trip-Komplexität stehen in keinem Verhältnis zum selten greifenden Nutzen. Ship-and-Observe als Verifikationsmethode: Scraping-Qualität wird über `scrape_log.jsonl` (Outcome-Feld, garbage_type) im Alltag beobachtet, kein formales Pre-Merge-Eval.
+The httpx fastpath (`fetch_markdown_fastpath`) was removed. User's rationale: the adoption probe (May 2026) showed adoption was low (~0% on non-Cloudflare-CDN customers). The scraper's use case is ad-hoc agent research with 2-3 URLs — time is NOT the criterion. The added `httpx` import and HTTP round-trip complexity were disproportionate to the rarely-triggering benefit. Ship-and-observe as the verification method: scraping quality is observed in day-to-day use via `scrape_log.jsonl` (outcome field, garbage_type), no formal pre-merge eval.
 
-## Log-Schema-Entschlackung
+## Log Schema Simplification
 
-Parallel zur Code-Vereinfachung: Phasen-Felder aus dem JSONL-Record entfernt (`phases_attempted`, `fastpath_hit`, `fastpath_miss_reason`, `timings_ms.*` Phasen-Keys, `phase_used`). `phase_used` vollständig gestrichen — vollständig aus `outcome` ableitbar (`outcome="ok"` ↔ Erfolg). Cleaneres Schema ohne Redundanz. `timings_ms` enthält nur noch `total_wall`.
+Alongside the code simplification: phase fields removed from the JSONL record (`phases_attempted`, `fastpath_hit`, `fastpath_miss_reason`, `timings_ms.*` phase keys, `phase_used`). `phase_used` dropped entirely — fully derivable from `outcome` (`outcome="ok"` ↔ success). Cleaner schema without redundancy. `timings_ms` now contains only `total_wall`.
 
-## Verifikationsstrategie
+## Verification Strategy
 
-Ship-and-Observe. Kein formales Eval vor dem Merge — der User hat explizit entschieden, dass 1:1 in Prod übernommen wird. Beobachtung über:
-- `src/logs/scrape_log.jsonl`: `outcome`-Feld (garbage_type, empty vs ok Rate)
-- Anekdotische Qualitäts-Checks im Alltag (Agent-Recherche, 2-3 URLs pro Session)
-- Kein Rollback-Plan documented — bei systematischen Regressions: neues OldThemes-Phase.
+Ship-and-observe. No formal eval before merge — the user explicitly decided to adopt 1:1 in production. Observation via:
+- `src/logs/scrape_log.jsonl`: `outcome` field (garbage_type, empty vs ok rate)
+- Anecdotal quality checks in day-to-day use (agent research, 2-3 URLs per session)
+- No rollback plan documented — on systematic regressions: a new process-docs entry.
 
-## Erste Live-Verifikation (2026-06-01)
+## First Live Verification (2026-06-01)
 
-Post-Merge live-getestet über die Prod-CLI (`searxng-cli scrape_url`) an zwei gezielten Fällen aus einer DDG-Suche ("rag chunking strategies"):
+Post-merge, live-tested via the production CLI (`searxng-cli scrape_url`) on two targeted cases from a DDG search ("rag chunking strategies"):
 
-- **Medium** (`medium.com/@.../15-advanced-chunking-techniques-...`) — der harte Bot/Cookie/Login-Wall-Fall. Ergebnis: `outcome=ok`, voller Artikel (alle 15 Techniken im Sidecar), `total_wall` 4510ms, `garbage_type=null`, Pruning 13307→7037 Bytes (~47% Boilerplate). **Empirische Bestätigung der #1959-Schlussfolgerung:** die Stealth-Kombi (UndetectedAdapter/Patchright + `enable_stealth` GPU-Flags) hat Mediums Bot-Detection passiert — keine Login-Wall, echter Content. Restchrome oben (`Sign up`/`Get app`) + eine Cookie-Zeile unten = bekannter prune_048-Tradeoff, kein Content-Verlust.
-- **Microsoft Learn** (`learn.microsoft.com/.../rag-chunking-phase`) — JS-lastige Docs-SPA, `wait_until="load"`-Test. Ergebnis: voller gerenderter Artikel, am Ende `[Content truncated...]` durch den bestehenden 15K-`DEFAULT_MAX_CONTENT_LENGTH`-Cap (intendiert, kein Fehler). Ein generisches „requires authorization"-Banner erschien, blockierte den Content aber NICHT.
+- **Medium** (`medium.com/@.../15-advanced-chunking-techniques-...`) — the hard bot/cookie/login-wall case. Result: `outcome=ok`, full article (all 15 techniques in the sidecar), `total_wall` 4510ms, `garbage_type=null`, pruning 13307→7037 bytes (~47% boilerplate). **Empirical confirmation of the #1959 conclusion:** the stealth combo (UndetectedAdapter/Patchright + `enable_stealth` GPU flags) passed Medium's bot detection — no login wall, real content. Residual chrome at the top (`Sign up`/`Get app`) + one cookie line at the bottom = a known prune_048 tradeoff, not content loss.
+- **Microsoft Learn** (`learn.microsoft.com/.../rag-chunking-phase`) — JS-heavy docs SPA, `wait_until="load"` test. Result: full rendered article, ending with `[Content truncated...]` due to the existing 15K `DEFAULT_MAX_CONTENT_LENGTH` cap (intended, not an error). A generic "requires authorization" banner appeared but did NOT block the content.
 
-Beide bestätigen Determinismus (weit unter 60s-page_timeout), Vollständigkeit (`wait_until=load`) und No-Blocking (Stealth) am echten Traffic. Weiterer E2E-Testlauf folgt user-seitig.
+Both confirm determinism (well under the 60s page_timeout), completeness (`wait_until=load`), and no-blocking (stealth) on real traffic. Further E2E test run to follow, user-side.

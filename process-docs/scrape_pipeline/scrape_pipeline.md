@@ -1,5 +1,7 @@
 # Scrape Pipeline — Content Extraction
 
+*Snapshot as of 2026-06 — historical process record; the live current state is the source code, not this file.*
+
 ## Browser Strategy
 
 ### Current State
@@ -23,7 +25,7 @@
 
 ### Evidence
 
-Process narrative, iteration history and alternatives evaluation (networkidle timeout costs, hamster-wheel risk, enable_stealth/#1959 analysis): `decisions/OldThemes/scrape_phase_escalation/`
+Process narrative, iteration history and alternatives evaluation covered networkidle timeout costs, hamster-wheel risk, and enable_stealth/#1959 analysis (2026-05/06).
 
 Crawl4AI 0.8.6 API verification:
 - All `CrawlerRunConfig` parameters (`magic`, `wait_until`, `page_timeout`, `max_retries`) present in `async_configs.py:1399–1519`
@@ -197,7 +199,7 @@ Recovery condition: stripped content must (a) differ from original and (b) pass 
 
 **Session findings:**
 - CookieYes cky-modal fix, TDS cookie wall, LanceDB 404, truncation logic (2026-03)
-- Phase-escalation analysis, networkidle timeout costs, ship-and-observe decision (2026-05/06): `decisions/OldThemes/scrape_phase_escalation/`
+- Phase-escalation analysis, networkidle timeout costs, ship-and-observe decision (2026-05/06)
 
 **To index (for systematic improvement):**
 - Crawl4AI GitHub Issues "stealth" — UndetectedAdapter bugs, browser detection: https://github.com/unclecode/crawl4ai/issues?q=stealth+undetected

@@ -1,5 +1,7 @@
 # Search Pipeline
 
+*Snapshot as of 2026-06 — historical process record; the live current state is the source code, not this file.*
+
 ## Engines
 
 ### Current State
@@ -24,7 +26,7 @@
 
 ² `ENGINE_WATCHDOG_OVERRIDE` entries in `search_web.py`: `semantic_scholar` 5.0s (CSR React hydration 0.5-2.5s), `crossref` 6.0s (API response 1-5s range), `open_library` 6.0s (server-dominated latency 1.4-5.8s). All others use `ENGINE_WATCHDOG_TIMEOUT = 3.6s`.
 
-**Rate limiting:** `max_requests=4, window_seconds=60` configured in every engine file's INFRASTRUCTURE section (via `get_limiter()` call at import time). `RATE_WAIT_TIMEOUT = 60.0` in `search_web.py` — outer `asyncio.wait_for` guard on `acquire()` calls; dormant under normal 4 req/min load, guards against token-bucket saturation. See `decisions/rate_limiting.md`.
+**Rate limiting:** `max_requests=4, window_seconds=60` configured in every engine file's INFRASTRUCTURE section (via `get_limiter()` call at import time). `RATE_WAIT_TIMEOUT = 60.0` in `search_web.py` — outer `asyncio.wait_for` guard on `acquire()` calls; dormant under normal 4 req/min load, guards against token-bucket saturation.
 
 **Bucket-uniformity invariant:** All 9 engines fire on every query regardless of filter mode. `--books` / `--pdf` / `--docs` apply only per-engine query modifiers and post-merge URL filtering — never restrict which engines participate. `apply_filter_mode()` in `filter_modes.py` returns `excluded={}` in all code paths.
 
@@ -32,32 +34,32 @@
 
 **Plugin engines** (not in `ENGINES` dict, not in this pipeline): ArXiv, GitHub, Reddit — URL discovery via MCP plugins; content fetched by dedicated plugin.
 
-**Tab teardown:** `kill_tab()` in `src/search/browser.py` — calls `_browser._execute_command(TargetCommands.close_target(target_id))` over the browser-level WebSocket (separate from the tab connection). Called in `finally` of all 5 pydoll engine `search_with_reason()` methods. Replaced `tab.close()` (`Page.close` via tab connection → hung renderer → pydoll 60s fallback → 65s total on NONCOOP). 5s `asyncio.wait_for` cap on `close_target` guards against wedged browser channel. Rationale: `decisions/OldThemes/pydoll_noncoop_teardown/01_teardown_design.md`.
+**Tab teardown:** `kill_tab()` in `src/search/browser.py` — calls `_browser._execute_command(TargetCommands.close_target(target_id))` over the browser-level WebSocket (separate from the tab connection). Called in `finally` of all 5 pydoll engine `search_with_reason()` methods. Replaced `tab.close()` (`Page.close` via tab connection → hung renderer → pydoll 60s fallback → 65s total on NONCOOP). 5s `asyncio.wait_for` cap on `close_target` guards against wedged browser channel.
 
 **`_diagnose_empty` title-keyword check:** Removed from `google.py`, `duckduckgo.py`, `semantic_scholar.py` (dead code for modern reCAPTCHA Enterprise; prior robust block-detection runs before `_diagnose_empty` in all three). Retained in `mojeek.py`, `lobsters.py` (sole `EMPTY_BLOCK` detection path).
 
 ### Evidence
 
-Per-engine implementation probes and smoke baselines — `decisions/OldThemes/engine_expansion_2026-05/`:
+Per-engine implementation probes and smoke baselines (2026-05):
 
-| Engine | OldThemes file | Key finding |
-|--------|---------------|-------------|
-| google | _(pre-engine-cut baseline)_ | DOM selectors in `config.yml`; no browser changes post-cut |
-| duckduckgo | `duckduckgo.md` | URL cleaning required (uddg param); no consent banner |
-| mojeek | `mojeek.md` | 403 at >1.2 req/s burst; 4 req/min safe; arc=none param |
-| lobsters | `lobsters.md` | No body text on search page; snippet = domain label |
-| semantic_scholar | `semantic_scholar.md` | TLDR selector (DOM drift 2026-05-08); CSR watchdog 5.0s |
-| crossref | _(HTTP API, no probe needed)_ | 4 req/min; `rows=` param; watchdog 6.0s |
-| openalex | `openalex.md` | Abstract inverted index reconstruction; `mailto=` polite pool |
-| stack_exchange | `stack_exchange.md` | 300 req/day anon; `filter=withbody`; 15/30 smoke OK |
-| open_library | `open_library.md` | A/B: 9/10 book queries widened; 81.2 avg OL URLs; watchdog 6.0s |
-| bing | `bing_dropped.md` | Dropped 2026-05-04: DOM drift + no added value over DDG |
-| HN | `hn_dropped.md` | Dropped 2026-05-04: cascade-hostile empty-backoff mechanism |
-| Scholar | `scholar_reeval.md` | _JS_PARSE fix 2026-05-03; removed 2026-05-21 (see below) |
+| Engine | Key finding |
+|--------|-------------|
+| google | _(pre-engine-cut baseline)_ DOM selectors in `config.yml`; no browser changes post-cut |
+| duckduckgo | URL cleaning required (uddg param); no consent banner |
+| mojeek | 403 at >1.2 req/s burst; 4 req/min safe; arc=none param |
+| lobsters | No body text on search page; snippet = domain label |
+| semantic_scholar | TLDR selector (DOM drift 2026-05-08); CSR watchdog 5.0s |
+| crossref | _(HTTP API, no probe needed)_ 4 req/min; `rows=` param; watchdog 6.0s |
+| openalex | Abstract inverted index reconstruction; `mailto=` polite pool |
+| stack_exchange | 300 req/day anon; `filter=withbody`; 15/30 smoke OK |
+| open_library | A/B: 9/10 book queries widened; 81.2 avg OL URLs; watchdog 6.0s |
+| bing | Dropped 2026-05-04: DOM drift + no added value over DDG |
+| HN | Dropped 2026-05-04: cascade-hostile empty-backoff mechanism |
+| Scholar | _JS_PARSE fix 2026-05-03; removed 2026-05-21 (see below) |
 
-**Scholar removal + uniformity invariant rationale:** `decisions/OldThemes/bee_cdp_starvation/fix_summary.md` — Phase 3 probe identified tokencap-path as primary cascade mechanism. RATE_WAIT_TIMEOUT=60 + Scholar removal + bucket-uniformity eliminated RATE_SKIP cascade. 20-query smoke post-fix: 0 RATE_SKIP events, 294s total wall (9 engines × 20 queries).
+**Scholar removal + uniformity invariant rationale:** a Phase 3 probe identified the tokencap-path as the primary cascade mechanism. RATE_WAIT_TIMEOUT=60 + Scholar removal + bucket-uniformity eliminated the RATE_SKIP cascade. 20-query smoke post-fix: 0 RATE_SKIP events, 294s total wall (9 engines × 20 queries).
 
-**No-backoff baseline (post-removal, 2026-05-22):** `dev/search_pipeline/01_reports/no_backoff_baseline_20260522_211439.md` — 30/30 queries with results, 0 RATE_SKIP events. See `decisions/rate_limiting.md` Evidence.
+**No-backoff baseline (post-removal, 2026-05-22):** `dev/search_pipeline/01_reports/no_backoff_baseline_20260522_211439.md` — 30/30 queries with results, 0 RATE_SKIP events.
 
 ### Open Questions
 
@@ -90,7 +92,7 @@ google_count = len(pools.get("google", []))
 K = google_count if google_count > 0 else 10
 capped_pools = {eng: pool[:K] for eng, pool in pools.items()}
 ```
-Each engine's pool is trimmed to `pool[:K]`. Engines with fewer than K URLs are unaffected. K = google's dedup-pool size; fallback K=10 when google returned 0 results (CAPTCHA) or was not in the selected engine set. Both `_format_breakdown` and `cache_write` receive `capped_pools`. Rationale: CrossRef/OpenAlex return up to 200 URLs, Stack Exchange up to 100, Open Library up to 100 — uncapped drilldown would flood context. The google-anchored K provides a natural, query-adaptive bound (typical 8-11 URLs). The capped-pool idea originates from `decisions/OldThemes/pooling/05_capped_pool_probe.md` (Phase 9 probe, K=google_count architecture) — not shipped then because the broader pooling investigation was abandoned; reintroduced now in the two-call architecture as a sanity bound on drilldown context size.
+Each engine's pool is trimmed to `pool[:K]`. Engines with fewer than K URLs are unaffected. K = google's dedup-pool size; fallback K=10 when google returned 0 results (CAPTCHA) or was not in the selected engine set. Both `_format_breakdown` and `cache_write` receive `capped_pools`. Rationale: CrossRef/OpenAlex return up to 200 URLs, Stack Exchange up to 100, Open Library up to 100 — uncapped drilldown would flood context. The google-anchored K provides a natural, query-adaptive bound (typical 8-11 URLs). The capped-pool idea originates from an earlier Phase 9 probe (K=google_count architecture) — not shipped then because the broader pooling investigation was abandoned; reintroduced now in the two-call architecture as a sanity bound on drilldown context size.
 
 **Cache schema (`~/.cache/searxng/<key>.json`, 1h TTL, atomic write):**
 ```json
@@ -138,7 +140,7 @@ Use `searxng-cli search_engine_drilldown "rust async runtime" --engine <name>` t
 
 ### Evidence
 
-**Pivot rationale:** `decisions/OldThemes/pooling/10_eyeball_engine_provenance.md` (Phase 13.5) — 12-method eval with M11 winner (Jaccard 0.259). Eyeball test showed 30/39 useful (77%) but general-mode worst-case 5/10 useful + 2 SEO-Spam. Engine-provenance analysis showed per-engine signal varies dramatically (DDG 24.4% signal%, Lobsters 0% in the probe). Pooling-as-unified-ranking aborted; pivot to engine-breakdown + drilldown for user-driven engine selection.
+**Pivot rationale:** a Phase 13.5 12-method eval had M11 as winner (Jaccard 0.259). Eyeball test showed 30/39 useful (77%) but general-mode worst-case 5/10 useful + 2 SEO-Spam. Engine-provenance analysis showed per-engine signal varies dramatically (DDG 24.4% signal%, Lobsters 0% in the probe). Pooling-as-unified-ranking aborted; pivot to engine-breakdown + drilldown for user-driven engine selection.
 
 **Pre-migration snippet quality data** (retained for reference, from `dev/search_pipeline/01_reports/snippet_quality_20260505_223506.md`):
 
@@ -165,8 +167,4 @@ Engine snippet quality differences now visible to the user via drilldown (they c
 | `src/search/search_web.py` | ENGINES dict, ENGINE_WATCHDOG_OVERRIDE, RATE_WAIT_TIMEOUT — ground truth |
 | `src/search/filter_modes.py` | _DEFAULT_ENGINES, apply_filter_mode() — uniformity invariant |
 | `src/search/engines/*.py` | Per-engine max_requests=4/60s |
-| `decisions/OldThemes/engine_expansion_2026-05/` | Per-engine implementation history |
-| `decisions/OldThemes/bee_cdp_starvation/fix_summary.md` | Cascade fix rationale, Scholar removal, uniformity |
-| `decisions/rate_limiting.md` | RATE_WAIT_TIMEOUT policy, fail-fast, no-backoff baseline |
-| `decisions/OldThemes/pooling/10_eyeball_engine_provenance.md` | Phase 13.5 eyeball test + engine-provenance analysis; pivot rationale |
 | `dev/search_pipeline/01_reports/snippet_quality_20260505_223506.md` | Pre-migration per-source snippet quality data |

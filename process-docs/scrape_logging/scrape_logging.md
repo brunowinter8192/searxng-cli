@@ -1,5 +1,7 @@
 # Scrape Pipeline — Per-URL Logging
 
+*Snapshot as of 2026-06 — historical process record; the live current state is the source code, not this file.*
+
 ## Per-URL Scrape Log
 
 ### Current State
