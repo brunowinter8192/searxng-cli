@@ -1,429 +1,429 @@
 # Stealth
 
-> **Demoted to OldThemes 2026-05-28 (research-inventory artifact).** Active production-stealth code paths in the current codebase are: (a) src/search/browser.py — JS_FINGERPRINT_PATCHES (screen-dimensions, devicePixelRatio, getComputedStyle CSS Color-Patch), REAL_USER_AGENT override, Chrome anti-detection flags (--disable-blink-features=AutomationControlled, webrtc_leak_protection) — applied per tab via apply_fingerprint_patches(); documented in src/search/DOCS.md (Stealth Decisions section); (b) src/scraper/scrape_url.py Phase-2 fallback — BrowserConfig(enable_stealth=True) + UndetectedAdapter; documented in decisions/scrape_pipeline.md → Browser Strategy. The remainder of this file is cross-layer detection-knowledge inventory and historical engine-status snapshots (pre-engine-cut 2026-04 SearXNG stack, Brave drop-decision). Kept as research reference.
+> **Demoted to historical-inventory 2026-05-28 (research-inventory artifact).** As of 2026-05-28, active production-stealth code paths in the codebase were: (a) src/search/browser.py — JS_FINGERPRINT_PATCHES (screen-dimensions, devicePixelRatio, getComputedStyle CSS Color-Patch), REAL_USER_AGENT override, Chrome anti-detection flags (--disable-blink-features=AutomationControlled, webrtc_leak_protection) — applied per tab via apply_fingerprint_patches(); (b) src/scraper/scrape_url.py Phase-2 fallback — BrowserConfig(enable_stealth=True) + UndetectedAdapter. The remainder of this file is cross-layer detection-knowledge inventory and historical engine-status snapshots (pre-engine-cut 2026-04 SearXNG stack, Brave drop-decision). Kept as research reference.
 
 Applies to: `src/search/` (pydoll-based custom engine) + `dev/search_pipeline/` (test suite)
 
 ## Detection Layers — Overview
 
-| # | Ebene | Was geprüft wird | Unsere Stellschrauben | Status |
+| # | Layer | What is checked | Our knobs | Status |
 |---|-------|-------------------|----------------------|--------|
-| 1 | **Browser-Fingerprint** | webdriver-Flag, WebGL vendor/renderer, Canvas Hash, navigator.plugins, chrome.runtime, Screen-Dimensionen, Permissions API, CSS media queries | screen/DPR/outer/css JS-Patches, `disable_blink_features=AutomationControlled` | 4/4 aktive Patches ON. WebGL, Canvas, chrome.runtime, navigator.plugins nicht implementiert |
-| 2 | **Behavioral** | Request-Timing, fehlende Mausbewegung/Scrolling, Klick-Muster | `humanize_click`, `humanize_type`, `humanize_scroll` | Alle OFF |
-| 3 | **Session-Tracking** | Cookie-Tracking über Queries, Cookie-Walls | SOCS consent cookie via CDP per Tab, `use_context` | SOCS ON, use_context OFF |
-| 4 | **IP-Reputation** | Datacenter-IPs, VPN/Tor Exit-Nodes, Proxy-Listen | `proxy` per Engine | Direct only. Kein Proxy. |
-| 5 | **Rate-Limiting** | X Requests/Zeitfenster pro IP | `delay_between_queries` | 0 — kein Delay (bewusst) |
-| 6 | **TLS/HTTP-Fingerprint** | JA3 Hash, HTTP/2 Frame-Order, Header-Order | Nicht steuerbar — Chrome ist Chrome | OK (Chrome TLS ist real) |
-| 7 | **CAPTCHA** | PoW (Brave), reCAPTCHA, hCaptcha | `captcha_path` URL-Erkennung | Detect-only, kein Solving |
+| 1 | **Browser Fingerprint** | webdriver flag, WebGL vendor/renderer, Canvas hash, navigator.plugins, chrome.runtime, screen dimensions, Permissions API, CSS media queries | screen/DPR/outer/css JS patches, `disable_blink_features=AutomationControlled` | 4/4 active patches ON. WebGL, Canvas, chrome.runtime, navigator.plugins not implemented |
+| 2 | **Behavioral** | Request timing, missing mouse movement/scrolling, click patterns | `humanize_click`, `humanize_type`, `humanize_scroll` | All OFF |
+| 3 | **Session Tracking** | Cookie tracking across queries, cookie walls | SOCS consent cookie via CDP per tab, `use_context` | SOCS ON, use_context OFF |
+| 4 | **IP Reputation** | Datacenter IPs, VPN/Tor exit nodes, proxy lists | `proxy` per engine | Direct only. No proxy. |
+| 5 | **Rate Limiting** | X requests/window per IP | `delay_between_queries` | 0 — no delay (deliberate) |
+| 6 | **TLS/HTTP Fingerprint** | JA3 hash, HTTP/2 frame order, header order | Not controllable — Chrome is Chrome | OK (Chrome TLS is real) |
+| 7 | **CAPTCHA** | PoW (Brave), reCAPTCHA, hCaptcha | `captcha_path` URL detection | Detect-only, no solving |
 
-## Stellschrauben-Inventar
+## Knob Inventory
 
 ### Global (config.yml + 01_google_smoke.py)
 
-| Stellschraube | Ebene | Default (Baseline) | Effekt |
+| Knob | Layer | Default (baseline) | Effect |
 |---------------|-------|--------------------|--------|
-| `disable_blink_features: AutomationControlled` | 1 | ON ✅ | Entfernt `navigator.webdriver=true` |
-| `js_patches.screen_dimensions` | 1 | ON ✅ | screen.width/height/availWidth/availHeight/colorDepth/pixelDepth Override |
-| `js_patches.device_pixel_ratio` | 1 | ON ✅ | window.devicePixelRatio = 2 |
-| `js_patches.outer_dimensions` | 1 | ON ✅ | window.outerWidth/outerHeight Override |
-| `js_patches.css_active_text` | 1 | ON ✅ | getComputedStyle Proxy — headless CSS-Color-Leak maskiert |
-| `webrtc_leak_protection` | 1/4 | ON ✅ | Verhindert IP-Leak via WebRTC |
-| WebGL vendor override | 1 | OFF ❌ | WebGL vendor/renderer Override (Apple M1 Pro) |
-| Canvas noise | 1 | OFF ❌ | Subtile Canvas-Fingerprint-Randomisierung |
-| Permissions override | 1 | OFF ❌ | Permissions.query Override für Notifications |
-| chrome.runtime masking | 1 | NICHT IMPLEMENTIERT | chrome.runtime Object Spoofing |
-| navigator.plugins spoofing | 1 | NICHT IMPLEMENTIERT | Fake Plugin-Liste für headless |
-| `block_popups` | 2 | ON ✅ | Blockiert Pop-ups (kein Behavioral-Signal) |
-| `block_notifications` | 2 | ON ✅ | Blockiert Notification-Requests |
-| `humanize_click` | 2 | NICHT IMPLEMENTIERT | Menschenähnliche Klick-Muster |
-| `humanize_type` | 2 | NICHT IMPLEMENTIERT | Menschenähnliches Tippen |
-| `humanize_scroll` | 2 | NICHT IMPLEMENTIERT | Scroll mit Easing/Jitter |
-| SOCS consent cookie | 3 | ON ✅ | CDP NetworkCommands.set_cookie pro Tab — bypassed Google Cookie-Wall |
-| `use_context` | 3 | OFF ❌ | Frischer Browser-Context pro Query (Cookie-Isolation) |
-| `delay_between_queries` | 5 | 0 ❌ | Pause zwischen Queries — 0 = kein Delay (bewusst) — Break bei ~90 queries/10min back-to-back → [Layer 5](#layer-5-rate-limiting) Batch 1 |
-| `page_load_timeout` | 5 | 20s | Max Navigation-Wartezeit |
+| `disable_blink_features: AutomationControlled` | 1 | ON ✅ | Removes `navigator.webdriver=true` |
+| `js_patches.screen_dimensions` | 1 | ON ✅ | Overrides screen.width/height/availWidth/availHeight/colorDepth/pixelDepth |
+| `js_patches.device_pixel_ratio` | 1 | ON ✅ | Sets window.devicePixelRatio = 2 |
+| `js_patches.outer_dimensions` | 1 | ON ✅ | Overrides window.outerWidth/outerHeight |
+| `js_patches.css_active_text` | 1 | ON ✅ | getComputedStyle proxy — masks headless CSS color leak |
+| `webrtc_leak_protection` | 1/4 | ON ✅ | Prevents IP leak via WebRTC |
+| WebGL vendor override | 1 | OFF ❌ | WebGL vendor/renderer override (Apple M1 Pro) |
+| Canvas noise | 1 | OFF ❌ | Subtle canvas fingerprint randomization |
+| Permissions override | 1 | OFF ❌ | Permissions.query override for notifications |
+| chrome.runtime masking | 1 | NOT IMPLEMENTED | chrome.runtime object spoofing |
+| navigator.plugins spoofing | 1 | NOT IMPLEMENTED | Fake plugin list for headless |
+| `block_popups` | 2 | ON ✅ | Blocks pop-ups (no behavioral signal) |
+| `block_notifications` | 2 | ON ✅ | Blocks notification requests |
+| `humanize_click` | 2 | NOT IMPLEMENTED | Human-like click patterns |
+| `humanize_type` | 2 | NOT IMPLEMENTED | Human-like typing |
+| `humanize_scroll` | 2 | NOT IMPLEMENTED | Scroll with easing/jitter |
+| SOCS consent cookie | 3 | ON ✅ | CDP NetworkCommands.set_cookie per tab — bypasses Google cookie wall |
+| `use_context` | 3 | OFF ❌ | Fresh browser context per query (cookie isolation) |
+| `delay_between_queries` | 5 | 0 ❌ | Pause between queries — 0 = no delay (deliberate) — break at ~90 queries/10min back-to-back → [Layer 5](#layer-5-rate-limiting) Batch 1 |
+| `page_load_timeout` | 5 | 20s | Max navigation wait time |
 
-### Per-Engine (in config.yml google-Section)
+### Per-Engine (in config.yml google section)
 
-| Stellschraube | Ebene | Effekt |
+| Knob | Layer | Effect |
 |---------------|-------|--------|
-| `proxy` | 4 | None (direkt) — kein Proxy konfiguriert |
-| `consent_cookie` | 3 | SOCS Cookie + Fallback consent_buttons für Google |
-| `wait_for_results` | 2/5 | Max 15 Zyklen × 1s — kein aggressives Polling |
-| `consent_settle` | 2 | 2s Settle nach Consent-Handling |
+| `proxy` | 4 | None (direct) — no proxy configured |
+| `consent_cookie` | 3 | SOCS cookie + fallback consent_buttons for Google |
+| `wait_for_results` | 2/5 | Max 15 cycles × 1s — no aggressive polling |
+| `consent_settle` | 2 | 2s settle after consent handling |
 
-## Engine-Status
+## Engine Status
 
-### Stresstest 2026-04-07 (Legacy — 9-Engine SearXNG-Stack)
+### Stress Test 2026-04-07 (Legacy — 9-Engine SearXNG Stack)
 
-| Engine | Score | Hauptproblem | Erkennungsebene | Routing |
+| Engine | Score | Main Problem | Detection Layer | Routing |
 |--------|-------|-------------|-----------------|---------|
 | Google | 30/30 ✅ | — | — | direct, consent_cookie |
 | Bing | 30/30 ✅ | — | — | direct |
 | CrossRef | 30/30 ✅ | — | — | httpx API |
-| Mojeek | 15/30 ⚠️ | Block ab Query 16 | Rate-Limiting (IP) | direct |
-| DuckDuckGo | 6/30 ⚠️ | Bing-Redirect | Package-Bug (ddgs) | httpx |
-| Brave | 1/30 ❌ | PoW CAPTCHA ab Query 2 | Fingerprint + Rate-Limiting | direct (Tor = 0/30) |
-| Startpage | 0/30 ❌ | Zero results, kein Error | Unklar | direct |
-| Google Scholar | 0/0 ❌ | Engine-Crash | Unklar | direct |
-| Semantic Scholar | 3/30 ❌ | 429 Rate-Limit | Rate-Limiting (API) | httpx API |
+| Mojeek | 15/30 ⚠️ | Block from query 16 | Rate-limiting (IP) | direct |
+| DuckDuckGo | 6/30 ⚠️ | Bing redirect | Package bug (ddgs) | httpx |
+| Brave | 1/30 ❌ | PoW CAPTCHA from query 2 | Fingerprint + rate-limiting | direct (Tor = 0/30) |
+| Startpage | 0/30 ❌ | Zero results, no error | Unclear | direct |
+| Google Scholar | 0/0 ❌ | Engine crash | Unclear | direct |
+| Semantic Scholar | 3/30 ❌ | 429 rate-limit | Rate-limiting (API) | httpx API |
 
-### Neue Baseline 2026-04-21 (pydoll custom stack, single-engine)
+### New Baseline 2026-04-21 (pydoll custom stack, single-engine)
 
 | Engine | Score | Stack | Config |
 |--------|-------|-------|--------|
-| Google | 30/30 ✅ | headless pydoll Chrome, SOCS cookie, 4 JS-Patches | `dev/search_pipeline/config.yml` + `01_google_smoke.py` |
+| Google | 30/30 ✅ | headless pydoll Chrome, SOCS cookie, 4 JS patches | `dev/search_pipeline/config.yml` + `01_google_smoke.py` |
 
-Dieser Run ist die aktuelle Referenz-Baseline. (Report deleted, see git history at 1ad627f.)
+This run was the reference baseline at the time. (Report deleted, see git history at 1ad627f.)
 
 ## Dropped Engines — Final Verdict
 
-| Engine | Score | Grund |
+| Engine | Score | Reason |
 |--------|-------|-------|
-| Brave | 1–10/30 | PoW CAPTCHA, keine Kombination erreicht 30/30 — siehe Rationale unten |
-| Startpage | 0/30 | Zero Results, Root Cause unklar |
-| DuckDuckGo | 6/30 | Redirect zu Bing via ddgs-Bug |
-| Mojeek | 15/30 | IP-basiertes Rate-Limit (15 req/60s, nicht umgehbar) |
-| Semantic Scholar | 3/30 | 429 Rate-Limit (API) |
+| Brave | 1–10/30 | PoW CAPTCHA, no combination reached 30/30 — see rationale below |
+| Startpage | 0/30 | Zero results, root cause unclear |
+| DuckDuckGo | 6/30 | Redirect to Bing via ddgs bug |
+| Mojeek | 15/30 | IP-based rate-limit (15 req/60s, not bypassable) |
+| Semantic Scholar | 3/30 | 429 rate-limit (API) |
 
-**Survivor-Set (aktiv in `src/search/`):** ~~Google, Bing, Google Scholar, CrossRef~~ — **historisch, vor Engine-Expansion**.
+**Survivor set (active in `src/search/`):** ~~Google, Bing, Google Scholar, CrossRef~~ — **historical, pre-engine-expansion**.
 
-**Aktueller Stand (2026-05-04):** 8 aktive Engines im 4 req/min uniform Rate-Limit-Pool — Google, DuckDuckGo, Mojeek, Lobsters (Browser via pydoll); Google Scholar (Browser, JS-Fix 2026-05-04); CrossRef, OpenAlex, Stack Exchange (HTTP-API). Bing: src/search/engines/bing.py deleted 2026-05-04 (DOM-drift, no added value over DDG — see `decisions/OldThemes/engine_expansion_2026-05/bing_dropped.md`). HN dropped 2026-05-04 (rate-limit-cascade-hostile — see `decisions/OldThemes/engine_expansion_2026-05/hn_dropped.md`). Vollständige Engine-Expansion-Historie: `decisions/OldThemes/engine_expansion_2026-05/`.
+**As of 2026-05-04:** 8 active engines in a uniform 4 req/min rate-limit pool — Google, DuckDuckGo, Mojeek, Lobsters (browser via pydoll); Google Scholar (browser, JS fix 2026-05-04); CrossRef, OpenAlex, Stack Exchange (HTTP API). Bing: src/search/engines/bing.py deleted 2026-05-04 (DOM-drift, no added value over DDG). HN dropped 2026-05-04 (rate-limit-cascade-hostile).
 
-**Update 2026-05-09:** Google Scholar Browser → HTTP migration (bead `searxng-f3i`). Scholar aus `_DEFAULT_ENGINES` ausgeschlossen wegen Google-Co-Fire-Decoupling — dormant in default queries bis Pooling-Rework. Plus Semantic Scholar (browser, added 2026-05-07) und Open Library (HTTP, 2026-05-08). Aktueller Default-Set: 9 Engines (Google, DDG, Mojeek, Lobsters, SemScholar via Browser; CrossRef, OpenAlex, StackExchange, Open Library via HTTP). Siehe `decisions/OldThemes/scholar_decoupling/20260509.md`.
+**Update 2026-05-09:** Google Scholar browser → HTTP migration (bead `searxng-f3i`). Scholar excluded from `_DEFAULT_ENGINES` due to Google co-fire decoupling — dormant in default queries until pooling-rework. Plus Semantic Scholar (browser, added 2026-05-07) and Open Library (HTTP, 2026-05-08). Engine set at that point: 9 engines (Google, DDG, Mojeek, Lobsters, SemScholar via browser; CrossRef, OpenAlex, StackExchange, Open Library via HTTP).
 
-### Brave — Drop-Entscheidung & Rationale
+### Brave — Drop Decision & Rationale
 
-**Entscheidung: Brave wird gedroppt.**
+**Decision: Brave is dropped.**
 
-Kern-Grund: Alle CAPTCHA-Lösungen (Warten, Klick-Lösung, API) sind inkompatibel mit der `asyncio.gather` Parallel-Engine-Architektur in `src/search/search_web.py`. Google liefert in ~0.2s. Ein Brave-CAPTCHA erzeugt 10–15s Minimum-Latenz pro Query — macht die gesamte Search-Response unbrauchbar.
+Core reason: All CAPTCHA solutions (waiting, click-solving, API) are incompatible with the `asyncio.gather` parallel-engine architecture in `src/search/search_web.py`. Google delivers in ~0.2s. A Brave CAPTCHA generates 10–15s minimum latency per query — makes the entire search response unusable.
 
-Getestet und verworfen:
-- Stealth-Patch-Matrix (8 Kombinationen, beste: WebGL +7 → 10/30) — Tabelle in [Layer 1: Browser-Fingerprint](#layer-1-browser-fingerprint)
-- Patchright mit Chromium Binary → Slider CAPTCHA statt PoW, 0/30
+Tested and rejected:
+- Stealth patch matrix (8 combinations, best: WebGL +7 → 10/30) — table in [Layer 1: Browser Fingerprint](#layer-1-browser-fingerprint)
+- Patchright with Chromium binary → slider CAPTCHA instead of PoW, 0/30
 - Camoufox (Firefox, headless) → 7/30
-- PoW Reverse-Engineering (Argon2 + Privacy Pass VOPRF) — lösbar, aber Latenz-Problem bleibt
-- Brave Search API (2K/Monat gratis) — kein CAPTCHA, aber Latenz-Architektur-Problem bleibt
+- PoW reverse-engineering (Argon2 + Privacy Pass VOPRF) — solvable, but latency problem remains
+- Brave Search API (2K/month free) — no CAPTCHA, but latency-architecture problem remains
 
-### Wie Brave-Arbeit fortgesetzt werden kann
+### How Brave Work Could Be Resumed
 
-Voraussetzungen für Resume:
-1. Architektur-Problem lösen: Brave aus `asyncio.gather` raus (eigener Timeout, Fallback auf restliche 3 Engines)
-2. Patchright mit echtem Chrome Binary testen (`patchright install chrome` + `channel="chrome"` + `headless=True`) — wurde nie korrekt getestet
-3. Alternativ: Brave Search API evaluieren
+Prerequisites for resume:
+1. Solve the architecture problem: take Brave out of `asyncio.gather` (own timeout, fallback to remaining 3 engines)
+2. Test Patchright with real Chrome binary (`patchright install chrome` + `channel="chrome"` + `headless=True`) — never correctly tested
+3. Alternatively: evaluate Brave Search API
 
 ## Referenced Files
 
-- `dev/search_pipeline/01_google_smoke.py` — Baseline-Implementation
-- `dev/search_pipeline/config.yml` — Baseline-Config
-- dev/search_pipeline/01_reports/smoke_20260421_022343.md (deleted, see git 1ad627f) — 30/30 Baseline-Run
-- dev/search_pipeline/01_reports/smoke_20260421_182917.md (deleted, see git 1ad627f) — 28/30 Re-verify Run
+- `dev/search_pipeline/01_google_smoke.py` — baseline implementation
+- `dev/search_pipeline/config.yml` — baseline config
+- dev/search_pipeline/01_reports/smoke_20260421_022343.md (deleted, see git 1ad627f) — 30/30 baseline run
+- dev/search_pipeline/01_reports/smoke_20260421_182917.md (deleted, see git 1ad627f) — 28/30 re-verify run
 
 ---
 
-## Layer 1: Browser-Fingerprint
+## Layer 1: Browser Fingerprint
 
-### Status Quo (IST)
+### Status Quo
 
 #### Baseline Mapping (2026-04-21)
 
 Basis: `dev/search_pipeline/config.yml` + `dev/search_pipeline/01_google_smoke.py`.
 
 **ON:**
-- `--disable-blink-features=AutomationControlled` — entfernt `navigator.webdriver=true` Flag
-- `screen_dimensions` patch — überschreibt `screen.width/height/availWidth/availHeight/colorDepth/pixelDepth` (1920×1080, colorDepth=30)
-- `device_pixel_ratio` patch — setzt `window.devicePixelRatio = 2`
-- `outer_dimensions` patch — setzt `window.outerWidth = innerWidth`, `window.outerHeight = innerHeight + 85`
-- `css_active_text` patch — `getComputedStyle` Proxy maskiert headless-typischen CSS-Color-Wert (rgb(255,0,0) → rgb(0,102,204))
-- User-Agent: Chrome 147 via `--user-agent=` CLI-Argument
-- `webrtc_leak_protection: true` (pydoll-Attribut)
-- Alle 4 JS-Patches via `PageCommands.add_script_to_evaluate_on_new_document` — injiziert sowohl beim Browserstart (initial tab) als auch per neuem Tab in `run_query()`
+- `--disable-blink-features=AutomationControlled` — removes the `navigator.webdriver=true` flag
+- `screen_dimensions` patch — overrides `screen.width/height/availWidth/availHeight/colorDepth/pixelDepth` (1920×1080, colorDepth=30)
+- `device_pixel_ratio` patch — sets `window.devicePixelRatio = 2`
+- `outer_dimensions` patch — sets `window.outerWidth = innerWidth`, `window.outerHeight = innerHeight + 85`
+- `css_active_text` patch — `getComputedStyle` proxy masks the headless-typical CSS color value (rgb(255,0,0) → rgb(0,102,204))
+- User-Agent: Chrome 147 via `--user-agent=` CLI argument
+- `webrtc_leak_protection: true` (pydoll attribute)
+- All 4 JS patches via `PageCommands.add_script_to_evaluate_on_new_document` — injected both at browser start (initial tab) and per new tab in `run_query()`
 
 **OFF:**
-- `patch_webgl` — WebGL vendor/renderer Override nicht konfiguriert
-- `patch_canvas_noise` — Canvas-Fingerprint-Randomisierung nicht konfiguriert
-- `patch_permissions` — Permissions.query Override nicht konfiguriert
+- `patch_webgl` — WebGL vendor/renderer override not configured
+- `patch_canvas_noise` — canvas fingerprint randomization not configured
+- `patch_permissions` — Permissions.query override not configured
 
-**NICHT IMPLEMENTIERT:**
-- chrome.runtime Object Masking (kein `window.chrome.runtime` Spoof)
-- navigator.plugins Spoofing (leere Plugin-Liste in headless bleibt sichtbar)
-- navigator.userAgentData brands Override (`Chromium` vs `Google Chrome`)
+**NOT IMPLEMENTED:**
+- chrome.runtime object masking (no `window.chrome.runtime` spoof)
+- navigator.plugins spoofing (empty plugin list in headless remains visible)
+- navigator.userAgentData brands override (`Chromium` vs `Google Chrome`)
 
 #### Detection Surface
 
-Was Layer 1 prüft:
+What Layer 1 checks:
 
-| Signal | Was erkannt wird | Unser Control |
+| Signal | What is detected | Our control |
 |--------|-----------------|---------------|
-| `navigator.webdriver` | `true` in headless | ✅ AutomationControlled entfernt es |
-| Screen-Dimensionen | `screen.width/height = 0` in headless | ✅ Patch auf 1920×1080 |
-| devicePixelRatio | 1.0 in headless (statt 2.0 auf Retina) | ✅ Patch auf 2 |
-| outerWidth/outerHeight | Fehlt Titlebar-Offset | ✅ Patch +85px outer height |
-| CSS active text color | rgb(255,0,0) headless-Artefakt | ✅ Proxy-Patch |
-| WebGL vendor/renderer | `Google SwiftShader` = starkes headless-Signal | ❌ kein Patch |
-| Canvas Hash | Deterministisch in headless | ❌ kein Rauschen |
-| navigator.plugins | Leer in headless | ❌ kein Spoof |
-| chrome.runtime | Fehlt in headless | ❌ kein Masking |
-| Permissions API | `.query({name:'notifications'})` returns `denied` sofort | ❌ kein Override |
-| Error.stack CDP trap | pydoll: `CDP Runtime.enable` detektierbar via Error.stack Getter | ❌ nicht gefixt |
-| navigator.userAgentData | `brands: ["Chromium"]` statt `["Google Chrome"]` | ❌ kein Override |
+| `navigator.webdriver` | `true` in headless | ✅ AutomationControlled removes it |
+| Screen dimensions | `screen.width/height = 0` in headless | ✅ Patched to 1920×1080 |
+| devicePixelRatio | 1.0 in headless (instead of 2.0 on Retina) | ✅ Patched to 2 |
+| outerWidth/outerHeight | Missing titlebar offset | ✅ Patched +85px outer height |
+| CSS active text color | rgb(255,0,0) headless artifact | ✅ Proxy patch |
+| WebGL vendor/renderer | `Google SwiftShader` = strong headless signal | ❌ no patch |
+| Canvas hash | Deterministic in headless | ❌ no noise |
+| navigator.plugins | Empty in headless | ❌ no spoof |
+| chrome.runtime | Missing in headless | ❌ no masking |
+| Permissions API | `.query({name:'notifications'})` returns `denied` immediately | ❌ no override |
+| Error.stack CDP trap | pydoll: `CDP Runtime.enable` detectable via Error.stack getter | ❌ not fixed |
+| navigator.userAgentData | `brands: ["Chromium"]` instead of `["Google Chrome"]` | ❌ no override |
 
-### Evidenz
+### Evidence
 
-#### Brave Stealth-Patch-Matrix (2026-04-09)
+#### Brave Stealth Patch Matrix (2026-04-09)
 
-| Stack / Patch | X/30 | Erste Failure | Delta vs Baseline |
+| Stack / Patch | X/30 | First Failure | Delta vs Baseline |
 |---------------|------|---------------|-------------------|
-| pydoll Baseline (settle=0.0, proxy=None) | 3/30 | Query 3 | — |
+| pydoll baseline (settle=0.0, proxy=None) | 3/30 | Query 3 | — |
 | pydoll + patch_webgl=True | 10/30 | Query 11 | +7 |
 | pydoll + patch_canvas_noise=True | 6/30 | Query 7 | +3 |
-| pydoll + patch_permissions=True | 0/30 | Query 1 | -3 (kontraproduktiv) |
-| pydoll + chrome.runtime + navigator.plugins | 0/30 | Query 1 | -3 (kontraproduktiv) |
-| pydoll + alle Patches kombiniert | 0/30 | Query 1 | -3 (schlechte Patches dominieren) |
-| Patchright (Chromium Binary) | 0/30 | Query 1 | -3 (Slider CAPTCHA statt PoW) |
+| pydoll + patch_permissions=True | 0/30 | Query 1 | -3 (counterproductive) |
+| pydoll + chrome.runtime + navigator.plugins | 0/30 | Query 1 | -3 (counterproductive) |
+| pydoll + all patches combined | 0/30 | Query 1 | -3 (bad patches dominate) |
+| Patchright (Chromium binary) | 0/30 | Query 1 | -3 (slider CAPTCHA instead of PoW) |
 | Camoufox (Firefox, headless) | 7/30 | Query 8 | +4 |
 
-Erkenntnis: WebGL-Fingerprint ist das stärkste Einzelsignal. Permissions- und plugin-Patches sind bei Brave kontraproduktiv — Brave detektiert JS-Overrides dieser APIs direkt.
+Finding: WebGL fingerprint is the strongest single signal. Permissions and plugin patches are counterproductive for Brave — Brave detects JS overrides of these APIs directly.
 
-#### Brave Detection-Signale (2026-04-09, Reverse-Engineering)
+#### Brave Detection Signals (2026-04-09, reverse engineering)
 
-- CDP `Runtime.enable` + `Error.stack` Getter Trap — pydoll betroffen, Patchright fixt es
-- `navigator.userAgentData.brands`: `"Chromium"` statt `"Google Chrome"` (Patchright mit Chromium-Binary betroffen)
+- CDP `Runtime.enable` + `Error.stack` getter trap — affects pydoll, Patchright fixes it
+- `navigator.userAgentData.brands`: `"Chromium"` instead of `"Google Chrome"` (affects Patchright with Chromium binary)
 - `__playwright_evaluation_script__` in `Function.prototype.toString`
 - `navigator.webdriver = true`
-- WebGL SwiftShader Renderer (starkes Signal — WebGL-Patch bringt +7)
-- `navigator.brave.isBrave` fehlt (Soft-Signal)
+- WebGL SwiftShader renderer (strong signal — WebGL patch gives +7)
+- `navigator.brave.isBrave` missing (soft signal)
 
-#### puppeteer-extra-plugin-stealth Vergleich (2026-04-07)
+#### puppeteer-extra-plugin-stealth Comparison (2026-04-07)
 
-Fehlende Patches vs. puppeteer-extra:
-- chrome.runtime Masking — nachträglich implementiert, kontraproduktiv bei Brave (0/30)
-- navigator.plugins Spoofing — nachträglich implementiert, kontraproduktiv bei Brave (0/30)
+Missing patches vs. puppeteer-extra:
+- chrome.runtime masking — implemented subsequently, counterproductive for Brave (0/30)
+- navigator.plugins spoofing — implemented subsequently, counterproductive for Brave (0/30)
 
-Erkenntnis: Patches die bei Puppeteer Brave schlagen, sind bei pydoll ineffektiv oder schaden — vermutlich weil pydoll zusätzliche CDP-Leak-Signale hat.
+Finding: patches that beat Brave with Puppeteer are ineffective or harmful with pydoll — presumably because pydoll has additional CDP-leak signals.
 
-### Recommendation (SOLL)
+### Recommendation
 
-Pending — wird durch Stress-Test-Iterationen bestimmt. Aktuelle Baseline erreicht 30/30 (Google, Run 1, kein Load). SOLL wird nach erstem Break verfeinert.
+Pending — to be determined by stress-test iterations. Current baseline reaches 30/30 (Google, Run 1, no load). Recommendation to be refined after the first break.
 
-Kandidaten für nächste Iteration (nach Stress-Break):
-- WebGL-Patch (bringt +7 bei Brave — zu testen ob bei Google Effekt neutral oder positiv)
-- Canvas-Noise (bringt +3 bei Brave — gleich testen)
-- **NICHT** Permissions/plugins/chrome.runtime (kontraproduktiv bei Brave, unklar bei Google)
+Candidates for the next iteration (after stress break):
+- WebGL patch (gives +7 with Brave — to be tested whether neutral or positive with Google)
+- Canvas noise (gives +3 with Brave — test alongside)
+- **NOT** permissions/plugins/chrome.runtime (counterproductive with Brave, unclear with Google)
 
-### Offene Fragen
+### Open Questions
 
-- Brave: Werden JS-Overrides von Permissions/plugins direkt über CDP detektiert oder über Behavioral-Abweichung?
-- Brave: Patchright mit echtem Chrome Binary (nicht Chromium) — wurde nie korrekt getestet (`patchright install chrome` + `channel="chrome"`)
-- Google: Verhält sich WebGL-Patch neutral oder positiv bei 30/30-Runs? (Brave-Evidenz zeigt +7, Google könnte anders reagieren)
-- navigator.userAgentData Override: Pydoll-Fähigkeit unklar — CDP `Emulation.setUserAgentOverride` mit `userAgentMetadata` wäre der Weg
+- Brave: are JS overrides of Permissions/plugins detected directly via CDP or via behavioral deviation?
+- Brave: Patchright with real Chrome binary (not Chromium) — never correctly tested (`patchright install chrome` + `channel="chrome"`)
+- Google: does the WebGL patch behave neutrally or positively on 30/30 runs? (Brave evidence shows +7, Google might react differently)
+- navigator.userAgentData override: pydoll capability unclear — CDP `Emulation.setUserAgentOverride` with `userAgentMetadata` would be the path
 
 ---
 
 ## Layer 2: Behavioral
 
-### Status Quo (IST)
+### Status Quo
 
 #### Baseline Mapping (2026-04-21)
 
 Basis: `dev/search_pipeline/config.yml` + `dev/search_pipeline/01_google_smoke.py`.
 
 **ON:**
-- `block_popups: true` — blockiert Pop-up-Fenster (reduziert unerwartete Interaktionen)
-- `block_notifications: true` — blockiert Notification-Permission-Dialoge
+- `block_popups: true` — blocks pop-up windows (reduces unexpected interactions)
+- `block_notifications: true` — blocks notification-permission dialogs
 
-**OFF / NICHT IMPLEMENTIERT:**
-- Keine Mausbewegungen zwischen Queries
-- Keine Scroll-Simulation
-- Kein humanisiertes Klick-Muster
-- Kein Typing (keine Formularinteraktion — Navigation direkt via URL)
-- `delay_between_queries: 0` — kein Delay (Timing-Signal vorhanden, siehe Layer 5)
-- `consent_settle: 2.0` — einzige Wartezeit, nur bei Consent-Handling
+**OFF / NOT IMPLEMENTED:**
+- No mouse movement between queries
+- No scroll simulation
+- No humanized click pattern
+- No typing (no form interaction — navigation directly via URL)
+- `delay_between_queries: 0` — no delay (timing signal present, see Layer 5)
+- `consent_settle: 2.0` — only wait, only during consent handling
 
-Der Baseline-Stack navigiert ausschließlich via `tab.go_to(url)` — kein DOM-Interaktion außer beim Consent-Fallback (`btn.click()`). Es gibt keine humanisierten Behavioral-Signale.
+The baseline stack navigates exclusively via `tab.go_to(url)` — no DOM interaction except during the consent fallback (`btn.click()`). There are no humanized behavioral signals.
 
 #### Detection Surface
 
-Was Layer 2 prüft:
+What Layer 2 checks:
 
-| Signal | Was erkannt wird | Unser Control |
+| Signal | What is detected | Our control |
 |--------|-----------------|---------------|
-| Request-Timing | Zu schnell, zu regelmäßig — bot-typisch | ❌ 0 Delay zwischen Queries |
-| Mausbewegung | Fehlt komplett | ❌ nicht implementiert |
-| Scroll-Verhalten | Fehlt | ❌ nicht implementiert |
-| Klick-Muster | Zu präzise / sofort (kein Human-Jitter) | ❌ bei Consent-Button-Click |
-| Tab-Aktivität | Neue Tabs öffnen/schließen ohne Idle | ⚠️ pro Query neuer Tab, sofort navigiert |
+| Request timing | Too fast, too regular — bot-typical | ❌ 0 delay between queries |
+| Mouse movement | Completely missing | ❌ not implemented |
+| Scroll behavior | Missing | ❌ not implemented |
+| Click pattern | Too precise / instant (no human jitter) | ❌ on consent-button click |
+| Tab activity | New tabs open/close without idle | ⚠️ new tab per query, navigates immediately |
 
-### Evidenz
+### Evidence
 
-Keine quantitativen Behavioral-Tests durchgeführt. Baseline-30/30 mit komplett OFF bestätigt, dass Google auf Layer 2 bei moderatem Traffic nicht aktiv blockiert.
+No quantitative behavioral tests conducted. Baseline 30/30 with everything OFF confirms that Google does not actively block on Layer 2 at moderate traffic.
 
-### Recommendation (SOLL)
+### Recommendation
 
-Pending — wird durch Stress-Test-Iterationen bestimmt. Erst wenn Stress-Break eintritt und Layer 5 (Rate-Limiting) ausgeschlossen ist, ist Behavioral der nächste Kandidat.
+Pending — to be determined by stress-test iterations. Only once a stress break occurs and Layer 5 (rate-limiting) is ruled out is behavioral the next candidate.
 
-### Offene Fragen
+### Open Questions
 
-- Google: Beginnt Behavioral-Detection erst bei hohem Traffic (>100 Queries pro Session) oder schon früher?
-- Ist der 0-Delay-Effekt Layer 2 (Timing) oder Layer 5 (Rate-Limit) — vermutlich Layer 5 für IP-Blocking, Layer 2 für Session-Score-Erhöhung
+- Google: does behavioral detection begin only at high traffic (>100 queries per session) or earlier?
+- Is the 0-delay effect Layer 2 (timing) or Layer 5 (rate-limit) — presumably Layer 5 for IP-blocking, Layer 2 for session-score increase
 
 ---
 
-## Layer 3: Session-Tracking
+## Layer 3: Session Tracking
 
-### Status Quo (IST)
+### Status Quo
 
 #### Baseline Mapping (2026-04-21)
 
 Basis: `dev/search_pipeline/config.yml` + `dev/search_pipeline/01_google_smoke.py`.
 
 **SOCS Cookie Injection:**
-- `config.yml` definiert: `consent_cookie: {name: SOCS, value: "CAISHAgCEhJnd3NfMjAyNjA0MDctMCAgIBgEIAEaBgiA_fC8Bg", domain: ".google.com", path: "/", secure: true}`
-- Cookie wird per Tab injiziert via `NetworkCommands.set_cookie` (CDP `Network.setCookie`) mit `same_site=CookieSameSite.LAX`
-- Injection erfolgt ZWEIFACH:
-  1. Beim Browserstart in `start_browser()` — initial tab bekommt Cookie
-  2. Pro Query in `run_query()` via `_inject_consent_cookie(tab, cfg)` — jeder neue Tab bekommt Cookie
-- Effekt: Google Cookie-Wall (consent.google.com Redirect + Inline-Consent) wird komplett bypassed
+- `config.yml` defines: `consent_cookie: {name: SOCS, value: "CAISHAgCEhJnd3NfMjAyNjA0MDctMCAgIBgEIAEaBgiA_fC8Bg", domain: ".google.com", path: "/", secure: true}`
+- Cookie is injected per tab via `NetworkCommands.set_cookie` (CDP `Network.setCookie`) with `same_site=CookieSameSite.LAX`
+- Injection happens TWICE:
+  1. At browser start in `start_browser()` — the initial tab gets the cookie
+  2. Per query in `run_query()` via `_inject_consent_cookie(tab, cfg)` — each new tab gets the cookie
+- Effect: Google's cookie wall (consent.google.com redirect + inline consent) is fully bypassed
 
 **use_context: OFF:**
-- Kein frischer Browser-Context pro Query
-- Alle Queries laufen im gleichen Chrome-Profil-Context (`--user-data-dir=~/.searxng-mcp/browser-session-smoke`)
-- Cookies akkumulieren über Session — kein Cookie-Isolation zwischen Queries
+- No fresh browser context per query
+- All queries run in the same Chrome profile context (`--user-data-dir=~/.searxng-mcp/browser-session-smoke`)
+- Cookies accumulate across the session — no cookie isolation between queries
 
-**Consent-Fallback:**
-- `_has_inline_consent()` detektiert Inline-Consent via `'Before you continue'` im Body-Text
-- `_handle_consent()` klickt ersten matchenden Button aus `consent_buttons` Fallback-Chain
-- Nach Consent: 2s settle + erneute Navigation zur Search-URL
+**Consent Fallback:**
+- `_has_inline_consent()` detects inline consent via `'Before you continue'` in body text
+- `_handle_consent()` clicks the first matching button from the `consent_buttons` fallback chain
+- After consent: 2s settle + re-navigation to the search URL
 
 #### Detection Surface
 
-Was Layer 3 prüft:
+What Layer 3 checks:
 
-| Signal | Was erkannt wird | Unser Control |
+| Signal | What is detected | Our control |
 |--------|-----------------|---------------|
-| Cookie-Wall (Redirect) | Redirect zu consent.google.com | ✅ SOCS Cookie bypassed |
-| Inline-Consent Banner | `'Before you continue'` auf Search-URL | ✅ Cookie + Fallback-Click |
-| Session-Akkumulation | Gleiche Session-Cookies über 30 Queries | ⚠️ kein use_context — Cookies akkumulieren |
-| Cookie-Fingerprint | SOCS-Wert ist fix — selber Wert bei jedem Start | ⚠️ unklar ob Google SOCS rotiert |
+| Cookie wall (redirect) | Redirect to consent.google.com | ✅ bypassed via SOCS cookie |
+| Inline consent banner | `'Before you continue'` on search URL | ✅ cookie + fallback click |
+| Session accumulation | Same session cookies across 30 queries | ⚠️ no use_context — cookies accumulate |
+| Cookie fingerprint | SOCS value is fixed — same value on every start | ⚠️ unclear whether Google rotates SOCS |
 
-### Evidenz
+### Evidence
 
-- SOCS Cookie Bypass: Stresstest 2026-04-07 + neue Baseline 2026-04-21 — beide 30/30, kein einziger CONSENT-Status
-- Brave: kein SOCS-Problem (Brave nutzt kein Google Cookie-System), aber use_context=OFF war aktiv → Session-Tracking beigetragen? Unklar
+- SOCS cookie bypass: stress test 2026-04-07 + new baseline 2026-04-21 — both 30/30, not a single CONSENT status
+- Brave: no SOCS problem (Brave doesn't use Google's cookie system), but use_context=OFF was active → contributed to session-tracking? Unclear
 
-### Recommendation (SOLL)
+### Recommendation
 
-Pending — wird durch Stress-Test-Iterationen bestimmt. Aktuelle Baseline zeigt, dass SOCS-Cookie ausreicht für 30/30 ohne Consent-Blockierung.
+Pending — to be determined by stress-test iterations. Current baseline shows the SOCS cookie is sufficient for 30/30 without consent blocking.
 
-### Offene Fragen
+### Open Questions
 
-- Brave: Trackt Brave per IP oder per Session? `use_context=True` würde Session-Tracking brechen, nicht IP-Tracking — relevant wenn Brave wieder aufgenommen wird
-- SOCS-Wert: Läuft der Cookie ab? (Format `gws_20260407-0` — datum-basiert?) Muss er periodisch erneuert werden?
-- Google Scholar: Braucht eigenen Consent-Cookie (anderer Domain)? (Scholar-Engine in src/ — nicht in smoke-Stack)
+- Brave: does Brave track per IP or per session? `use_context=True` would break session-tracking, not IP-tracking — relevant if Brave work resumes
+- SOCS value: does the cookie expire? (format `gws_20260407-0` — date-based?) Does it need periodic renewal?
+- Google Scholar: needs its own consent cookie (different domain)? (Scholar engine in src/ — not in the smoke stack)
 
 ---
 
-## Layer 4: IP-Reputation
+## Layer 4: IP Reputation
 
-### Status Quo (IST)
+### Status Quo
 
 #### Baseline Mapping (2026-04-21)
 
 Basis: `dev/search_pipeline/config.yml` + `dev/search_pipeline/01_google_smoke.py`.
 
 **Direct Connection:**
-- Kein Proxy konfiguriert
-- Requests laufen über die lokale IP (Mac-Entwickler-IP, Heimnetz oder Büro-Netz)
-- `webrtc_leak_protection: true` — verhindert WebRTC-basierte IP-Leaks (lokale IP via STUN)
+- No proxy configured
+- Requests run over the local IP (Mac developer IP, home network or office network)
+- `webrtc_leak_protection: true` — prevents WebRTC-based IP leaks (local IP via STUN)
 
-**Kein Proxy-Support implementiert:**
-- `config.yml` hat keinen `proxy`-Key
-- Pydoll-Options haben kein `proxy`-Argument in der aktuellen Smoke-Implementation
+**No Proxy Support Implemented:**
+- `config.yml` has no `proxy` key
+- pydoll options have no `proxy` argument in the current smoke implementation
 
 #### Detection Surface
 
-Was Layer 4 prüft:
+What Layer 4 checks:
 
-| Signal | Was erkannt wird | Unser Control |
+| Signal | What is detected | Our control |
 |--------|-----------------|---------------|
-| Datacenter-IP | ASN-Klassifikation (AWS, GCP, DigitalOcean) | ✅ Heimnetz-IP unkritisch |
-| VPN-IP | Bekannte VPN-Provider-ASNs | ⚠️ unklar (je nach Netz) |
-| Tor Exit-Node | Öffentliche Tor-Exit-Node-Listen | ❌ Tor gelistet (0/30 Brave mit Tor) |
-| Proxy-Listen | Bekannte kommerzielle Proxy-IPs | ❌ kein Proxy |
-| IP-Rotation | Keine Rotation zwischen Queries | ❌ gleiche IP für alle 30 Queries |
+| Datacenter IP | ASN classification (AWS, GCP, DigitalOcean) | ✅ home-network IP uncritical |
+| VPN IP | Known VPN-provider ASNs | ⚠️ unclear (depends on network) |
+| Tor exit node | Public Tor exit-node lists | ❌ Tor listed (0/30 Brave with Tor) |
+| Proxy lists | Known commercial proxy IPs | ❌ no proxy |
+| IP rotation | No rotation between queries | ❌ same IP for all 30 queries |
 
-### Evidenz
+### Evidence
 
 #### Tor Exit-Node Blocking (2026-04-07)
 
-- Brave mit Tor-Proxy: 0/30 (alle Tor Exit-Nodes auf Blocklist)
-- Brave ohne Proxy (direct): 1/30 — zeigt dass Layer 4 bei Brave aktiver ist als bei Google
+- Brave with Tor proxy: 0/30 (all Tor exit nodes on blocklist)
+- Brave without proxy (direct): 1/30 — shows Layer 4 is more active for Brave than for Google
 
-#### Google IP-Tolerance
+#### Google IP Tolerance
 
-- Google 30/30 mit direkter IP bestätigt (2026-04-07 + 2026-04-21)
-- Google scheint bei Heimnetz/Büro-IPs keine IP-Reputation-Probleme zu erzeugen bei dieser Query-Rate
+- Google 30/30 with direct IP confirmed (2026-04-07 + 2026-04-21)
+- Google appears not to raise IP-reputation problems on home/office IPs at this query rate
 
-### Recommendation (SOLL)
+### Recommendation
 
-Pending — aktuell kein Problem für Google. Bei Stress-Tests über mehrere Runs hinweg (IP-Akkumulation) könnte IP-basiertes Blocking einsetzen.
+Pending — currently no problem for Google. Across multiple stress-test runs (IP accumulation), IP-based blocking could kick in.
 
-Residential Proxies wären die Ideal-Lösung für IP-Rotation, stehen aber nicht zur Verfügung.
+Residential proxies would be the ideal solution for IP rotation but are not available.
 
-### Offene Fragen
+### Open Questions
 
-- Residential Proxies: Nicht verfügbar — wäre optimale IP-Rotation (nicht detektierbar als Datacenter/VPN)
-- Google: Ab welcher Query-Rate / welchem Zeitfenster beginnt IP-basiertes Blocking? (noch nicht stress-getestet)
-- Mehrere Back-to-Back Runs: Akkumulieren sich IP-Signale über Runs, oder resettet Google nach gewissem Idle-Intervall?
+- Residential proxies: not available — would be optimal IP rotation (not detectable as datacenter/VPN)
+- Google: at what query rate / time window does IP-based blocking begin? (not yet stress-tested)
+- Multiple back-to-back runs: do IP signals accumulate across runs, or does Google reset after a certain idle interval?
 
 ---
 
-## Layer 5: Rate-Limiting
+## Layer 5: Rate Limiting
 
-### Status Quo (IST)
+### Status Quo
 
 #### Baseline Mapping (2026-04-21)
 
 Basis: `dev/search_pipeline/config.yml` + `dev/search_pipeline/01_google_smoke.py`.
 
-**`delay_between_queries: 0`** — kein Delay zwischen Queries.
+**`delay_between_queries: 0`** — no delay between queries.
 
-Rationale: 2026-04-07 Baseline lief mit 0 Delay und lieferte 30/30. Ein 10s Delay wurde 2026-04-16 als defensiver Wert eingebaut — ohne Evidenz, dass er nötig war. Im neuen Smoke-Stack wurde auf 0 zurückgesetzt.
+Rationale: the 2026-04-07 baseline ran with 0 delay and delivered 30/30. A 10s delay was added 2026-04-16 as a defensive value — without evidence it was needed. In the new smoke stack it was reset to 0.
 
-**`page_load_timeout: 20`** — maximale Wartezeit pro Navigation.
+**`page_load_timeout: 20`** — maximum wait time per navigation.
 
-**`consent_settle: 2.0`** — 2s Settle nur bei Consent-Handling (nicht zwischen normalen Queries).
+**`consent_settle: 2.0`** — 2s settle only during consent handling (not between normal queries).
 
-**`wait_for_results.max_cycles: 15`, `interval_seconds: 1.0`** — bis zu 15 Sekunden Warten auf DOM-Ergebnisse pro Query.
+**`wait_for_results.max_cycles: 15`, `interval_seconds: 1.0`** — up to 15 seconds waiting for DOM results per query.
 
-Effektives Timing pro Query: Navigation (~1–2s) + DOM-Wait (0–15s, typisch 1–2s) + Tab-Open/Close (~0.1s). Kein expliziter Delay dazwischen.
+Effective timing per query: navigation (~1–2s) + DOM-wait (0–15s, typically 1–2s) + tab open/close (~0.1s). No explicit delay in between.
 
-Gesamte 30-Query-Run: ~2.5 Minuten (aus Baseline-Report `smoke_20260421_022343.md`).
+Full 30-query run: ~2.5 minutes (from baseline report `smoke_20260421_022343.md`).
 
 #### Detection Surface
 
-Was Layer 5 prüft:
+What Layer 5 checks:
 
-| Signal | Was erkannt wird | Unser Control |
+| Signal | What is detected | Our control |
 |--------|-----------------|---------------|
-| X Requests/Zeitfenster (IP) | Rate > Threshold → 429 / Redirect zu /sorry/ | ❌ kein Delay — Rate ist hoch |
-| Request-Pattern | Zu regelmäßig (kein Jitter) | ❌ natürliches Jitter durch DOM-Wait variiert |
-| Burst-Detection | Viele Requests in kurzer Zeit | ❌ 30 Queries in ~2.5min = ~12 Req/min |
+| X requests/window (IP) | Rate > threshold → 429 / redirect to /sorry/ | ❌ no delay — rate is high |
+| Request pattern | Too regular (no jitter) | ❌ natural jitter varies via DOM-wait |
+| Burst detection | Many requests in short time | ❌ 30 queries in ~2.5min = ~12 req/min |
 
-### Evidenz
+### Evidence
 
-#### Mojeek Rate-Limit (2026-04-09)
+#### Mojeek Rate Limit (2026-04-09)
 
-- Exakt 15 Requests pro ~60s Sliding Window
-- Ab Request 16: HTTP 403 "automated queries"
-- IP-basiert — `use_context` (Browser-Rotation) hilft nicht
-- Unabhängig von Sprache der Query
+- Exactly 15 requests per ~60s sliding window
+- From request 16: HTTP 403 "automated queries"
+- IP-based — `use_context` (browser rotation) doesn't help
+- Independent of query language
 
-#### Google Rate-Tolerance (2026-04-07 + 2026-04-21)
+#### Google Rate Tolerance (2026-04-07 + 2026-04-21)
 
-- 30/30 mit 0 Delay in ~2.5min — kein Rate-Limit
-- Google scheint bei 12 Req/min (mit realem DOM-Wait-Jitter) kein Blocking zu aktivieren
-- Stress-Test Back-to-Back Batch 1 durchgeführt 2026-04-22 → siehe Subsection unten
+- 30/30 with 0 delay in ~2.5min — no rate-limit
+- Google appears not to trigger blocking at 12 req/min (with real DOM-wait jitter)
+- Stress-test back-to-back Batch 1 conducted 2026-04-22 → see subsection below
 
 #### Google Back-to-Back Stress Batch 1 (2026-04-22)
 
@@ -434,144 +434,144 @@ Was Layer 5 prüft:
 | 3 | 28/30 | 2× CAPTCHA | Q11 | 345 / 664 |
 | 4 | 0/30 | 30× CAPTCHA | Q1 | 537 / 661 |
 
-**Threshold:** Hard IP-Block nach ~90 Queries / ~10 Minuten über 4 konsekutive Runs ohne Cooldown.
+**Threshold:** hard IP-block after ~90 queries / ~10 minutes across 4 consecutive runs without cooldown.
 
-**Layer-Attribution: IP-Level (Layer 5), NICHT Fingerprint (Layer 1–3).**
+**Layer attribution: IP-level (Layer 5), NOT fingerprint (Layer 1–3).**
 
-Evidenz für IP-Block (nicht Fingerprint-Detection):
-- Run 4 Nav-Mean 537ms (stabil, identisch zu Runs 1–3) — Google serviert /sorry/ sofort, kein Fingerprint-Scan
-- DOM-Wait 0ms in Run 4 — keine DOM-Verarbeitung, sofortiger Redirect
-- /sorry/ startet ab Q1 in Run 4 — kein Query-spezifischer Trigger, vollständiger IP-Block
-- Runs 1–3 zeigen normale Nav-Zeiten (345–520ms mean) — Fingerprint-Patches unangetastet
+Evidence for IP-block (not fingerprint-detection):
+- Run 4 nav-mean 537ms (stable, identical to runs 1–3) — Google serves /sorry/ immediately, no fingerprint scan
+- DOM-wait 0ms in run 4 — no DOM processing, immediate redirect
+- /sorry/ starts at Q1 in run 4 — no query-specific trigger, full IP block
+- Runs 1–3 show normal nav times (345–520ms mean) — fingerprint patches untouched
 
-**Referenz:** dev/search_pipeline/01_reports/stress_20260422_012755.md (deleted, see git 1ad627f)
+**Reference:** dev/search_pipeline/01_reports/stress_20260422_012755.md (deleted, see git 1ad627f)
 
-### Recommendation (SOLL)
+### Recommendation
 
-**Change:** `delay_between_queries: 0 → uniform(12, 18)` in `dev/search_pipeline/config.yml` und analog `src/search/rate_limiter.py` Token-Bucket auf ~4 Req/min.
+**Change:** `delay_between_queries: 0 → uniform(12, 18)` in `dev/search_pipeline/config.yml` and analogously `src/search/rate_limiter.py` token bucket to ~4 req/min.
 
-Begründung:
-- Empirisch (Batch 1, 2026-04-22): 12 Req/min bricht nach ~90 kumulativen Queries. Threshold ist nicht instantan-Rate-basiert sondern kumulativer Score pro IP.
-- Community-Baseline: `karust/openserp` config (aktive Commits April 2026) defaultet Google auf `rate_requests: 4, rate_burst: 2` — defensiver Floor weit unter jeder plausiblen Schwelle.
-- 12–18s ergibt ~4 Req/min mit natürlichem Jitter. Bei Burst-Toleranz (openserp `rate_burst: 2`) können 2 Queries schnell hintereinander, danach Drosselung.
-- Für Agentic-Search-Use-Case (4 Queries pro Engine × N Engines → Dedup) passt das: 4 Queries in ~60s pro Engine statt 30 Queries in 2.5min.
+Rationale:
+- Empirically (Batch 1, 2026-04-22): 12 req/min breaks after ~90 cumulative queries. Threshold is not instantaneous-rate-based but a cumulative score per IP.
+- Community baseline: `karust/openserp` config (active commits April 2026) defaults Google to `rate_requests: 4, rate_burst: 2` — a defensive floor well under any plausible threshold.
+- 12–18s gives ~4 req/min with natural jitter. With burst tolerance (openserp `rate_burst: 2`), 2 queries can fire quickly in succession, then throttling kicks in.
+- Fits the agentic-search use case (4 queries per engine × N engines → dedup): 4 queries in ~60s per engine instead of 30 queries in 2.5min.
 
-**Stress-Test-Protokoll (bleibt):** Für zukünftige Layer-Experimente — Back-to-Back-Runs ohne Cooldown auf ANDEREM IP-Kontext als Library-NAT. Shared-IP-Scraping verzerrt sowohl die Baseline (andere Nutzer beeinflussen Score) als auch ist ethisch zweifelhaft (andere leiden unter unseren CAPTCHAs).
+**Stress-test protocol (retained):** for future layer experiments — back-to-back runs without cooldown on a DIFFERENT IP context than a library NAT. Shared-IP scraping distorts both the baseline (other users affect the score) and is ethically questionable (others suffer from our CAPTCHAs).
 
-### Offene Fragen
+### Open Questions
 
-- Google: Wo ist die tatsächliche Rate-Limit-Schwelle? → answered 2026-04-22: ~90 queries / 10min back-to-back (Batch 1 Break)
-- Jitter durch DOM-Wait: Reicht die natürliche Varianz (1–15s pro Query) um Regularity-Detection zu umgehen?
+- Google: where is the actual rate-limit threshold? → answered 2026-04-22: ~90 queries / 10min back-to-back (Batch 1 break)
+- Jitter via DOM-wait: does the natural variance (1–15s per query) suffice to evade regularity detection?
 
 ---
 
-## Layer 6: TLS/HTTP-Fingerprint
+## Layer 6: TLS/HTTP Fingerprint
 
-### Status Quo (IST)
+### Status Quo
 
 #### Baseline Mapping (2026-04-21)
 
 Basis: `dev/search_pipeline/01_google_smoke.py`.
 
-**Chrome TLS ist real — kein Eingriff nötig oder möglich.**
+**Chrome TLS is real — no intervention needed or possible.**
 
-Der Smoke-Stack verwendet pydoll mit echtem Chrome Binary (`/Applications/Google Chrome.app/Contents/MacOS/Google Chrome`). Chrome's TLS-Stack ist der echte Browser-Stack — JA3-Hash, HTTP/2 Frame-Order und Header-Order sind identisch mit einem echten Chrome-User.
+The smoke stack uses pydoll with a real Chrome binary (`/Applications/Google Chrome.app/Contents/MacOS/Google Chrome`). Chrome's TLS stack is the real browser stack — JA3 hash, HTTP/2 frame order, and header order are identical to a real Chrome user.
 
-Kein httpx in dieser Pipeline — keine Requests via Python-HTTP-Client (die einen anderen TLS-Fingerprint erzeugen würden).
+No httpx in this pipeline — no requests via a Python HTTP client (which would produce a different TLS fingerprint).
 
 #### Detection Surface
 
-Was Layer 6 prüft:
+What Layer 6 checks:
 
-| Signal | Was erkannt wird | Unser Control |
+| Signal | What is detected | Our control |
 |--------|-----------------|---------------|
-| JA3 Hash | TLS Client-Hello Fingerprint | ✅ Chrome TLS ist real |
-| HTTP/2 Frame-Order | SETTINGS Frame, WINDOW_UPDATE Frame Reihenfolge | ✅ Chrome HTTP/2 ist real |
-| Header-Order | User-Agent, Accept, Accept-Language Reihenfolge | ✅ Chrome Headers sind real |
+| JA3 hash | TLS client-hello fingerprint | ✅ Chrome TLS is real |
+| HTTP/2 frame order | SETTINGS frame, WINDOW_UPDATE frame order | ✅ Chrome HTTP/2 is real |
+| Header order | User-Agent, Accept, Accept-Language order | ✅ Chrome headers are real |
 | ALPN | `h2` negotiation | ✅ Chrome |
-| TLS Version | TLS 1.3 | ✅ Chrome |
+| TLS version | TLS 1.3 | ✅ Chrome |
 
-### Evidenz
+### Evidence
 
-TLS-Fingerprint-Tests wurden in Legacy-Scripts durchgeführt (`20_tls_fingerprint.py`, `21_cipher_shuffle_verify.py`) — diese untersuchten den httpx-Stack (SearXNG-Proxy-Ära), nicht den pydoll-Chrome-Stack. Für den aktuellen Chrome-Stack ist kein Test nötig — Chrome ist nicht fälschbar.
+TLS-fingerprint tests were conducted in legacy scripts (`20_tls_fingerprint.py`, `21_cipher_shuffle_verify.py`) — these examined the httpx stack (SearXNG-proxy era), not the pydoll-Chrome stack. For the current Chrome stack, no test is needed — Chrome cannot be faked.
 
-### Recommendation (SOLL)
+### Recommendation
 
-N/A — keine Handlung erforderlich. Chrome-basierte Stacks sind bei Layer 6 inherent unauffällig. Relevant wird Layer 6 nur wenn httpx-basierte Engines (CrossRef, Bing via API-Fallback) problematisch werden.
+N/A — no action required. Chrome-based stacks are inherently inconspicuous on Layer 6. Layer 6 becomes relevant only if httpx-based engines (CrossRef, Bing via API fallback) become problematic.
 
-### Offene Fragen
+### Open Questions
 
-- Keine — Layer 6 ist für Chrome-basierte Requests gelöst.
+- None — Layer 6 is solved for Chrome-based requests.
 
 ---
 
 ## Layer 7: CAPTCHA
 
-### Status Quo (IST)
+### Status Quo
 
 #### Baseline Mapping (2026-04-21)
 
 Basis: `dev/search_pipeline/config.yml` + `dev/search_pipeline/01_google_smoke.py`.
 
-**Detect-only — kein Solving.**
+**Detect-only — no solving.**
 
-CAPTCHA-Erkennung erfolgt über URL-Check:
-- `config.yml`: `captcha_path: /sorry/` — Google's CAPTCHA-Redirect-Pfad
+CAPTCHA detection happens via URL check:
+- `config.yml`: `captcha_path: /sorry/` — Google's CAPTCHA redirect path
 - In `run_query()`: `if gc["captcha_path"] in current_url: record["status"] = "CAPTCHA"; return record`
-- Record bekommt Status `CAPTCHA` und wird nicht weiter verarbeitet
+- Record gets status `CAPTCHA` and is not processed further
 
-Kein JavaScript-basierter Solver. Kein Klick-Versuch. Kein automatisches Retry.
+No JavaScript-based solver. No click attempt. No automatic retry.
 
-**Baseline-Ergebnis:** 30/30 Run 2026-04-21 ohne einzigen CAPTCHA-Status. Google scheint CAPTCHA (`/sorry/`) erst bei signifikant höherem Traffic zu aktivieren.
+**Baseline result:** 30/30 run 2026-04-21 without a single CAPTCHA status. Google appears to activate CAPTCHA (`/sorry/`) only at significantly higher traffic.
 
 #### Detection Surface
 
-Was Layer 7 ist:
+What Layer 7 is:
 
-| CAPTCHA-Typ | Engine | Mechanismus | Unser Status |
+| CAPTCHA Type | Engine | Mechanism | Our Status |
 |-------------|--------|-------------|--------------|
-| reCAPTCHA (/sorry/) | Google | Rate-basierter Redirect nach Fingerprint-Verdacht | ✅ Erkannt via URL-Check |
-| PoW CAPTCHA (Argon2) | Brave | Proof-of-Work Challenge im Browser | ✅ Erkannt — nicht lösbar |
-| Slider CAPTCHA | Brave (Patchright) | Drag-Slider Interaktion | ✅ Erkannt — nicht lösbar |
-| hCaptcha | Diverse | Challenge-Response | ❌ Kein Selector konfiguriert |
+| reCAPTCHA (/sorry/) | Google | Rate-based redirect after fingerprint suspicion | ✅ detected via URL check |
+| PoW CAPTCHA (Argon2) | Brave | Proof-of-work challenge in browser | ✅ detected — not solvable |
+| Slider CAPTCHA | Brave (Patchright) | Drag-slider interaction | ✅ detected — not solvable |
+| hCaptcha | Various | Challenge-response | ❌ no selector configured |
 
-### Evidenz
+### Evidence
 
 #### Brave PoW CAPTCHA (2026-04-07)
 
-- Screenshot: "Confirm you're a human being / I'm not a robot" Dialog mit "Learn more about Proof of Work Captcha"
-- Svelte-basierter CAPTCHA — PoW (Proof of Work) Challenge, kein Slider
-- Tritt ab Query 2–3 auf (Query 1 liefert Results)
-- Mit Tor-Proxy: 0/30 (Tor Exit-Nodes auf Blocklist → sofort CAPTCHA)
+- Screenshot: "Confirm you're a human being / I'm not a robot" dialog with "Learn more about Proof of Work Captcha"
+- Svelte-based CAPTCHA — PoW (proof of work) challenge, no slider
+- Occurs from query 2–3 onward (query 1 delivers results)
+- With Tor proxy: 0/30 (Tor exit nodes on blocklist → immediate CAPTCHA)
 
-#### Brave PoW Technische Analyse (2026-04-09)
+#### Brave PoW Technical Analysis (2026-04-09)
 
-- Algorithmus: Argon2 (Memory-Hard Hash) via WASM, berechnet in Web Worker
-- Challenge-Parameter: `zero_count=1` (trivial), 21 Tokens, `iterations=2`, `memory_size=512KB`
-- Privacy Pass: VOPRF-Protokoll (Blind Tokens) in separatem WASM-Modul
-- API-Endpoint: POST `/api/captcha/pow?brave=0` mit solutions + blinded_messages
-- Server antwortet mit `signed_tokens` → Cookie → Zugang
-- Klick auf "I'm not a robot": Spinner "Letting you in..." erscheint, nach 3s keine Weiterleitung — unklar ob Berechnung zu langsam oder Server rejected wegen Fingerprint
+- Algorithm: Argon2 (memory-hard hash) via WASM, computed in a Web Worker
+- Challenge parameters: `zero_count=1` (trivial), 21 tokens, `iterations=2`, `memory_size=512KB`
+- Privacy Pass: VOPRF protocol (blind tokens) in a separate WASM module
+- API endpoint: POST `/api/captcha/pow?brave=0` with solutions + blinded_messages
+- Server responds with `signed_tokens` → cookie → access
+- Click on "I'm not a robot": spinner "Letting you in..." appears, after 3s no redirect — unclear whether computation was too slow or the server rejected due to fingerprint
 
-**Zwei CAPTCHA-Tiers:**
-- `PoW ("I'm not a robot")` — für Chrome/pydoll
-- `Slider ("Drag the slider")` — für Patchright/Chromium
+**Two CAPTCHA tiers:**
+- `PoW ("I'm not a robot")` — for Chrome/pydoll
+- `Slider ("Drag the slider")` — for Patchright/Chromium
 
 #### captcha_detect_js Bug (Legacy)
 
-Im alten Legacy-Stresstest-Stack war ein `captcha_detect_js` JavaScript konfiguriert mit Selektor `dialog .captcha-card`. Dieser Selektor matchte nicht das tatsächliche Brave CAPTCHA-DOM. Korrekt wäre `[class*="pow-captcha"]` oder Title-Check auf "Captcha". Im neuen Smoke-Stack nicht relevant (kein JS-Selektor für CAPTCHA — nur URL-Check).
+The old legacy stress-test stack had a `captcha_detect_js` JavaScript configured with selector `dialog .captcha-card`. This selector did not match the actual Brave CAPTCHA DOM. The correct selector would be `[class*="pow-captcha"]` or a title check for "Captcha". Not relevant in the new smoke stack (no JS selector for CAPTCHA — only URL check).
 
-### Recommendation (SOLL)
+### Recommendation
 
-Pending — wird durch Stress-Test-Iterationen bestimmt. Google CAPTCHA tritt erst bei hohem Traffic auf — aktuell kein Problem.
+Pending — to be determined by stress-test iterations. Google CAPTCHA occurs only at high traffic — currently not a problem.
 
-**Brave CAPTCHA Optionen (wenn Brave resume):**
-1. Klick + länger warten (10–15s) — unklar ob Argon2-Berechnung abschließt
-2. Argon2 PoW programmatisch lösen — technisch möglich, Privacy Pass VOPRF-Teil ist der Blocker
-3. Brave Search API (2K Queries/Monat gratis) — kein CAPTCHA, aber Architektur-Problem (siehe [Engine-Status](#engine-status))
+**Brave CAPTCHA options (if Brave resumes):**
+1. Click + wait longer (10–15s) — unclear whether Argon2 computation completes
+2. Solve Argon2 PoW programmatically — technically possible, Privacy Pass VOPRF part is the blocker
+3. Brave Search API (2K queries/month free) — no CAPTCHA, but architecture problem remains (see [Engine Status](#engine-status))
 
-### Offene Fragen
+### Open Questions
 
-- Brave: CAPTCHA-Klick mit 10–15s Wartezeit — reicht die Zeit für PoW-Berechnung + API-Call? Oder rejected Server wegen Fingerprint?
-- Brave: Ist das CAPTCHA per Session oder per IP lösbar? (Klick-Lösung persistent für die Session?)
-- Google: Ab welchem Traffic-Level schaltet `/sorry/` ein? (Stress-Test-Erkenntnis pending)
+- Brave: CAPTCHA click with 10–15s wait — is that enough time for PoW computation + API call? Or does the server reject due to fingerprint?
+- Brave: is the CAPTCHA solvable per session or per IP? (is a click-solution persistent for the session?)
+- Google: at what traffic level does `/sorry/` activate? (stress-test finding pending)
