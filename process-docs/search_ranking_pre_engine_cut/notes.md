@@ -1,13 +1,13 @@
 ## Status
 
-**SUPERSEDED by `decisions/search_pipeline.md` (2026-05-04)** — this file documents the pre-engine-cut SearXNG-Docker pipeline (`src/searxng/`, `MAX_RESULTS=80`, hostname-priority via SearXNG-Plugin). That implementation no longer exists in the codebase as of the engine-cut refactor (2026-04-15). Kept for historical reference only.
+**SUPERSEDED (2026-05-04)** — this file documents the pre-engine-cut SearXNG-Docker pipeline (`src/searxng/`, `MAX_RESULTS=80`, hostname-priority via SearXNG plugin). That implementation no longer exists in the codebase as of the engine-cut refactor (2026-04-15). Kept for historical reference only.
 
 # Search Pipeline Step 3: Ranking & Result Processing
 
 ## Status Quo
 
 **Code:** `src/searxng/settings.yml` (hostnames), `src/searxng/search_web.py` (MAX_RESULTS, SNIPPET_LENGTH)
-**Method:** SearXNG-internes Ranking + Hostname-Priorität + Post-Processing-Truncation
+**Method:** SearXNG-internal ranking + hostname priority + post-processing truncation
 **Config:**
 
 ```python
@@ -37,64 +37,64 @@ remove:
   - pinterest.*
 ```
 
-### Ranking-Pipeline
+### Ranking Pipeline
 
-1. SearXNG berechnet internen Score: `weight = Π(engine_weights) × len(positions)`, `score = Σ(weight / position_i)` (→ search_pipeline.md)
-2. Hostname-Regeln modifizieren Score: `high_priority` = priority='high' (voller Weight statt Weight/Position), `low_priority` = priority='low' (Score 0)
-3. `remove`-Einträge werden vollständig aus Ergebnissen entfernt (vor Ausgabe)
-4. `fetch_search_results()` nimmt die ersten `MAX_RESULTS=80` aus dem SearXNG-JSON
-5. `format_results()` trunciert jeden Snippet auf `SNIPPET_LENGTH=5000` Zeichen
+1. SearXNG computes an internal score: `weight = Π(engine_weights) × len(positions)`, `score = Σ(weight / position_i)`
+2. Hostname rules modify the score: `high_priority` = priority='high' (full weight instead of weight/position), `low_priority` = priority='low' (score 0)
+3. `remove` entries are removed entirely from results (before output)
+4. `fetch_search_results()` takes the first `MAX_RESULTS=80` from the SearXNG JSON
+5. `format_results()` truncates each snippet to `SNIPPET_LENGTH=5000` characters
 
-## Evidenz
+## Evidence
 
-### Hostname-Priorität — Kategorisiert nach Nutzung
+### Hostname Priority — Categorized by Usage
 
-**Code/Q&A:** github.com, stackoverflow.com, stackexchange.com — konsistent hochwertige technische Inhalte. github.com ist zusätzlich Plugin-Domain (Discovery → github-research Plugin).
+**Code/Q&A:** github.com, stackoverflow.com, stackexchange.com — consistently high-quality technical content. github.com is additionally a plugin domain (discovery → github-research plugin).
 
-**Dokumentation:** docs.python.org, developer.mozilla.org, readthedocs.io, pytorch.org — offizielle Docs, immer relevant. Ergänzt um docs.rs (Rust), pkg.go.dev (Go), learn.microsoft.com (Azure, .NET, TypeScript) für breiteren Tech-Stack.
+**Documentation:** docs.python.org, developer.mozilla.org, readthedocs.io, pytorch.org — official docs, always relevant. Extended with docs.rs (Rust), pkg.go.dev (Go), learn.microsoft.com (Azure, .NET, TypeScript) for a broader tech stack.
 
-**ML/AI:** arxiv.org, huggingface.co, anthropic.com, openai.com — Kern-Quellen für ML/AI Recherche. semanticscholar.org neu (korrespondiert mit Semantic Scholar Engine). arxiv.org ist Plugin-Domain.
+**ML/AI:** arxiv.org, huggingface.co, anthropic.com, openai.com — core sources for ML/AI research. semanticscholar.org new (corresponds to the Semantic Scholar engine). arxiv.org is a plugin domain.
 
-**Reference:** wikipedia.org — breite Referenz, konsistent gut für Konzepterklärungen.
+**Reference:** wikipedia.org — broad reference, consistently good for concept explanations.
 
-### Hostname-Depriorisierung — Rausch-Reduktion
+### Hostname Deprioritization — Noise Reduction
 
-- **pinterest, amazon:** SEO-Spam, keine technischen Inhalte
-- **quora:** Qualität stark schwankend, oft veraltet
-- **w3schools:** Oberflächliche Tutorials, von MDN übertroffen
-- **linkedin:** Job-Listings statt technischer Inhalte
-- **hub.docker.com:** Registry-Seiten, kein Lerninhalt
+- **pinterest, amazon:** SEO spam, no technical content
+- **quora:** quality varies widely, often outdated
+- **w3schools:** superficial tutorials, superseded by MDN
+- **linkedin:** job listings instead of technical content
+- **hub.docker.com:** registry pages, no learning content
 
-### Pinterest — Remove statt nur Low Priority
+### Pinterest — Remove Instead of Just Low Priority
 
-Pinterest erscheint bei vielen Queries als Spam (Bildgalerien, keine Textinhalte). `remove` entfernt vollständig.
+Pinterest appears as spam on many queries (image galleries, no text content). `remove` eliminates it entirely.
 
-### MAX_RESULTS = 80 (von 50 erhöht)
+### MAX_RESULTS = 80 (raised from 50)
 
-Mit 10 aktiven Engines (7 general + 3 plugin) statt vorher 5 liefert SearXNG deutlich mehr unique Ergebnisse pro Query. 50 war das Ceiling bei 4-5 Engines; mit 10 Engines sind 80 ein besserer Schnitt. Höherer Wert würde den MCP-Response unnötig aufblähen.
+With 10 active engines (7 general + 3 plugin) instead of the previous 5, SearXNG delivers significantly more unique results per query. 50 was the ceiling at 4-5 engines; with 10 engines, 80 is a better cut. A higher value would unnecessarily bloat the MCP response.
 
 ### SNIPPET_LENGTH = 5000
 
-Snippets werden im MCP-Response direkt an Claude übergeben. 5000 Zeichen (~750-1000 Wörter) bieten genug Kontext. Reale SearXNG-Snippets sind typischerweise 200-500 Zeichen — das Limit ist ein Sicherheits-Ceiling.
+Snippets are passed directly to Claude in the MCP response. 5000 characters (~750-1000 words) offer enough context. Real SearXNG snippets are typically 200-500 characters — the limit is a safety ceiling.
 
-## Entscheidung
+## Decision
 
-- Hostname-Listen kategorisiert nach Nutzungstyp (Code/Docs/ML/Reference)
-- 4 neue high_priority Domains: docs.rs, pkg.go.dev, learn.microsoft.com, semanticscholar.org
-- MAX_RESULTS 50→80 wegen doppelt so vielen aktiven Engines
-- SNIPPET_LENGTH bleibt 5000 (reale Snippets liegen weit darunter)
+- Hostname lists categorized by usage type (Code/Docs/ML/Reference)
+- 4 new high_priority domains: docs.rs, pkg.go.dev, learn.microsoft.com, semanticscholar.org
+- MAX_RESULTS 50→80 due to twice as many active engines
+- SNIPPET_LENGTH stays at 5000 (real snippets are well below it)
 
-## Offene Fragen
+## Open Questions
 
-- Hostname-Priority-Multiplikatoren: Wie genau modifiziert high_priority/low_priority den Score? SearXNG Hostnames Plugin Source (searx/plugins/hostnames.py) sollte gelesen werden für exakte Formel.
-- Fehlende Domains: developer.apple.com? tensorflow.org? docs.docker.com?
-- `remove: pinterest` ist redundant zu `low_priority: pinterest` — oder überschreibt `remove` den `low_priority`-Eintrag?
-- Weight-Kalibrierung der Hostname-Liste basierend auf empirischer Precision@10 pro Domain fehlt
+- Hostname priority multipliers: how exactly does high_priority/low_priority modify the score? The SearXNG hostnames plugin source (searx/plugins/hostnames.py) should be read for the exact formula.
+- Missing domains: developer.apple.com? tensorflow.org? docs.docker.com?
+- `remove: pinterest` is redundant with `low_priority: pinterest` — or does `remove` override the `low_priority` entry?
+- Weight calibration of the hostname list based on empirical Precision@10 per domain is missing
 
-## Quellen
+## Sources
 
-- `src/searxng/settings.yml` — hostnames Konfiguration
-- `src/searxng/search_web.py` — MAX_RESULTS, SNIPPET_LENGTH Konstanten
-- `searxng/searxng` GitHub Repo (`searx/results.py`) — Score-Berechnung
-- `searxng/searxng` GitHub Repo (`searx/plugins/hostnames.py`) — Priority-Modifikation
-- SearXNG Docs (RAG Collection: searxng) — hostname Plugin
+- `src/searxng/settings.yml` — hostnames configuration
+- `src/searxng/search_web.py` — MAX_RESULTS, SNIPPET_LENGTH constants
+- `searxng/searxng` GitHub Repo (`searx/results.py`) — score calculation
+- `searxng/searxng` GitHub Repo (`searx/plugins/hostnames.py`) — priority modification
+- SearXNG Docs (RAG Collection: searxng) — hostname plugin
