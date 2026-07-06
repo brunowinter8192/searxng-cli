@@ -2,7 +2,7 @@
 
 **Session:** 2026-06-01  
 **Status:** RESOLVED — closes the open decision from `02_pipe_flow_and_roadmap.md`  
-**Source decisions:** `01_gh_live_experiment.md`, `02_pipe_flow_and_roadmap.md`, `decisions/explore01_discovery.md`
+**Source decisions:** `01_gh_live_experiment.md`, `02_pipe_flow_and_roadmap.md`
 
 ---
 
@@ -10,7 +10,7 @@
 
 ### 1. Discovery = guideline in `capture-and-index` Phase 0 (no pinned script)
 
-The capture pipeline's URL discovery is encoded as a PROCEDURE in the worker skill (`capture-and-index/SKILL.md`, Phase 0), not as a reference script that workers invoke. Workers write situational `/tmp` scripts based on the procedure — the deliverable is maximum URL coverage, not adherence to a specific implementation.
+The capture pipeline's URL discovery is encoded as a PROCEDURE in the worker skill (`capture-and-index`, Phase 0), not as a reference script that workers invoke. Workers write situational `/tmp` scripts based on the procedure — the deliverable is maximum URL coverage, not adherence to a specific implementation.
 
 **Rationale:** The experiment arc showed that discovery strategy is site-dependent (Next.js `__NEXT_DATA__` vs sitemap vs Playwright BFS). Pinning a single script would require workers to adapt it per-site anyway. A guideline with a clear cascade (Path A → B → C) and explicit gotchas is more durable and flexible than a template. A capable model given a clear procedure and a concrete deliverable outperforms one following a rigid script.
 
@@ -28,7 +28,7 @@ The only planned `src/` addition for this architecture is the **pipe-scraper** (
 
 ### 4. CLI contract: `search` + `scrape` only
 
-No `crawl` CLI tool. The BFS crawlers (`crawl_site` BFS path, `explore_site`) are retired as the PRIMARY discovery mechanism (BFS measured insufficient at 67–81% recall). `explore_site` stays for ad-hoc use but is marked legacy/ad-hoc in `web-research/SKILL.md`.
+No `crawl` CLI tool. The BFS crawlers (`crawl_site` BFS path, `explore_site`) are retired as the PRIMARY discovery mechanism (BFS measured insufficient at 67–81% recall). `explore_site` stays for ad-hoc use but is marked legacy/ad-hoc in the `web-research` skill.
 
 ### 5. Rename: `cleanup-and-index` → `capture-and-index`
 
@@ -36,7 +36,7 @@ The old name no longer fits — the worker now owns Discovery + Scrape + Drop + 
 
 Directory renamed: `skills/cleanup-and-index/` → `skills/capture-and-index/`.
 
-Active references updated: `web-research/SKILL.md` spawn template, `decisions/explore01_discovery.md` IST text.
+Active references updated: `web-research` skill spawn template, the explore01_discovery status text.
 
 Historical OldThemes narratives that describe past state (e.g. `skill_consolidation_split/01_re_split_2026-05-24.md`) are preserved intact — do not rewrite history.
 
@@ -65,4 +65,3 @@ Old convention: "always `<current_project>_reference`, never per-source." Relaxe
 | 2 | End-to-end capture run of 305 docs.github.com/de/rest URLs | After pipe-scraper lands |
 | 3 | Second website as generalizability proof | After (2) — test `__NEXT_DATA__` approach on an unknown Next.js doc site |
 
-See `decisions/explore01_discovery.md` for the current production state.
