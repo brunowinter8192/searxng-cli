@@ -7,7 +7,7 @@ Rebuilt `p5_logger.AcquireLogger` to stream events to JSONL on every fetch attem
 throughput over time, derived entirely from the durable JSONL.
 
 Then ran the 64-sub-sitemap target again (curated pool, concurrency 128) to measure
-the proxy economics that were lost in OldThemes 29 when the process was killed before
+the proxy economics that were lost in the prior sitemap dev-run entry when the process was killed before
 `finalize()`.
 
 ## Design
@@ -44,7 +44,7 @@ Surface 6 throughput curve — was reconstructed offline from the durable JSONL 
 using a standalone script calling `_throughput_buckets()` and `_write_summary()`.
 
 This is the direct proof that the streaming design closes the finalize()-data-loss
-problem documented in OldThemes 29.
+problem documented in the prior sitemap dev-run entry.
 
 B-distribution reconstruction note: `proxy_success_count` in each event is the
 running ok-count for that proxy at the time of the event. For proxies that were burned
@@ -121,6 +121,6 @@ exhausts and throughput falls to trickle. For a 64-item target this is acceptabl
   26,000 / 60 ok-per-cycle × 60min/cycle ≈ 26,000min ≈ 18 days. Also not actionable.
 
 **Confirms the 22k-survey-pool as the backfill path.** The 22k-candidate top-13 survey
-pool (OldThemes 28) has ~6× more candidates and higher CF-passability (selected by
+pool (per the acquire-pipe-design entry) has ~6× more candidates and higher CF-passability (selected by
 successful theblock survey hits). The B-distribution and fail/success ratio on THAT pool
 are the open measurement needed before a backfill wall-time estimate is meaningful.

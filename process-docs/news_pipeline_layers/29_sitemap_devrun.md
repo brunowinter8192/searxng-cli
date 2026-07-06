@@ -77,7 +77,7 @@ Without the logger report, both are unknown for the curated pool on sub-sitemaps
 completely unknown for article pages.
 
 **(c) The backfill uses a different pool.**
-The article backfill design (OldThemes 28) targets the 22k-candidate survey top-13 pool
+The article backfill design (per the acquire-pipe-design entry) targets the 22k-candidate survey top-13 pool
 (not the curated 3477). Pool size, socks4/5 composition, and CF-pass rate are different.
 
 **(d) HTML article pages face heavier CF challenge than XML sitemaps.**
