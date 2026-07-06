@@ -22,7 +22,7 @@ re-tries the SAME (increasingly dead) proxies — it adds no fresh supply. So ov
 fraction of the eligible set monotonically drops → more wasted fetches on dead proxies → throughput
 degrades. A 60-min re-fetch re-aligns the pool with the current live source-list state (drops proxies
 that died and fell off the lists, adds new ones), holding the live fraction up. The eligible-pool
-metric (OT68) makes this visible: each refresh shows as an eligible jump in the 10-min window table.
+metric makes this visible: each refresh shows as an eligible jump in the 10-min window table.
 
 TheBlock's `proxy_pool` engine refreshes every 60 min via `pool_provider()` in `run_loop`
 (`src/news/engine/proxy_pool/loop.py`, `REFRESH_INTERVAL_S = 3600`). The rider had no equivalent.
