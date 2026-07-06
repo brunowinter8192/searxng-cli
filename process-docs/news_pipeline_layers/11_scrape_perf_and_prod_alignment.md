@@ -1,19 +1,19 @@
 # Iter 11 — Scrape Performance & Prod Alignment
 
 **Date:** 2026-06-07
-**State:** Problem analysiert, Directive klar. Umbau von 02b steht als nächster Schritt aus.
+**State:** Problem analyzed, directive clear. Rebuild of 02b is the next step, pending.
 
 ---
 
-## Scrape-Performance-Problem (Lauf 2026-06-07)
+## Scrape Performance Problem (run 2026-06-07)
 
-**Symptom:** Stage 02b lief in den Orchestrator-Timeout (600s, ERROR im Log). Ergebnis: 0 ok / 0 failed → cleanup + publish übersprungen → Lauf 1 hat **nichts** indexiert.
+**Symptom:** Stage 02b ran into the orchestrator timeout (600s, ERROR in log). Result: 0 ok / 0 failed → cleanup + publish skipped → run 1 indexed **nothing**.
 
-**Gemessene Rate:** 19 MDs produziert in 600s = ~31s/URL.
+**Measured rate:** 19 MDs produced in 600s = ~31s/URL.
 
-**Ursache (Code-belegt, Rate-gestützt):**
+**Root cause (code-backed, rate-supported):**
 
-`02b` nutzt `fetch_with_fallback` — networkidle zuerst, domcontentloaded als Fallback:
+`02b` uses `fetch_with_fallback` — networkidle first, domcontentloaded as fallback:
 
 ```python
 async def fetch_with_fallback(crawler, url, run_config, run_config_fallback):
@@ -26,67 +26,67 @@ async def fetch_with_fallback(crawler, url, run_config, run_config_fallback):
     ...
 ```
 
-Auf werbe- und tracker-lastigen News-Seiten wie CoinDesk settled networkidle nie vollständig → läuft pro URL in den ~30s Page-Timeout → erst dann greift der schnelle domcontentloaded-Fallback. Dazu kommt: frischer `AsyncWebCrawler` (= neuer Playwright-Browser-Prozess) pro URL, ~2–5s Startup, plus voll sequenzielles Abarbeiten. Summe: ~31s/URL ist erklärbar und erwartbar.
+On ad- and tracker-heavy news sites like CoinDesk, networkidle never settles fully → runs into the ~30s page timeout per URL → only then does the fast domcontentloaded fallback kick in. On top of that: a fresh `AsyncWebCrawler` (= new Playwright browser process) per URL, ~2–5s startup, plus fully sequential processing. Sum: ~31s/URL is explainable and expected.
 
 ---
 
-## Prod-Vergleich (src/crawler/pipe_scraper.py)
+## Prod Comparison (src/crawler/pipe_scraper.py)
 
-Prod-Scraper macht dieselbe Aufgabe ~30× schneller:
+The prod scraper does the same task ~30x faster:
 
 | Dimension | 02b (dev) | Prod (pipe_scraper.py) |
 |---|---|---|
-| Browser-Session | Frische `AsyncWebCrawler`-Instanz pro URL | Eine geteilte Session |
-| Concurrency | Voll sequenziell | `asyncio.gather` + `Semaphore(8)` per-domain |
-| Page-wait | networkidle (primär) + domcontentloaded-Fallback | `delay_before_return_html` (fixes Delay, kein networkidle) |
-| Rate-Limit | `asyncio.sleep(1.0)` fix | Scrapy `DOWNLOAD_DELAY=1.0` + Jitter |
-| Messung | ~31s/URL (19 URLs in 600s) | ~1s/URL (316 URLs in 319s) |
+| Browser session | Fresh `AsyncWebCrawler` instance per URL | One shared session |
+| Concurrency | Fully sequential | `asyncio.gather` + `Semaphore(8)` per-domain |
+| Page-wait | networkidle (primary) + domcontentloaded fallback | `delay_before_return_html` (fixed delay, no networkidle) |
+| Rate-limit | `asyncio.sleep(1.0)` fixed | Scrapy `DOWNLOAD_DELAY=1.0` + jitter |
+| Measurement | ~31s/URL (19 URLs in 600s) | ~1s/URL (316 URLs in 319s) |
 
-Der geteilte Session-Ansatz war in iter 1 (`02_coindesk_scrape.py`) der Regwall-Auslöser (21/25 regwall'd). Der Wechsel auf frisch-pro-URL in iter 2 (`02b`) hat das gelöst — aber auf Kosten des Startups pro URL. Prod löst das anders: geteilte Browser-Instanz + frischer **Context** pro Request (innerhalb derselben Instanz), was sowohl Speed als auch Cookie-Isolation geben kann.
+The shared-session approach was the regwall trigger in iter 1 (`02_coindesk_scrape.py`, 21/25 regwall'd). The switch to fresh-per-URL in iter 2 (`02b`) fixed that — but at the cost of per-URL startup. Prod solves it differently: shared browser instance + fresh **context** per request (within the same instance), which can give both speed and cookie isolation.
 
 ---
 
-## Sitemap-vs-Discover-Vergleich (verifiziert 2026-06-07)
+## Sitemap-vs-Discover Comparison (verified 2026-06-07)
 
-Stichprobe: 32 Discover-URLs vs. CoinDesk-Sitemap (`news-sitemap-index` + `articles-1.xml` / `articles-2.xml`), Fenster 2026-06-04 … 2026-06-07.
+Sample: 32 discover URLs vs. CoinDesk sitemap (`news-sitemap-index` + `articles-1.xml` / `articles-2.xml`), window 2026-06-04 … 2026-06-07.
 
-**A\B = 0: Alle 32 Discover-URLs sind in der Sitemap** (Sitemap ist Obermenge).
+**A\B = 0: all 32 discover URLs are in the sitemap** (sitemap is a superset).
 
-Per Datum:
+Per date:
 
-| Datum | Discover | Sitemap | Nur-Sitemap |
+| Date | Discover | Sitemap | Sitemap-only |
 |---|---|---|---|
 | 2026-06-07 | 4 | 4 | 0 |
 | 2026-06-06 | 13 | 13 | 0 |
 | 2026-06-05 | 14 | 20 | 6 |
 | 2026-06-04 | 1 | 25 | 24 |
 
-**Fazit:** Für das Ziel-Fenster heute + gestern sind Discover und Sitemap **identisch** — der Browser-Discover ist vollständig für die Pipeline-relevante Zone. Die 30 Extras liegen ausschließlich in der Overshoot-Zone (06-04 / 06-05), die der Discover wegen Früh-Abbruch (PRE_48H_THRESHOLD) nur teilweise paginiert.
+**Conclusion:** for the target window (today + yesterday), discover and sitemap are **identical** — the browser discover is complete for the pipeline-relevant zone. The 30 extras sit entirely in the overshoot zone (06-04 / 06-05), which the discover only partially paginates due to early termination (`PRE_48H_THRESHOLD`).
 
-Praktische Implikation: Die Sitemap wäre gleichwertig, einfacher und vollständiger für tiefere Fenster, falls je ein breiteres Backfill-Fenster gebraucht wird. Für den täglichen 48h-Lauf ist der Browser-Discover validiert.
+Practical implication: the sitemap would be equivalent, simpler, and more complete for deeper windows, should a wider backfill window ever be needed. For the daily 48h run, the browser discover is validated.
 
 ---
 
-## Minor: Live-Blog-Filter zu eng
+## Minor: Live-Blog Filter Too Narrow
 
-Der aktuelle Filter in `filter_live_blogs()` fängt nur `/live-markets-` im URL:
+The current filter in `filter_live_blogs()` only catches `/live-markets-` in the URL:
 
 ```python
 kept = [e for e in entries if "/live-markets-" not in e["url"]]
 ```
 
-Ein `/live-updates-`-Artikel ist beim 2026-06-07-Lauf durchgerutscht. Bei Ein-Tages-Fenstern ist das meist kein Problem; bei größeren Fenstern (mehr Paginierung) häufen sich solche URLs. Der Filter sollte auf ein breiteres Muster erweitert werden (z.B. `/live-`).
+A `/live-updates-` article slipped through in the 2026-06-07 run. For one-day windows this is usually not a problem; for larger windows (more pagination), such URLs accumulate. The filter should be widened to a broader pattern (e.g. `/live-`).
 
 ---
 
-## Directive — Nächster Schritt: 02b auf Prod-Ansatz umstellen
+## Directive — Next Step: Rebuild 02b to the Prod Approach
 
-**Eine Option, keine Auswahl:** 02b auf den Prod-Ansatz umstellen — geteilte Session + `asyncio.gather` + `Semaphore` + fixes Delay statt networkidle. Ziel: ~30× Speed-Up, damit 32 URLs in <60s durchlaufen statt in >600s.
+**One option, no selection needed:** rebuild 02b to the prod approach — shared session + `asyncio.gather` + `Semaphore` + fixed delay instead of networkidle. Goal: ~30x speed-up, so 32 URLs run in <60s instead of >600s.
 
-**Bekanntes Risiko (empirisch zu prüfen, kein Block):** Geteilte Session kann die CoinDesk-Regwall wieder triggern (iter-1-Problem). Das ist ein Test, keine Option — wenn Regwall zurückkommt, beim Umbau lösen, z.B.:
-- Frischer Playwright-Browser-Context pro URL innerhalb der geteilten Browser-Instanz (Cookie-Isolation ohne Browser-Prozess-Startup).
-- Prod tut das bereits für andere Sites — prüfen ob pipe_scraper.py das als Muster liefert.
+**Known risk (to verify empirically, not a blocker):** a shared session may re-trigger the CoinDesk regwall (the iter-1 problem). This is a test, not a choice — if the regwall returns, resolve during the rebuild, e.g.:
+- Fresh Playwright browser context per URL within the shared browser instance (cookie isolation without browser-process startup).
+- Prod already does this for other sites — check whether pipe_scraper.py provides this as a pattern.
 
-**Orchestrator-Timeout mitfixen:** Der fixe 600s-Timeout per Stage (`run_pipeline.py:_run()`) ist zu starr für den Scrape. Skalieren mit URL-Anzahl (z.B. `60 + n_urls * 30`) oder auf einen großzügigeren Fixwert (z.B. 1800s) setzen. Beim 02b-Umbau erledigen.
+**Fix the orchestrator timeout alongside it:** the fixed 600s timeout per stage (`run_pipeline.py:_run()`) is too rigid for the scrape. Scale with URL count (e.g. `60 + n_urls * 30`) or set a more generous fixed value (e.g. 1800s). Handle during the 02b rebuild.
 
-**Live-Blog-Filter erweitern:** `/live-` statt `/live-markets-` beim Umbau ergänzen (Minor, kein eigener Task).
+**Widen the live-blog filter:** add `/live-` instead of `/live-markets-` during the rebuild (minor, not a separate task).

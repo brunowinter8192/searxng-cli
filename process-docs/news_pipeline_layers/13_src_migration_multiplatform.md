@@ -3,7 +3,7 @@
 **Date:** 2026-06-08
 **State:** SHIPPED on `dev` (4 commits, merged), user-accepted end-to-end. Refines the flat promotion sketch from iter-8 into a multi-platform-extensible structure.
 
-Implementation record (structure, corrections, flow) → iter-12 § "Migration to src/news/" + `src/news/DOCS.md`. This note captures the DESIGN RATIONALE argued in the migration session — the *why*, for future platform authors.
+Implementation record (structure, corrections, flow) lives in the prior migration entry and in `src/news/`'s own documentation. This note captures the DESIGN RATIONALE argued in the migration session — the *why*, for future platform authors.
 
 ---
 

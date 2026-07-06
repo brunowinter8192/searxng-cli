@@ -1,7 +1,7 @@
 # Iter 10 — One-Command Runner & Background Browser Launch
 
 **Date:** 2026-06-07
-**State:** BUILT + STAGE-01 SMOKE-TESTED. Awaiting user two-run validation (Lauf 1 indexiert alles, Lauf 2 nichts Neues).
+**State:** BUILT + STAGE-01 SMOKE-TESTED. Awaiting user two-run validation (Run 1 indexes everything, Run 2 finds nothing new).
 
 ---
 
@@ -129,7 +129,7 @@ Result: **only Stage 01 (pydoll) required background-launch changes. Stage 02b u
 **Dedup (04_dedup.py):**
 - Pure Python, no browser, no network.
 - For each discover entry: construct `collection_dir / f"coindesk__{pubdate}__{hash}.md"` and check `Path.exists()`.
-- Filesystem presence IS the seen-state — no separate state file. Rationale: single source of truth, reproducible from cold start, no drift risk (OldThemes 08 decision confirmed, collection path updated here to `searxng_crypto`).
+- Filesystem presence IS the seen-state — no separate state file. Rationale: single source of truth, reproducible from cold start, no drift risk (decision confirmed in the prior iteration, collection path updated here to `searxng_crypto`).
 
 **Publish (05_publish.py):**
 - Reads `03_output/manifest.json` — has `hash`, `url`, `publication_date` per entry.
