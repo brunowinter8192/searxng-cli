@@ -1,4 +1,4 @@
-# Lobsters — Implementiert (2026-05-03)
+# Lobsters — Implemented (2026-05-03)
 
 **Endpoint:** `https://lobste.rs/search?q={query}&what=stories&order=relevance` (GET, server-rendered HTML, no JS required)
 **Engine:** `src/search/engines/lobsters.py` — BaseEngine subclass, pydoll Chrome, 4 req/min

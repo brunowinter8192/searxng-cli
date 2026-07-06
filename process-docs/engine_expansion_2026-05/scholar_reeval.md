@@ -1,6 +1,6 @@
 # Google Scholar — Re-Eval (2026-05-03, pydoll stack)
 
-**Status before:** "Engine-Crash 0/0, cause unklar" (2026-04-21 SearXNG stack).
+**Status before:** "Engine crash 0/0, cause unclear" (2026-04-21 SearXNG stack).
 
 **Phase-A findings (2026-05-03, pydoll stack):**
 - DOM probe: page loads correctly, no CAPTCHA, no `/sorry/` redirect, 170 KB HTML
@@ -12,4 +12,4 @@
 
 **Smoke baseline:** `dev/search_pipeline/01_reports/scholar_smoke_*.md` (2026-05-03).
 
-**Subsequent removal (2026-05-21):** Scholar fully removed from ENGINES dict as part of the bee_fix cascade resolution. See `decisions/OldThemes/bee_cdp_starvation/fix_summary.md` for rationale. Scholar re-integration deferred to g82 pooling-rework (Google-free pool). `src/search/engines/scholar.py` retained in tree, inert.
+**Subsequent removal (2026-05-21):** Scholar fully removed from ENGINES dict as part of the bee_fix cascade resolution (CDP-starvation investigation). Scholar re-integration deferred to g82 pooling-rework (Google-free pool). `src/search/engines/scholar.py` retained in tree, inert.

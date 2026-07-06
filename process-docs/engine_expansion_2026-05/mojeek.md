@@ -1,4 +1,4 @@
-# Mojeek — Implementiert (2026-05-03)
+# Mojeek — Implemented (2026-05-03)
 
 **Endpoint:** `https://www.mojeek.com/search?q={query}&safe=1` (GET, server-rendered HTML, no JS required)
 **Engine:** `src/search/engines/mojeek.py` — BaseEngine subclass, pydoll Chrome, 4 req/min

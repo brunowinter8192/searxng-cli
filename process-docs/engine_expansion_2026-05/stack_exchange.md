@@ -1,4 +1,4 @@
-# Stack Exchange — Implementiert (2026-05-04)
+# Stack Exchange — Implemented (2026-05-04)
 
 **Endpoint:** `https://api.stackexchange.com/2.3/search/advanced?site=stackoverflow&filter=withbody` (GET, JSON)
 **Engine:** `src/search/engines/stack_exchange.py` — BaseEngine subclass, httpx, 4 req/min

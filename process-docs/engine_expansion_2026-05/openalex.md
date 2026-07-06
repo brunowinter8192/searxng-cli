@@ -1,4 +1,4 @@
-# OpenAlex — Implementiert (2026-05-03)
+# OpenAlex — Implemented (2026-05-03)
 
 **Endpoint:** `https://api.openalex.org/works?search={query}&per_page=10[&mailto={email}]` (GET, JSON, no auth)
 **Engine:** `src/search/engines/openalex.py` — BaseEngine subclass, httpx-only, 4 req/min
@@ -12,4 +12,4 @@
 
 **Rate limiting:** Anonymous polite-pool: no published hard limit, but OpenAlex asks for `mailto=` parameter to identify polite users. Set `OPENALEX_MAILTO` env var — engine includes it in all requests when present. No default (don't hardcode an email). Production 4 req/min limiter stays well within observed anonymous limits.
 
-**Semantic Scholar HTTP drop rationale (same session):** Tested 2026-05-03. Anonymous tier blocked after 3 rapid requests; 429 persisted for > 180s. Even with 4 req/min limiter, startup/warmup scenarios (prior session already hit the API) would cause persistent 429. Free key requires academic-institution email gate. OpenAlex provides equivalent academic metadata without the rate-cascade risk. (Semantic Scholar was later re-added via browser path 2026-05-07; see `semantic_scholar.md`.)
+**Semantic Scholar HTTP drop rationale (same session):** Tested 2026-05-03. Anonymous tier blocked after 3 rapid requests; 429 persisted for > 180s. Even with 4 req/min limiter, startup/warmup scenarios (prior session already hit the API) would cause persistent 429. Free key requires academic-institution email gate. OpenAlex provides equivalent academic metadata without the rate-cascade risk. (Semantic Scholar was later re-added via browser path 2026-05-07.)
