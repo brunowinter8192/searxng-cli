@@ -1,0 +1,129 @@
+# src/search/engines/
+
+## Role
+
+Per-engine search implementations. Each module (except `base.py`) exports one `BaseEngine` subclass implementing `search(query, language, max_results) -> list[SearchResult]`. Two implementation styles: pydoll Chrome-tab scraping (DOM parse via injected JS) for engines with no public API, and direct `httpx` calls for engines with a JSON/XML API. Touch this package to add/modify an engine's parsing logic or its rate-limit registration; touch `search_web.py` to change which engines are wired into the default pool.
+
+## Public Interface
+
+`__init__.py` is empty. Consumers import engine classes directly, e.g. `from src.search.engines.google import GoogleEngine`.
+
+## Flow
+
+Query string in → engine-specific fetch (pydoll tab navigation + JS extraction, or `httpx` GET/POST) → HTML/JSON parse → `list[SearchResult]` out. Each module registers a `RateLimiter` into the shared `_limiters` registry (`src/search/rate_limiter.py`) at import time; `search_web._engine_with_timing` acquires a token before invoking `search()`.
+
+## Modules
+
+### base.py (18 LOC)
+
+**Purpose:** Abstract `BaseEngine` parent. Declares `search()` (abstract) and default `search_with_reason()` (delegates to `search()`, returns `(results, None)`); Stage-2 engines override `search_with_reason` to return a sub-status empty_reason.
+**Reads:** nothing.
+**Writes:** nothing.
+**Called by:** every engine module in this package (subclassed).
+**Calls out:** `src.search.result.SearchResult` (type only).
+
+---
+
+### google.py (208 LOC)
+
+**Purpose:** Google web search via pydoll Chrome tab. Navigates to search URL, sets `SOCS` consent cookie, waits for `div.MjjYud` result containers via polling JS, detects `/sorry/` CAPTCHA path and consent-domain redirects, extracts results via injected JS parse script.
+**Reads:** none (network only).
+**Writes:** none (network only).
+**Called by:** `src/search/search_web.py`.
+**Calls out:** `pydoll` (NetworkCommands, CookieSameSite), `src.search.browser` (`new_tab`, `kill_tab`).
+
+---
+
+### duckduckgo.py (155 LOC)
+
+**Purpose:** DuckDuckGo HTML-endpoint search via pydoll Chrome tab (`html.duckduckgo.com/html/`). Waits for `#links > div.web-result` containers, detects challenge-form CAPTCHA selector, extracts via injected JS parse script.
+**Reads:** none (network only).
+**Writes:** none (network only).
+**Called by:** `src/search/search_web.py`.
+**Calls out:** `src.search.browser` (`new_tab`, `kill_tab`).
+
+---
+
+### mojeek.py (131 LOC)
+
+**Purpose:** Mojeek search via pydoll Chrome tab (`safe=1` filter). Waits for `ul.results-standard > li > a.ob` anchors, extracts title/snippet/URL via injected JS parse script.
+**Reads:** none (network only).
+**Writes:** none (network only).
+**Called by:** `src/search/search_web.py`.
+**Calls out:** `src.search.browser` (`new_tab`, `kill_tab`).
+
+---
+
+### lobsters.py (130 LOC)
+
+**Purpose:** Lobsters (lobste.rs) search via pydoll Chrome tab, `what=stories&order=relevance` endpoint. Waits for `li.story` containers, extracts direct hrefs — no CAPTCHA check (site has none).
+**Reads:** none (network only).
+**Writes:** none (network only).
+**Called by:** `src/search/search_web.py`.
+**Calls out:** `src.search.browser` (`new_tab`, `kill_tab`).
+
+---
+
+### semantic_scholar.py (163 LOC)
+
+**Purpose:** Semantic Scholar search via pydoll Chrome tab. Waits for `div.cl-paper-row` containers, detects backend error page (`error-message-block` test-id, 400/405 rate-limit signal), handles a cookie-consent accept button, extracts via injected JS parse script. `&sort=` URL param deliberately omitted — causes HTTP 400/405 from SS backend.
+**Reads:** none (network only).
+**Writes:** none (network only).
+**Called by:** `src/search/search_web.py`.
+**Calls out:** `src.search.browser` (`new_tab`, `kill_tab`).
+
+---
+
+### crossref.py (122 LOC)
+
+**Purpose:** CrossRef academic works search via `httpx` GET against `api.crossref.org/works` (JSON API, no browser). Iterative HTML-entity unescape (handles double-encoded entities) on titles.
+**Reads:** none (network only).
+**Writes:** none (network only).
+**Called by:** `src/search/search_web.py`.
+**Calls out:** `httpx`.
+
+---
+
+### openalex.py (105 LOC)
+
+**Purpose:** OpenAlex academic graph search via `httpx` GET against `api.openalex.org/works` (JSON API, no browser). Same entity-unescape treatment as `crossref.py`.
+**Reads:** `OPENALEX_MAILTO` env var (polite-pool identification, optional).
+**Writes:** none (network only).
+**Called by:** `src/search/search_web.py`.
+**Calls out:** `httpx`.
+
+---
+
+### stack_exchange.py (96 LOC)
+
+**Purpose:** Stack Overflow search via `httpx` GET against `api.stackexchange.com/2.3/search/advanced` (JSON API, no browser). Warns once (module-level `_KEY_WARNED` flag) when no API key is configured (anonymous quota).
+**Reads:** `STACK_EXCHANGE_API_KEY` env var (optional; anonymous quota if unset).
+**Writes:** none (network only).
+**Called by:** `src/search/search_web.py`.
+**Calls out:** `httpx`.
+
+---
+
+### open_library.py (81 LOC)
+
+**Purpose:** Open Library book-catalog search via `httpx` GET against `openlibrary.org/search.json` (JSON API, no browser).
+**Reads:** none (network only).
+**Writes:** none (network only).
+**Called by:** `src/search/search_web.py`.
+**Calls out:** `httpx`.
+
+---
+
+### scholar.py (119 LOC)
+
+**Purpose:** Google Scholar search via `httpx` GET (no browser) — migrated off pydoll 2026-05-09. Detects concurrent-CAPTCHA via 30x redirect to `/sorry/`. Full logic lives in `search_with_reason`; `search()` is a legacy thin wrapper that swallows exceptions for dev-script compat.
+**Reads:** none (network only).
+**Writes:** none (network only).
+**Called by:** dev probe scripts only (`dev/search_pipeline/`) — NOT imported by `src/search/search_web.py`. Decoupled/parked from the production 9-engine pool.
+**Calls out:** `httpx`, `lxml.html`.
+
+## Gotchas
+
+- All 9 production engines register a uniform `RateLimiter(max_requests=4, window_seconds=60)` into `_limiters` at module import time — adding a new engine requires this registration or `search_web._engine_with_timing` will KeyError on `get_limiter(name)`.
+- `scholar.py` is fully wired (class, rate limiter, parse logic) but excluded from `search_web.py`'s imports — it is reachable code, not literally dead, but not part of any production call path. Re-enabling it means adding an import + entry to `_DEFAULT_ENGINES` in `filter_modes.py`.
+- pydoll-based engines (`google`, `duckduckgo`, `mojeek`, `lobsters`, `semantic_scholar`) all use `finally: await kill_tab(tab)` — NOT `tab.close()`, which caused 65s hangs on `TIMEOUT_NONCOOP` cases (`Page.close` via tab connection → hung renderer → 60s pydoll fallback).
