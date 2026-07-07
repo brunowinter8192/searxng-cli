@@ -28,7 +28,7 @@ from src.scraper.markdown_converter import (
 )
 from src.scraper.scrape_url import init_browser, fetch_url_content, cleanup_browser
 
-REPORT_DIR = Path(__file__).parent / "04_filter_reports"
+REPORT_DIR = Path(__file__).parent / "md"
 DOMAINS_FILE = Path(__file__).parent.parent / "domains.txt"
 MAX_PREVIEW_CHARS = 500
 
@@ -240,7 +240,7 @@ def save_report(report: dict):
 
     report_dir = REPORT_DIR / profile
     report_dir.mkdir(parents=True, exist_ok=True)
-    report_file = report_dir / f"{domain_name}_{timestamp}.txt"
+    report_file = report_dir / f"05_{domain_name}_{timestamp}.txt"
 
     with open(report_file, "w", encoding="utf-8") as f:
         f.write("=" * 80 + "\n")
@@ -269,8 +269,8 @@ def save_report(report: dict):
 
         f.write(f"\nFINAL OUTPUT: {report['final_chars']} chars\n")
 
-    raw_file = report_dir / f"{domain_name}_{timestamp}_raw.md"
-    clean_file = report_dir / f"{domain_name}_{timestamp}_clean.md"
+    raw_file = report_dir / f"05_{domain_name}_{timestamp}_raw.md"
+    clean_file = report_dir / f"05_{domain_name}_{timestamp}_clean.md"
 
     with open(raw_file, "w", encoding="utf-8") as f:
         f.write(report["raw_markdown"])

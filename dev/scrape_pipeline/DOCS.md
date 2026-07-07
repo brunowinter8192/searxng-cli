@@ -242,7 +242,7 @@ URLs are processed in parallel (PARALLEL_URLS=5, Semaphore). The 5 configs per U
 
 **Purpose:** Instruments the scraping pipeline step-by-step to show what each filter removes at each stage. Reports include node counts, character counts, percentage deltas, and markdown previews of removed content. Used during active profile development.
 **Input:** `domains.txt` (pipeline root)
-**Output:** `05_reports/<profile>/<domain>_<timestamp>.txt`
+**Output:** `md/<profile>/05_<domain>_<timestamp>.txt`
 
 ```bash
 ./venv/bin/python dev/scrape_pipeline/filter_eval/05_filter_debug.py https://de.wikipedia.org/wiki/Biber
