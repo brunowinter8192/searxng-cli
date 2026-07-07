@@ -36,7 +36,7 @@ DEFAULT_CONCURRENCY = 1
 
 AGENT_TASKS_URL = "https://docs.github.com/de/rest/agent-tasks/agent-tasks"
 GOLD_DEFAULT = Path(__file__).parent / "goldstandard" / "docs_github_rest.txt"
-OUTPUT_DIR = Path(__file__).parent / "05_reports"
+OUTPUT_DIR = Path(__file__).parent / "md"
 MISSING_SAMPLE = 20
 
 
@@ -289,10 +289,10 @@ def format_report(seed: str, gold: frozenset, recall: dict, bfs_stats: dict,
     return "\n".join(lines)
 
 
-# Save report to 05_reports/docs_github_rest_YYYYMMDD.md, return path
+# Save report to md/05_docs_github_rest_YYYYMMDD.md, return path
 def save_report(report: str) -> Path:
     OUTPUT_DIR.mkdir(parents=True, exist_ok=True)
-    path = OUTPUT_DIR / f"docs_github_rest_{datetime.now().strftime('%Y%m%d')}.md"
+    path = OUTPUT_DIR / f"05_docs_github_rest_{datetime.now().strftime('%Y%m%d')}.md"
     path.write_text(report, encoding="utf-8")
     return path
 

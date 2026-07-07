@@ -35,7 +35,7 @@ MISSING_SAMPLE = 20
 RECOVERED_SAMPLE = 30
 
 GOLD_DEFAULT = Path(__file__).parent / "goldstandard" / "docs_github_rest.txt"
-OUTPUT_DIR = Path(__file__).parent / "04_reports"
+OUTPUT_DIR = Path(__file__).parent / "md"
 
 STRATEGIES = [
     ("A_prefetch_domcontentloaded", {"prefetch": True,  "wait_until": "domcontentloaded"}),
@@ -268,10 +268,10 @@ def format_report(gold: frozenset, main_results: dict, regression_rows: list[dic
     return "\n".join(lines)
 
 
-# Save report to 04_reports/docs_github_rest_YYYYMMDD.md, return path
+# Save report to md/04_docs_github_rest_YYYYMMDD.md, return path
 def save_report(report: str) -> Path:
     OUTPUT_DIR.mkdir(parents=True, exist_ok=True)
-    path = OUTPUT_DIR / f"docs_github_rest_{datetime.now().strftime('%Y%m%d')}.md"
+    path = OUTPUT_DIR / f"04_docs_github_rest_{datetime.now().strftime('%Y%m%d')}.md"
     path.write_text(report, encoding="utf-8")
     return path
 

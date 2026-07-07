@@ -10,7 +10,7 @@ from crawl4ai.deep_crawling import BFSDeepCrawlStrategy
 from crawl4ai.deep_crawling.filters import FilterChain, DomainFilter, URLPatternFilter, ContentTypeFilter
 from crawl4ai.markdown_generation_strategy import DefaultMarkdownGenerator
 
-OUTPUT_DIR = Path(__file__).parent / "02_reports"
+OUTPUT_DIR = Path(__file__).parent / "md"
 
 
 # Run baseline and filtered crawl, compare results
@@ -104,7 +104,7 @@ def build_report(url, domain, depth, max_pages, exclude_patterns,
 def save_report(report, label):
     OUTPUT_DIR.mkdir(parents=True, exist_ok=True)
     timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-    path = OUTPUT_DIR / f"{label}_{timestamp}.md"
+    path = OUTPUT_DIR / f"02_{label}_{timestamp}.md"
 
     s = report["summary"]
     lines = [

@@ -29,7 +29,7 @@ from urllib.parse import urlparse
 SEED_URL = "https://docs.github.com/de/rest"
 BASE = "https://docs.github.com"
 GOLD_DEFAULT = Path(__file__).parent / "goldstandard" / "docs_github_rest.txt"
-OUTPUT_DIR = Path(__file__).parent / "06_reports"
+OUTPUT_DIR = Path(__file__).parent / "md"
 DISCOVERED_FILE = Path(__file__).parent / "06_discovered_urls.txt"
 UA = "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36"
 
@@ -316,10 +316,10 @@ def build_report(log: list, recall: dict, gold: frozenset,
     return "\n".join(lines)
 
 
-# Save report to 06_reports/
+# Save report to md/
 def save_report(report: str) -> Path:
     OUTPUT_DIR.mkdir(parents=True, exist_ok=True)
-    path = OUTPUT_DIR / f"gh_live_discovery_{datetime.now().strftime('%Y%m%d_%H%M')}.md"
+    path = OUTPUT_DIR / f"06_gh_live_discovery_{datetime.now().strftime('%Y%m%d_%H%M')}.md"
     path.write_text(report, encoding="utf-8")
     return path
 

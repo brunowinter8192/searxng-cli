@@ -5,7 +5,7 @@ URL discovery and traversal testing for Crawl4AI's BFS deep crawl strategy.
 ## 01_discovery.py
 
 **Purpose:** Crawls a website using BFS strategy with domain filtering. Reports URL discovery metrics: total fetched, unique URLs, duplicates removed, content presence, character counts.
-**Output:** `01_reports/<label>_<timestamp>.json`
+**Output:** `md/01_<label>_<timestamp>.json`
 
 `--all` crawls all domains from `domains.txt` in parallel (asyncio.gather, no semaphore — each domain gets its own browser context with independent BFS state).
 
@@ -23,7 +23,7 @@ Each domain represents a different HTML generator and content type for broad tes
 ## 02_url_filters.py
 
 **Purpose:** Compares crawl results with and without URL filters. Runs baseline crawl (no filters) and filtered crawl (with --exclude-patterns), then reports which URLs were removed by the filter.
-**Output:** `02_reports/<label>_<timestamp>.md`
+**Output:** `md/02_<label>_<timestamp>.md`
 
 ```bash
 python dev/explore_pipeline/02_url_filters.py https://docs.searxng.org --exclude-patterns "/genindex*,/py-modindex*,/search*"
@@ -34,7 +34,7 @@ ContentTypeFilter (text/html) is always active in both runs. The report shows ba
 ## 03_strategies.py
 
 **Purpose:** Benchmarks explore_site crawl strategies. Compares baseline (domcontentloaded + DefaultMarkdownGenerator), prefetch + domcontentloaded, and prefetch without wait_until. Measures time per strategy, pages discovered, per-page latency, and speedup vs baseline.
-**Output:** `03_reports/explore_strategies_<domain>_<timestamp>.md`
+**Output:** `md/03_explore_strategies_<domain>_<timestamp>.md`
 
 ```bash
 python dev/explore_pipeline/03_strategies.py https://docs.crawl4ai.com --max-pages 50
@@ -46,7 +46,7 @@ Default test URL: docs.crawl4ai.com. Report includes results table, speedup calc
 ## 04_render_recall.py
 
 **Purpose:** Measures URL discovery recall on docs.github.com/de/rest against a 305-URL gold standard. Compares three BFS strategies (prefetch+dCL baseline, prefetch+NI, full-render NI) to isolate the effect of JS rendering on discovered URL count.
-**Output:** `04_reports/docs_github_rest_<YYYYMMDD>.md`
+**Output:** `md/04_docs_github_rest_<YYYYMMDD>.md`
 **Gold standard:** `goldstandard/docs_github_rest.txt` (305 URLs from github/docs content/rest repo tree)
 
 ```bash
@@ -70,7 +70,7 @@ Key finding from Phase A run (2026-05-29): `BFSDeepCrawlStrategy` uses HTTP for 
 ## 05_playwright_bfs.py (328 LOC)
 
 **Purpose:** Manual Playwright-per-page BFS: renders each page via `AsyncWebCrawler.arun()` (real browser, post-JS DOM), extracts `result.links.internal`, follows matching `--include-pattern` URLs. Measures recall vs goldstandard. Contrasts with `04_render_recall.py` (HTTP BFS).
-**Output:** `05_reports/docs_github_rest_<YYYYMMDD>.md`
+**Output:** `md/05_docs_github_rest_<YYYYMMDD>.md`
 
 ```bash
 ./venv/bin/python dev/explore_pipeline/05_playwright_bfs.py
@@ -85,7 +85,7 @@ Key finding (2026-05-29): Playwright BFS from `docs.github.com/de/rest` reaches 
 ## 06_nextdata_probe.py (339 LOC)
 
 **Purpose:** Agentic discovery via `__NEXT_DATA__` nav-tree extraction. Fetches seed HTML via plain HTTP (no browser), parses `sidebarTree` from the Next.js SSR blob, detects all versions via `allVersions`, fetches each version's REST root page, unions all sidebar trees normalized to canonical `/de/rest/…` form. Scores recall vs goldstandard.
-**Output:** `06_reports/gh_live_discovery_<date>_<time>.md` · discovered URL set → `06_discovered_urls.txt`
+**Output:** `md/06_gh_live_discovery_<date>_<time>.md` · discovered URL set → `06_discovered_urls.txt`
 
 ```bash
 ./venv/bin/python dev/explore_pipeline/06_nextdata_probe.py
@@ -99,12 +99,12 @@ Key finding (2026-05-31): 305/305 = 100% recall in 1.6s. FPT sidebar (256) + GHE
 
 ## Report Formats
 
-**01_reports:** JSON with summary (total fetched, unique URLs, duplicates, content/empty counts, total chars) and URL list with per-URL content status and character counts. Reports are consumed by `dev/scrape_pipeline/filter_eval/06_content_source.py`.
+**md/01_*.json:** JSON with summary (total fetched, unique URLs, duplicates, content/empty counts, total chars) and URL list with per-URL content status and character counts. Reports are consumed by `dev/scrape_pipeline/filter_eval/06_content_source.py`.
 
-**02_reports:** Markdown with summary table, removed URLs list, and full baseline URL list with [REMOVED] markers.
+**md/02_*.md:** Markdown with summary table, removed URLs list, and full baseline URL list with [REMOVED] markers.
 
-**03_reports:** Markdown with strategy comparison table (pages, time, per-page ms, duplicates), speedup vs baseline, and depth distribution per strategy.
+**md/03_*.md:** Markdown with strategy comparison table (pages, time, per-page ms, duplicates), speedup vs baseline, and depth distribution per strategy.
 
-**05_reports:** Markdown with recall table (found/matched/missing/noise/latency), baseline comparison, and sample missing URLs.
+**md/05_*.md:** Markdown with recall table (found/matched/missing/noise/latency), baseline comparison, and sample missing URLs.
 
-**06_reports:** Markdown with recall table (found per version/net additions/matched/noise), baseline comparison, per-step discovery log. Discovered URL set saved separately as `06_discovered_urls.txt`.
+**md/06_*.md:** Markdown with recall table (found per version/net additions/matched/noise), baseline comparison, per-step discovery log. Discovered URL set saved separately as `06_discovered_urls.txt`.

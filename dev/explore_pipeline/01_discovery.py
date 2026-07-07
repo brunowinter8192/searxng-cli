@@ -11,7 +11,7 @@ from crawl4ai.deep_crawling import BFSDeepCrawlStrategy
 from crawl4ai.deep_crawling.filters import FilterChain, DomainFilter
 from crawl4ai.markdown_generation_strategy import DefaultMarkdownGenerator
 
-OUTPUT_DIR = Path(__file__).parent / "01_reports"
+OUTPUT_DIR = Path(__file__).parent / "md"
 DOMAINS_FILE = Path(__file__).parent / "domains.txt"
 TRAILING_SLASH = re.compile(r'/$')
 
@@ -104,7 +104,7 @@ def build_report(seed_url, domain, depth, max_pages, total_fetched, unique_resul
 def save_report(report, label):
     OUTPUT_DIR.mkdir(parents=True, exist_ok=True)
     timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-    path = OUTPUT_DIR / f"{label}_{timestamp}.json"
+    path = OUTPUT_DIR / f"01_{label}_{timestamp}.json"
     with open(path, 'w') as f:
         json.dump(report, f, indent=2)
     print(f"\nReport saved: {path}")

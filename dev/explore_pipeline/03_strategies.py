@@ -11,7 +11,7 @@ from crawl4ai.deep_crawling import BFSDeepCrawlStrategy
 from crawl4ai.deep_crawling.filters import FilterChain, DomainFilter, ContentTypeFilter
 from crawl4ai.markdown_generation_strategy import DefaultMarkdownGenerator
 
-OUTPUT_DIR = Path(__file__).parent / "03_reports"
+OUTPUT_DIR = Path(__file__).parent / "md"
 
 STRATEGIES = {
     "baseline_domcontentloaded": {
@@ -164,7 +164,7 @@ def format_report(url: str, depth: int, max_pages: int, results: dict) -> str:
 def save_report(report: str, domain: str):
     OUTPUT_DIR.mkdir(parents=True, exist_ok=True)
     timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-    path = OUTPUT_DIR / f"explore_strategies_{domain}_{timestamp}.md"
+    path = OUTPUT_DIR / f"03_explore_strategies_{domain}_{timestamp}.md"
     with open(path, 'w') as f:
         f.write(report)
     print(f"Report saved: {path}")
