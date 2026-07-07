@@ -9,7 +9,7 @@ from pathlib import Path
 
 ROOT = Path(__file__).parent.parent.parent  # repo root (worktree)
 SRC_DIR = ROOT / "src"
-REPORT_DIR = Path(__file__).parent / "01_reports"
+REPORT_DIR = Path(__file__).parent / "md"
 LEVELS = {"debug", "info", "warning", "error", "critical"}
 MSG_LIMIT = 120
 
@@ -110,7 +110,7 @@ def _render_report(records: list[dict]) -> str:
 def _write_report(content: str) -> Path:
     REPORT_DIR.mkdir(parents=True, exist_ok=True)
     ts_file = datetime.now(timezone.utc).strftime("%Y%m%dT%H%M%SZ")
-    out_path = REPORT_DIR / f"audit_{ts_file}.md"
+    out_path = REPORT_DIR / f"01_audit_{ts_file}.md"
     out_path.write_text(content, encoding="utf-8")
     return out_path
 

@@ -24,7 +24,7 @@ Production code fix: `cli.py` logging config + call-site relevel.
 
 ### Scripts
 
-**`01_audit.py`** — AST walker over `src/`; emits one row per `logger.X()` / `logging.X()` call with file:line, logger object name, current level, and message template (truncated to 120 chars). Outputs MD report to `01_reports/`.
+**`01_audit.py`** — AST walker over `src/`; emits one row per `logger.X()` / `logging.X()` call with file:line, logger object name, current level, and message template (truncated to 120 chars). Outputs MD report to `md/` (`01_audit_<ts>.md`).
 
 Usage (from repo root):
 ```bash
