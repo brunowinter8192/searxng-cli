@@ -50,7 +50,7 @@ URLS: list[tuple[str, str]] = [
     ("C", "https://raw.githubusercontent.com/vinta/awesome-python/master/README.md"),
 ]
 
-REPORTS_DIR = Path(__file__).parent / "06_reports"
+REPORTS_DIR = Path(__file__).parent / "md"
 
 
 # ORCHESTRATOR
@@ -153,7 +153,7 @@ def write_report(
         format_table(results),
         format_summary(results),
     ]
-    report_path = output_dir / f"cf_md_adoption_{ts}.md"
+    report_path = output_dir / f"06_cf_md_adoption_{ts}.md"
     report_path.write_text("\n\n".join(sections), encoding="utf-8")
     return report_path
 
