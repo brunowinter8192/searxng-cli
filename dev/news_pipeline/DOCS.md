@@ -56,7 +56,7 @@ Per-domain news scraping pipeline for trading-bot data layer. CoinDesk → RAG c
 **Purpose:** Scrape each URL with fresh `AsyncWebCrawler` per URL — new Chromium process + clean cookie jar each fetch. Runs CONCURRENTLY via `asyncio.gather` + prod's deterministic per-domain Scrapy gate (ported from `src/crawler/pipe_scraper.py`: `_ensure_domain_state` + `_gate_domain`, `DOWNLOAD_DELAY=1.0`, `CONCURRENCY_PER_DOMAIN=8`, jitter=uniform(0.5×,1.5×)). `domcontentloaded` + `delay_before_return_html=0.5`, `page_timeout=15000`, no networkidle, no custom UA. Loud regwall guard: per-page WARN + per-run ERROR + exit non-zero if ≥20% regwalled. **Use this for production-quality scrapes.**
 
 Only deviation from `pipe_scraper.py`: fresh crawler per URL (isolation). Pacing is identical.
-Validated: 0/32 regwall, 32/32 ok, ~32s on 32 CoinDesk URLs. See `decisions/OldThemes/news_pipeline_layers/12_scrape_prod_rebuild.md` for full investigation trail (real-B1 timezone dead-end, B2 validation, gate restoration).
+Validated: 0/32 regwall, 32/32 ok, ~32s on 32 CoinDesk URLs.
 
 **Input:** `--input <path>` or auto-picks newest `01_output/discover_*.json`. Pipeline passes the 04_dedup output explicitly via `--input`.
 
@@ -126,7 +126,7 @@ Validated: 0/32 regwall, 32/32 ok, ~32s on 32 CoinDesk URLs. See `decisions/OldT
 
 **Purpose:** Smoke B — two isolation candidates over same 32 URLs. B1: shared crawler + per-URL `timezone_id` (intended to bust crawl4ai 0.8.6 context cache). B2: fresh `AsyncWebCrawler` per URL, concurrent via `asyncio.gather` + `Semaphore(8)`. Produces `smoke_output/b1_regwall_review.md` + `smoke_output/b2_regwall_review.md` and a comparison table (stdout). NOT committed: `smoke_output/` is gitignored.
 
-**Result:** Both rows 0/32 regwall, 24s — but B1 row was invalid (script edited while running; B1 actually executed as B2). Real-B1 subsequently failed 25/32 timeout. B2 is the shipped mechanism. See `decisions/OldThemes/news_pipeline_layers/12_scrape_prod_rebuild.md`.
+**Result:** Both rows 0/32 regwall, 24s — but B1 row was invalid (script edited while running; B1 actually executed as B2). Real-B1 subsequently failed 25/32 timeout. B2 is the shipped mechanism.
 
 ```bash
 ./venv/bin/python dev/news_pipeline/scrape_isolation_smoke.py
@@ -134,13 +134,13 @@ Validated: 0/32 regwall, 32/32 ok, ~32s on 32 CoinDesk URLs. See `decisions/OldT
 
 ## The Block — Discovery Probes (`theblock/`)
 
-Status: discovery 36/64 sub-sitemaps cached (first pipe run). CF-pass rate measured at **0.8%** on live pool (vs old 18.8% discriminator probe). Per-IP budget B: min=4, max=20, mean=9.3 (3 exhausted proxies). See `decisions/OldThemes/news_pipeline_layers/` files 14–21 for full state.
+Status: discovery 36/64 sub-sitemaps cached (first pipe run). CF-pass rate measured at **0.8%** on live pool (vs old 18.8% discriminator probe). Per-IP budget B: min=4, max=20, mean=9.3 (3 exhausted proxies).
 
 ### theblock/probe_discovery.py
 
 **Purpose:** Measure discovery coverage + URL taxonomy. Fetches the 64-sub sitemap union, news sitemap, RSS, and bounded UI crawl; outputs `theblock/discover_coverage_report.md`. Resume-safe: per-sub checkpoint files in `theblock/cache/`.
 
-**CF behaviour:** IP-level 403/429 fires after ~21 sequential sub-sitemap fetches. See `decisions/OldThemes/news_pipeline_layers/15_theblock_cf_block_and_anti_cf_method.md`.
+**CF behaviour:** IP-level 403/429 fires after ~21 sequential sub-sitemap fetches.
 
 ```bash
 ./venv/bin/python dev/news_pipeline/theblock/probe_discovery.py
@@ -150,7 +150,7 @@ Status: discovery 36/64 sub-sitemaps cached (first pipe run). CF-pass rate measu
 
 **Purpose:** Evidence probe for `monosans/proxy-scraper-checker` proxy pool yield against theblock.co. Two runs: neutral `check_url` (icanhazip) and theblock.co sitemap `check_url`. Wrapper handles Docker invocation (native TUI binary requires TTY; Docker path works headless).
 
-**Results:** `decisions/OldThemes/news_pipeline_layers/16_monosans_pool_evidence.md`. Key finding: neutral pool yields 494/17,202 proxies; theblock check_url yields 0/17,202. Conclusion: use neutral check_url only; theblock.co CF validation is the `curl_cffi impersonate="chrome"` fetch loop's responsibility.
+**Key finding:** neutral pool yields 494/17,202 proxies; theblock check_url yields 0/17,202. Conclusion: use neutral check_url only; theblock.co CF validation is the `curl_cffi impersonate="chrome"` fetch loop's responsibility.
 
 **Configs:**
 - `monosans_cfg_neutral.toml` — `check_url = https://ipv4.icanhazip.com`, concurrency 512
@@ -167,7 +167,7 @@ bash dev/news_pipeline/theblock/probe_monosans.sh theblock
 
 **Purpose:** Discriminates OldThemes 16's ambiguous 0/17202 monosans result: re-tests the neutral pool with `curl_cffi impersonate=chrome` (correct browser JA3 vs monosans' rustls) against a real `/post/` sub-sitemap (`sitemap_tbco_post_type_post_0.xml`). Identifies which failure mode dominates: CF signature block (a), CF IP-reputation block (b), or stale pool (c).
 
-**Results:** `decisions/OldThemes/news_pipeline_layers/17_curl_cffi_passability_discriminator.md`. Key finding: **80/425 (18.8%) pass** → verdict **(a)**: rustls was the blocker; curl_cffi-chrome passes CF; free proxy loop is viable for the discovery gap. URL correction required mid-run: real sub URL is `sitemap_tbco_post_type_post_N.xml` (not `post_N.xml`).
+**Key finding:** **80/425 (18.8%) pass** → verdict **(a)**: rustls was the blocker; curl_cffi-chrome passes CF; free proxy loop is viable for the discovery gap. URL correction required mid-run: real sub URL is `sitemap_tbco_post_type_post_N.xml` (not `post_N.xml`).
 
 **Ephemeral output (gitignored):** `theblock/probe_curl_cffi_discriminator_reports/`
 
@@ -179,7 +179,7 @@ bash dev/news_pipeline/theblock/probe_monosans.sh theblock
 
 **Purpose:** Measure the raw proxy pool size from 68 public source URLs — pure fetch+parse+count, NO liveness checking, NO proxy contacted. Fetches all sources concurrently (`httpx.AsyncClient`, `Semaphore(20)`, 15s timeout), parses `host:port` entries from bare, `proto://`, and `proto://user:pass@` formats, reports per-source counts + per-protocol bucket breakdown + global unique dedup vs baseline.
 
-**Results:** `decisions/OldThemes/news_pipeline_layers/19_maxed_source_expansion.md`. Key finding: 68/68 sources OK (1.7s), **428,500 raw** / **118,701 globally unique** host:port entries (24.9× monosans single-source baseline of ~17,202).
+**Key finding:** 68/68 sources OK (1.7s), **428,500 raw** / **118,701 globally unique** host:port entries (24.9× monosans single-source baseline of ~17,202).
 
 **Ephemeral output (gitignored):** `theblock/probe_pool_size_reports/`
 
@@ -193,7 +193,7 @@ bash dev/news_pipeline/theblock/probe_monosans.sh theblock
 
 **Staleness filter (`--source monosans` and `--source curated`):** after loading the live list, calls `proxy_status_log.partition_fresh(entries, window_s)` to split into `(to_check, skipped_fresh)`. Only `to_check` enters `run_checks` and `record_run`; skipped proxies keep their existing `last_seen`. `--recheck-window S` (int, default `3600`) controls the freshness threshold in seconds. Console and `sweep_log.md` report `skipped_fresh=N` when non-zero. Frozen/sample path is unaffected.
 
-**Results:** `decisions/OldThemes/news_pipeline_layers/20_liveness_check_and_concurrency_sweep.md`. Sweep: 20k sample × 4 concurrency levels (512/1000/2000/3000), timeout 5s/5s.
+**Sweep:** 20k sample × 4 concurrency levels (512/1000/2000/3000), timeout 5s/5s.
 
 **Persistent output (committed):** `theblock/probe_liveness_logs/sweep_log.md`, `theblock/logs/proxy_status_log.json`
 **Ephemeral (gitignored):** `theblock/frozen_pool/`, `theblock/probe_liveness_logs/unknown_errors_*.log`

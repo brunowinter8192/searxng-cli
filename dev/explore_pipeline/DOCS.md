@@ -65,7 +65,7 @@ Default test URL: docs.crawl4ai.com. Report includes results table, speedup calc
 
 CLI flags: `--gold PATH`, `--max-pages INT`, `--depth INT`, `--no-regression`, `--strategies COMMA_LIST`, `--delay INT`
 
-Key finding from Phase A run (2026-05-29): `BFSDeepCrawlStrategy` uses HTTP for link extraction regardless of `wait_until` — changing to `networkidle` has no effect on recall. Strategy C (prefetch=False) found 205/305 = 67.2% recall. See `decisions/OldThemes/crawler_js_render_discovery/A_recall_probe.md`.
+Key finding from Phase A run (2026-05-29): `BFSDeepCrawlStrategy` uses HTTP for link extraction regardless of `wait_until` — changing to `networkidle` has no effect on recall. Strategy C (prefetch=False) found 205/305 = 67.2% recall.
 
 ## 05_playwright_bfs.py (328 LOC)
 
@@ -95,7 +95,7 @@ Key finding (2026-05-29): Playwright BFS from `docs.github.com/de/rest` reaches 
 
 CLI flags: `--gold PATH`, `--no-ghec`, `--no-ghes`
 
-Key finding (2026-05-31): 305/305 = 100% recall in 1.6s. FPT sidebar (256) + GHEC normalized (36 net new) + GHES all-versions normalized (24 net new, incl. deprecated `projects-classic` in GHES 3.16). Generic to any Next.js SSR doc site. Method narrative: `decisions/OldThemes/agentic_discovery/01_gh_live_experiment.md`.
+Key finding (2026-05-31): 305/305 = 100% recall in 1.6s. FPT sidebar (256) + GHEC normalized (36 net new) + GHES all-versions normalized (24 net new, incl. deprecated `projects-classic` in GHES 3.16). Generic to any Next.js SSR doc site.
 
 ## Report Formats
 

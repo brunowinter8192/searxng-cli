@@ -91,7 +91,7 @@ plain dict, dict with `@graph`, top-level array, non-dict values (int/str) silen
 10. Podcast sponsor block (`_SPONSOR_BLOCK_RE`): `\n\*{0,2}This episode is brought to you by\b.*` to EOS (DOTALL).
 11. Trailing whitespace per line; blank-run collapse to single blank; final strip.
 
-Rules validated against full 22,995 raw corpus. See `decisions/OldThemes/news_pipeline_layers/54_theblock_cleaner_extension.md`.
+Rules validated against full 22,995 raw corpus.
 Fallback: if no `NewsArticle` or no `articleBody` → returns `""` + stderr log, no crash.
 
 ---

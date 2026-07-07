@@ -8,7 +8,7 @@ Does NOT import from `src/`; self-contained dev implementation.
 
 ## Design (SUSTAINED)
 
-**Sustained concurrent rotation loop with persistent cooldown.** (Full rationale: `decisions/OldThemes/news_pipeline_layers/32_sustained_loop.md`.)
+**Sustained concurrent rotation loop with persistent cooldown.**
 - **Active buffer:** up to `buffer_size` (default 1280 = 10× concurrency) ELIGIBLE proxies pulled
   from the full pool (pool order), refilled as proxies burn out.
 - **Batches:** fires up to `concurrency` (default 128) (proxy, URL) pairs concurrently. Working-set
@@ -191,9 +191,8 @@ index (via p3_target).
 
 ## Status
 
-**Machine: SUSTAINED + BOX/JANITOR (built, validated on dev).** OldThemes 32 built the sustained
-loop; OldThemes 33 added job/box/janitor (clean-slate cooldown, global lock, persistent job record).
-Full rationale: `decisions/OldThemes/news_pipeline_layers/33_box_janitor.md`.
+**Machine: SUSTAINED + BOX/JANITOR (built, validated on dev).** Sustained rotation loop plus
+job/box/janitor layer (clean-slate cooldown, global lock, persistent job record).
 
 | Stage | Commit | What |
 |---|---|---|
@@ -211,8 +210,6 @@ Full rationale: `decisions/OldThemes/news_pipeline_layers/33_box_janitor.md`.
 pool 3396 curated. Persistent output at `acquire_pipe_jobs/20260614T190143Z/`.
 
 **Prior sitemap dev-run** (single-pass machine, superseded): 59/64, 44k URLs (26,003 `/post/`).
-Full analysis: `decisions/OldThemes/news_pipeline_layers/29_sitemap_devrun.md` (run) +
-`30_streaming_logger_economics.md` (economics) + `32_sustained_loop.md` (the sustained rebuild).
 
 ## Gotchas
 - Home IP is CF-blocked for direct theblock GETs (403) — p3_target proxy fallback handles this.

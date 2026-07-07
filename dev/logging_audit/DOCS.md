@@ -11,7 +11,7 @@ Lobsters empty (EMPTY_NO_CONTAINER) for: <query>
 
 Root causes: (1) per-engine-empty events misclassified as WARNING — they are already captured structurally in `query_log.jsonl`; (2) no FileHandler-only config — Python's default lastResort handler emits WARNING+ to stderr.
 
-Production code fix: `cli.py` logging config + call-site relevel. See `decisions/logging.md`.
+Production code fix: `cli.py` logging config + call-site relevel.
 
 ## Investigation
 

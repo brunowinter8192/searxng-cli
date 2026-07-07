@@ -70,7 +70,7 @@ Stub — always returns `""`. Domain blocking removed; no plugin-routing hint is
 ## Architecture
 
 Content extraction is delegated entirely to Crawl4AI (v0.8.6):
-- **Browser strategy:** Single call — `enable_stealth=True` + `UndetectedAdapter` (Patchright) + `magic=True` + `wait_until="load"` + `page_timeout=60000`. No phase escalation. See `decisions/scrape_pipeline.md`.
+- **Browser strategy:** Single call — `enable_stealth=True` + `UndetectedAdapter` (Patchright) + `magic=True` + `wait_until="load"` + `page_timeout=60000`. No phase escalation.
 - **Cookie removal:** CSS selector exclusion via `excluded_selector=COOKIE_CONSENT_SELECTOR`. Specific selectors per framework (CookieYes, OneTrust, Cookiebot, GDPR etc.). `remove_overlay_elements` is NOT used — it removes legitimate content on some sites.
 - **Content filtering:** PruningContentFilter(0.48) + fit_markdown for relevance assessment. raw_markdown fallback when filtered content < 200 chars (table-heavy pages).
 - **Markdown generation:** Two modes:
