@@ -136,11 +136,11 @@ def generate_content_diff(domain_dir: Path, prev_iter: int, latest_iter: int) ->
 
 # Save comparison report to reports directory
 def save_comparison_report(results: list[dict]) -> None:
-    reports_dir = Path(__file__).parent / "02_iteration_reports"
+    reports_dir = Path(__file__).parent / "md"
     reports_dir.mkdir(parents=True, exist_ok=True)
 
     timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-    report_file = reports_dir / f"diff_report_{timestamp}.txt"
+    report_file = reports_dir / f"02_diff_report_{timestamp}.txt"
 
     with open(report_file, 'w', encoding='utf-8') as f:
         f.write("=" * 80 + "\n")

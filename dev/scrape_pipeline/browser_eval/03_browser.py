@@ -6,7 +6,7 @@ from urllib.parse import urlparse
 from crawl4ai import AsyncWebCrawler, BrowserConfig, CrawlerRunConfig, CacheMode
 from crawl4ai.markdown_generation_strategy import DefaultMarkdownGenerator
 
-OUTPUT_DIR = Path(__file__).parent / "03_reports"
+OUTPUT_DIR = Path(__file__).parent / "md"
 PARALLEL_URLS = 5
 
 CONFIGS = {
@@ -114,7 +114,7 @@ async def scrape_url_configs(sem, crawler, url, results):
             raw_md = result.markdown.raw_markdown if result.markdown else ""
             word_count = len(raw_md.split()) if raw_md else 0
 
-            out_path = OUTPUT_DIR / f"{prefix}_{name}.md"
+            out_path = OUTPUT_DIR / f"03_{prefix}_{name}.md"
             out_path.write_text(raw_md, encoding="utf-8")
 
             results[(url, name)] = (len(raw_md), word_count)
