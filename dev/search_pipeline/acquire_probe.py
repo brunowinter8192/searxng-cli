@@ -19,7 +19,6 @@ Usage:
 
 Output (full run only):
     dev/search_pipeline/01_reports/acquire_probe_<ts>.md
-    decisions/OldThemes/bee_cdp_starvation/02_acquire_probe.md
 """
 
 # INFRASTRUCTURE
@@ -503,7 +502,6 @@ def _write_findings(records: list[dict], report_path: Path, cascade_ok: bool, ze
         f"**Verdict:** {od}  ",
         f"**Cascade reproduced:** {cascade_ok} ({zero_n}/{len(records)} zero_cascade)  ",
         f"**Report:** `{report_rel}`  ",
-        "**Prior probe:** `decisions/OldThemes/bee_cdp_starvation/01_probe.md`",
         "",
         "---",
         "",

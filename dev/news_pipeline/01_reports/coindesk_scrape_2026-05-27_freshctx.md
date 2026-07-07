@@ -22,5 +22,3 @@
 - `business/…/block-kicks-off-cash-app-s-phased-stablecoin-roll-out-to-its-nearly-60-million-users` — 35,612 chars (was 24,981 chars regwall in iter 1)
 
 **Verdict:** PASS. Fresh context per URL resolves regwall. Filter-design unblocked.
-
-See `decisions/OldThemes/news_pipeline_layers/03_coindesk_fresh_context_iteration2.md` for full analysis.

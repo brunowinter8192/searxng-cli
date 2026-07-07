@@ -107,7 +107,7 @@ def write_phase1_report(sweep_rows: list[tuple], sample_n: int) -> tuple[Path, i
         "  Save raw markdown to `A_pipe_scrape_eval_reports/full_run_<ts>/`.  ",
         "  Report: p50/p95/max latency, success/empty/timeout rates, total wallclock.",
         "",
-        "Then write `decisions/pipe_scraper.md` (NEW file, separate from scrape_pipeline.md).",
+        "Then record the config decision in process history.",
     ]
     path.write_text('\n'.join(lines), encoding='utf-8')
     return path, best

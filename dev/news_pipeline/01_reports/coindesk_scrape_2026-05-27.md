@@ -25,5 +25,3 @@
 - `opinion/…/a-bipartisan-bridge-to-the-future-why-the-senate-must-finish-the-job-on-digital-assets` — 25,202 chars
 - `markets/…/robinhood-is-letting-ai-trade-for-you-so-you-don-t-have-to-keep-checking-the-markets` — 24,869 chars
 - `business/…/dtcc-plans-to-bring-tokenized-assets-to-stellar-in-latest-wall-street-blockchain-push` — 25,096 chars
-
-See `decisions/OldThemes/news_pipeline_layers/02_coindesk_regwall_iteration1.md` for analysis.

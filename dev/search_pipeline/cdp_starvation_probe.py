@@ -3,14 +3,13 @@
 
 Hypothesis: Chrome CDP event flooding during CAPTCHA navigation starves the asyncio event loop,
 causing all 9 engines' asyncio.wait_for(limiter.acquire(), 5.0) to time out simultaneously.
-See decisions/OldThemes/pooling/04_zero_query_diagnosis.md for prior analysis.
+Builds on prior zero-query diagnosis analysis.
 
 Usage:
     ./venv/bin/python3 dev/search_pipeline/cdp_starvation_probe.py [--max-queries N]
 
 Output:
     dev/search_pipeline/01_reports/cdp_probe_<ts>.md
-    decisions/OldThemes/bee_cdp_starvation/01_probe.md
 """
 
 # INFRASTRUCTURE
@@ -288,7 +287,7 @@ def _write_report(records: list[dict]) -> Path:
     return path
 
 
-# Write findings narrative to decisions/OldThemes/bee_cdp_starvation/01_probe.md; return path
+# Write findings narrative; return path
 def _write_findings(records: list[dict], report_path: Path) -> Path:
     path = FINDINGS_DIR / "01_probe.md"
     stats = _compute_stats(records)
@@ -305,7 +304,6 @@ def _write_findings(records: list[dict], report_path: Path) -> Path:
         f"**Date:** {datetime.now().strftime('%Y-%m-%d')}  ",
         f"**Verdict:** {verdict}  ",
         f"**Report:** `{report_rel}`  ",
-        "**Prior diagnosis:** `decisions/OldThemes/pooling/04_zero_query_diagnosis.md`",
         "",
         "---",
         "",

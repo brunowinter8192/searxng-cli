@@ -25,4 +25,4 @@ Phase 3 — Full run on all URLs at best (concurrency, delay):
   Save raw markdown to `A_pipe_scrape_eval_reports/full_run_<ts>/`.  
   Report: p50/p95/max latency, success/empty/timeout rates, total wallclock.
 
-Then write `decisions/pipe_scraper.md` (NEW file, separate from scrape_pipeline.md).
+Then record the config decision in process history.
