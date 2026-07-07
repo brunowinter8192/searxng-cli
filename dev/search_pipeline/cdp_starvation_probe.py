@@ -53,7 +53,7 @@ search_web_workflow = _search_mod.search_web_workflow
 SCRIPT_DIR = Path(__file__).parent
 QUERIES_FILE = SCRIPT_DIR / "queries.txt"
 REPORT_DIR = SCRIPT_DIR / "01_reports"
-FINDINGS_DIR = Path(__file__).parent.parent.parent / "decisions" / "OldThemes" / "bee_cdp_starvation"
+FINDINGS_DIR = Path(__file__).parent / "01_reports"
 
 COLD_START_SKIP_S = 5.0      # exclude first N seconds from statistics (Chrome boot noise)
 CANARY_INTERVAL_S = 0.1      # Pattern B: scheduling probe interval

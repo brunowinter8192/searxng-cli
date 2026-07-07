@@ -2,7 +2,6 @@
 # Proxy pool evidence for theblock.co — monosans/proxy-scraper-checker runs
 #
 # Deliverables: pool yield under neutral check_url vs theblock.co check_url
-# Results: decisions/OldThemes/news_pipeline_layers/16_monosans_pool_evidence.md
 #
 # Acquisition: nightly.link arm64 binary (TUI, requires TTY) → falls back to Docker.
 # Docker image: ghcr.io/monosans/proxy-scraper-checker:<sha> (from compose.yaml in docker artifact)
