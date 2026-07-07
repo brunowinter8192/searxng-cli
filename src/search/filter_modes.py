@@ -12,7 +12,7 @@ from src.search.docs_filter import is_docs_url
 logger = logging.getLogger(__name__)
 
 # Default engine set — all 9 active engines. Scholar fully removed (not just dormant) until
-# Pooling-Rework assigns it a Google-free pool. See decisions/OldThemes/bee_cdp_starvation/fix_summary.md.
+# Pooling-Rework assigns it a Google-free pool.
 _DEFAULT_ENGINES: frozenset[str] = frozenset({
     "google", "crossref", "duckduckgo", "mojeek", "lobsters",
     "openalex", "stack_exchange", "semantic_scholar", "open_library",
