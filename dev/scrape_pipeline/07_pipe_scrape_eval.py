@@ -7,13 +7,14 @@ import sys
 import time
 from pathlib import Path
 
-# Local import — run from project root: ./venv/bin/python dev/scrape_pipeline/A_pipe_scrape_eval.py
+# Local import — run from project root: ./venv/bin/python dev/scrape_pipeline/07_pipe_scrape_eval.py
 sys.path.insert(0, str(Path(__file__).parent))
 # From p1_pipe_scraper.py: raw URL scraper (domcontentloaded, no filter, configurable knobs)
 from p1_pipe_scraper import scrape_urls
 
 DISCOVERED_URLS = Path(__file__).parent.parent / "explore_pipeline" / "06_discovered_urls.txt"
-REPORTS_DIR = Path(__file__).parent / "A_pipe_scrape_eval_reports"
+REPORTS_DIR = Path(__file__).parent / "md"
+DATA_DIR = Path(__file__).parent / "07_pipe_scrape_eval_data"
 
 PHASE3_BATCH_SIZE = 30       # URLs per batch — matches WAF burst window from Phase 1
 PHASE3_INTER_BATCH_S = 30.0  # pause between batches (conservative WAF recovery)
@@ -71,7 +72,7 @@ def fmt_sweep_row(concurrency: int, m: dict, wall_s: float) -> str:
 def write_phase1_report(sweep_rows: list[tuple], sample_n: int) -> tuple[Path, int]:
     REPORTS_DIR.mkdir(parents=True, exist_ok=True)
     ts = datetime.datetime.now().strftime('%Y%m%d_%H%M')
-    path = REPORTS_DIR / f"concurrency_sweep_{ts}.md"
+    path = REPORTS_DIR / f"07_concurrency_sweep_{ts}.md"
 
     best = 1
     for concurrency, m, _ in sweep_rows:
@@ -104,7 +105,7 @@ def write_phase1_report(sweep_rows: list[tuple], sample_n: int) -> tuple[Path, i
         "  Sweep `delay_s` ∈ {0.5, 1.0, 2.0, 3.0}. Metric: bytes_p50 as completeness proxy.",
         "",
         "Phase 3 — Full run on all URLs at best (concurrency, delay):  ",
-        "  Save raw markdown to `A_pipe_scrape_eval_reports/full_run_<ts>/`.  ",
+        "  Save raw markdown to `07_pipe_scrape_eval_data/full_run_<ts>/`.  ",
         "  Report: p50/p95/max latency, success/empty/timeout rates, total wallclock.",
         "",
         "Then record the config decision in process history.",
@@ -158,7 +159,7 @@ def find_plateau_delay(sweep_rows: list[tuple]) -> float:
 def write_phase2_report(sweep_rows: list[tuple], sample_n: int, concurrency: int) -> tuple[Path, float]:
     REPORTS_DIR.mkdir(parents=True, exist_ok=True)
     ts = datetime.datetime.now().strftime('%Y%m%d_%H%M')
-    path = REPORTS_DIR / f"delay_sweep_{ts}.md"
+    path = REPORTS_DIR / f"07_delay_sweep_{ts}.md"
 
     best_delay = find_plateau_delay(sweep_rows)
 
@@ -266,7 +267,7 @@ def write_phase3_report(
     ts: str,
 ) -> Path:
     REPORTS_DIR.mkdir(parents=True, exist_ok=True)
-    path = REPORTS_DIR / f"full_run_{ts}.md"
+    path = REPORTS_DIR / f"07_full_run_{ts}.md"
 
     retry_ok = sum(1 for r in retry_results if r['outcome'] == 'ok') if retry_results else 0
     retry_429 = sum(1 for r in retry_results if r['outcome'] == 'waf_429') if retry_results else 0
@@ -357,7 +358,7 @@ async def phase3_full_run(urls: list[str], delay_s: float, concurrency: int = 5)
         sys.exit(1)
 
     ts = datetime.datetime.now().strftime('%Y%m%d_%H%M')
-    output_dir = REPORTS_DIR / f"full_run_{ts}"
+    output_dir = DATA_DIR / f"full_run_{ts}"
 
     # Main pass: batched with inter-batch pause
     print(f"\nStep 2: Main pass — {len(urls)} URLs in batches of {PHASE3_BATCH_SIZE} ...")
