@@ -15,7 +15,7 @@ from crawl4ai.markdown_generation_strategy import DefaultMarkdownGenerator
 
 from src.scraper.scrape_url import is_garbage_content
 
-REPORTS_DIR = Path(__file__).parent / "08_reports"
+REPORTS_DIR = Path(__file__).parent / "md"
 EDGE_CASES = {
     "consent_prefix": [
         "https://www.azubiyo.de/bewerbung/layout/",
@@ -36,7 +36,7 @@ EDGE_CASES = {
 async def run_edge_case_suite():
     os.makedirs(REPORTS_DIR, exist_ok=True)
     timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-    report_path = REPORTS_DIR / f"garbage_edge_cases_{timestamp}.md"
+    report_path = REPORTS_DIR / f"08_garbage_edge_cases_{timestamp}.md"
 
     sections = ["# Garbage Detection Edge Cases\n"]
 

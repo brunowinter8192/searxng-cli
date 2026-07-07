@@ -14,7 +14,7 @@ from crawl4ai import AsyncWebCrawler, BrowserConfig, CrawlerRunConfig, CacheMode
 from crawl4ai.content_filter_strategy import PruningContentFilter
 from crawl4ai.markdown_generation_strategy import DefaultMarkdownGenerator
 
-REPORTS_DIR = Path(__file__).parent / "09_reports"
+REPORTS_DIR = Path(__file__).parent / "md"
 CONSENT_WORDS = ["cookie", "consent", "einwilligung", "tracking", "akzeptieren", "datenschutz", "zweck"]
 CONSENT_DENSITY_THRESHOLD = 5
 CONSENT_SKIP_OFFSET = 300
@@ -38,7 +38,7 @@ FIX2_URLS = [
 async def run_fix_prototype():
     os.makedirs(REPORTS_DIR, exist_ok=True)
     timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-    report_path = REPORTS_DIR / f"garbage_fix_prototype_{timestamp}.md"
+    report_path = REPORTS_DIR / f"09_garbage_fix_prototype_{timestamp}.md"
 
     all_urls = list(dict.fromkeys(url for _, url in FIX1_URLS + FIX2_URLS))
     print(f"Scraping {len(all_urls)} unique URLs...")

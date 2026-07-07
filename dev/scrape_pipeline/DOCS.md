@@ -278,7 +278,7 @@ Configs tested:
 ### 07_result_inspect.py
 
 **Purpose:** Inspects the full Crawl4AI `CrawlResult` object to discover available metadata fields. Scrapes 3 URLs (normal, 404, consent-heavy) and enumerates all result attributes with types and values. Key finding: `result.status_code` is available and reliable (404 for error pages, 200 for good pages). `result.success` is always True and unreliable.
-**Output:** `07_reports/result_inspect_<timestamp>.md`
+**Output:** `md/07_result_inspect_<timestamp>.md`
 
 ```bash
 ./venv/bin/python dev/scrape_pipeline/garbage_eval/07_result_inspect.py
@@ -287,7 +287,7 @@ Configs tested:
 ### 08_garbage_edge_cases.py
 
 **Purpose:** Tests `is_garbage_content()` against known edge case URLs (consent-prefix sites, padded 404 pages) and baseline URLs. Scrapes raw and filtered content, runs garbage detection on both, and tests header-zone (first 500 chars) detection for padded 404s.
-**Output:** `08_reports/garbage_edge_cases_<timestamp>.md`
+**Output:** `md/08_garbage_edge_cases_<timestamp>.md`
 
 ```bash
 ./venv/bin/python dev/scrape_pipeline/garbage_eval/08_garbage_edge_cases.py
@@ -296,7 +296,7 @@ Configs tested:
 ### 09_garbage_fix_prototype.py
 
 **Purpose:** Prototypes and validates garbage detection improvements. Tests two fixes: (1) status_code based 404 detection, (2) consent prefix stripping. Validates against edge case and baseline URLs to confirm no false positives.
-**Output:** `09_reports/garbage_fix_prototype_<timestamp>.md`
+**Output:** `md/09_garbage_fix_prototype_<timestamp>.md`
 
 ```bash
 ./venv/bin/python dev/scrape_pipeline/garbage_eval/09_garbage_fix_prototype.py
@@ -306,7 +306,7 @@ Configs tested:
 
 **Purpose:** Live integration test for garbage detection. Two modes: `--search QUERY` fires a live SearXNG search, scrapes the top 10 results, and runs garbage detection on each. `--edge-cases` scrapes known problem URLs (consent-prefix, padded 404, paywall). Results logged to `failures.jsonl` and saved as report.
 **Input:** Live SearXNG search or hardcoded edge-case URLs
-**Output:** `10_reports/live_garbage_test_<timestamp>.md`
+**Output:** `md/10_live_garbage_test_<timestamp>.md`
 
 ```bash
 ./venv/bin/python dev/scrape_pipeline/garbage_eval/10_live_garbage_test.py --search "cookie policy GDPR compliance"

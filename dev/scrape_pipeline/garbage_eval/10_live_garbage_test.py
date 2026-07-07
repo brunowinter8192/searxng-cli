@@ -21,7 +21,7 @@ from crawl4ai.markdown_generation_strategy import DefaultMarkdownGenerator
 from src.search.search_web import fetch_search_results
 from src.scraper.scrape_url import is_garbage_content, log_scrape_failure, try_scrape
 
-REPORTS_DIR = Path(__file__).parent / "10_reports"
+REPORTS_DIR = Path(__file__).parent / "md"
 FAILURES_JSONL = PROJECT_ROOT / "dev" / "scrape_pipeline" / "failures.jsonl"
 SEARCH_TOP_K = 10
 SCRAPE_DELAY = 3
@@ -61,7 +61,7 @@ async def run_live_garbage_test(mode: str, search_query: str | None) -> None:
     failures_after = count_failures(FAILURES_JSONL)
 
     report = build_report(title, results, failures_before, failures_after)
-    report_path = REPORTS_DIR / f"live_garbage_test_{timestamp}.md"
+    report_path = REPORTS_DIR / f"10_live_garbage_test_{timestamp}.md"
     report_path.write_text(report)
     print(f"Report saved: {report_path}")
 

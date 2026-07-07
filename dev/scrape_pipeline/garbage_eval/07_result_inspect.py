@@ -11,7 +11,7 @@ sys.path.insert(0, str(Path(__file__).parent.parent.parent.parent))
 
 from crawl4ai import AsyncWebCrawler, BrowserConfig, CrawlerRunConfig, CacheMode
 
-REPORTS_DIR = Path(__file__).parent / "07_reports"
+REPORTS_DIR = Path(__file__).parent / "md"
 HTTP_FIELDS = ["status_code", "http_status", "status", "success", "error_message", "response_headers", "metadata"]
 TEST_URLS = [
     ("normal", "https://en.wikipedia.org/wiki/Python_(programming_language)"),
@@ -24,7 +24,7 @@ TEST_URLS = [
 async def run_result_inspection():
     os.makedirs(REPORTS_DIR, exist_ok=True)
     timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-    report_path = REPORTS_DIR / f"result_inspect_{timestamp}.md"
+    report_path = REPORTS_DIR / f"07_result_inspect_{timestamp}.md"
 
     sections = ["# Crawl4AI Result Object Inspection\n"]
 
