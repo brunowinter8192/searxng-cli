@@ -8,7 +8,7 @@ from crawl4ai import AsyncWebCrawler, BrowserConfig, CrawlerRunConfig, CacheMode
 from crawl4ai.markdown_generation_strategy import DefaultMarkdownGenerator
 from crawl4ai.content_filter_strategy import PruningContentFilter
 
-CRAWL_REPORTS_DIR = Path(__file__).parent.parent.parent / "explore_pipeline" / "01_reports"
+CRAWL_REPORTS_DIR = Path(__file__).parent.parent.parent / "explore_pipeline" / "md"
 OUTPUT_DIR = Path(__file__).parent / "05_content_source"
 MAX_URLS_PER_DOMAIN = 20
 PARALLEL_URLS = 5
