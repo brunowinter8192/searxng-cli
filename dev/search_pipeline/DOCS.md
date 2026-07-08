@@ -1,217 +1,468 @@
 # dev/search_pipeline/
 
 ## Role
+Smoke tests, selector-drift probes, ranking-method eval harness, and bee-investigation instrumentation for `src/search/`. Own-level scripts range from per-engine production smokes (`0N_*_smoke.py`) to multi-stage pooling/reranking evals (`stage1..4_*`, `value_eval_*`) to one-off debugging probes (`cdp_starvation_probe.py`, `branch_probe.py`, `acquire_probe.py`). `_lib/` (own DOCS.md) holds shared parse/text helpers. `inspections/` (own DOCS.md, different level) holds DOM-selector-drift tooling.
 
-Production-mode smoke test suite for all 9 active search engines. Each per-engine smoke invokes the production engine class from `src/search/engines/` directly — no standalone pydoll setup, rate-limiter active, selectors and config internal to the engine class. Multi-engine smoke (`05`) fans out across all engines in parallel via `asyncio.gather`. `config.yml` retained for run parameters used by `02_burst_smoke.py` only.
+## Modules
 
-## Layout
+### 00_single_query.py (140 LOC)
 
-| File | Purpose |
-|------|---------|
-| `config.yml` | Run params (`queries_file`, `page_load_timeout`, `consent_settle`) and report path (`output_dir`) — used by `02_burst_smoke.py` only |
-| `queries.txt` | 30 baseline queries (Tech 8 + Science 6 + German 6 + Niche 5 + Broad 5) |
-| `01_google_smoke.py` | Google production-mode smoke — imports `GoogleEngine` from `src/`, calls `.search()` per query, rate-limiter active (4 req/60s), writes `google_smoke_<ts>.md` to `01_reports/`. Status: OK / EMPTY / ERROR |
-| `02_burst_smoke.py` | Burst smoke against the production CLI — invokes `searxng-cli search_batch` per batch (one subprocess per N queries, warm Chrome amortized) and writes `burst_<ts>.md` to `01_reports/`. Exists to validate the prod CLI path under the architectural rate pattern (4 queries per burst, optional cooldown). CLI flags: `--queries-per-burst N` (default 4), `--cooldown S` (default 60), `--max-queries N` (default all from queries.txt). |
-| `04_ddg_smoke.py` | DuckDuckGo production-mode smoke — imports `DuckDuckGoEngine` from `src/`, calls `.search()` per query, rate-limiter active (4 req/60s), writes `ddg_smoke_<ts>.md` to `01_reports/`. Status: OK / EMPTY / ERROR |
-| `05_search_smoke.py` | Multi-engine comparison smoke — imports all 8 engine classes from `src/`, fans out per-engine in parallel via `asyncio.gather`, merges by URL preserving per-engine snippets, writes `search_smoke_<ts>.md` to `01_reports/`. CLI flags: `--engines` (default: google duckduckgo), `--max-queries N`. |
-| `06_mojeek_smoke.py` | Mojeek production-mode smoke — imports `MojeekEngine` from `src/`, calls `.search()` per query, rate-limiter active (4 req/60s), writes `mojeek_smoke_<ts>.md` to `01_reports/`. Status: OK / EMPTY / ERROR |
-| `07_lobsters_smoke.py` | Lobsters production-mode smoke — imports `LobstersEngine` from `src/`, calls `.search()` per query, rate-limiter active (4 req/60s), writes `lobsters_smoke_<ts>.md` to `01_reports/`. Status: OK / EMPTY / ERROR |
-| `08_scholar_smoke.py` | Google Scholar smoke runner — imports `ScholarEngine` from `src/`, calls `.search()` directly (pydoll browser managed by `src/search/browser.py` singleton), runs 30 baseline queries. Rate limiter is engine-internal (4 req/60s → ~7.5 min total). Writes `scholar_smoke_<ts>.md` to `01_reports/`. Status taxonomy: OK (≥3 results) / EMPTY / SUSPECT / ERROR. |
-| `09_openalex_smoke.py` | OpenAlex smoke runner — imports `OpenAlexEngine` from `src/`, calls `.search()` directly (pure HTTP, no browser), runs 30 baseline queries. Writes `openalex_smoke_<ts>.md` to `01_reports/`. Status taxonomy: OK / EMPTY / RATE_LIMITED / ERROR. OPENALEX_MAILTO env var forwarded automatically via engine. |
-| `10_stack_exchange_smoke.py` | Stack Exchange smoke runner — imports `StackExchangeEngine` from `src/`, calls `.search()` directly (pure HTTP, no browser), runs 30 baseline queries against `api.stackexchange.com/2.3/search/advanced?site=stackoverflow`. Writes `se_smoke_<ts>.md` to `01_reports/`. Status taxonomy: OK / EMPTY / RATE_LIMITED / ERROR. Set `STACK_EXCHANGE_API_KEY` env var for 10k/day quota (without key: anonymous 300/day). |
-| `11_pipeline_smoke.py` | Full-pipeline smoke — calls `search_web_workflow(query, _with_timings=True, engine_timeout=N)` per query (vs 05's per-engine fanout that bypasses `_merge_and_rank`), reads cache after each call. Per-URL block in MD output: title + URL + engines list + `source: SOURCE \| display: '...'` (chosen snippet) + `og: ... \| meta: ...` + per-engine snippet lines — singular baseline format that downstream investigation scripts (snippet_quality_analysis) parse without re-running queries. Per-query timing line + `Slot fill: GENERAL X/12, ACADEMIC Y/6, QA Z/2` (no OVERFLOW post-dl9-v3). Per-engine status/timing inline (`Engines: google=OK/200ms ddg=TIMEOUT/8002ms ...`) plus `Per-Engine Status Aggregate` section at end (OK/EMPTY/TIMEOUT/ERROR counts per engine across all queries). Writes `pipeline_smoke_<ts>.md` to `01_reports/`. CLI flags: `--max-queries N`, `--language` (default `en`), `--engine-timeout N` (float seconds, default None — pass 8.0 to enable per-engine watchdog around actual search work, with rate-limiter wait happening outside the watchdog). Use this script when reviewing the production ranking output as the user would see it AND when needing the structured baseline for downstream investigations. |
-| `empty_classify_se.py` | Classification probe for Stack Exchange EMPTY queries — direct httpx against api.stackexchange.com (no rate limiter, no API key) for the 15 SE-EMPTY queries from the canonical 2026-05-04 multi-engine smoke. Two probes per query: `site=stackoverflow` (production-identical) + `site=stackexchange` (cross-site fallback for ENGINE_NICHE detection). Output `empty_classify_se_<ts>.md` to `01_reports/`. Status taxonomy: ENGINE_EMPTY / ENGINE_NICHE / RATE_LIMITED / PIPELINE_BUG / UNKNOWN. |
-| `empty_classify_lobsters.py` | Classification probe for Lobsters EMPTY queries — pydoll browser with 3s wait (vs production 600ms) for the 11 Lobsters-EMPTY queries from the same smoke. Captures story count, page title, HTML snippet, plus screenshots for first 3 queries (`empty_classify_lobsters_screenshots/`). Output `empty_classify_lobsters_<ts>.md` to `01_reports/`. Status taxonomy: ENGINE_EMPTY / PIPELINE_BUG / BOT_BLOCK / UNKNOWN. |
-| `12_max_results_probe.py` | Per-engine single-call ceiling probe — direct engine instantiation, one call per representative query at high `max_results` (Google/Scholar/SE 100, others 200), observes actual returned count + latency + status. Output `max_results_probe_<ts>.md` to `01_reports/`. Used to diagnose effective per-engine pool depth before changing production max_results. |
-| `google_selector_probe.py` | Google DOM-selector diagnostic — loads one query at `num=100`, counts production selector `#rso h3` matches vs `div.MjjYud` containers vs alternative selectors in the rendered DOM. Output `google_selector_probe_<ts>.md` to `01_reports/`. Distinguishes selector limitations from server-side rendering caps. |
-| `ddg_mojeek_selector_probe.py` | DDG + Mojeek selector coverage probe — per engine loads one query, counts production-selector matches vs alternative containers in DOM, tallies external links. Output `ddg_mojeek_selector_probe_<ts>.md` to `01_reports/`. Confirms whether production selectors achieve 100% coverage of rendered results vs being structurally capped by page layout. |
-| `13_free_word_probe.py` | Free-word query injection probe — appends 'pdf' or 'book' (no operator, just free word) to query string and measures domain-distribution shift across all 8 engines. 3 representative queries × 3 variants (baseline/+pdf/+book) = 9 runs. Output `free_word_injection_probe_<ts>.md` to `01_reports/` with per-variant URL listings + PDF-relevant / book-domain count comparison + new-domains delta. Validates free-word-as-relevance-bias hypothesis before designing filter flags. |
-| `13_timing_ablation.py` | Timing-config ablation probe — A vs B comparison (status-quo vs aggressive Scholar polling/consent sleep/HTTP rate-limit) using concurrent fan-out across all 8 engines per query. 3 queries × 2 configs, 2-min cooldown between configs to reset rate-limiter buckets. Output `timing_ablation_<ts>.md` to `01_reports/` with per-engine latency Δ and Jaccard URL-set similarity. Used to validate timing-config migrations are result-equivalent before touching production. |
-| `14_download_classify_probe.py` | Download-classify probe — sniff-classifies academic URLs from the search pool without saving content. Reads pipeline_smoke + free_word_injection_probe URLs, applies Tier-1 transforms (arxiv/aclanthology/openreview), GETs each URL with per-Tier timeout (T1=15s, others=8s), classifies outcome (PDF_OK / HTML_OK / HTML_HAS_PDF_LINK / HTML_PAYWALL / HTTP_4xx etc.). doi.org sampled to 300 (seed=42) for tractable runtime. Output `download_classify_<ts>.md` + `pool_<ts>.txt` + `pool_doi_sample_<ts>.txt` to `01_reports/`. Validates which domains deliver PDFs via direct GET vs. need Multi-Step extraction. |
-| `15_citation_pdf_followup.py` | Two-hop citation_pdf_url validation — loads the HTML_HAS_PDF_LINK URLs from probe 14's report, GETs each (Hop 1 to extract citation_pdf_url meta), then GETs the extracted PDF URL (Hop 2). Per-domain semaphore keyed on PDF-host domain. Output `citation_pdf_followup_<ts>.md` with per-source-domain and per-PDF-host-domain success rates. Used to measure Multi-Step pipeline downloadability before migrating to src/. |
-| `16_search_to_pdf_probe.py` | End-to-end search-to-PDF chain probe. Takes queries via CLI, runs `search_web_workflow` directly, applies the full chain (Tier-1 transform / DIRECT .pdf / MULTI_STEP citation_pdf_url / BLACKLIST), saves real PDFs to `~/Downloads/`. Per-query report with chain-path distribution + downloaded files. Imports chain logic from `src/scraper/pdf_chain.py` post-migration. CLI flags: `--top-n N`, queries as positional args. Used as regression check after pdf_chain refactors. |
-| `18_uniform_timing_probe.py` | Uniform timing data collection — runs all 8 engines × 12 queries with monkey-patch instrumentation to capture per-engine page_load_ms / polling_cycles_used / http_request_ms / consent_fired / engine_search_total_ms plus preview URL fetch ms. Output `uniform_timing_probe_<ts>.md` with per-engine stats tables (min/mean/p50/p95/max), cross-engine maximum table (lock-in recommendations per dimension), per-query breakdown. Used to derive the uniform 3.6s lock-in values for src/search/ timeouts (max-observed = the value, no multiplier). |
-| `19_books_probe.py` | Empirical book-domain inventory — appends free word `book` to 12 thematically broad queries (tech classics, fiction, subject areas, DE queries) and runs them against Google, DDG, Mojeek (3 browser engines, max 100/200/200). No classification applied — raw domain pool observation. Output `books_probe_<ts>.md` to `01_reports/` with: per-query URL listings, global domain frequency table (count ≥ 2), top-30 inspection table (domain + 3 sample paths), per-engine top-15 distribution, run stats. Informs BOOK_WHITELIST/BLACKLIST design for the `--books` CLI flag (bead searxng-gpk). |
-| `21_semscholar_smoke.py` | Semantic Scholar production-mode smoke — imports `SemanticScholarEngine` from `src/`, calls `.search()` per query (pydoll browser, rate-limiter registered but acquire() in workflow not here), runs 30 baseline queries. Writes `semscholar_smoke_<ts>.md` to `01_reports/`. Status taxonomy: OK (≥3 results) / SUSPECT (1-2) / EMPTY / ERROR. Baseline 2026-05-07: 21/30 OK — EMPTY on dev-ops/consumer queries (expected, academic index) + burst-rate tail (queries 27-30 from no-throttle burst; production 4 req/min avoids). |
-| `20_docs_probe.py` | Empirical docs-domain probe — appends free word `documentation` to 12 broad tech queries and runs them against Google, DDG, Mojeek (max 100/200/200). Evaluates H1-H13 heuristics (docs subdomain, readthedocs, gitbook, notion, developer-subdomain, /docs/, /documentation/, /reference/, /guide/, /api/, /tutorial/, /manual/, /learn/) against the URL pool. Output `docs_probe_<ts>.md` to `01_reports/` with: per-query URL listings, global domain frequency (count ≥ 2), heuristic coverage matrix (per-heuristic count + % + per-engine breakdown), top-30 inspection table (domain + H-codes + 3 sample paths), miss-set analysis (domains count ≥ 2 matching no heuristic — new-heuristic candidates), per-engine top-15 distribution, run stats. Informs `--docs` whitelist/heuristic design (bead searxng-x4f). |
-| `bm25_sweep_smoke.py` | Pooling-investigation probe (bead g82, Phase 7) — BM25 parameter sensitivity sweep across 16-config main grid (b × stopwords × doc_repr at k1=1.2) + 4-config k1 sensitivity sweep. `BM25Uniform(BM25Okapi)` subclass overrides `_calc_idf` to set IDF=1.0 for all terms (TF + length-norm only, per user design call to skip IDF). Output `bm25_sweep_<ts>.md` to `01_reports/` with per-axis sensitivity tables (Top-20 overlap with vanilla) and stability count across configs. Conclusion: b is dominant axis (peak at 0.75), k1 zero effect on short docs, stopwords ~marginal, doc_repr title3x diverges but worse quality. |
-| `bm25_compare_smoke.py` | Pooling-investigation probe (bead g82) — 5-config visual compare (Hard-Slot, Vanilla BM25, b=0 extreme, b=1 extreme, Title3x), top-10 stacked tables per query. Imports from `bm25_sweep_smoke.py` (BM25Uniform, _build_pool, _tokenize, _doc_repr, STOPWORDS). Output `bm25_compare_<ts>.md` to `01_reports/`. Used after sweep to drill into qualitative differences between divergent configs. |
-| `bm25_idf_engine_smoke.py` | Pooling-investigation probe (bead g82, Phase 7) — IDF + engine-inverse-weighting orthogonal axes. 5-config compare: Hard-Slot, Vanilla BM25, +per-pool IDF (BM25Okapi default), +engine-inv-weighting (1/engine_count multiplier on BM25 scores), +IDF+Weighting combined. Output `bm25_idf_engine_<ts>.md` to `01_reports/`. Conclusion: IDF made no meaningful difference (small pool, similar query-word distribution); engine-weighting bipolar — helped Q2/Q3 (multi-engine consensus URLs surfaced) but over-rewarded sparse engines on Q4 (stack_exchange with 2 URLs got weight 0.5 → SO question floated to #1). |
-| `bm25_capped_smoke.py` | Pooling-investigation probe (bead g82) — per-engine top-K cap variant. Pre-pool truncates each engine's results to top-K (K = google's result count for query, fallback K=10), then BM25 vanilla on capped pool. 3-config compare: Hard-Slot, BM25 uncapped, BM25 capped. Pool size shrinks 5-7× (~450 → ~70 unique URLs), rank latency ~17× faster (~250ms → ~15ms). Output `bm25_capped_<ts>.md` to `01_reports/`. Quality: marginal Q1 improvement (5/10 → 6/10), unchanged Q2/Q3/Q4. Cap removes depth-tail DOI flood but not engine-top-K noise (semscholar PV-cell-defect survives because it's already in semscholar's top-10). |
-| `value_eval_probe.py` | Pooling-investigation probe (beads g82+y6e, Phase 11) — Stage 1+2 of LLM-as-Oracle eval: per `(mode, query)` pair fetches pool via `_query_engines_concurrent` with mode-specific query modifiers (+book / +pdf / +documentation for general engines) and post-merge URL filter, applies 4 C-methods (C1 Overlap on capped+filtered, C2 BM25 vanilla on full+filtered, C2' BM25-Capped, C3 Cross-Encoder Qwen3-Reranker-0.6B port 8082). Writes `<mode>_<slug>_pool.json` (oracle input: url+title+snippet sorted alphabetically, no engine/score signals) and `<mode>_<slug>_methods.json` (each C-method Top-10 URLs + latency) to `01_reports/value_eval_<ts>/`. Filter logic inlined (no `from src.` imports). `--smoke` runs 1-pair (general × M1) + auto-runs aggregator with `--no-oracle`. |
-| `value_eval_aggregate.py` | Pooling-investigation probe (beads g82+y6e, Phase 11) — Stage 4 of LLM-as-Oracle eval: loads `pool.json` + `methods.json` + `oracle.json` (worker LLM Top-10 selection) per pair, computes Jaccard `\|oracle ∩ method\| / \|oracle ∪ method\|` for each C-method, writes per-query MD `value_eval_<mode>_<slug>_<ts>.md` (pool dump + oracle + each method + comparison matrix + scores) and summary MD `value_eval_summary_<ts>.md` (per-mode mean per method + overall winner). Handles undersized-pool case (`undersized_pool=True AND pool_size=0` → skipped in mode means). `--no-oracle` flag for pipeline-validation MDs without oracle section. |
-| `stage1_pool_fetch.py` | Phase 12+ pool fetch (v3 schema) — 4 modes × 4 queries, per-pair `<mode>_<slug>_pool.json` + `<mode>_<slug>_engine_report.md`, global `engine_report_summary.md`. v3 schema (2026-05-23): every pool entry carries `positions: {engine: rank}` alongside `engines` + `min_position`; invariants `set(engines)==set(positions.keys())`, `min_position==min(positions.values())`. Positions added by `_attach_positions()` after `_build_pool()`. `--smoke` (1-pair), `--ts-dir PATH`. |
-| `stage3_method_run.py` | Phase 12+ method run — loads `<mode>_<slug>_pool.json` from a ts_dir, applies C1 Overlap / C2 BM25 / C2' BM25-Capped / C3 Cross-Encoder, writes `<mode>_<slug>_methods.json`. Dynamic reranker URL via `ensure_ready("reranker")` + `find_server_url("reranker")`. |
-| `stage4_aggregate.py` | Phase 12+ aggregate — loads pool/oracle/methods per pair from a ts_dir, computes Jaccard per C-method, writes per-pair `<mode>_<slug>_eval.md` + global `eval_summary.md`. |
-| `stage3_method_run_v3.py` | Phase 13 method run (489 LOC) — loads `<mode>_<slug>_pool.json` (v3 schema) from `--pool-dir`, filters `{google, semantic_scholar}`, applies M1–M12: C1 Overlap, RRF, Structural-URL, BM25, BM25-Capped, C3 vanilla, C3+InstrPrefix, RRF+C3, SPLADE, SPLADE+C3, two-stage C3+LLM-Filter, LLM-Selector. GPU deps: reranker-0.6b (M6-M8, M10-M11), splade (M9-M10), generator-4b (M11-M12). Writes `<mode>_<slug>_methods_v3.json`. CLI: `--pool-dir PATH`, `--smoke`. |
-| `stage4_aggregate_v3.py` | Phase 13 aggregate (300 LOC) — loads `*_pool.json` + `*_methods_v3.json` + `*_oracle_v3clean.json` per pair, computes Jaccard per method, writes per-pair `<mode>_<slug>_eval_v3.md` + `eval_summary_v3.md` with per-mode mean Jaccard, per-method latency stats (mean/p50/p95/max/cold), and Quality×Latency Pareto table. CLI: `--pool-dir PATH`, `--oracle-dir PATH` (default: v2 dir), `--no-oracle`. |
-| `pool_diff_v2_v3.py` | Pool diff analysis — compares URL sets across all 16 (mode × query) pairs between v2 ref dir and v3 ts_dir. Per-pair: overlap_pct, new-in-v3, removed-from-v2, google_count comparison. Aggregate: mean overlap, pair counts above/below thresholds, per-engine OK% (v2 vs v3). Output `01_reports/pool_diff_v2_vs_v3.md`. CLI: `--v3-dir PATH`. |
-| `clean_pool.py` | Filter helper + oracle cleanup — importable `filter_pool(pool, drop_engines)` removes named engines from each entry's `engines`+`positions`, recomputes `min_position`, drops engine-less URLs. As script: generates `<pair>_oracle_v3clean.json` for all 16 pairs in the v2 ts_dir — backfills 4 loss-pairs (google+SS filter removes 5 oracle picks, 3.1% of 160). Picks from filtered pool by same oracle criterion (authoritative/canonical, not SEO). CLI: `--v2-dir PATH`. |
-| `rerank_probe_smoke.py` | Pooling-investigation probe (bead g82, Phase 8) — URL-filter + BM25-Retrieve top-50 + 2-method semantic rerank. 5-config compare: Hard-Slot, Filter+BM25-only, Filter+BM25→Embedding-Cosine (Qwen3-Embedding-0.6B at port 8090), Filter+BM25→Cross-Encoder (Qwen3-Reranker-0.6B at port 8092), BM25-Capped reference. URL-pattern filter detects search-results-page URLs (`[?&](q\|query\|search\|keyword\|term\|p)=`, `/search/`, `/sresults/`, `/scholar?q=`) generic over queries. Output `rerank_probe_<ts>.md` to `01_reports/`. **Cross-Encoder is first method to TIE Hard-Slot at 35/40 AND WIN Q1 9/10 vs 8/10** — semantic disambiguation eliminates PV-cell/WSD/scholar-echo false-friends. Embedding-Cosine underperforms at 26/40 (bi-encoder architectural limit on short snippets, not parameter count). Latency: ~1.7s/query for 50 docs. Requires GPU services running. |
-| `cdp_starvation_probe.py` | Phase 1 bee investigation — asyncio event-loop starvation probe. Pattern A (slow-callback logger), Pattern B (scheduling-latency canary), CDP event counter (monkey-patch on `ConnectionHandler._process_single_message`). 20-30 queries from `queries.txt`, categorizes as normal/captcha/zero_cascade. Output `cdp_probe_<ts>.md` to `01_reports/`. Verdict: REFUTED (event loop p99=1.4ms, 0 CDP events during cascade). |
-| `acquire_probe.py` | Phase 2 bee investigation — `RateLimiter.acquire()` instrumentation probe. Monkey-patches `RateLimiter.__init__` (installs `_WatchedLock`) + `RateLimiter.acquire()` (enter/exit events). Records `enter`, `lock_attempt`, `lock_granted`, `lock_released`/`lock_stuck`, `exit_ok`/`exit_err:<class>` per engine per call. Discriminates three hypotheses: B (task never scheduled) / A-lock (stale lock) / A-sleep (sleeping on backoff). Pattern B canary re-runs for triangulation. CLI flags: `--max-queries N`, `--smoke` (4-query dry-run, no report). Output `acquire_probe_<ts>.md` to `01_reports/`. Verdict: A-sleep confirmed — multi-engine backoff cascade (all 9 engines sleep on `backoff_until`, Python 3.14 asyncio.Lock releases correctly). |
-| `inspect_query_log.py` | Quick summary of `src/logs/query_log.jsonl` — total record count, wall_ms min/mean/max, bottleneck-engine and TIMEOUT-hit counts, full per-engine breakdown of the most recent query (rate_wait_ms / search_ms / status / drop_reason / preview stats). CLI flag: `--tail N` to inspect the last N records. Used for spot-checking real query performance after the search_web_workflow logger went live. |
-| `24_pydoll_teardown_verify.py` | Integration test for kill_tab teardown fix (bead 7u5). Three tests: T1 single hung tab (`about:blank` + never-resolving JS Promise, `await_promise=True`) through 5s watchdog + kill_tab → wall=~5s; T2 normal tab → completes fine; T3 parallel batch of 5 hung tabs via `asyncio.gather` (mirrors production 5-engine pydoll fanout) → wall=~5s, CDP `Target.getTargets` Δ=0 (no orphaned targets), registry clean. Hang simulation uses `execute_script("return new Promise(…)", await_promise=True)` — browser process stays responsive so `close_target` completes in <100ms (contrast: `chrome://hang` stalls browser IPC too). Output `teardown_verify_<ts>.md` to `01_reports/`. Uses `importlib` to access production `src/search/browser.py`. |
-| `engine_health_audit.py` | Reads `src/logs/query_log.jsonl` and aggregates per-engine status counts across all queries. Sub-status-aware classification (post-2026-05-08, bead ii8): per-engine `status_counts: dict` carries raw counter; classification rules fire BEFORE the coarse success-rate bucket — `BROKEN (DOM-DRIFT)` when `EMPTY_NO_CONTAINER > 50%` of empty samples, `DEGRADED (ANTI-BOT)` when `EMPTY_BLOCK > 30%` of empty samples, `HEALTHY-EMPTY` when `EMPTY_NO_RESULTS` dominates with success_rate ≥ DEGRADED, `FLAG (PYDOLL-CANCEL-LEAK)` when `TIMEOUT_NONCOOP > 10%` of timeouts (cross-ref bead 7u5). Bucket aggregation uses `startswith("EMPTY"/"TIMEOUT"/"ERROR")` to tolerate sub-status names without enumerating them. |
-| `_lib/` | Shared parser + text utilities — single source of truth for `KNOWN_ENGINES`, `parse_smoke_report`, `strip_bloat`, `lexical_density`, `detect_bloat`; consumed by `snippet_quality_analysis.py`, `engine_distribution_analysis.py`, `snippet_selection_simulator.py`. |
-| `snippet_quality_analysis.py` | Per-source bloat + lexical-density analysis over the singular pipeline_smoke baseline (auto-finds newest `pipeline_smoke_*.md` via glob+sort, no hardcoded filename). 11 sources (8 engines + scholar_strip derived bucket + og + meta), 9 bloat-pattern regexes (URL breadcrumb, Read-more, Web-results prefix, Featured-snippet prefix, social-proof, Scholar ellipsis, Mojeek nav-dump, HTML entities, Tag noise) + 1 JATS-XML pattern. Output sections: (1) per-source aggregated stats table (mean_clean_len, lex_density, % bloated, usefulness), (2) 8×8 engine-overlap matrix, (3) all-URLs side-by-side per-URL block with ⭐-Winner annotation per URL, (4) `Best by usefulness` aggregate (which source wins most often per length×density score across all URLs), (5) per-class breakdown of best-by-usefulness (GENERAL / ACADEMIC / QA winners). EN+DE combined stopword list for lexical_density (avoids penalizing German queries). Output `snippet_quality_<ts>.md` to `01_reports/`. |
-| `engine_distribution_analysis.py` | Per-engine slot-count and slot-share analysis over the singular pipeline_smoke baseline (auto-finds newest `pipeline_smoke_*.md` via glob+sort). Imports `parse_smoke_report` from `snippet_quality_analysis.py`. Output sections: (1) slot-count total per engine (Total / GENERAL / ACADEMIC / QA / Solo / Overlap columns; column-sum footer shows actual vs URL-count baseline), (2) Per-Engine Status Aggregate quoted through from smoke tail (OK / EMPTY / TIMEOUT / ERROR), (3) slot-share + two baselines per engine within class — uniform (1/N) and OK-adjusted (engine OK / class OK sum) — with signed Δ columns; three sub-tables GENERAL / ACADEMIC / QA, (4) per-query distribution matrix (30 rows × 8 engine columns, cell = slot-count contributed by that engine in that query). Output `engine_distribution_<ts>.md` to `01_reports/`. |
-| `snippet_selection_simulator.py` | Dry-run of new snippet-selection logic over the pipeline_smoke baseline (auto-finds newest `pipeline_smoke_*.md`). Imports `parse_smoke_report`, `strip_bloat`, `lexical_density` from `snippet_quality_analysis.py`. Selection: for each URL gather all non-empty sources (og, meta, per-engine snippets), score each as `clean_len × lex_density`, pick highest; if all sources below MIN_FLOOR=40 chars use best-of-worst fallback. Output sections: (1) Summary — analyzed/no-content/floor-trigger counts, NEW source distribution table, per-class NEW source distribution table, (2) Per-Query Picks — all 30 queries × all URLs, showing picked source, score, clean_len, ⚠ floor-trigger tag, and first 200 chars of picked snippet, (3) Floor-Triggered Cases — list of URLs where all sources were below MIN_FLOOR. Output `snippet_selection_<ts>.md` to `01_reports/`. |
-| `inspections/` | DOM-inspection tooling for engine selector drift recovery — `inspect_engine_dom.py` + committed per-engine inspection reports. See [inspections/DOCS.md](inspections/DOCS.md). |
-| `01_reports/` | Singular baseline + investigation evidence: `pipeline_smoke_<ts>.md` (canonical baseline, input for all investigation scripts), `snippet_quality_<ts>.md`, `empty_classify_se/lobsters_<ts>.md` (forensic probes 2026-05-04). Phase 12+: `value_eval_v2_20260523_000156/` — 98 files (16 pool.json + 16 engine_report.md + 16 oracle.json + 16 oracle.md + 16 methods.json + 16 eval.md + 1 engine_summary + 1 eval_summary) + 17 new files added Phase 13-Prep (`<pair>_oracle_v3clean.json` × 16 + `oracle_v3clean_summary.md`). `value_eval_v3_20260523_021216/` — 66 files (16 pool.json v3-schema + 16 engine_report.md + 1 engine_report_summary.md; Phase 13 adds 16 methods_v3.json + 16 eval_v3.md + 1 eval_summary_v3.md). `pool_diff_v2_vs_v3.md` — URL-set comparison across 16 pairs (mean 80% overlap, Google 6%→81% recovery). Per-engine standalone smoke reports gitignored. |
+**Purpose:** Single-query debug runner — reuses `01_google_smoke.py` internals (`load_config`, `start_browser`, JS patches, consent-cookie injection) via `importlib` to hit one query and print DOM diagnostics (title, current URL) to stdout.
+**Reads:** `config.yml`, query from `sys.argv[1]` (default `"python asyncio best practices"`).
+**Writes:** stdout only.
+**Called by:** CLI only. `./venv/bin/python3 dev/search_pipeline/00_single_query.py "your query here"`.
+**Calls out:** `pydoll` (Chrome, PageCommands, NetworkCommands, CookieSameSite).
 
-## Production Baseline
+### 01_google_smoke.py (125 LOC)
 
-**Date:** 2026-05-04  
-**Run:** `05_search_smoke.py --engines google duckduckgo mojeek lobsters "google scholar" crossref openalex stack_exchange --max-queries 30`  
-**Report:** deleted (see git history at 1ad627f)
+**Purpose:** Google production-mode smoke — `GoogleEngine().search()` per query from `queries.txt`, rate-limiter active. Status OK/EMPTY.
+**Reads:** `queries.txt`.
+**Writes:** `md/google_smoke_<ts>.md`.
+**Called by:** CLI only; also imported by `_capture_sorry.py` and `00_single_query.py` for shared helpers (`load_config`, `start_browser`, `_build_js_patches`, `_inject_consent_cookie`, `_extract_scalar`).
+**Calls out:** `src.search.engines.google.GoogleEngine`, `src.search.browser.close_browser`.
 
-### Per-Engine Results (from full-pool smoke)
+### 02_burst_smoke.py (263 LOC)
 
-| Engine | OK | EMPTY | ERROR | Notes |
-|--------|-----|-------|-------|-------|
-| Google | 30 | 0 | 0 | Uniform 4 req/min, no backoff on EMPTY |
-| DuckDuckGo | 30 | 0 | 0 | Uniform 4 req/min, no backoff on EMPTY |
-| Mojeek | 30 | 0 | 0 | Uniform 4 req/min, no backoff on EMPTY |
-| Lobsters | 19 | 11 | 0 | Link-aggregator; German + non-tech queries EMPTY (expected) |
-| Google Scholar | 29 | 1 | 0 | Uniform 4 req/min (up from 3), no backoff on EMPTY |
-| CrossRef | 30 | 0 | 0 | HTTP API, backoff only on 429/403 |
-| OpenAlex | 26 | 4 | 0 | HTTP API, 4 EMPTY on niche dev-tool queries |
-| Stack Exchange | 15 | 15 | 0 | HTTP API, 15 EMPTY on German + niche queries (expected) |
-| Semantic Scholar | 21 | 9 | 0 | pydoll; EMPTY on dev-ops/niche (academic index) + burst tail; baseline 2026-05-07 |
+**Purpose:** Burst smoke against the production CLI — invokes `cli.py search_batch` per batch (one subprocess per N queries, warm Chrome amortized). Validates the prod CLI path under the burst rate pattern.
+**Reads:** `config.yml` (`queries_file`, `report.output_dir`), `queries.txt`.
+**Writes:** `<config report.output_dir>/burst_<ts>.md` (config-driven, currently `md/`).
+**Called by:** CLI only. Flags: `--queries-per-burst N` (default 4), `--cooldown S` (default 60), `--max-queries N`.
+**Calls out:** `cli.py` (subprocess), `yaml`.
 
-**KPI:** 30/30 queries with results from ≥1 engine. Wall time <12 min.
+### 04_ddg_smoke.py (125 LOC)
 
-### Per-Engine Standalone Baselines
+**Purpose:** DuckDuckGo production-mode smoke — same pattern as `01_google_smoke.py` via `DuckDuckGoEngine`.
+**Reads:** `queries.txt`.
+**Writes:** `md/ddg_smoke_<ts>.md`.
+**Called by:** CLI only.
+**Calls out:** `src.search.engines.duckduckgo.DuckDuckGoEngine`, `src.search.browser.close_browser`.
 
-#### Google
-- **Result (standalone):** 30/30 OK — prior standalone runs 2026-04-21 (stress baseline), production-mode from 2026-05-04
-- **Stack:** headless Chrome via `GoogleEngine` (src/), uniform 4 req/min, no backoff on EMPTY, SOCS cookie injection per-tab, fingerprint patches, selectors `#rso h3` + `.MjjYud`
+### 05_search_smoke.py (226 LOC)
 
-#### DuckDuckGo
-- **Result (standalone):** 30/30 OK — first prod-mode standalone 2026-05-03 (report deleted, see git 1ad627f)
-- **Stack:** headless Chrome via `DuckDuckGoEngine` (src/), uniform 4 req/min, no backoff on EMPTY, GET `html.duckduckgo.com/html/`
+**Purpose:** Multi-engine comparison smoke — imports all 8 browser/HTTP engine classes, fans out per-engine in parallel (`asyncio.gather`), merges by URL preserving per-engine snippets (bypasses `_merge_and_rank`).
+**Reads:** `queries.txt`.
+**Writes:** `md/search_smoke_<ts>.md`.
+**Called by:** CLI only. Flags: `--engines` (default: google duckduckgo), `--max-queries N`.
+**Calls out:** `src.search.browser.close_browser`, `src.search.engines.{google,duckduckgo,mojeek,lobsters,scholar,crossref,openalex,stack_exchange}`, `src.search.result.SearchResult`.
 
-#### Mojeek
-- **Result (standalone):** 7/30 OK at 0-delay stress (cascade above 4 req/min); at uniform 4 req/min: 30/30 OK in full-pool run
-- **Stack:** headless Chrome via `MojeekEngine` (src/), uniform 4 req/min, no backoff on EMPTY
-- **Rate-limit break (stress only):** 403 at query 10 (~1.2 req/s burst). Production 4 req/min stays well within threshold.
+### 06_mojeek_smoke.py (125 LOC)
 
-#### Google Scholar
-- **Result:** 28/30 OK standalone (report deleted, see git 1ad627f); 29/30 in full-pool run
-- **Stack:** headless Chrome via `ScholarEngine` (src/), uniform 4 req/min (up from 3), no backoff on EMPTY
-- **JS fix (2026-05-03):** `_JS_PARSE` rewritten from IIFE-with-leading-`return` to flat JS. Root cause: pydoll `execute_script` wraps single-line `return` scripts but passes multi-line raw to `Runtime.evaluate` where top-level `return` is illegal.
+**Purpose:** Mojeek production-mode smoke — same pattern as `01_google_smoke.py` via `MojeekEngine`.
+**Reads:** `queries.txt`.
+**Writes:** `md/mojeek_smoke_<ts>.md`.
+**Called by:** CLI only.
+**Calls out:** `src.search.engines.mojeek.MojeekEngine`, `src.search.browser.close_browser`.
 
-#### OpenAlex
-- **Result:** 26/30 OK (report deleted, see git 1ad627f); 4 EMPTY on non-academic queries
-- **Stack:** pure httpx, `OpenAlexEngine` (src/), rate limiter 4 req/60s, ~7 min for 30 queries
+### 07_lobsters_smoke.py (125 LOC)
 
-#### Lobsters
-- **Result:** 19/30 OK at production rate (4 req/min) in full-pool run; 16/30 at 0-delay stress
-- **Stack:** headless Chrome via `LobstersEngine` (src/), uniform 4 req/min, no backoff on EMPTY
-- **Notes:** Link-aggregator — smaller index; German + off-topic queries EMPTY (expected). Snippet = domain only by design.
+**Purpose:** Lobsters production-mode smoke — same pattern as `01_google_smoke.py` via `LobstersEngine`.
+**Reads:** `queries.txt`.
+**Writes:** `md/lobsters_smoke_<ts>.md`.
+**Called by:** CLI only.
+**Calls out:** `src.search.engines.lobsters.LobstersEngine`, `src.search.browser.close_browser`.
 
-#### Stack Exchange
-- **Result:** 15/30 OK — consistent across standalone (report deleted, see git 1ad627f) and full-pool run
-- **Stack:** pure httpx, `StackExchangeEngine` (src/), rate limiter 4 req/60s, site=stackoverflow, filter=withbody, anonymous quota
-- **Notes:** 15 EMPTY — German queries (6) + niche dev-tool queries. Token bucket paces to 59s wait every 4 queries.
+### 08_scholar_smoke.py (134 LOC)
 
-#### 05 — Multi-engine comparison
-- **Script:** `05_search_smoke.py` — imports from `src/` (not standalone), uses production engine instances
-- **Design:** per-engine fanout avoids `search_web_workflow` merge so per-engine snippets are preserved for comparison
-- **Preview:** preview fetch removed (preview.py deleted 2026-05-23 drilldown-mig migration)
-- **Report:** `01_reports/search_smoke_<ts>.md` — per-query section with engine-set badges, per-engine snippets, preview block
+**Purpose:** Google Scholar production-mode smoke — `ScholarEngine().search()` per query (pydoll browser, engine-internal rate limiter). Status taxonomy: OK (≥3 results) / EMPTY / SUSPECT / ERROR.
+**Reads:** `queries.txt`.
+**Writes:** `md/scholar_smoke_<ts>.md`.
+**Called by:** CLI only.
+**Calls out:** `src.search.engines.scholar.ScholarEngine`, `src.search.browser.close_browser`.
 
-## Running
+### 09_openalex_smoke.py (121 LOC)
 
-```bash
-# Google prod-mode smoke (30 queries via GoogleEngine, ~7.5 min at 4 req/min)
-./venv/bin/python3 dev/search_pipeline/01_google_smoke.py
+**Purpose:** OpenAlex smoke — `OpenAlexEngine().search()` per query (pure HTTP, no browser). Status taxonomy: OK / EMPTY / RATE_LIMITED / ERROR. Forwards `OPENALEX_MAILTO` env var.
+**Reads:** `queries.txt`.
+**Writes:** `md/openalex_smoke_<ts>.md`.
+**Called by:** CLI only.
+**Calls out:** `src.search.engines.openalex.OpenAlexEngine`.
 
-# DuckDuckGo prod-mode smoke (30 queries via DuckDuckGoEngine, ~7.5 min at 4 req/min)
-./venv/bin/python3 dev/search_pipeline/04_ddg_smoke.py
+### 10_stack_exchange_smoke.py (121 LOC)
 
-# Burst against prod CLI (30 queries in 4-per-burst, no cooldown, ~1.7 min)
-./venv/bin/python3 dev/search_pipeline/02_burst_smoke.py --queries-per-burst 4 --cooldown 0
+**Purpose:** Stack Exchange smoke — `StackExchangeEngine().search()` per query (pure HTTP, `api.stackexchange.com/2.3/search/advanced?site=stackoverflow`). Status taxonomy: OK / EMPTY / RATE_LIMITED / ERROR.
+**Reads:** `queries.txt`.
+**Writes:** `md/se_smoke_<ts>.md`.
+**Called by:** CLI only. `STACK_EXCHANGE_API_KEY` env var raises quota from 300/day anonymous to 10k/day.
+**Calls out:** `src.search.engines.stack_exchange.StackExchangeEngine`.
 
-# Burst with steady-state rate cap (30 queries, 4-per-burst, 60s cooldown between, ~9 min)
-./venv/bin/python3 dev/search_pipeline/02_burst_smoke.py --queries-per-burst 4 --cooldown 60
+### 11_pipeline_smoke.py (376 LOC)
 
-# Mojeek prod-mode smoke (30 queries via MojeekEngine, ~7.5 min at 4 req/min)
-./venv/bin/python3 dev/search_pipeline/06_mojeek_smoke.py
+**Purpose:** Full-pipeline smoke — calls `search_web_workflow(query, _with_timings=True, engine_timeout=N)` per query (unlike `05`'s per-engine fanout, this goes through `_merge_and_rank`). Produces the singular baseline consumed by downstream investigation scripts (`snippet_quality_analysis.py`, `engine_distribution_analysis.py`, `snippet_selection_simulator.py`). Per-URL block: title/URL/engines + chosen `source`/`display` + `og`/`meta` + per-engine snippets. Per-query timing + slot-fill line. Per-Engine Status Aggregate section at end.
+**Reads:** `queries.txt`, cache via `cache_key`/`cache_read`.
+**Writes:** `md/pipeline_smoke_<ts>.md`.
+**Called by:** CLI only. Flags: `--max-queries N`, `--language` (default `en`), `--engine-timeout N` (float seconds, per-engine watchdog).
+**Calls out:** `src.search.browser.close_browser`, `src.search.cache`, `src.search.search_web.search_web_workflow`.
 
-# Lobsters prod-mode smoke (30 queries via LobstersEngine, ~7.5 min at 4 req/min)
-./venv/bin/python3 dev/search_pipeline/07_lobsters_smoke.py
+### 12_max_results_probe.py (189 LOC)
 
-# Google Scholar smoke (30 queries via ScholarEngine, ~7.5 min at 4 req/min)
-./venv/bin/python3 dev/search_pipeline/08_scholar_smoke.py
+**Purpose:** Per-engine single-call ceiling probe — direct engine instantiation, one call per query at high `max_results` (Google/Scholar/SE 100, others 200), observes actual returned count + latency + status.
+**Reads:** hardcoded 3-query set.
+**Writes:** `md/max_results_probe_<ts>.md`.
+**Called by:** CLI only.
+**Calls out:** `src.search.engines.{google,scholar,duckduckgo,mojeek,lobsters,openalex,crossref,stack_exchange}`, `src.search.browser.close_browser`.
 
-# OpenAlex smoke (30 queries via OpenAlexEngine, ~7.5 min at 4 req/min)
-OPENALEX_MAILTO=yourname@example.com ./venv/bin/python3 dev/search_pipeline/09_openalex_smoke.py
+### 13_free_word_probe.py (301 LOC)
 
-# Stack Exchange smoke (30 queries via StackExchangeEngine, ~7.5 min at 4 req/min)
-./venv/bin/python3 dev/search_pipeline/10_stack_exchange_smoke.py
-# with API key (10k/day quota):
-STACK_EXCHANGE_API_KEY=your_key ./venv/bin/python3 dev/search_pipeline/10_stack_exchange_smoke.py
+**Purpose:** Free-word query injection probe — appends `pdf`/`book` (no operator) to query string, measures domain-distribution shift across all 8 engines. 3 queries × 3 variants (baseline/+pdf/+book).
+**Reads:** hardcoded 3-query set.
+**Writes:** `md/free_word_injection_probe_<ts>.md`.
+**Called by:** CLI only.
+**Calls out:** `src.search.engines.{google,scholar,duckduckgo,mojeek,lobsters,openalex,crossref,stack_exchange}`, `src.search.browser.close_browser`.
 
-# Multi-engine comparison smoke — canonical baseline (all 8 engines, 30 queries, ~7.5 min)
-./venv/bin/python3 dev/search_pipeline/05_search_smoke.py --engines google duckduckgo mojeek lobsters "google scholar" crossref openalex stack_exchange --max-queries 30
+### 13_timing_ablation.py (356 LOC)
 
-# Multi-engine smoke with query limit for quick validation
-./venv/bin/python3 dev/search_pipeline/05_search_smoke.py --engines google duckduckgo --max-queries 5
+**Purpose:** Timing-config ablation — A (status-quo) vs B (aggressive Scholar polling/consent sleep/HTTP rate-limit) via concurrent fan-out across all 8 engines. 3 queries × 2 configs, 2-min cooldown between configs.
+**Reads:** hardcoded 3-query set.
+**Writes:** `md/timing_ablation_<ts>.md`.
+**Called by:** CLI only.
+**Calls out:** `src.search.engines.{google,scholar,duckduckgo,mojeek,lobsters,openalex,crossref,stack_exchange}` (monkeypatched via module import), `src.search.browser.close_browser`, `src.search.rate_limiter`.
 
-# Single query diagnostic
-./venv/bin/python3 dev/search_pipeline/00_single_query.py "your query here"
+### 14_download_classify_probe.py (605 LOC)
 
-# Books domain probe (12 queries × 3 engines × +book, ~4-6 min, output books_probe_<ts>.md)
-./venv/bin/python3 dev/search_pipeline/19_books_probe.py
+**Purpose:** Download-classify probe — sniff-classifies academic URLs from search pool without saving content. Tier-1 domain transforms (arxiv/aclanthology/openreview/pmc), per-Tier timeout, classifies outcome (PDF_OK/HTML_OK/HTML_HAS_PDF_LINK/HTML_PAYWALL/HTTP_4xx etc.). `doi.org` sampled to 300 (seed=42).
+**Reads:** newest `pipeline_smoke_*.md` + `free_word_injection_probe_*.md` from `md/` (glob-discovered).
+**Writes:** `md/download_classify_<ts>.md`, `data/pool_<ts>.txt`, `data/pool_doi_sample_<ts>.txt`.
+**Called by:** CLI only.
+**Calls out:** `httpx`.
 
-# Docs domain probe (12 queries × 3 engines × +documentation, ~4-6 min, output docs_probe_<ts>.md)
-./venv/bin/python3 dev/search_pipeline/20_docs_probe.py
+### 15_citation_pdf_followup.py (446 LOC)
 
-# Semantic Scholar smoke (30 queries via SemanticScholarEngine, ~2.5 min burst / ~7.5 min at 4 req/min)
-./venv/bin/python3 dev/search_pipeline/21_semscholar_smoke.py
+**Purpose:** Two-hop `citation_pdf_url` validation — loads HTML_HAS_PDF_LINK URLs from probe 14's report, GETs each (Hop 1 extracts `citation_pdf_url` meta), GETs the extracted PDF URL (Hop 2). Per-domain semaphore keyed on PDF-host domain.
+**Reads:** `md/<SOURCE_REPORT>` (hardcoded filename constant), `data/<SOURCE_POOL>`.
+**Writes:** `md/citation_pdf_followup_<ts>.md`.
+**Called by:** CLI only.
+**Calls out:** `httpx`.
 
-# DOM inspection — diagnose selector drift for any browser engine (~10s)
-./venv/bin/python dev/search_pipeline/inspections/inspect_engine_dom.py semantic_scholar "transformer attention mechanism"
-./venv/bin/python dev/search_pipeline/inspections/inspect_engine_dom.py semantic_scholar "neural network" --wait-s 5
+### 16_search_to_pdf_probe.py (495 LOC)
 
-# Bee investigation — Phase 1 CDP starvation probe (30 queries, ~3 min)
-./venv/bin/python dev/search_pipeline/cdp_starvation_probe.py
-./venv/bin/python dev/search_pipeline/cdp_starvation_probe.py --max-queries 10
+**Purpose:** End-to-end search-to-PDF chain probe — runs `search_web_workflow` directly, applies full chain (Tier-1 transform / DIRECT .pdf / MULTI_STEP citation_pdf_url / BLACKLIST), saves real PDFs to `~/Downloads/`. Regression check after `pdf_chain` refactors.
+**Reads:** queries via CLI positional args.
+**Writes:** `md/search_to_pdf_<ts>.md`, PDF files to `~/Downloads/`.
+**Called by:** CLI only. Flags: `--top-n N`, queries as positional args.
+**Calls out:** `src.scraper.pdf_chain` (HARD_BLACKLIST, TIER1_DOMAINS, apply_tier1_transform, is_blacklisted, is_github_blob, parse_citation_pdf_url), `src.search.browser.close_browser`, `src.search.merge.build_engine_pools`, `src.search.result.SearchResult`, `src.search.search_web` (`_query_engines_concurrent`, `_select_engines`), `httpx`.
 
-# Bee investigation — Phase 2 acquire() instrumentation probe
-./venv/bin/python dev/search_pipeline/acquire_probe.py --smoke           # 4-query dry-run, verify events
-./venv/bin/python dev/search_pipeline/acquire_probe.py                   # full run (30 queries, ~4 min)
-./venv/bin/python dev/search_pipeline/acquire_probe.py --max-queries 20  # limit to 20 queries
+### 19_books_probe.py (316 LOC)
 
-# Value-eval Phase 11 — LLM-as-Oracle vs 4 C-methods, 4 modes × 4 queries
-./venv/bin/python dev/search_pipeline/value_eval_probe.py --smoke        # single (general × M1) + auto-aggregate, ~10s
-./venv/bin/python dev/search_pipeline/value_eval_probe.py                # full 16-pair batch, ~3-4 min
-# After Stage 1+2 produces 16 pool+methods JSONs, an LLM worker reads each pool.json (DO NOT open methods.json)
-# and writes oracle.json per pair. Then:
-./venv/bin/python dev/search_pipeline/value_eval_aggregate.py --ts-dir dev/search_pipeline/01_reports/value_eval_<ts>
-# Writes per-query MDs + value_eval_summary_<ts>.md with per-mode means + overall winner.
+**Purpose:** Empirical book-domain inventory — appends `book` to 12 broad queries, runs against Google/DDG/Mojeek (max 100/200/200). Raw domain-pool observation, no classification. Informs `--books` whitelist/blacklist design.
+**Reads:** hardcoded 12-query set.
+**Writes:** `md/books_probe_<ts>.md`.
+**Called by:** CLI only.
+**Calls out:** `src.search.engines.{google,duckduckgo,mojeek}`, `src.search.browser.close_browser`.
 
-# Phase 12+ — staged pipeline (pool fetch → oracle → methods → aggregate)
-./venv/bin/python dev/search_pipeline/stage1_pool_fetch.py --smoke       # 1-pair smoke, verify v3 positions schema
-./venv/bin/python dev/search_pipeline/stage1_pool_fetch.py               # full 16-pair fetch → value_eval_v3_<ts>/
-./venv/bin/python dev/search_pipeline/stage3_method_run.py --ts-dir dev/search_pipeline/01_reports/value_eval_v3_<ts>
-./venv/bin/python dev/search_pipeline/stage4_aggregate.py  --ts-dir dev/search_pipeline/01_reports/value_eval_v3_<ts>
+### 20_docs_probe.py (461 LOC)
 
-# Pool diff v2 vs v3 (latest v3 ts_dir auto-detected)
-./venv/bin/python dev/search_pipeline/pool_diff_v2_v3.py
-./venv/bin/python dev/search_pipeline/pool_diff_v2_v3.py --v3-dir dev/search_pipeline/01_reports/value_eval_v3_<ts>
+**Purpose:** Empirical docs-domain probe — appends `documentation` to 12 broad tech queries, runs against Google/DDG/Mojeek. Evaluates H1-H13 heuristics (docs subdomain, readthedocs, gitbook, /docs/, /api/, etc.) against the URL pool. Informs `--docs` whitelist/heuristic design.
+**Reads:** hardcoded 12-query set.
+**Writes:** `md/docs_probe_<ts>.md`.
+**Called by:** CLI only.
+**Calls out:** `src.search.engines.{google,duckduckgo,mojeek}`, `src.search.browser.close_browser`.
 
-# Oracle cleanup — filter google+SS, backfill 4 loss-pairs → 16 oracle_v3clean.json
-./venv/bin/python dev/search_pipeline/clean_pool.py
-./venv/bin/python dev/search_pipeline/clean_pool.py --v2-dir dev/search_pipeline/01_reports/value_eval_v2_<ts>
+### 21_semscholar_smoke.py (134 LOC)
 
-# Phase 13 — 12-method eval (reranker-0.6b + splade + generator-4b must be running)
-./venv/bin/python dev/search_pipeline/stage3_method_run_v3.py --pool-dir dev/search_pipeline/01_reports/value_eval_v3_20260523_021216
-./venv/bin/python dev/search_pipeline/stage4_aggregate_v3.py  --pool-dir dev/search_pipeline/01_reports/value_eval_v3_20260523_021216
-```
+**Purpose:** Semantic Scholar production-mode smoke — `SemanticScholarEngine().search()` per query (pydoll browser). Status taxonomy: OK (≥3)/SUSPECT (1-2)/EMPTY/ERROR.
+**Reads:** `queries.txt`.
+**Writes:** `md/semscholar_smoke_<ts>.md`.
+**Called by:** CLI only.
+**Calls out:** `src.search.engines.semantic_scholar.SemanticScholarEngine`, `src.search.browser.close_browser`.
 
-## Documentation Tree
+### 22_openlibrary_smoke.py (122 LOC)
 
-- [inspections/DOCS.md](inspections/DOCS.md) — DOM-inspection tooling for engine selector drift recovery
+**Purpose:** Open Library smoke — `OpenLibraryEngine().search()` for 30 baseline queries.
+**Reads:** `queries.txt`.
+**Writes:** `md/open_library_smoke_<ts>.md` (via `write_report`, `md/` dir).
+**Called by:** CLI only.
+**Calls out:** `src.search.engines.open_library.OpenLibraryEngine`.
+
+### 23_books_ab_smoke.py (202 LOC)
+
+**Purpose:** A/B pool-widening smoke — measures Open Library's additive contribution to `--books` mode. OL URLs (`openlibrary.org/works/*`) are structurally unique vs web engines, so OL result count = unique-to-OL count directly. No Chrome needed. `MEANINGFUL_WIDENING_THRESHOLD = 3`.
+**Reads:** hardcoded 10-query `BOOK_QUERIES` set.
+**Writes:** `md/books_ab_smoke_<ts>.md`.
+**Called by:** CLI only.
+**Calls out:** `src.search.engines.open_library.OpenLibraryEngine`.
+
+### 24_pydoll_teardown_verify.py (302 LOC)
+
+**Purpose:** Integration test for `kill_tab` teardown fix. T1: single hung tab (`about:blank` + never-resolving Promise, `await_promise=True`) through watchdog + `kill_tab` (wall ~ watchdog). T2: normal tab completes fine. T3: parallel batch of 5 hung tabs via `asyncio.gather` (mirrors production 5-engine fanout), verifies `Target.getTargets` delta=0 (no orphaned targets).
+**Reads:** none (self-contained hang simulation).
+**Writes:** `md/teardown_verify_<ts>.md`.
+**Called by:** CLI only.
+**Calls out:** `src.search.browser` (via `importlib`), pydoll CDP (`Target.getTargets`).
+
+### _capture_sorry.py (231 LOC)
+
+**Purpose:** Captures Google `/sorry/` block page — helper script, not a numbered experiment. Navigates to a search URL, checks if redirected to `/sorry/`, saves HTML + screenshot + MD summary.
+**Reads:** `config.yml`.
+**Writes:** `md/sorry_<ts>.md`, `data/sorry_<ts>.html`, `data/sorry_<ts>.png`.
+**Called by:** CLI only.
+**Calls out:** `pydoll` (Chrome, ChromiumOptions, PageCommands, NetworkCommands, CookieSameSite), `yaml`. Imports `load_config`/`start_browser` pattern mirrored from `01_google_smoke.py` (not imported directly).
+
+### acquire_probe.py (584 LOC)
+
+**Purpose:** Phase 2 bee investigation — `RateLimiter.acquire()` instrumentation probe. Monkey-patches `RateLimiter.__init__` (installs `_WatchedLock`) + `acquire()` (enter/exit events). Discriminates hypotheses B (task never scheduled) / A-lock (stale lock) / A-sleep (sleeping on backoff) / C (acquire innocent). Historical verdict (as of the investigation date, see process-docs): A-sleep confirmed.
+**Reads:** none (live instrumented run against production engines).
+**Writes:** `md/acquire_probe_<ts>.md` (full run only; `--smoke` writes nothing).
+**Called by:** CLI only. Flags: `--max-queries N`, `--smoke` (4-query dry-run, no report).
+**Calls out:** `src.search.rate_limiter` (monkeypatched via `importlib`), full engine set via production search path.
+
+### bm25_capped_smoke.py (243 LOC)
+
+**Purpose:** Per-engine top-K cap variant — pre-pool truncates each engine's results to top-K (K = google result count, fallback K=10), then BM25 vanilla on capped pool. 3-config compare: Hard-Slot, BM25 uncapped, BM25 capped.
+**Reads:** imports `QUERIES`, `VANILLA_K1`, `_build_pool`, `_tokenize`, `_doc_repr`, `BM25Uniform` from `bm25_sweep_smoke.py`.
+**Writes:** `md/bm25_capped_<ts>.md`.
+**Called by:** CLI only.
+**Calls out:** `bm25_sweep_smoke.py` (sibling), `rank_bm25`.
+
+### bm25_compare_smoke.py (174 LOC)
+
+**Purpose:** 5-config visual compare — Hard-Slot, Vanilla BM25, b=0 extreme, b=1 extreme, Title3x. Top-10 stacked tables per query.
+**Reads:** imports `QUERIES`, `VANILLA_K1`, `_bm25_rank`, `_build_pool` from `bm25_sweep_smoke.py`.
+**Writes:** `md/bm25_compare_<ts>.md`.
+**Called by:** CLI only.
+**Calls out:** `bm25_sweep_smoke.py` (sibling), `src.search.browser.close_browser`, `src.search.merge._merge_and_rank`, `src.search.search_web` (`_query_engines_concurrent`, `_select_engines`).
+
+### bm25_idf_engine_smoke.py (258 LOC)
+
+**Purpose:** IDF + engine-inverse-weighting orthogonal axes. 5-config compare: Hard-Slot, Vanilla BM25, +per-pool IDF (BM25Okapi default), +engine-inv-weighting (`1/engine_count` multiplier), +IDF+Weighting combined.
+**Reads:** imports `QUERIES`, `VANILLA_K1`, `STOPWORDS`, `_build_pool`, `_tokenize`, `_doc_repr`, `BM25Uniform` from `bm25_sweep_smoke.py`.
+**Writes:** `md/bm25_idf_engine_<ts>.md`.
+**Called by:** CLI only.
+**Calls out:** `bm25_sweep_smoke.py` (sibling), `rank_bm25`.
+
+### bm25_sweep_smoke.py (420 LOC)
+
+**Purpose:** BM25 parameter sensitivity sweep — 16-config main grid (b × stopwords × doc_repr at k1=1.2) + 4-config k1 sensitivity sweep, against Hard-Slot baseline. `BM25Uniform(BM25Okapi)` subclass overrides `_calc_idf` to force IDF=1.0 (TF + length-norm only). Base module for the whole `bm25_*` family — exports `QUERIES`, `VANILLA_K1`, `STOPWORDS`, `_build_pool`, `_tokenize`, `_doc_repr`, `_bm25_rank`, `BM25Uniform`.
+**Reads:** none (queries hardcoded, live pool fetch via production engines).
+**Writes:** `md/bm25_sweep_<ts>.md`.
+**Called by:** CLI + imported by `bm25_compare_smoke.py`, `bm25_idf_engine_smoke.py`, `bm25_capped_smoke.py`, `pooling_probe.py`, `rerank_probe_smoke.py`, `single_query_pool_dump.py`, `stage1_pool_fetch.py`, `stage3_method_run.py`, `stage3_method_run_v3.py`, `value_eval_probe.py`.
+**Calls out:** `rank_bm25` (BM25Okapi).
+
+### branch_probe.py (700 LOC)
+
+**Purpose:** Phase 3 bee investigation — sleep-branch discriminator. Distinguishes which of the two `asyncio.sleep` branches inside `RateLimiter.acquire()` fires during zero-cascade queries: `backoff_sleep_attempt` vs `tokencap_sleep_attempt`. Full replacement of `RateLimiter.acquire()` (byte-identical body + branch-discriminator event-emits) installed via monkeypatch before any `src.search` import. Structural discriminator: 6 engines have `.backoff()` calls (google, google_scholar, lobsters, mojeek, duckduckgo, semantic_scholar), 4 do not (crossref, openalex, stack_exchange, open_library).
+**Reads:** none (live instrumented run).
+**Writes:** `md/branch_probe_<ts>.md` (full run only).
+**Called by:** CLI only. Flags: `--max-queries N`, `--smoke` (4-query dry-run, no report).
+**Calls out:** `src.search.rate_limiter` (monkeypatched via `importlib`), full engine set via production search path.
+
+### cdp_starvation_probe.py (575 LOC)
+
+**Purpose:** Phase 1 bee investigation — asyncio event-loop starvation probe. Pattern A (slow-callback logger), Pattern B (scheduling-latency canary), CDP event counter (monkey-patch on `ConnectionHandler._process_single_message`). Categorizes queries as normal/captcha/zero_cascade. Historical verdict (as of the investigation date, see process-docs): REFUTED (event loop p99=1.4ms, 0 CDP events during cascade).
+**Reads:** `queries.txt` (20-30 queries).
+**Writes:** `md/cdp_probe_<ts>.md`.
+**Called by:** CLI only. Flags: `--max-queries N`.
+**Calls out:** `pydoll.connection.connection_handler.ConnectionHandler` (monkeypatched).
+
+### clean_pool.py (236 LOC)
+
+**Purpose:** Filter helper + oracle cleanup for 7-engine eval. `filter_pool(pool, drop_engines)` removes named engines from each entry's `engines`+`positions`, recomputes `min_position`, drops engine-less URLs. As script: generates `<pair>_oracle_v3clean.json` for all 16 (mode × query) pairs in the v2 ts_dir, backfilling loss-pairs where google/semantic_scholar picks are unavailable after filtering.
+**Reads:** `data/<v2 ts_dir>/*_oracle.json`.
+**Writes:** `data/<v2 ts_dir>/<pair>_oracle_v3clean.json`, `data/<v2 ts_dir>/oracle_v3clean_summary.md`.
+**Called by:** CLI only; `filter_pool` importable by other stage scripts. Flags: `--v2-dir PATH`.
+**Calls out:** none beyond stdlib.
+
+### ddg_mojeek_selector_probe.py (404 LOC)
+
+**Purpose:** DDG + Mojeek DOM-selector coverage probe — per engine loads one query, counts production-selector matches vs alternative containers in DOM, tallies external links. Distinguishes selector limitations from server-side rendering caps.
+**Reads:** none (live DOM fetch, hardcoded `QUERY`).
+**Writes:** `md/ddg_mojeek_selector_probe_<ts>.md`.
+**Called by:** CLI only.
+**Calls out:** `src.search.browser` (new_tab, close_browser), `src.search.engines.duckduckgo` (`_build_url`, `_wait_for_results`, `_extract_value`), `src.search.engines.mojeek` (`_build_url`, `_wait_for_results`).
+
+### empty_classify_lobsters.py (223 LOC)
+
+**Purpose:** Classification probe for 11 Lobsters EMPTY queries from a historical smoke baseline (`smoke_20260504_023641`) — pydoll browser with 3s wait (vs production 600ms). Captures story count, page title, HTML snippet, screenshots for first 3 queries. Status taxonomy: ENGINE_EMPTY/PIPELINE_BUG/BOT_BLOCK/UNKNOWN.
+**Reads:** hardcoded query list embedded in-file (row indices reference `md/search_smoke_20260504_023641.md`).
+**Writes:** `md/empty_classify_lobsters_<ts>.md`, `data/empty_classify_lobsters_screenshots/`.
+**Called by:** CLI only.
+**Calls out:** `src.search.browser` (new_tab, close_browser), `src.search.rate_limiter.get_limiter`.
+
+### empty_classify_se.py (204 LOC)
+
+**Purpose:** Classification probe for 15 Stack Exchange EMPTY queries from the same historical smoke baseline — direct httpx (no rate limiter, no API key) against `site=stackoverflow` (production-identical) + `site=stackexchange` (cross-site fallback). Status taxonomy: ENGINE_EMPTY/ENGINE_NICHE/RATE_LIMITED/PIPELINE_BUG/UNKNOWN.
+**Reads:** hardcoded query list embedded in-file.
+**Writes:** `md/empty_classify_se_<ts>.md`.
+**Called by:** CLI only.
+**Calls out:** `httpx`.
+
+### engine_distribution_analysis.py (301 LOC)
+
+**Purpose:** Per-engine slot-count and slot-share analysis over the newest `pipeline_smoke_*.md` baseline (auto-discovered via glob+sort). Sections: slot-count totals per engine (Total/GENERAL/ACADEMIC/QA/Solo/Overlap), Per-Engine Status Aggregate (quoted from smoke tail), slot-share with uniform + OK-adjusted baselines and signed delta columns, per-query distribution matrix.
+**Reads:** newest `md/pipeline_smoke_*.md`.
+**Writes:** `md/engine_distribution_<ts>.md`.
+**Called by:** CLI only.
+**Calls out:** `_lib.parse` (`KNOWN_ENGINES`, `parse_smoke_report`).
+
+### engine_health_audit.py (214 LOC)
+
+**Purpose:** Reads `src/logs/query_log.jsonl` and aggregates per-engine status counts. Sub-status-aware classification (rules fire before the coarse success-rate bucket): `BROKEN (DOM-DRIFT)` when `EMPTY_NO_CONTAINER > 50%` of empty samples, `DEGRADED (ANTI-BOT)` when `EMPTY_BLOCK > 30%`, `HEALTHY-EMPTY` when `EMPTY_NO_RESULTS` dominates with acceptable success rate, `FLAG (PYDOLL-CANCEL-LEAK)` when `TIMEOUT_NONCOOP > 10%` of timeouts. Bucket aggregation uses `startswith("EMPTY"/"TIMEOUT"/"ERROR")` to tolerate sub-status names.
+**Reads:** `src/logs/query_log.jsonl`.
+**Writes:** `md/<report>.md`.
+**Called by:** CLI only. Flags: `--last N` (default 100), `--since ISO_TS`, `--engine NAME`.
+**Calls out:** none beyond stdlib.
+
+### google_selector_probe.py (250 LOC)
+
+**Purpose:** Google DOM-selector diagnostic — loads one query at `num=100`, counts production selector `#rso h3` matches vs `div.MjjYud` containers vs alternative selectors in the rendered DOM. Distinguishes selector limitations from server-side rendering caps.
+**Reads:** none (live DOM fetch, hardcoded `QUERY`, `NUM=100`).
+**Writes:** `md/google_selector_probe_<ts>.md`.
+**Called by:** CLI only.
+**Calls out:** `src.search.browser` (new_tab, close_browser), `src.search.engines.google` (`_inject_socs_cookie`, `_build_url`, `_wait_for_results`, `_extract_value`).
+
+### inspect_query_log.py (99 LOC)
+
+**Purpose:** Quick summary of `src/logs/query_log.jsonl` — total record count, wall_ms min/mean/max, bottleneck-engine and TIMEOUT-hit counts, full per-engine breakdown of the most recent query. Distinguishes `engine_run` (written always) vs `workflow_summary` (production-only, includes total_wall_ms + preview) vs old-style (no `record_type`, treated as `workflow_summary`).
+**Reads:** `src/logs/query_log.jsonl` (path resolution: `--log-path` arg → `SEARXNG_QUERY_LOG_PATH` env → default).
+**Writes:** stdout only.
+**Called by:** CLI only. Flags: `--tail N`, `--log-path PATH`, `--all-types` (include `engine_run` records).
+**Calls out:** none beyond stdlib.
+
+### no_google_burst_smoke.py (212 LOC)
+
+**Purpose:** No-Google concurrent burst smoke — production `ScholarEngine` (HTTP) vs 8 other production engines under concurrent multi-engine burst pattern, without Google browser present. Architectural discriminator: does HTTP Scholar survive the burst pattern without the Google-driven browser warmup? Import switched from the dev-only `ScholarHTTPProbe` (see `scholar_http_probe.py`) to production `ScholarEngine` as part of an HTTP migration.
+**Reads:** hardcoded 12-query set (academic queries, 3 bursts × 4).
+**Writes:** `data/no_google_burst_<ts>.jsonl` (per-query records); summary table to stderr.
+**Called by:** CLI only.
+**Calls out:** `httpx`, `pydoll.exceptions`, `websockets.exceptions`, `src.search.status`, `src.search.browser.close_browser`, `src.search.engines.{crossref,duckduckgo,lobsters,mojeek,open_library,openalex,semantic_scholar,stack_exchange,scholar}`.
+
+### pool_diff_v2_v3.py (240 LOC)
+
+**Purpose:** Pool diff — compares URL sets and engine counts across all 16 (mode × query) pairs between a v2 reference dir and a v3 ts_dir. Per-pair overlap_pct, new-in-v3, removed-from-v2, google_count comparison; aggregate mean overlap + per-engine OK% comparison.
+**Reads:** `data/value_eval_v2_20260523_000156/` (hardcoded `V2_REF` default), `data/value_eval_v3_<ts>/` (`--v3-dir` or newest auto-detected).
+**Writes:** `md/pool_diff_v2_vs_v3.md`.
+**Called by:** CLI only. Flags: `--v3-dir PATH`.
+**Calls out:** none beyond stdlib.
+
+### pooling_probe.py (363 LOC)
+
+**Purpose:** Capped-pool strategy comparison — 4 configs on the same capped pool (each engine contributes ≤ google_count URLs): C1 Overlap-Count, C2 BM25 (BM25Uniform k1=1.2 b=0.75), C3 Cross-Encoder (Qwen3-Reranker-0.6B, port 8082), C4 Embedding-Cosine (Qwen3-Embedding-0.6B, port 8084). Hard-stop: `google_count == 0` → query skipped, no fallback. Requires reranker + embedding GPU services running.
+**Reads:** imports pure BM25/pool utilities from `bm25_sweep_smoke.py`, GPU API helpers + 20-query set from `rerank_probe_smoke.py`.
+**Writes:** `md/pooling_probe_<ts>.md`, `data/pooling_probe_<ts>.queries.jsonl`.
+**Called by:** CLI only.
+**Calls out:** `bm25_sweep_smoke.py`, `rerank_probe_smoke.py` (siblings), GPU services (embedding-0.6b, reranker-0.6b).
+
+### pydoll_fingerprint_probe.py (200 LOC)
+
+**Purpose:** Measures the production `browser.py` Chrome fingerprint against `bot.sannysoft.com` (JS bot-detection checks table). Extracts pass/fail per fingerprint vector + high-signal `navigator` properties.
+**Reads:** none (live page load).
+**Writes:** `/tmp/pydoll_probe_sannysoft.png` (screenshot); JSON summary to stdout.
+**Called by:** CLI only.
+**Calls out:** `src.search.browser` (new_tab, close_browser).
+
+### rerank_probe_smoke.py (576 LOC)
+
+**Purpose:** URL-filter + BM25-Retrieve top-50 + 2-method semantic rerank. 5-config compare: Hard-Slot, Filter+BM25-only, Filter+BM25→Embedding-Cosine (Qwen3-Embedding-0.6B, port 8090/8084), Filter+BM25→Cross-Encoder (Qwen3-Reranker-0.6B, port 8082/8092), BM25-Capped reference. URL-pattern filter drops search-results-page URLs (`[?&](q|query|search|keyword|term|p)=`, `/search/`, `/sresults/`, `/scholar?q=`). Base module for `pooling_probe.py`/`single_query_pool_dump.py`/stage scripts — exports `QUERIES`, `QUERY_CATEGORIES`, `EMBEDDING_URL`, `RERANKER_URL`, `embed_batch`, `cross_encoder_rerank`, `cosine_sim`, `_bm25_score`, `_verify_services`, `close_browser`, `_query_engines_concurrent`, `_select_engines`.
+**Reads:** hardcoded 20-query set (5 academic/5 product/5 technical/5 mixed-intent).
+**Writes:** `md/rerank_probe_<ts>.md`.
+**Called by:** CLI + imported by `pooling_probe.py`, `single_query_pool_dump.py`, `stage1_pool_fetch.py`, `stage3_method_run.py`, `stage3_method_run_v3.py`, `value_eval_probe.py`.
+**Calls out:** `httpx`, `numpy`, GPU services (embedding-0.6b, reranker-0.6b).
+
+### scholar_http_probe.py (144 LOC)
+
+**Purpose:** HTTP-based architectural alternative to `src/search/engines/scholar.py` — pure httpx + lxml against `scholar.google.com`, no browser. Status: dev-only PROBE, not wired into production `ENGINES` dict. `ScholarHTTPProbe` class (`name="scholar_http"`) uses a probe-local `RateLimiter` distinct from production `_limiters`.
+**Reads:** none (live HTTP fetch).
+**Writes:** returns `SearchResult` list — no file I/O.
+**Called by:** imported historically by `no_google_burst_smoke.py` (that script has since switched to production `ScholarEngine`; import is currently unused there, see module docstring cross-reference).
+**Calls out:** `httpx`, `lxml.html`, `src.search.rate_limiter.RateLimiter`, `src.search.result.SearchResult`, `src.search.status`.
+
+### single_query_pool_dump.py (385 LOC)
+
+**Purpose:** Single-query capped-pool vs Top-N dump for 4 configs. Sections: per-engine raw, full capped pool, Top-N per config, comparison matrix (every pool URL × 4 configs → rank or —). Hard-stop: `google_count == 0` → exit, no fallback. Requires embedding (port 8084) + reranker (port 8082) GPU services.
+**Reads:** imports `_build_pool`, `_doc_repr` from `bm25_sweep_smoke.py`; GPU helpers from `rerank_probe_smoke.py`.
+**Writes:** `md/<output>.md` (default naming; `--output` overridable).
+**Called by:** CLI only. Flags: `--query TEXT` (default: postgresql index query), `--output PATH`.
+**Calls out:** `bm25_sweep_smoke.py`, `rerank_probe_smoke.py` (siblings), GPU services.
+
+### snippet_quality_analysis.py (384 LOC)
+
+**Purpose:** Per-source bloat + lexical-density analysis over the newest `pipeline_smoke_*.md` baseline (auto-discovered). 11 sources (8 engines + `scholar_strip` derived bucket + og + meta), 10 bloat-pattern regexes. Sections: per-source aggregated stats table, 8×8 engine-overlap matrix, all-URLs side-by-side per-URL block with winner annotation, "best by usefulness" aggregate, per-class breakdown (GENERAL/ACADEMIC/QA).
+**Reads:** newest `md/pipeline_smoke_*.md`.
+**Writes:** `md/snippet_quality_<ts>.md`.
+**Called by:** CLI only.
+**Calls out:** `_lib.parse` (`KNOWN_ENGINES`, `parse_smoke_report`), `_lib.text` (`strip_bloat`, `lexical_density`, `detect_bloat`).
+
+### snippet_selection_simulator.py (198 LOC)
+
+**Purpose:** Dry-run of new snippet-selection logic over the newest `pipeline_smoke_*.md` baseline. For each URL, gathers all non-empty sources (og, meta, per-engine snippets), scores each as `clean_len × lex_density`, picks the highest; falls back to best-of-worst when all sources are below `MIN_FLOOR=40` chars. Sections: summary (analyzed/no-content/floor-trigger counts + source distribution), per-query picks, floor-triggered cases list.
+**Reads:** newest `md/pipeline_smoke_*.md`.
+**Writes:** `md/snippet_selection_<ts>.md`.
+**Called by:** CLI only.
+**Calls out:** `_lib.parse.parse_smoke_report`, `_lib.text` (`strip_bloat`, `lexical_density`).
+
+### stage1_pool_fetch.py (381 LOC)
+
+**Purpose:** Phase 12+ pool fetch (v3 schema) — 4 modes × 4 queries, per-pair `<mode>_<slug>_pool.json` + `<mode>_<slug>_engine_report.md`, global `engine_report_summary.md`. Every pool entry carries `positions: {engine: rank}` alongside `engines` + `min_position` (invariants: `set(engines)==set(positions.keys())`, `min_position==min(positions.values())`).
+**Reads:** imports pool-build utilities from `bm25_sweep_smoke.py`, `rerank_probe_smoke.py`.
+**Writes:** `data/value_eval_v3_<ts>/` — per-pair `*_pool.json` + `*_engine_report.md`, `engine_report_summary.md`.
+**Called by:** CLI only. Flags: `--smoke` (1-pair), `--ts-dir PATH`.
+**Calls out:** `bm25_sweep_smoke.py`, `rerank_probe_smoke.py` (siblings).
+
+### stage3_method_run.py (209 LOC)
+
+**Purpose:** Phase 12+ method run (v2) — loads `<mode>_<slug>_pool.json` from a ts_dir, applies C1 Overlap / C2 BM25 / C2' BM25-Capped / C3 Cross-Encoder, writes `<mode>_<slug>_methods.json`. Dynamic reranker URL via `ensure_ready("reranker")` + `find_server_url("reranker")` (RAG server_manager). Exits with error if reranker cannot be reached.
+**Reads:** `<ts_dir>/*_pool.json`.
+**Writes:** `<ts_dir>/<mode>_<slug>_methods.json`.
+**Called by:** CLI only. Flags: `--ts-dir PATH` (required), `--smoke`.
+**Calls out:** `httpx`, RAG `server_manager` (via hardcoded `RAG_SRC` path insert), reranker GPU service.
+
+### stage3_method_run_v3.py (489 LOC)
+
+**Purpose:** Phase 13 method run (12 methods) — loads `<mode>_<slug>_pool.json` (v3 schema) from `--pool-dir`, filters `{google, semantic_scholar}` via `clean_pool.filter_pool`, applies M1-M12: C1 Overlap, RRF, Structural-URL, BM25, BM25-Capped, C3 vanilla, C3+InstrPrefix, RRF+C3, SPLADE, SPLADE+C3, two-stage C3+LLM-Filter, LLM-Selector. GPU deps: reranker-0.6b (M6-M8,M10-M11), splade (M9-M10), generator-4b (M11-M12).
+**Reads:** `<pool_dir>/*_pool.json`.
+**Writes:** `<pool_dir>/<mode>_<slug>_methods_v3.json`.
+**Called by:** CLI only. Flags: `--pool-dir PATH` (required), `--smoke`.
+**Calls out:** `clean_pool.filter_pool`, reranker/SPLADE/generator-4b GPU services.
+
+### stage4_aggregate.py (325 LOC)
+
+**Purpose:** Phase 12+ aggregate (v2) — loads pool/methods/oracle JSONs from a ts_dir, computes Jaccard overlap per C-method, writes per-pair `<mode>_<slug>_eval.md` + global `eval_summary.md` into the ts_dir. `--no-oracle` (smoke mode) generates MDs without oracle section to verify pool+methods pipeline integrity.
+**Reads:** `<ts_dir>/*_pool.json`, `*_methods.json`, `*_oracle.json`.
+**Writes:** `<ts_dir>/<mode>_<slug>_eval.md`, `<ts_dir>/eval_summary.md`.
+**Called by:** CLI only. Flags: `--ts-dir PATH` (required), `--no-oracle`.
+**Calls out:** none beyond stdlib.
+
+### stage4_aggregate_v3.py (300 LOC)
+
+**Purpose:** Phase 13 aggregate (12-method eval) — loads `*_pool.json` + `*_methods_v3.json` (pool_dir) + `*_oracle_v3clean.json` (oracle_dir), computes Jaccard per method, writes per-pair `<mode>_<slug>_eval_v3.md` + `eval_summary_v3.md` with per-mode mean Jaccard, per-method latency stats (mean/p50/p95/max/cold), Quality×Latency Pareto table (DOMINATED flagged).
+**Reads:** `<pool_dir>/*_pool.json`, `*_methods_v3.json`; `<oracle_dir>/*_oracle_v3clean.json` (default: hardcoded v2 dir `value_eval_v2_20260523_000156`).
+**Writes:** `<pool_dir>/<mode>_<slug>_eval_v3.md`, `<pool_dir>/eval_summary_v3.md`.
+**Called by:** CLI only. Flags: `--pool-dir PATH` (required), `--oracle-dir PATH`, `--no-oracle`.
+**Calls out:** none beyond stdlib.
+
+### test_snippet_truncate.py (32 LOC)
+
+**Purpose:** Standalone assertion script for `src/search/snippet._truncate` — 4 regression-guard assertions (short text unchanged, clean period cut without ellipsis, word-boundary cut with ellipsis, hard cut at exactly MAX_SNIPPET_LEN+1 with ellipsis).
+**Reads:** none.
+**Writes:** stdout (`OK`) or `AssertionError`.
+**Called by:** CLI only. `./venv/bin/python dev/search_pipeline/test_snippet_truncate.py`.
+**Calls out:** `src.search.snippet` (`_truncate`, `MAX_SNIPPET_LEN`).
+
+### value_eval_aggregate.py (325 LOC)
+
+**Purpose:** Pooling-investigation Stage 4 (v1, historical, superseded by `stage4_aggregate.py`/`stage4_aggregate_v3.py`) — loads `pool.json`+`methods.json`+`oracle.json` per pair, computes Jaccard `|oracle ∩ method| / |oracle ∪ method|`, writes per-query MD + summary MD with per-mode means + overall winner. Handles undersized-pool case (`undersized_pool=True AND pool_size=0` skipped in mode means). `--no-oracle` for pipeline-validation MDs without oracle section.
+**Reads:** `<ts_dir>/*_pool.json`, `*_methods.json`, `*_oracle.json`.
+**Writes:** `md/value_eval_<mode>_<slug>_<ts>.md`, `md/value_eval_summary_<ts>.md`.
+**Called by:** CLI only. Flags: `--ts-dir PATH` (required), `--ts-out TS`, `--no-oracle`.
+**Calls out:** none beyond stdlib.
+
+### value_eval_probe.py (369 LOC)
+
+**Purpose:** Pooling-investigation Stage 1+2 (v1, historical) — per `(mode, query)` pair fetches pool via `_query_engines_concurrent` with mode-specific query modifiers (+book/+pdf/+documentation for general engines) and post-merge URL filter, applies 4 C-methods (C1 Overlap on capped+filtered, C2 BM25 vanilla on full+filtered, C2' BM25-Capped, C3 Cross-Encoder Qwen3-Reranker-0.6B port 8082). Writes oracle-input pool.json (url+title+snippet only, alphabetical, no engine/score signals) and methods.json. Filter logic inlined (no `from src.` imports). `--smoke` runs 1 pair + auto-aggregates with `--no-oracle`.
+**Reads:** hardcoded 4-mode × 4-query matrix, live engine fetch.
+**Writes:** `data/value_eval_<ts>/<mode>_<slug>_pool.json`, `<mode>_<slug>_methods.json`.
+**Called by:** CLI only. Flags: `--smoke`, `--ts-dir PATH`.
+**Calls out:** `httpx`, reranker GPU service (port 8082).
+
+### with_google_decoupling_smoke.py (189 LOC)
+
+**Purpose:** Verifies Scholar is absent from the default engine set (production `_select_engines(None)` path). Checks: Google browser engine present, `google_scholar` NOT in `engines_requested`, `engines_excluded["google_scholar"] == "decoupled_from_google"` in query log, no `EMPTY_BLOCK` attributed to Scholar. Runs 5 queries through `search_web_workflow(query, engines=None)` then reads the last 5 `query_log.jsonl` lines.
+**Reads:** `src/logs/query_log.jsonl` (tail, before/after count).
+**Writes:** `md/with_google_decoupling_<ts>.md`.
+**Called by:** CLI only.
+**Calls out:** `src.search.search_web.search_web_workflow`, `src.search.browser.close_browser`.
+
+## State
+`config.yml` — run params (`queries_file`, `page_load_timeout`, `consent_settle`) and report path (`output_dir`, currently `./md`); consumed by `02_burst_smoke.py`, `_capture_sorry.py`, `00_single_query.py` (latter two via shared helper import, not direct config read). `queries.txt` — 30 baseline queries (Tech 8 + Science 6 + German 6 + Niche 5 + Broad 5), shared across most per-engine smokes. Report outputs live in `md/` (readable reports); run-payload/corpus data lives in `data/` (JSON/JSONL pool dumps, screenshots, raw HTML) — kept separate per the dev/ layout convention.
+
+## Gotchas
+Several scripts (`bm25_capped_smoke.py`, `bm25_idf_engine_smoke.py`, `bm25_compare_smoke.py`, `pooling_probe.py`, `single_query_pool_dump.py`, `stage1_pool_fetch.py`, `stage3_method_run*.py`, `value_eval_probe.py`) import helpers directly from sibling script files (`bm25_sweep_smoke.py`, `rerank_probe_smoke.py`) via `sys.path.insert(0, str(SCRIPT_DIR))` — these are not `_lib/` modules; treat them as informal shared-code sources when editing either base file. GPU-dependent scripts (reranker/embedding/SPLADE/generator-4b at fixed localhost ports) fail hard if the corresponding RAG server isn't running — check `_verify_services()` / `ensure_ready()` calls before assuming a script is broken. `no_google_burst_smoke.py`, `stage1_pool_fetch.py`, `value_eval_probe.py` write to `data/` rather than `md/` — their outputs are JSON/JSONL payloads, not readable reports.
