@@ -125,7 +125,8 @@ async def run_inspection(engine_name: str, query: str, wait_s: float) -> None:
         await tab.close()
         await close_browser()
     ts = datetime.now().strftime("%Y%m%d_%H%M%S")
-    report_path = SCRIPT_DIR / f"{engine_name}_{ts}.md"
+    report_path = SCRIPT_DIR / "md" / f"{engine_name}_{ts}.md"
+    report_path.parent.mkdir(parents=True, exist_ok=True)
     report_path.write_text(
         build_report(engine_name, query, url, wait_s, ts, h1, h2, h2_all, h3, h4, h5, h6, h7, cfg),
         encoding="utf-8",
