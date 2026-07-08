@@ -27,52 +27,6 @@ the job lifecycle (lock, janitor). Do NOT touch when adding a browser-engine pla
 5. `logger` streams all events to JSONL (discovery + scrape combined); `pipeline.py` calls `logger.close()` + `janitor.end_job` in `finally` — fires on all exit paths including 0-entries and 0-new-after-dedup early returns. `end_job` derives `job.md` + `cumulative_hits.png`.
 6. `_build_manifest` maps `(done, dead, gap)` → `[{url, hash, status, file, char_count, error}]` matching the browser engine manifest contract.
 
-## Job Report (job.md)
-
-Written by `janitor.end_job` to `{platform_dir}/proxy_pool_jobs/{job_id}/job.md`. Spans the full
-unified job — discovery proxy fetches + article-scrape proxy fetches in one JSONL → one report.
-
-### Summary table (always present)
-
-| Metric | Value |
-|---|---|
-| URLs | N target, M completed |
-| Mean inter-hit | …s |
-| Median inter-hit | …s |
-| Total time | …s |
-| Pool size (per refresh) | 22400, 21900 |
-
-### Per-60-min-window proxy table (present when ≥1 attempt event exists)
-
-| Window | Probiert | Erfolgreich | URLs handled | Fetch-Versuche | Pool size |
-|---|---|---|---|---|---|
-| 0 | 412 | 38 | 203 | 5000 | — |
-| 1 | 290 | 31 | 180 | 3180 | 22400 |
-
-**Semantics:**
-- Window k spans `[t0 + k×3600s, t0 + (k+1)×3600s)`. `t0` = earliest event timestamp in the JSONL.
-- **Probiert**: distinct `proxy_key` values across all attempt events in window k.
-- **Erfolgreich**: distinct `proxy_key` values where `result == "ok"` in window k (HTTP 200 + valid content).
-- **Distinct per window**: a proxy used in both window 0 and window 1 counts once in each. Within a window, any number of reuses = 1.
-- **URLs handled**: distinct target URLs in the window — the real "how many articles did we work on" signal.
-- **Fetch-Versuche**: total attempt events (proxy × URL pairs) in the window — the proxy-economics signal (volume). A URL contested by 5 proxies = 5 Fetch-Versuche, 1 URLs handled.
-- **Pool size**: size of the most-recent `pool_refresh` event whose `floor((ts−t0)/3600) ≤ k`. `—` if no refresh precedes window k. A refresh that fires seconds after the hour boundary lands in window k+1 and serves that window (same bucketing as attempts — no off-by-one on the boundary).
-
-### Pool source breakdown (present when pool_source events exist)
-
-One subsection per pool_refresh (`### Refresh 0 (startup)`, `### Refresh 1`, …):
-
-| URL | Result | Count |
-|---|---|---|
-| https://raw.githubusercontent.com/monosans/.../proxies.json | ok | 4521 |
-| https://raw.githubusercontent.com/TheSpeedX/.../http.txt | fail | 0 |
-
-**Semantics:**
-- **URL**: the individual raw-file URL fetched (one row per URL — `THESPEEDX_SOURCES` has 3 rows, etc.).
-- **Result**: `ok` if the fetch succeeded after retries; `fail` if all retries exhausted.
-- **Count**: raw proxy entries parsed from that source before cross-repo dedup.
-- Sum of counts > Pool size is expected — `load_backfill_pool()` deduplicates across all sources. This note is rendered inline in job.md to prevent misreading the relationship.
-
 ## Modules
 
 ### scrape.py (90 LOC)

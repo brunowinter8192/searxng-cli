@@ -1,90 +1,129 @@
-# search/
+# src/search/
 
-pydoll-based parallel search pipeline. Exposes `search_web_workflow()` (single-query, fan-out across engines via asyncio.gather, returns engine-breakdown TextContent + writes per-engine pool cache) consumed by `cli.py`. Plus `fetch_search_results()` sync wrapper consumed by dev scripts.
+## Role
 
-**Active engines (9):** google, duckduckgo, mojeek, lobsters, semantic_scholar (pydoll); crossref, openalex, stack_exchange, open_library (HTTP). Google Scholar (`engines/scholar.py`) is decoupled from the default pool. brave / startpage / bing were dropped from the engine set.
+pydoll-based parallel web-search pipeline behind the `search_web` and `search_engine_drilldown` CLI subcommands. Fans a single query out across 9 engines concurrently, dedups URLs into per-engine pools, caches the pools to disk, and returns an engine-breakdown table; the drilldown subcommand re-reads the cache to emit one engine's URLs. Touch this package when changing engine fan-out, dedup/pool-building, the disk cache, rate-limiting, or the three filter flags. Individual engine parsers live one level down in `engines/`.
 
-**Two-call drilldown architecture (2026-05-23):** `search_web` returns an engine-breakdown table (counts only, no URLs). URLs per engine retrieved via `search_engine_drilldown` CLI subcommand, which reads the per-engine cache written by `search_web`. Dedup: URLs owned by the engine with the lowest position; random tie-break. No global ranking, no class/slot allocation.
+## Public Interface
 
-**Filter-flag trio (`--books` / `--pdf` / `--docs`):** three filter flags. Each applies a per-engine query modifier + post-fanout URL filter before `build_engine_pools`. Breakdown table counts reflect filtered pool. Wiring in `search_web_workflow`: `apply_filter_mode` → set query_modifier_map → `filter_urls_by_mode(raw_results, mode)` → `build_engine_pools(filtered)`.
+`__init__.py` is empty — modules are imported by path:
 
-## search_web.py
+- `search_web_workflow(query, language="en", time_range=None, engines=None, …, query_modifier_map=None)` (search_web.py) — the `search_web` subcommand entry (`cli.py`). Returns `list[TextContent]` (one breakdown table).
+- `fetch_search_results(...)` (search_web.py) — sync wrapper for dev scripts; returns the raw result list, no pool-building.
+- `cache_key`, `cache_read`, `format_engine_pool` (cache.py) — the `search_engine_drilldown` subcommand path (`cli.py`).
+- `kill_stale_chrome()` (browser.py) — registered `atexit` in `cli.py`.
 
-**Purpose:** Search orchestrator. Two entry points:
-- `search_web_workflow(query, language="en", time_range=None, engines=None, ..., engine_timeout=None, _with_timings=False, query_modifier_map=None)` — single query, fan-out across all active engines via `asyncio.gather` of `_engine_with_timing` tasks. After fanout: `filter_urls_by_mode(raw_results, mode)` → `build_engine_pools(filtered)` → **post-dedup pool cap** → `_format_breakdown` → `cache_write(capped_pools)`. **Post-dedup pool cap:** after `build_engine_pools`, K = `len(pools['google'])` if > 0 else 10. Each engine's pool trimmed to `pool[:K]` — engines with fewer than K URLs unaffected. Prevents 200-URL drilldown floods from CrossRef/OpenAlex/Stack Exchange/Open Library. If Google was CAPTCHA'd or not in the engine set, K falls back to 10. **Three-tier timeout architecture:** (1) `ENGINE_WATCHDOG_TIMEOUT=3.6s` global default. (2) `ENGINE_WATCHDOG_OVERRIDE: dict[str, float]` per-engine override — `{"open_library": 6.0, "semantic_scholar": 5.0, "crossref": 6.0}`. (3) `RATE_WAIT_TIMEOUT=60.0s` cap on token-bucket acquire → `RATE_SKIP`. Status sub-classification: `_engine_with_timing` returns 5-tuple `(results, rate_wait_ms, search_ms, status, drop_reason)`. TIMEOUT into 3 sub-statuses (`TIMEOUT_WATCHDOG / TIMEOUT_NONCOOP / TIMEOUT_HTTPX`), ERROR into 4 (`ERROR_BROWSER / ERROR_HTTP / ERROR_PARSE / ERROR_OTHER`). **Two-record logging:** `_query_engines_concurrent` writes `engine_run` record immediately after fanout; `search_web_workflow` writes `workflow_summary` record after pool-build. `_select_engines(engines)` returns `(selected_dict, excluded_dict)`; default 9-engine set via `_DEFAULT_ENGINES`. Per-engine result caps in `ENGINE_MAX_RESULTS` dict. Returns `list[TextContent]` (one element: breakdown table); with `_with_timings=True` returns `(list, dict)` where `dict` has `engine_fanout_ms, pool_build_ms, cache_write_ms, total_ms, engine_details`. **CLI dispatch:** hardcodes `language="en"`, `time_range=None`, `engines=None` — full signature retained for dev-script callers.
-- `fetch_search_results()` — sync wrapper for dev scripts; returns raw result list, no pool-building.
+## Flow
 
-**Input:** Query string, language, time range, engine filter, filter-mode flags.
-**Output:** `list[TextContent]`. Side effect: writes disk cache `~/.cache/searxng/<key>.json`.
+`search_web_workflow` selects engines → `asyncio.gather` of `_engine_with_timing` tasks (each acquires a rate-limiter token, then runs the engine) → flat `raw_results` → `filter_urls_by_mode` (if a filter flag set) → `build_engine_pools` dedups by URL owner → post-dedup pool cap to Google's pool size (fallback 10) → `_format_breakdown` table → `cache_write` to `~/.cache/searxng/<key>.json`. `search_engine_drilldown` skips all of this: `cache_read` the per-engine pool → `format_engine_pool` numbers + cleans snippets.
 
-## merge.py
+## Modules
 
-**Purpose:** Cross-engine URL dedup and per-engine pool builder. `build_engine_pools(results: list[SearchResult]) -> dict[str, list[SearchResult]]`: (1) group all SearchResult objects by URL — one bucket per URL, one entry per engine; (2) for each URL, determine owner = engine with lowest position value; random choice on position ties via `random.choice`; (3) return `{engine_name → [SearchResult, ...]}` where each engine's list contains ONLY URLs it owns, sorted by that engine's native position ascending. `engine_positions: dict[str, int]` field on each returned result records all engines' positions for that URL.
-**Public interface:** `build_engine_pools`.
-**Input:** `list[SearchResult]` from engine fan-out (may contain same URL from multiple engines).
-**Output:** `dict[str, list[SearchResult]]` — per-engine owned pools. Called from `search_web.search_web_workflow`.
+### search_web.py (336 LOC)
 
-## snippet.py
+**Purpose:** Search orchestrator. Fans out across the 9 active engines via `asyncio.gather`, then filters → builds pools → caps → formats → caches. Post-dedup pool cap: K = `len(pools['google'])` if >0 else 10, each pool trimmed to `pool[:K]` (prevents CrossRef/OpenAlex/StackExchange/OpenLibrary drilldown floods). Three-tier timeout: `ENGINE_WATCHDOG_TIMEOUT=3.6s` default, `ENGINE_WATCHDOG_OVERRIDE` per-engine (open_library 6.0, semantic_scholar 5.0, crossref 6.0), `RATE_WAIT_TIMEOUT=60.0s` acquire cap → RATE_SKIP. `_engine_with_timing` returns a 5-tuple `(results, rate_wait_ms, search_ms, status, drop_reason)` with sub-classified TIMEOUT/ERROR statuses. Two-record logging: `engine_run` after fanout, `workflow_summary` after pool-build. `fetch_search_results` is a sync dev wrapper (raw list, no pools).
+**Reads:** query + params; per-engine caps in `ENGINE_MAX_RESULTS`; default set via `_DEFAULT_ENGINES`.
+**Writes:** disk cache `~/.cache/searxng/<key>.json` (via cache_write); query log (via log_query).
+**Called by:** `cli.py` (search_web_workflow); dev scripts (fetch_search_results).
+**Calls out:** `httpx`, `pydoll.exceptions`, `websockets.exceptions`, `mcp.types.TextContent`; `engines/` (all 9 engine classes); `cache` (cache_key, cache_write), `rate_limiter` (get_limiter), `merge` (build_engine_pools), `result` (SearchResult), `status`, `query_logger` (log_query), `filter_modes` (apply_filter_mode, filter_urls_by_mode, _DEFAULT_ENGINES).
 
-**Purpose:** Snippet text utilities for drilldown display. `_strip_bloat(text)` — HTML unescape + 9 bloat patterns (doubled prefix, Web results prefix, Featured snippet prefix, Read more, social proof, URL breadcrumbs, date prefix, HTML entities, Tagged-with suffix). `_truncate(text, max_len)` — sentence-aware truncation: period+space cut in `[max_len/2, max_len-1]`, else last-space cut + `…`, else hard-cut + `…`. `MAX_SNIPPET_LEN = 500`. Used by `cache.format_engine_pool` for drilldown output.
-**Public interface:** `_strip_bloat`, `_truncate`, `MAX_SNIPPET_LEN`.
-**Input:** Raw snippet text string.
-**Output:** Cleaned/truncated string.
+### merge.py (36 LOC)
 
-## cache.py
+**Purpose:** Cross-engine URL dedup + per-engine pool builder. `build_engine_pools(results)` groups SearchResults by URL, assigns each URL to the owner engine (lowest position value, random tie-break), returns `{engine → [owned SearchResult, …]}` sorted by native position. Populates `engine_positions` on each result (all engines' positions for that URL).
+**Reads:** flat `list[SearchResult]` from fan-out.
+**Writes:** none (returns the pool dict).
+**Called by:** `search_web.py`.
+**Calls out:** `result` (SearchResult).
 
-**Purpose:** Disk cache for per-engine pool results. Backs `search_engine_drilldown` CLI subcommand — reads per-engine URL lists without re-running the engine fan-out. **Cache key:** `sha256(query|language|engines|time_range[|modifier_id])[:16]` — `class_filter` removed (no longer a concept); `modifier_id` kept for `--books`/`--pdf`/`--docs` separation. **Path:** `~/.cache/searxng/<key>.json`. **TTL:** 1 hour, mtime-based. **Atomic writes** via `tempfile.mkstemp` + `os.replace`. **JSON structure:** `{query, language, engines, time_range, timestamp, pools: {engine_name: [{url, title, snippet, position}, ...]}}` — `pools` is the full per-engine result dict from `build_engine_pools`; `position` is engine's native rank for re-emitting in drilldown. `format_engine_pool(pool, engine_name, query) -> str` formats one engine's pool as a numbered list with `_strip_bloat`+`_truncate` applied to each snippet.
-**Public interface:** `cache_key`, `cache_path`, `cache_write`, `cache_read`, `format_engine_pool`.
-**Input:** `cache_write` takes key + `pools: dict[str, list[SearchResult]]` + search params. `cache_read` returns dict or None. `format_engine_pool` takes cached pool list (dicts) + engine name + query.
-**Output:** Persisted JSON; `cache_read` returns dict on hit or None on miss/expired.
+### filter_modes.py (76 LOC)
 
-## browser.py
+**Purpose:** Engine restriction + URL filtering for the `--books`/`--pdf`/`--docs` flags, plus `_DEFAULT_ENGINES`. `apply_filter_mode(...)` resolves the 3-way mutex (`pdf > docs > books`), sets the per-engine query-modifier map, returns `(selected, qmm, mode_id, excluded)`. `filter_urls_by_mode(raw_results, mode)` applies the post-fanout URL filter on the flat list BEFORE pool-build. Engine subsets are modifier-target sets, not restriction sets — all engines still fire on every query.
+**Reads:** selected engines + flag booleans.
+**Writes:** none.
+**Called by:** `search_web.py`.
+**Calls out:** `book_whitelist` (is_book_url), `pdf_filter` (is_pdf_url), `docs_filter` (is_docs_url).
 
-**Purpose:** pydoll Chrome lifecycle. Starts a single shared Chrome instance on first call, creates a new tab per engine for isolation. Applies fingerprint patches (WebGL, canvas, permissions) at launch. Three cleanup paths:
-- `kill_tab(tab)` — async, per-engine tab cleanup in engine `finally` blocks. Uses browser-level `Target.closeTarget` CDP command (via `_browser._execute_command`, NOT the hung tab connection). 5s `asyncio.wait_for` cap. Cleans `_browser._tabs_opened`. Replaces the former `tab.close()` path which caused 65s hangs on TIMEOUT_NONCOOP cases (`Page.close` via tab connection → hung renderer → 60s pydoll fallback).
-- `close_browser()` — async, for in-loop shutdown (used by dev scripts). Issues CDP `Browser.close` and waits for response.
-- `kill_stale_chrome()` — sync `pkill -f "user-data-dir=<SESSION_DIR>"`, nuclear OS-level fallback.
+### book_whitelist.py (145 LOC)
 
-**Input:** None (singleton on first access).
-**Output:** pydoll Chrome instance and new tab contexts.
+**Purpose:** `is_book_url(url)` — book-domain whitelist match for the `--books` filter.
+**Reads:** URL string.
+**Called by:** `filter_modes.py`.
+**Calls out:** none (stdlib `urllib` only).
 
-## rate_limiter.py
+### pdf_filter.py (88 LOC)
 
-**Purpose:** Per-engine token-bucket rate limiter. Module-level `_limiters: dict[str, RateLimiter]` registry; engines populate at module-import (`_limiters["<name>"] = RateLimiter(max_requests=4, window_seconds=60)`), workflow consumes via `get_limiter(name).acquire()` BEFORE invoking engine work in `search_web._engine_with_timing`.
-**Input:** Engine name (via `get_limiter`).
-**Output:** Async context that blocks until a token is available.
+**Purpose:** `is_pdf_url(url)` — PDF-host / `.pdf`-path match for the `--pdf` filter.
+**Reads:** URL string.
+**Called by:** `filter_modes.py`.
+**Calls out:** none (stdlib `urllib` only).
 
-## status.py
+### docs_filter.py (73 LOC)
 
-**Purpose:** Engine-status string constants for query log + audit. 17 constants total: 5 legacy (`OK / EMPTY / TIMEOUT / ERROR / RATE_SKIP`) + 5 EMPTY sub-statuses + 3 TIMEOUT sub-statuses + 4 ERROR sub-statuses. Imported as `from src.search import status as S` in `search_web.py`.
-**Public interface:** all 17 constants are module-level strings.
+**Purpose:** `is_docs_url(url)` — documentation-host match + noise blacklist for the `--docs` filter.
+**Reads:** URL string.
+**Called by:** `filter_modes.py`.
+**Calls out:** none (stdlib `urllib` only).
 
-## query_logger.py
+### cache.py (117 LOC)
 
-**Purpose:** Append-only JSONL query log. `log_query(record: dict)` writes one JSON line. Path from `SEARXNG_QUERY_LOG_PATH` env var, fallback `src/logs/query_log.jsonl`. **Two record types:** `engine_run` (written by `_query_engines_concurrent` for every call) and `workflow_summary` (written by `search_web_workflow` after pool-build — no `preview` field in new architecture). Inspector: `dev/search_pipeline/inspect_query_log.py --tail N`.
-**Record fields:** `ts`, `query`, `language`, `engines_requested`, `engines_excluded`, `total_wall_ms`, `bottleneck_engine`, `engines` ({name: {rate_wait_ms, search_ms, status, result_count, drop_reason}}).
-**Calls out:** `src/log_janitor.py` (`maybe_prune_jsonl`).
+**Purpose:** Disk cache for per-engine pools, backing `search_engine_drilldown`. Cache key `sha256(query|language|engines|time_range[|modifier_id])[:16]`; path `~/.cache/searxng/<key>.json`; 1h mtime TTL; atomic write via `tempfile.mkstemp` + `os.replace`. JSON holds the full per-engine pool dict with native positions. `format_engine_pool(pool, engine_name, query)` renders one engine's pool as a numbered list with snippet cleanup applied.
+**Reads:** cache files under `~/.cache/searxng/`.
+**Writes:** `~/.cache/searxng/<key>.json`.
+**Called by:** `cli.py` (cache_key, cache_read, format_engine_pool); `search_web.py` (cache_key, cache_write).
+**Calls out:** `result` (SearchResult), `snippet` (_strip_bloat, _truncate, MAX_SNIPPET_LEN).
 
-## result.py
+### snippet.py (63 LOC)
 
-**Purpose:** `SearchResult` dataclass. Fields: `url, title, snippet, engine, position, preview, engines, snippets, engine_positions`. `engine_positions: dict[str, int]` — populated by `build_engine_pools`; maps engine name → that engine's native position for this URL (covers all engines that returned the URL, not just the owner). `engines: list[str]` and `snippets: dict[str, str]` retained for backward compat with dev scripts that call `engine.search()` directly. `preview: dict | None` retained for backward compat (no longer populated in production path).
+**Purpose:** Snippet text utilities for drilldown display. `_strip_bloat(text)` (HTML unescape + 9 bloat patterns), `_truncate(text, max_len)` (sentence-aware, `MAX_SNIPPET_LEN=500`).
+**Reads:** raw snippet string.
+**Called by:** `cache.py` (format_engine_pool).
+**Calls out:** none (stdlib `html`, `re`).
 
-## filter_modes.py
+### query_logger.py (64 LOC)
 
-**Purpose:** Engine restriction and URL filtering for the three CLI filter flags (`--books` / `--pdf` / `--docs`), plus `_DEFAULT_ENGINES` constant. `apply_filter_mode(selected, books, pdf, docs, query_modifier_map)` resolves the 3-way mutex (`pdf > docs > books`), sets the effective `query_modifier_map` (per-engine query suffix), returns `(selected, qmm, mode_id, excluded)`. `filter_urls_by_mode(raw_results, mode)` applies the post-fanout URL filter via `is_book_url` / `is_pdf_url` / `is_docs_url` on the flat `raw_results` list BEFORE `build_engine_pools` — filtered-out URLs never reach any engine's pool. Engine subsets: `_DEFAULT_ENGINES = {google, crossref, duckduckgo, mojeek, lobsters, openalex, stack_exchange, semantic_scholar, open_library}`, `_BOOKS_ENGINES`, `_PDF_ENGINES`, `_DOCS_ENGINES` are modifier-target sets, not restriction sets — all engines still fire on every query regardless of filter mode.
-**Public interface:** `apply_filter_mode`, `filter_urls_by_mode`, `_DEFAULT_ENGINES`.
+**Purpose:** Append-only JSONL query log. `log_query(record)` writes one line. Two record types: `engine_run` (per fanout) and `workflow_summary` (after pool-build).
+**Reads:** `SEARXNG_QUERY_LOG_PATH` env (fallback `src/logs/query_log.jsonl`).
+**Writes:** `src/logs/query_log.jsonl`.
+**Called by:** `search_web.py`.
+**Calls out:** `src/log_janitor.py` (maybe_prune_jsonl).
 
-## book_whitelist.py / pdf_filter.py / docs_filter.py
+### browser.py (166 LOC)
 
-See prior DOCS.md entries — these modules are unchanged. `is_book_url`, `is_pdf_url`, `is_docs_url` called from `filter_modes.filter_urls_by_mode` on flat raw_results pre-pool-build.
+**Purpose:** pydoll Chrome lifecycle. One shared Chrome, a new tab per engine for isolation, fingerprint patches (WebGL, canvas, permissions) at launch. Cleanup paths: `kill_tab(tab)` (browser-level `Target.closeTarget`, 5s cap), `close_browser()` (in-loop shutdown for dev), `kill_stale_chrome()` (nuclear `pkill` fallback).
+**Reads:** none (singleton on first access).
+**Writes:** Chrome session dir under the user-data-dir.
+**Called by:** `cli.py` (kill_stale_chrome, atexit); `engines/` (new_tab, kill_tab — google, duckduckgo, lobsters, semantic_scholar, scholar).
+**Calls out:** `pydoll` (Chrome, ChromiumOptions, PageCommands, TargetCommands).
 
-## engines/
+### rate_limiter.py (48 LOC)
 
-Per-engine parser modules. Each exports an `Engine` class with `search(query, language, max_results)` returning `list[SearchResult]`. Rate-limiter integration, entity decoding, sub-status interface unchanged — see individual engine entries in prior DOCS.md. Engine parsers were NOT modified by the drilldown migration. Post-migration changes: all 5 pydoll engines switched `finally: await tab.close()` → `finally: await kill_tab(tab)` (bead 7u5); title-keyword CAPTCHA check removed from `_diagnose_empty` in google/duckduckgo/semantic_scholar (bead 18v).
+**Purpose:** Per-engine token-bucket rate limiter. Module-level `_limiters` registry populated at engine import (`RateLimiter(max_requests=4, window_seconds=60)`); consumed via `get_limiter(name).acquire()` before engine work.
+**Reads / Writes:** in-memory `_limiters` registry.
+**Called by:** `search_web.py` (get_limiter); `engines/` (RateLimiter, _limiters).
+**Calls out:** none (stdlib `asyncio`, `time`).
 
-### engines/base.py (18 LOC)
-Abstract `BaseEngine` parent — `search()` + default `search_with_reason()` that delegates to `search()`.
+### result.py (15 LOC)
 
-## Stealth Configuration
+**Purpose:** `SearchResult` dataclass. Fields: `url, title, snippet, engine, position, preview, engines, snippets, engine_positions`. `engine_positions` populated by `build_engine_pools`; `engines`/`snippets`/`preview` retained for dev-script backward compat.
+**Called by:** `search_web.py`, `merge.py`, `cache.py`, `engines/`.
+**Calls out:** none (stdlib `dataclasses`).
 
-Active stealth configuration lives in `src/search/browser.py` (hardcoded JS patches, UA, window size, Chrome options) and per-engine files (SOCS cookie for Google).
+### status.py (26 LOC)
+
+**Purpose:** Engine-status string constants for the query log + audit — 17 total: 5 legacy (OK/EMPTY/TIMEOUT/ERROR/RATE_SKIP) + 5 EMPTY + 3 TIMEOUT + 4 ERROR sub-statuses.
+**Called by:** `search_web.py`, `engines/` (imported as `status as S`).
+**Calls out:** none.
+
+## State
+
+Two module-owned states. `rate_limiter._limiters` — the per-engine token-bucket registry, populated at engine import, read/mutated via `get_limiter().acquire()`. The disk cache (`~/.cache/searxng/`) — written by `cache.cache_write` (from search_web), read by `cache.cache_read` (from the drilldown path); 1h TTL, atomic writes. No cross-request in-memory search state — each `search_web_workflow` call is independent.
+
+## Gotchas
+
+- Active engines (9): google, duckduckgo, mojeek, lobsters, semantic_scholar (pydoll); crossref, openalex, stack_exchange, open_library (HTTP). Google Scholar (`engines/scholar.py`) is decoupled from the default pool. brave / startpage / bing were dropped.
+- Two-call architecture: `search_web` returns counts only (no URLs); URLs come from `search_engine_drilldown` reading the cache. The drilldown query + filter flags MUST match the prior `search_web` call or the cache key misses.
+- Post-dedup pool cap keys off Google's pool size — if Google was CAPTCHA'd or excluded, K falls back to 10.
+- All engines fire on every query regardless of filter flag — the flags add a query modifier + post-fanout URL filter, they do NOT restrict the engine set.
+- Stealth config is hardcoded in `browser.py` (JS patches, UA, window size, Chrome options) + per-engine files (SOCS cookie for Google) — no config file.
+- pydoll tab cleanup uses `kill_tab` (browser-level close), NOT `tab.close()` — the latter hung 65s on non-cooperative renderers.
+- CLI dispatch hardcodes `language="en"`, `time_range=None`, `engines=None`; the full `search_web_workflow` signature is retained only for dev-script callers.

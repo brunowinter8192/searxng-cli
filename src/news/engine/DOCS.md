@@ -80,18 +80,6 @@ Three modes via `mode` param:
 Key metric: `completion_s ≈ (t_chunk_start − t_job_start).total_seconds() + elapsed_s` per ok record — used as x-axis of the cumulative plot.
 Backfill projection extrapolates from URLs/min → hours to scrape `_BACKFILL_TOTAL` (61 k) articles.
 
-### proxy_pool/ (11 modules — see DOCS.md)
+## Sub-Engines
 
-Generic proxy-rotation scrape engine. Active when `platform.scrape_engine == "proxy_pool"`.
-Entry point: `scrape_entries_proxy()` in `proxy_pool/scrape.py`.
-
-### proxy_riding/ (3 modules — see DOCS.md)
-
-Browser + rotating-proxy engine for CoinDesk backfill. Ported from `dev/news_pipeline/coindesk_proxy_riding/`.
-Entry point: `scrape_entries_riding()` in `proxy_riding/scrape.py` — returns `(manifest, state)` tuple.
-Active: `platform.scrape_engine == "proxy_riding"` dispatched from `run_scrape_only` (CoinDesk backfill).
-
-## Documentation Tree
-
-- [proxy_pool/DOCS.md](proxy_pool/DOCS.md) — proxy-rotation engine (loop, fetch, cooldown, buffer, logger, janitor, box_lock, proxy_key, pool_loaders, monosans_loader, scrape)
-- [proxy_riding/DOCS.md](proxy_riding/DOCS.md) — browser + rotating-proxy engine (rider, reporter, scrape entry point); wired as CoinDesk's run_scrape_only path
+Two scrape engines live in their own subpackages (own-level docs there): `proxy_pool/` (proxy-rotation engine, entry `scrape_entries_proxy` in `proxy_pool/scrape.py`, active when `scrape_engine == "proxy_pool"`) and `proxy_riding/` (browser + rotating-proxy engine, entry `scrape_entries_riding` in `proxy_riding/scrape.py` returning `(manifest, state)`, active when `scrape_engine == "proxy_riding"` from `run_scrape_only`).
