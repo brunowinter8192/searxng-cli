@@ -15,7 +15,8 @@ from urllib.parse import urlparse, parse_qs, urlencode, urlunparse
 import httpx
 
 SCRIPT_DIR = Path(__file__).parent
-REPORT_DIR = SCRIPT_DIR / "01_reports"
+REPORT_DIR = SCRIPT_DIR / "md"
+DATA_DIR = SCRIPT_DIR / "data"
 
 RANDOM_SEED = 42
 DOI_SAMPLE_SIZE = 300
@@ -67,6 +68,7 @@ FREE_WORD_REPORTS_GLOB = "free_word_injection_probe_*.md"
 
 async def run_probe() -> None:
     REPORT_DIR.mkdir(parents=True, exist_ok=True)
+    DATA_DIR.mkdir(parents=True, exist_ok=True)
     ts = datetime.now().strftime("%Y%m%d_%H%M%S")
 
     # Pool extraction
@@ -174,11 +176,11 @@ def _apply_doi_sampling(tier_pool: list[tuple[str, str]]) -> tuple[list[tuple[st
 
 # Write pool.txt and doi_sample.txt; log paths to stderr
 def _write_pool_files(sampled_pool: list[tuple[str, str]], doi_sample: list[str], ts: str) -> None:
-    pool_path = REPORT_DIR / f"pool_{ts}.txt"
+    pool_path = DATA_DIR / f"pool_{ts}.txt"
     pool_path.write_text("\n".join(u for u, _ in sampled_pool) + "\n", encoding="utf-8")
     print(f"[pool] written: {pool_path.name}", file=sys.stderr)
 
-    doi_path = REPORT_DIR / f"pool_doi_sample_{ts}.txt"
+    doi_path = DATA_DIR / f"pool_doi_sample_{ts}.txt"
     doi_path.write_text("\n".join(doi_sample) + "\n", encoding="utf-8")
     print(f"[pool] written: {doi_path.name}", file=sys.stderr)
 

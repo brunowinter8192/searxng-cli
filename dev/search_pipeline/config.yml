@@ -5,7 +5,7 @@ run:
   consent_settle: 2.0
 
 report:
-  output_dir: ./01_reports
+  output_dir: ./md
   format: markdown
   include_sample_urls: 5
   include_page_title: true

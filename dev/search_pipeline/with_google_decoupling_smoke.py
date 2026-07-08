@@ -11,7 +11,7 @@ Tests the production _select_engines(None) path end-to-end:
 Runs 5 queries through search_web_workflow(query, engines=None) — the real production
 path — then reads the last 5 lines of query_log.jsonl to verify the exclusion machinery.
 
-Output: markdown summary → dev/search_pipeline/01_reports/with_google_decoupling_<ts>.md
+Output: markdown summary → dev/search_pipeline/md/with_google_decoupling_<ts>.md
 """
 
 # INFRASTRUCTURE
@@ -32,7 +32,7 @@ from src.search.browser import close_browser
 
 logging.basicConfig(level=logging.WARNING, format="%(levelname)s %(name)s: %(message)s")
 
-REPORT_DIR = SCRIPT_DIR / "01_reports"
+REPORT_DIR = SCRIPT_DIR / "md"
 REPORT_DIR.mkdir(parents=True, exist_ok=True)
 
 LOG_PATH = PROJECT_ROOT / "src" / "logs" / "query_log.jsonl"

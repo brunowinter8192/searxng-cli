@@ -50,7 +50,7 @@ from rerank_probe_smoke import (
 import logging
 logging.basicConfig(level=logging.WARNING, format="%(levelname)s %(name)s: %(message)s")
 
-REPORT_DIR = SCRIPT_DIR / "01_reports"
+REPORT_DIR = SCRIPT_DIR / "data"
 REPORT_DIR.mkdir(parents=True, exist_ok=True)
 
 TOP_N     = 10

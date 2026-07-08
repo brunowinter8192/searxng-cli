@@ -10,7 +10,7 @@ pipeline integrity only.
 
 Usage:
   ./venv/bin/python dev/search_pipeline/value_eval_aggregate.py \\
-      --ts-dir dev/search_pipeline/01_reports/value_eval_YYYYMMDD_HHmmss \\
+      --ts-dir dev/search_pipeline/data/value_eval_YYYYMMDD_HHmmss \\
       [--ts-out YYYYMMDD_HHmmss] [--no-oracle]
 """
 
@@ -23,7 +23,7 @@ from datetime import datetime
 from pathlib import Path
 
 SCRIPT_DIR = Path(__file__).parent
-REPORT_DIR = SCRIPT_DIR / "01_reports"
+REPORT_DIR = SCRIPT_DIR / "md"
 
 MODES = ["general", "pdf", "books", "docs"]
 

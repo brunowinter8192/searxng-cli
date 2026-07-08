@@ -56,7 +56,7 @@ from src.search.search_web import _query_engines_concurrent, _select_engines
 import logging
 logging.basicConfig(level=logging.WARNING, format="%(levelname)s %(name)s: %(message)s")
 
-REPORT_DIR = SCRIPT_DIR / "01_reports"
+REPORT_DIR = SCRIPT_DIR / "md"
 REPORT_DIR.mkdir(parents=True, exist_ok=True)
 
 TOP_N     = 10

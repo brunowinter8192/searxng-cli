@@ -21,7 +21,7 @@ Stopword list: ~45-word inline English set (determiners, prepositions, auxiliari
 NLTK (~180 words) not used — no dependency, and for short title+snippet text the
 marginal coverage gain of 180 vs 45 words is small.
 
-Output: dev/search_pipeline/01_reports/bm25_sweep_<ts>.md
+Output: dev/search_pipeline/md/bm25_sweep_<ts>.md
 """
 
 # INFRASTRUCTURE
@@ -48,7 +48,7 @@ from src.search.search_web import _query_engines_concurrent, _select_engines
 import logging
 logging.basicConfig(level=logging.WARNING, format="%(levelname)s %(name)s: %(message)s")
 
-REPORT_DIR = SCRIPT_DIR / "01_reports"
+REPORT_DIR = SCRIPT_DIR / "md"
 REPORT_DIR.mkdir(parents=True, exist_ok=True)
 
 QUERIES = [

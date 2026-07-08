@@ -9,7 +9,7 @@ Usage:
     ./venv/bin/python3 dev/search_pipeline/cdp_starvation_probe.py [--max-queries N]
 
 Output:
-    dev/search_pipeline/01_reports/cdp_probe_<ts>.md
+    dev/search_pipeline/md/cdp_probe_<ts>.md
 """
 
 # INFRASTRUCTURE
@@ -52,8 +52,8 @@ search_web_workflow = _search_mod.search_web_workflow
 
 SCRIPT_DIR = Path(__file__).parent
 QUERIES_FILE = SCRIPT_DIR / "queries.txt"
-REPORT_DIR = SCRIPT_DIR / "01_reports"
-FINDINGS_DIR = Path(__file__).parent / "01_reports"
+REPORT_DIR = SCRIPT_DIR / "md"
+FINDINGS_DIR = SCRIPT_DIR / "md"
 
 COLD_START_SKIP_S = 5.0      # exclude first N seconds from statistics (Chrome boot noise)
 CANARY_INTERVAL_S = 0.1      # Pattern B: scheduling probe interval
@@ -266,7 +266,7 @@ def _derive_verdict(stats: dict) -> str:
     return "REFUTED"
 
 
-# Write report to 01_reports/cdp_probe_<ts>.md; return path
+# Write report to md/cdp_probe_<ts>.md; return path
 def _write_report(records: list[dict]) -> Path:
     ts_str = datetime.now().strftime("%Y%m%d_%H%M%S")
     path = REPORT_DIR / f"cdp_probe_{ts_str}.md"

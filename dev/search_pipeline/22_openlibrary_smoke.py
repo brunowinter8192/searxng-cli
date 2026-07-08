@@ -17,7 +17,7 @@ from src.search.engines.open_library import OpenLibraryEngine
 logging.basicConfig(level=logging.WARNING, format="%(levelname)s %(name)s: %(message)s")
 
 QUERIES_FILE = SCRIPT_DIR / "queries.txt"
-REPORT_DIR = SCRIPT_DIR / "01_reports"
+REPORT_DIR = SCRIPT_DIR / "md"
 
 
 # ORCHESTRATOR
