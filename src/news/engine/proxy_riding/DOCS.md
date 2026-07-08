@@ -162,7 +162,7 @@ comparability. `_Fewer than 2 connect-fail records_` note + no histogram when <2
 job.md section **"Success load-time distribution"**: percentile table computed over OK fetches only.
 `_Fewer than 2 OK fetches_` note when unavailable.
 
-### scrape.py (113 LOC)
+### scrape.py (114 LOC)
 
 **Purpose:** Pipeline entry point + manifest adapter. Loads pool, shuffles, calls `run_riding_pool`,
 maps `RiderState.job_records` → pipeline manifest.
