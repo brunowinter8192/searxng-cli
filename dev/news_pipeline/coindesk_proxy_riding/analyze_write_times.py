@@ -8,7 +8,7 @@ sorts ascending, then plots:
   bottom — files-per-bin rate (bars) + rolling mean (line) +
            30-min vertical markers (dashed grey) aligned to t[0]
 
-Output: dev/news_pipeline/coindesk_proxy_riding/01_reports/raw_write_times_<YYYYMMDD>[_since<HH:MM>].png
+Output: dev/news_pipeline/coindesk_proxy_riding/png/raw_write_times_<YYYYMMDD>[_since<HH:MM>].png
 Stdout: Files, Span, Mean/Median rate, longest gap.
 
 Usage:
@@ -45,7 +45,7 @@ def _repo_root() -> Path:
 
 _ROOT = _repo_root()
 _DEFAULT_RAW_DIR = _ROOT / "data" / "news" / "coindesk" / "raw"
-_REPORT_DIR = _HERE.parent / "01_reports"
+_REPORT_DIR = _HERE.parent / "png"
 _POOL_REFRESH_MIN = 30   # engine constant — vertical marker cadence
 
 
