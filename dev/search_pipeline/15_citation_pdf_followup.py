@@ -14,7 +14,8 @@ from urllib.parse import urlparse
 import httpx
 
 SCRIPT_DIR = Path(__file__).parent
-REPORT_DIR = SCRIPT_DIR / "01_reports"
+REPORT_DIR = SCRIPT_DIR / "md"
+DATA_DIR = SCRIPT_DIR / "data"
 
 SOURCE_REPORT = "download_classify_20260507_172709.md"
 SOURCE_POOL = "pool_20260507_172709.txt"
@@ -37,6 +38,7 @@ CITATION_PDF_META_RE = re.compile(
 
 async def run_probe() -> None:
     REPORT_DIR.mkdir(parents=True, exist_ok=True)
+    DATA_DIR.mkdir(parents=True, exist_ok=True)
     ts = datetime.now().strftime("%Y%m%d_%H%M%S")
 
     pool = _load_pool()
@@ -56,7 +58,7 @@ async def run_probe() -> None:
 # Load HTML_HAS_PDF_LINK URLs from probe-14 report; resolve truncated entries via pool file
 def _load_pool() -> list[str]:
     report_path = REPORT_DIR / SOURCE_REPORT
-    pool_path = REPORT_DIR / SOURCE_POOL
+    pool_path = DATA_DIR / SOURCE_POOL
 
     report_text = report_path.read_text(encoding="utf-8")
     pool_urls = set(pool_path.read_text(encoding="utf-8").splitlines())
@@ -90,7 +92,7 @@ def _load_pool() -> list[str]:
 
 # Write pool file; log path to stderr
 def _write_pool_file(pool: list[str], ts: str) -> None:
-    path = REPORT_DIR / f"pool_has_pdf_link_{ts}.txt"
+    path = DATA_DIR / f"pool_has_pdf_link_{ts}.txt"
     path.write_text("\n".join(pool) + "\n", encoding="utf-8")
     print(f"[pool] written: {path.name}", file=sys.stderr)
 

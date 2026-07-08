@@ -14,7 +14,7 @@ sys.path.insert(0, str(SCRIPT_DIR.parent.parent))
 from _lib.parse import parse_smoke_report
 from _lib.text  import strip_bloat, lexical_density
 
-REPORT_DIR = SCRIPT_DIR / "01_reports"
+REPORT_DIR = SCRIPT_DIR / "md"
 _smoke_candidates = sorted(REPORT_DIR.glob("pipeline_smoke_*.md"), reverse=True)
 if not _smoke_candidates:
     raise FileNotFoundError(f"No pipeline_smoke_*.md found in {REPORT_DIR}")

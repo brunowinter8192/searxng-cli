@@ -13,7 +13,7 @@ import httpx
 SCRIPT_DIR = Path(__file__).parent
 sys.path.insert(0, str(SCRIPT_DIR.parent.parent))
 
-REPORT_DIR = SCRIPT_DIR / "01_reports"
+REPORT_DIR = SCRIPT_DIR / "md"
 API_URL = "https://api.stackexchange.com/2.3/search/advanced"
 
 # (smoke_row, query) for all 15 StackEx EMPTY entries from smoke_20260504_023641
@@ -162,7 +162,7 @@ def write_report(records: list[dict]) -> Path:
     lines = [
         f"# StackEx EMPTY Classification — {ts}",
         "",
-        "Source: `dev/search_pipeline/01_reports/search_smoke_20260504_023641.md`",
+        "Source: `dev/search_pipeline/md/search_smoke_20260504_023641.md`",
         "Method: direct httpx probe against api.stackexchange.com/2.3/search/advanced, anonymous quota.",
         "",
         "## Summary",

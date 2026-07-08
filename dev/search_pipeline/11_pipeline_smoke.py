@@ -19,7 +19,7 @@ from src.search.search_web import search_web_workflow
 
 SCRIPT_DIR   = Path(__file__).parent
 QUERIES_FILE = SCRIPT_DIR / "queries.txt"
-REPORT_DIR   = SCRIPT_DIR / "01_reports"
+REPORT_DIR   = SCRIPT_DIR / "md"
 
 # Short human-readable hint per non-OK status (shown in per-query engine breakdown table)
 _STATUS_HINTS: dict[str, str] = {
@@ -325,7 +325,7 @@ def _render_engine_reliability(records: list[dict]) -> list[str]:
     return L
 
 
-# Write markdown report to 01_reports/<prefix>_<ts>.md, return path
+# Write markdown report to md/<prefix>_<ts>.md, return path
 def _write_report(records: list[dict], language: str, checkpoints: list[dict], prefix: str = "pipeline_smoke") -> Path:
     ts   = datetime.now().strftime("%Y%m%d_%H%M%S")
     path = REPORT_DIR / f"{prefix}_{ts}.md"

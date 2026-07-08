@@ -14,7 +14,7 @@ Services required:
   Embedding:    http://127.0.0.1:8084/v1/embeddings   (preset: embedding-0.6b)
   Cross-encoder: http://127.0.0.1:8082/v1/rerank      (preset: reranker-0.6b)
 
-Output: dev/search_pipeline/01_reports/rerank_probe_<ts>.md
+Output: dev/search_pipeline/md/rerank_probe_<ts>.md
 """
 
 # INFRASTRUCTURE
@@ -104,8 +104,10 @@ QUERY_CATEGORIES: dict[str, str] = {
     "convolutional neural network image classification tutorial": "mixed_pathology",
 }
 
-REPORT_DIR = SCRIPT_DIR / "01_reports"
+REPORT_DIR = SCRIPT_DIR / "md"
 REPORT_DIR.mkdir(parents=True, exist_ok=True)
+DATA_DIR = SCRIPT_DIR / "data"
+DATA_DIR.mkdir(parents=True, exist_ok=True)
 
 TOP_N       = 10
 RETRIEVE_N  = 50   # BM25 retrieve candidate count before reranking
@@ -133,7 +135,7 @@ async def run_probe() -> None:
 
     ts = datetime.now().strftime("%Y%m%d_%H%M%S")
     report_path = REPORT_DIR / f"rerank_probe_{ts}.md"
-    probe_log_path = REPORT_DIR / f"rerank_probe_{ts}.queries.jsonl"
+    probe_log_path = DATA_DIR / f"rerank_probe_{ts}.queries.jsonl"
     os.environ["SEARXNG_QUERY_LOG_PATH"] = str(probe_log_path)
 
     selected, _ = _select_engines(None)

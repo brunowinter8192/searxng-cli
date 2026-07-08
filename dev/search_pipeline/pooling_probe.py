@@ -19,8 +19,8 @@ Services required (preset names: embedding-0.6b, reranker-0.6b):
   Cross-encoder: http://127.0.0.1:8082/v1/rerank
 
 Output:
-  dev/search_pipeline/01_reports/pooling_probe_<ts>.md
-  dev/search_pipeline/01_reports/pooling_probe_<ts>.queries.jsonl
+  dev/search_pipeline/md/pooling_probe_<ts>.md
+  dev/search_pipeline/data/pooling_probe_<ts>.queries.jsonl
 
 All src/ dependencies routed through the already-committed dev/ modules that carry those imports.
 """
@@ -60,8 +60,10 @@ from rerank_probe_smoke import (
 import logging
 logging.basicConfig(level=logging.WARNING, format="%(levelname)s %(name)s: %(message)s")
 
-REPORT_DIR    = SCRIPT_DIR / "01_reports"
+REPORT_DIR    = SCRIPT_DIR / "md"
 REPORT_DIR.mkdir(parents=True, exist_ok=True)
+DATA_DIR      = SCRIPT_DIR / "data"
+DATA_DIR.mkdir(parents=True, exist_ok=True)
 
 BM25_REPR     = "title+snippet"
 SNIPPET_CHARS = 200   # chars shown in report for Müll-eyeball
@@ -74,7 +76,7 @@ async def run_probe() -> None:
 
     ts          = datetime.now().strftime("%Y%m%d_%H%M%S")
     report_path = REPORT_DIR / f"pooling_probe_{ts}.md"
-    jsonl_path  = REPORT_DIR / f"pooling_probe_{ts}.queries.jsonl"
+    jsonl_path  = DATA_DIR / f"pooling_probe_{ts}.queries.jsonl"
 
     selected, _ = _select_engines(None)
     print(f"Engines ({len(selected)}): {', '.join(sorted(selected.keys()))}", file=sys.stderr)

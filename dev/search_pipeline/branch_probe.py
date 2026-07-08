@@ -23,7 +23,7 @@ Usage:
              Run before full probe to verify instrumentation is live.
 
 Output (full run only):
-    dev/search_pipeline/01_reports/branch_probe_<ts>.md
+    dev/search_pipeline/md/branch_probe_<ts>.md
 """
 
 # INFRASTRUCTURE
@@ -105,8 +105,8 @@ search_web_workflow = _search_mod.search_web_workflow
 
 SCRIPT_DIR = Path(__file__).parent
 QUERIES_FILE = SCRIPT_DIR / "queries.txt"
-REPORT_DIR = SCRIPT_DIR / "01_reports"
-FINDINGS_DIR = Path(__file__).parent / "01_reports"
+REPORT_DIR = SCRIPT_DIR / "md"
+FINDINGS_DIR = SCRIPT_DIR / "md"
 
 # 4 engines have NO .backoff() call in engine source — cannot enter backoff branch legitimately
 BACKOFF_IMMUNE = frozenset({"crossref", "openalex", "stack_exchange", "open_library"})

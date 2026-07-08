@@ -21,7 +21,7 @@ from src.search.engines.open_library import OpenLibraryEngine
 
 logging.basicConfig(level=logging.WARNING, format="%(levelname)s %(name)s: %(message)s")
 
-REPORT_DIR = SCRIPT_DIR / "01_reports"
+REPORT_DIR = SCRIPT_DIR / "md"
 
 # Book-affine queries covering diverse genres and subjects
 BOOK_QUERIES = [

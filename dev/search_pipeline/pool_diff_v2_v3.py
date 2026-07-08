@@ -16,9 +16,10 @@ import re
 from pathlib import Path
 
 SCRIPT_DIR = Path(__file__).parent
-REPORT_DIR = SCRIPT_DIR / "01_reports"
+REPORT_DIR = SCRIPT_DIR / "md"
+DATA_DIR = SCRIPT_DIR / "data"
 
-V2_REF = REPORT_DIR / "value_eval_v2_20260523_000156"
+V2_REF = DATA_DIR / "value_eval_v2_20260523_000156"
 MODES  = ["general", "pdf", "books", "docs"]
 QUERIES = [
     "transformer attention mechanism",
@@ -227,13 +228,13 @@ def _write_report(rows: list[dict], eng_rows: list[dict], v3_dir: Path) -> None:
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="Pool diff v2 vs v3")
-    parser.add_argument("--v3-dir", default=None, help="v3 ts_dir path (default: latest value_eval_v3_* in 01_reports/)")
+    parser.add_argument("--v3-dir", default=None, help="v3 ts_dir path (default: latest value_eval_v3_* in data/)")
     args = parser.parse_args()
     if args.v3_dir:
         v3_dir = Path(args.v3_dir)
     else:
-        candidates = sorted(REPORT_DIR.glob("value_eval_v3_*"), reverse=True)
+        candidates = sorted(DATA_DIR.glob("value_eval_v3_*"), reverse=True)
         if not candidates:
-            raise SystemExit("No value_eval_v3_* dir found in 01_reports/")
+            raise SystemExit("No value_eval_v3_* dir found in data/")
         v3_dir = candidates[0]
     pool_diff_workflow(v3_dir)

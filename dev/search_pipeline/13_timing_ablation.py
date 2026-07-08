@@ -30,7 +30,7 @@ from src.search.rate_limiter import _limiters, get_limiter
 
 logging.basicConfig(level=logging.WARNING, format="%(levelname)s %(name)s: %(message)s")
 
-REPORT_DIR  = SCRIPT_DIR / "01_reports"
+REPORT_DIR  = SCRIPT_DIR / "md"
 MAX_RESULTS = 10   # production default
 PAUSE_S     = 120  # seconds between A and B to drain rate-limiter buckets
 

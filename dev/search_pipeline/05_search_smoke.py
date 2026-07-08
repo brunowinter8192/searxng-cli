@@ -25,7 +25,7 @@ from src.search.result import SearchResult
 
 SCRIPT_DIR = Path(__file__).parent
 QUERIES_FILE = SCRIPT_DIR / "queries.txt"
-REPORT_DIR = SCRIPT_DIR / "01_reports"
+REPORT_DIR = SCRIPT_DIR / "md"
 
 AVAILABLE_ENGINES = {
     "google": GoogleEngine,

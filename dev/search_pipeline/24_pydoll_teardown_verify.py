@@ -20,7 +20,7 @@ reliable on macOS where pgrep --type=renderer reports 0 for headless Chrome.
 Usage (from project root):
     ./venv/bin/python dev/search_pipeline/24_pydoll_teardown_verify.py
 
-Output: MD report to dev/search_pipeline/01_reports/teardown_verify_<ts>.md + stdout summary.
+Output: MD report to dev/search_pipeline/md/teardown_verify_<ts>.md + stdout summary.
 """
 import asyncio
 import importlib
@@ -44,7 +44,7 @@ WATCHDOG = 5.0
 FAST_THRESHOLD_MS = 8000   # generous: watchdog(5s) + kill_tab overhead(< 3s)
 BATCH_N = 5                # mirrors 5-engine pydoll fanout
 
-REPORT_DIR = Path(__file__).parent / "01_reports"
+REPORT_DIR = Path(__file__).parent / "md"
 
 
 # ORCHESTRATOR

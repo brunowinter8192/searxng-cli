@@ -10,7 +10,7 @@ Runs 5 configs per query:
   4. b=1 extreme         — k1=1.2, b=1.00, sw=on, repr=title+snippet (full length-norm)
   5. Title3x variant     — k1=1.2, b=0.75, sw=on, repr=title3x
 
-Output: dev/search_pipeline/01_reports/bm25_compare_<ts>.md
+Output: dev/search_pipeline/md/bm25_compare_<ts>.md
 Top-10 per config (not 20) — keeps tables eyeball-readable.
 """
 
@@ -34,7 +34,7 @@ from src.search.search_web import _query_engines_concurrent, _select_engines
 import logging
 logging.basicConfig(level=logging.WARNING, format="%(levelname)s %(name)s: %(message)s")
 
-REPORT_DIR = SCRIPT_DIR / "01_reports"
+REPORT_DIR = SCRIPT_DIR / "md"
 REPORT_DIR.mkdir(parents=True, exist_ok=True)
 
 TOP_N = 10

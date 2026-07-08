@@ -18,7 +18,7 @@ Usage:
              Run first to verify instrumentation is live before full 20-query run.
 
 Output (full run only):
-    dev/search_pipeline/01_reports/acquire_probe_<ts>.md
+    dev/search_pipeline/md/acquire_probe_<ts>.md
 """
 
 # INFRASTRUCTURE
@@ -111,8 +111,8 @@ search_web_workflow = _search_mod.search_web_workflow
 
 SCRIPT_DIR = Path(__file__).parent
 QUERIES_FILE = SCRIPT_DIR / "queries.txt"
-REPORT_DIR = SCRIPT_DIR / "01_reports"
-FINDINGS_DIR = Path(__file__).parent / "01_reports"
+REPORT_DIR = SCRIPT_DIR / "md"
+FINDINGS_DIR = SCRIPT_DIR / "md"
 
 CANARY_INTERVAL_S = 0.1
 COLD_START_SKIP_S = 5.0

@@ -15,8 +15,8 @@ sys.path.insert(0, str(SCRIPT_DIR.parent.parent))
 from src.search.browser import new_tab, close_browser
 from src.search.rate_limiter import get_limiter
 
-REPORT_DIR = SCRIPT_DIR / "01_reports"
-SCREENSHOT_DIR = REPORT_DIR / "empty_classify_lobsters_screenshots"
+REPORT_DIR = SCRIPT_DIR / "md"
+SCREENSHOT_DIR = SCRIPT_DIR / "data" / "empty_classify_lobsters_screenshots"
 
 SEARCH_URL = "https://lobste.rs/search?q={}&what=stories&order=relevance"
 WAIT_SECONDS = 3.0  # vs production 600ms — deliberate generous margin
@@ -175,7 +175,7 @@ def write_report(records: list[dict]) -> Path:
     lines = [
         f"# Lobsters EMPTY Classification — {ts}",
         "",
-        "Source: `dev/search_pipeline/01_reports/search_smoke_20260504_023641.md`",
+        "Source: `dev/search_pipeline/md/search_smoke_20260504_023641.md`",
         f"Method: pydoll browser, {WAIT_SECONDS}s wait (vs production 600ms), "
         "li.story count + page title + HTML snippet + screenshots for first 3 queries.",
         "",

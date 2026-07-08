@@ -18,7 +18,7 @@ from datetime import datetime, timezone
 from pathlib import Path
 
 LOG_PATH = Path("src/logs/query_log.jsonl")
-REPORT_DIR = Path("dev/search_pipeline/01_reports")
+REPORT_DIR = Path("dev/search_pipeline/md")
 
 SUCCESS_BROKEN: float = 0.50
 SUCCESS_DEGRADED: float = 0.80
@@ -202,7 +202,7 @@ def format_table(stats: dict[str, dict], n_records: int, last_n: int, since: str
     return "\n".join(lines)
 
 
-# Write report MD to 01_reports/ with timestamp; returns the path written
+# Write report MD to md/ with timestamp; returns the path written
 def write_report(table_str: str, report_dir: Path, timestamp: str) -> Path:
     report_dir.mkdir(parents=True, exist_ok=True)
     path = report_dir / f"engine_health_{timestamp}.md"

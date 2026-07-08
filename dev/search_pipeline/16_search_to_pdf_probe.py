@@ -31,7 +31,7 @@ from src.search.merge import build_engine_pools
 from src.search.result import SearchResult
 from src.search.search_web import _query_engines_concurrent, _select_engines
 
-REPORT_DIR = SCRIPT_DIR / "01_reports"
+REPORT_DIR = SCRIPT_DIR / "md"
 DOWNLOAD_DIR = Path.home() / "Downloads"
 
 MAX_CONNECTIONS = 8
