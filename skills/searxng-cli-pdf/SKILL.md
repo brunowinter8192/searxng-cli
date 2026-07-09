@@ -34,15 +34,11 @@ PYTHONUNBUFFERED=1 ~/Documents/ai/Mineru/venv/bin/python ~/Documents/ai/Mineru/w
   --out-dir <OUTPUT_DIR> 2>&1 | tee /tmp/<batch>_mineru.log
 ```
 - ONE invocation processes all PDFs sequentially — each as a single whole-document mineru process.
-- The mem_watchdog wraps each process and aborts a runaway before it takes the Mac down. A PDF that
-  aborts is logged as failed (`md:null`) and the batch CONTINUES with the next PDF.
 - Output: flat `<OUTPUT_DIR>/<STEM>.md` per PDF.
-- Re-run is safe: Phase 0 skip-check drops PDFs already converted, so a re-run only fills the gaps
-  (including any PDF that aborted on the previous pass).
 - USER runs the block, reports done.
 
 ## Phase 2 — Clean (CLAUDE)
-Run on each `<OUTPUT_DIR>/<STEM>.md`. Audit FIRST (counts are signals — sample the hits), then strip.
+Run on each `<OUTPUT_DIR>/<STEM>.md`. Audit FIRST — sample the hits, then strip.
 
 Per-class detection + action:
 - **A — lost formula (UNRECOVERABLE → do NOT clean):** `??`, `` (U+FFFD), empty/`?`-containing

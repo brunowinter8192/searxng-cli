@@ -9,7 +9,7 @@ description: SearXNG web research — CLI tool reference (search_web, search_eng
 
 Ad-hoc web research via `searxng-cli`: search across 9 engines, drill into one engine for its URLs, scrape a page to filtered markdown. To permanently capture a whole domain into RAG, use the Permanent Capture Workflow at the bottom — that spawns a worker; this CLI is for in-chat lookups. (PDF → MD conversion is a separate flow — see the `searxng-cli-pdf` skill.)
 
-**This is the web-md capture skill Opus activates.** Everything Opus needs to prompt and supervise a web-md capture lives here. The worker activates `searxng-cli-capture-and-index` to execute the pipeline; Opus never reads that skill. (Both sides holding a skill is by design: the worker runs the steps, Opus knows the gates well enough to man them.)
+**This is the web-md capture skill Opus activates.** Everything Opus needs to prompt and supervise a web-md capture lives here. The worker activates `searxng-cli-capture-and-index` to execute the pipeline; Opus never reads that skill.
 
 ## CLI Invocation
 
@@ -104,9 +104,9 @@ Mode flags: `--books` / `--pdf` / `--docs` restrict to google/duckduckgo/mojeek,
 
 When the user wants to permanently capture a whole domain into RAG — "crawl X and index it", "RAG-fähig machen". A worker drives the capture; this is the Opus-side setup. Opus activates ONLY this skill (see top); the worker activates `searxng-cli-capture-and-index`. (PDF → MD conversion is a separate flow — see the `searxng-cli-pdf` skill.)
 
-**How the capture handles content (informative):** the worker scrapes each page RAW/maximal — no content filter, full fidelity (unlike the in-chat `scrape_url`, which returns pre-filtered 15k markdown). It then cleans the content AD-HOC per page-shape (diagnose shapes → per-shape strip scripts → block/thin-page drop) before indexing, via the `searxng-cli-capture-and-index` skill. Raw in, worker cleans.
+**How the capture handles content:** the worker scrapes each page RAW/maximal (no content filter), then cleans AD-HOC per page-shape (diagnose shapes → per-shape strip scripts → block/thin-page drop) before indexing, via the `searxng-cli-capture-and-index` skill.
 
-**Worker placement (HARD RULE — no exceptions, no per-task judgment):** the worker is ALWAYS spawned into a worktree IN THE CURRENT PROJECT — the project the session is running in. NEVER `--no-worktree` (it breaks `worker-cli response` → forces the noisier `capture` fallback), NEVER a parent or other project's path. Pass `<current_project_root>` explicitly to `worker-cli spawn`; the worktree must land at `<current_project_root>/.claude/worktrees/<name>`. Verify after spawn (step 3). This is also enforced by a spawn hook — a worker spawned outside the current project's worktree is blocked.
+**Worker placement (HARD RULE — no exceptions, no per-task judgment):** the worker is ALWAYS spawned into a worktree IN THE CURRENT PROJECT — the project the session is running in. NEVER `--no-worktree`, NEVER a parent or other project's path. Pass `<current_project_root>` explicitly to `worker-cli spawn`; the worktree must land at `<current_project_root>/.claude/worktrees/<name>`. Verify after spawn (step 3). This is also enforced by a spawn hook — a worker spawned outside the current project's worktree is blocked.
 
 **1.** Identify the source: a seed domain URL.
 

@@ -14,12 +14,10 @@ Every long run (scrape / index) is launched as a background Bash call (`run_in_b
 That message is your ONLY trigger to look. It is a push event — it arrives on its own. You never go looking for completion, and you never schedule yourself to look.
 
 Until that message arrives, FORBIDDEN:
-- **setting a timer (`sleep N && echo done`) to wake yourself — a post-launch timer is a poll in disguise. You do NOT set one. The process finishing IS your timer.**
+- **setting a timer (`sleep N && echo done`) to wake yourself.**
 - reading the scrape log / index log (`logread` included), or `ls` / `wc` / byte-size on the output dir or the redirect targets
 - `ps` / `pgrep` / `top` liveness checks
 - any "early sanity check" that the run started cleanly
-
-These probes are not just forbidden, they are **useless**: stdout/stderr are block-buffered to the redirect files and flushed only at process exit. Mid-run the log is empty and the output dir may hold no md yet. Empty proves nothing (not stalled, not crashed). Nothing to learn → no reason to look.
 
 When `background done — check worker or other process` arrives: read the run's log EXACTLY ONCE, then continue the pipeline on your own. A crash surfaces HERE — as a non-zero `EXIT` + traceback in the log at this same single read; there is no earlier check that would catch it sooner. The ONLY check you run before the background launch is pre-launch validation (binary exists, `--help` parses), in the foreground.
 
