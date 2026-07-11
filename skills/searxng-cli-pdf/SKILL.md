@@ -1,6 +1,6 @@
 ---
 name: searxng-cli-pdf
-description: Convert PDF(s) to Markdown (whole-document, MinerU mlx / vlm-auto-engine) and index into a RAG collection. Fully interactive — the USER runs ONE convert command that processes all PDFs sequentially; Claude does naming, cleanup, index.
+description:
 ---
 
 # PDF → MD → Index — Skill

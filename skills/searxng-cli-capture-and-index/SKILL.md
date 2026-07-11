@@ -1,6 +1,6 @@
 ---
 name: searxng-cli-capture-and-index
-description: Discover URLs agentically (write /tmp scripts), select which to scrape, scrape raw/maximal, clean (incl. post-scrape noise drop), and index into RAG. Web-MD capture only — Discovery→Select→Scrape→Cleanup→Index. PDF conversion lives in the searxng-cli-pdf skill.
+description:
 ---
 
 # Capture-and-Index — Skill
