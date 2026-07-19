@@ -5,6 +5,8 @@ description:
 
 # SearXNG Web Research — Skill
 
+**Default = Permanent Capture Workflow (worker).** When the user wants a source pulled in, assume they want it captured into RAG — spawn the capture worker (bottom of this file). Only run ad-hoc in-chat scraping (`search_web` / `search_engine_drilldown` / `scrape_url` directly) when the user EXPLICITLY says "ad hoc" (or equivalent: "nur kurz nachschauen", "nicht indexieren").
+
 Ad-hoc web research via `searxng-cli`: search across engines, drill into one engine for its URLs, scrape a page to filtered markdown. To permanently capture a whole domain into RAG, use the Permanent Capture Workflow at the bottom — that spawns a worker; this CLI is for in-chat lookups. (PDF → MD conversion is a separate flow — see the `searxng-cli-pdf` skill.)
 
 ## CLI Invocation
