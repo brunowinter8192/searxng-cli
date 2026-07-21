@@ -221,6 +221,14 @@ Smoke tests, selector-drift probes, ranking-method eval harness, and bee-investi
 **Called by:** CLI only.
 **Calls out:** `pydoll` (Chrome, ChromiumOptions, TargetCommands) — inline copy of the `src/search/browser.py` session-setup shape, not a shared import.
 
+### 29_yandex_probe.py (400 LOC)
+
+**Purpose:** Go/no-go scrapeability probe for yandex.com (self-contained — no `src/` import) as a genuine NEW-COVERAGE candidate — Yandex is one of the few remaining independent web indexes (own crawler), unlike Bing/Startpage which are redundancy paths to indexes already in the pool. Runs 10 queries via pydoll stealth stack, headless. Result: CANDIDATE under the relaxed criterion — 8/10 usable hits, longest consecutive clean run of 7, only 2 blocks (both with hard `showcaptcha` redirect-URL evidence, not just a text-marker guess). Confirms `li.serp-item` still live, `a.OrganicTitle-Link` gives a direct href (no unwrap needed, unlike Bing). Quality axis called honestly: German-query results genuinely relevant, not junk/region-skewed.
+**Reads:** none (live run against production yandex.com).
+**Writes:** `md/yandex_probe_<ts>.md`.
+**Called by:** CLI only.
+**Calls out:** `pydoll` (Chrome, ChromiumOptions, TargetCommands) — inline copy of the `src/search/browser.py` session-setup shape, not a shared import.
+
 ### _capture_sorry.py (231 LOC)
 
 **Purpose:** Captures Google `/sorry/` block page — helper script, not a numbered experiment. Navigates to a search URL, checks if redirected to `/sorry/`, saves HTML + screenshot + MD summary.
