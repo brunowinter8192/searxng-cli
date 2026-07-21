@@ -205,6 +205,14 @@ Smoke tests, selector-drift probes, ranking-method eval harness, and bee-investi
 **Called by:** CLI only.
 **Calls out:** `pydoll` (Chrome, ChromiumOptions, TargetCommands) — inline copy of the `src/search/browser.py` session-setup shape, not a shared import.
 
+### 27_brave_headed_lane_probe.py (387 LOC)
+
+**Purpose:** Headed hard-engine lane probe (macOS) — tests whether a real Chrome window, backgrounded via `open -g` (no focus steal, isolated `--user-data-dir`), clears Brave's PoW/CAPTCHA where headless doesn't. Validates the `pydoll.browser.managers.BrowserProcessManager(process_creator=...)` override (`Chrome(options)` built, then `browser._browser_process_manager` swapped before `start()`) — `_open_process_creator` re-launches via `open -g -n -a "Google Chrome" --args --remote-debugging-port=<port> --user-data-dir=<isolated dir> ...`, teardown via CDP `browser.stop()` + unconditional `pkill` safety net (the `open` wrapper Popen gives pydoll's own reaper nothing real to kill). Result: DROP — only 2/10 clean before a persistent PoW block (worse than 26_brave_probe.py's 4/10 headless run), but the launch mechanism itself (headed-background + isolated profile + clean teardown, verified via `ps aux` showing zero orphaned processes) is validated and reusable for a future hard-engine candidate.
+**Reads:** none (live run against production search.brave.com).
+**Writes:** `md/brave_headed_lane_probe_<ts>.md`.
+**Called by:** CLI only.
+**Calls out:** `pydoll` (Chrome, ChromiumOptions, BrowserProcessManager), macOS `open` CLI.
+
 ### _capture_sorry.py (231 LOC)
 
 **Purpose:** Captures Google `/sorry/` block page — helper script, not a numbered experiment. Navigates to a search URL, checks if redirected to `/sorry/`, saves HTML + screenshot + MD summary.
