@@ -189,6 +189,14 @@ Smoke tests, selector-drift probes, ranking-method eval harness, and bee-investi
 **Called by:** CLI only.
 **Calls out:** `src.search.browser` (via `importlib`), pydoll CDP (`Target.getTargets`).
 
+### 25_startpage_probe.py (384 LOC)
+
+**Purpose:** Go/no-go data probe for startpage.com scrapeability (self-contained — no `src/` import, dev-isolation guardrail). Drives the real homepage search form (load homepage, set `#q` via native setter + `input` event, real `.click()` on `button.search-btn`) to obtain a valid per-session `sc` token, then runs 10 queries (mainstream DE/EN, local-business DE, docs-style EN/DE) and records count/quality/block-marker per query.
+**Reads:** none (live run against production startpage.com).
+**Writes:** `md/startpage_probe_<ts>.md`.
+**Called by:** CLI only.
+**Calls out:** `pydoll` (Chrome, ChromiumOptions, TargetCommands) — inline copy of the `src/search/browser.py` session-setup shape, not a shared import.
+
 ### _capture_sorry.py (231 LOC)
 
 **Purpose:** Captures Google `/sorry/` block page — helper script, not a numbered experiment. Navigates to a search URL, checks if redirected to `/sorry/`, saves HTML + screenshot + MD summary.
