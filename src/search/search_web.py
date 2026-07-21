@@ -19,6 +19,7 @@ from src.search.engines.mojeek import MojeekEngine
 from src.search.engines.startpage import StartpageEngine
 from src.search.engines.brave import BraveEngine
 from src.search.engines.bing import BingEngine
+from src.search.engines.yandex import YandexEngine
 from src.search.engines.lobsters import LobstersEngine
 from src.search.engines.openalex import OpenAlexEngine
 from src.search.engines.stack_exchange import StackExchangeEngine
@@ -61,6 +62,7 @@ ENGINE_MAX_RESULTS: dict[str, int] = {
     "startpage": 10,        # no count param; 10/page fixed by DOM (25_startpage_probe.py)
     "brave": 10,            # no count param; 10/page fixed by DOM (26_brave_probe.py)
     "bing": 10,             # no count param; 10/page fixed by DOM (28_bing_probe.py)
+    "yandex": 10,           # no count param; 10/page fixed by DOM (29_yandex_probe.py)
 }
 
 ENGINES = {
@@ -76,6 +78,7 @@ ENGINES = {
     "startpage": StartpageEngine(),
     "brave": BraveEngine(),
     "bing": BingEngine(),
+    "yandex": YandexEngine(),
 }
 
 # ORCHESTRATOR

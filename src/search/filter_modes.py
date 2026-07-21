@@ -11,25 +11,25 @@ from src.search.docs_filter import is_docs_url
 
 logger = logging.getLogger(__name__)
 
-# Default engine set — all 12 active engines. Scholar fully removed (not just dormant) until
+# Default engine set — all 13 active engines. Scholar fully removed (not just dormant) until
 # Pooling-Rework assigns it a Google-free pool.
 _DEFAULT_ENGINES: frozenset[str] = frozenset({
     "google", "crossref", "duckduckgo", "mojeek", "lobsters",
-    "openalex", "stack_exchange", "semantic_scholar", "open_library", "startpage", "brave", "bing",
+    "openalex", "stack_exchange", "semantic_scholar", "open_library", "startpage", "brave", "bing", "yandex",
 })
 
 # --books mode: engines that receive the '+book' query modifier (web engines only; open_library excluded — already a catalog)
-_BOOKS_ENGINES: frozenset[str] = frozenset({"google", "duckduckgo", "mojeek", "startpage", "brave", "bing", "open_library"})
+_BOOKS_ENGINES: frozenset[str] = frozenset({"google", "duckduckgo", "mojeek", "startpage", "brave", "bing", "yandex", "open_library"})
 _BOOKS_MODIFIER: Callable[[str], str] = lambda q: f"{q} book"
 
 # --pdf mode: engines that receive the '+pdf' query modifier; post-filter via is_pdf_url
-# google/ddg/mojeek/startpage/brave/bing surface direct .pdf URLs; crossref/openalex return doi.org-only (0 yield post-filter)
-_PDF_ENGINES: frozenset[str] = frozenset({"google", "duckduckgo", "mojeek", "startpage", "brave", "bing"})
+# google/ddg/mojeek/startpage/brave/bing/yandex surface direct .pdf URLs; crossref/openalex return doi.org-only (0 yield post-filter)
+_PDF_ENGINES: frozenset[str] = frozenset({"google", "duckduckgo", "mojeek", "startpage", "brave", "bing", "yandex"})
 _PDF_MODIFIER: Callable[[str], str] = lambda q: f"{q} pdf"
 
 # --docs mode: engines that receive the '+documentation' query modifier; post-filter via is_docs_url
 # Pure blacklist: blocks known noise (forums, blogs, code-hosting, tutorial sites), passes everything else
-_DOCS_ENGINES: frozenset[str] = frozenset({"google", "duckduckgo", "mojeek", "startpage", "brave", "bing"})
+_DOCS_ENGINES: frozenset[str] = frozenset({"google", "duckduckgo", "mojeek", "startpage", "brave", "bing", "yandex"})
 _DOCS_MODIFIER: Callable[[str], str] = lambda q: f"{q} documentation"
 
 

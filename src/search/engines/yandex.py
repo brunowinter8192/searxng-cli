@@ -1,0 +1,179 @@
+# INFRASTRUCTURE
+import asyncio
+import json
+import logging
+from urllib.parse import urlparse
+
+from src.search.browser import new_tab, kill_tab
+from src.search.engines.base import BaseEngine
+from src.search.rate_limiter import RateLimiter, _limiters
+from src.search.result import SearchResult
+from src.search import status as S
+
+logger = logging.getLogger(__name__)
+
+SEARCH_URL = "https://yandex.com/search/?text={}"
+BLOCK_URL_MARKERS = ("showcaptcha", "checkcaptcha", "/captcha")
+SELF_DOMAIN_LABEL = "yandex"
+MAX_WAIT_CYCLES = 20
+WAIT_INTERVAL = 0.3
+
+_JS_WAIT = "return document.querySelectorAll('li.serp-item').length"
+
+_JS_PARSE = """
+var _cs = document.querySelectorAll('li.serp-item');
+var _out = [];
+for (var _i = 0; _i < _cs.length; _i++) {
+    var _c = _cs[_i];
+    var _a = _c.querySelector('a.OrganicTitle-Link');
+    var _snip = _c.querySelector('.OrganicText .OrganicTextContentSpan') || _c.querySelector('.OrganicText');
+    if (!_a || !_a.href) continue;
+    _out.push({
+        url: _a.href,
+        title: _a.textContent.trim(),
+        snippet: _snip ? _snip.textContent.trim() : ''
+    });
+}
+return JSON.stringify(_out);
+"""
+
+_JS_DIAGNOSE = """
+var body = document.body ? document.body.innerText.toLowerCase() : '';
+var title = document.title.toLowerCase();
+var markers = ['captcha', 'confirm you are not a robot', 'unusual activity',
+               'smartcaptcha', 'подтвердите, что запросы', 'подозрительн', 'ты робот'];
+var hit = null;
+for (var _i = 0; _i < markers.length; _i++) {
+    if (body.indexOf(markers[_i]) !== -1 || title.indexOf(markers[_i]) !== -1) { hit = markers[_i]; break; }
+}
+return JSON.stringify({marker: hit, url: window.location.href, ready_state: document.readyState});
+"""
+
+# Uniform 4 req/min across all engines (Google-Baseline, normalized 2026-05-04)
+_limiters["yandex"] = RateLimiter(max_requests=4, window_seconds=60)
+
+
+# ORCHESTRATOR
+
+# Yandex web search via pydoll stealth browser — independent index (own crawler, new coverage,
+# not a Google/Bing frontend); SmartCaptcha blocks degrade gracefully to empty+reason
+class YandexEngine(BaseEngine):
+    name = "yandex"
+
+    # Full search logic with empty-reason diagnosis; exceptions propagate to _engine_with_timing
+    async def search_with_reason(self, query: str, language: str = "en", max_results: int = 10) -> tuple[list[SearchResult], str | None]:
+        logger.info("Yandex search: %s", query)
+        tab = await new_tab()
+        try:
+            await tab.go_to(SEARCH_URL.format(query.replace(" ", "+")), timeout=10.0)
+            # Check the URL for a showcaptcha/checkcaptcha redirect BEFORE the result-wait poll —
+            # a blocked query never produces results, so diagnosing only after the poll times out
+            # burns the full ~6-8s wait budget for nothing (empirically observed in the probe).
+            current_url = await tab.current_url
+            if _is_block_url(current_url):
+                logger.warning("Yandex CAPTCHA redirect detected for: %s", query)
+                return [], S.EMPTY_BLOCK
+            if not await _wait_for_results(tab):
+                reason = await _diagnose_empty(tab)
+                logger.debug("Yandex empty (%s) for: %s", reason, query)
+                return [], reason
+            results = await _parse_results(tab, max_results)
+            return results, (None if results else S.EMPTY_NO_RESULTS)
+        finally:
+            await kill_tab(tab)
+
+    # Legacy thin wrapper — delegates to search_with_reason; swallows exceptions for dev-script compat
+    async def search(self, query: str, language: str = "en", max_results: int = 10) -> list[SearchResult]:
+        try:
+            results, _ = await self.search_with_reason(query, language, max_results)
+            return results
+        except Exception as e:
+            logger.error("Yandex search failed: %s", e)
+            return []
+
+
+# FUNCTIONS
+
+# Extract primitive value from CDP execute_script result dict
+def _extract_value(result):
+    try:
+        return result["result"]["result"]["value"]
+    except (KeyError, TypeError):
+        return None
+
+
+# Check a URL for Yandex's SmartCaptcha redirect path (pure — no browser access)
+def _is_block_url(url: str) -> bool:
+    lowered = (url or "").lower()
+    return any(marker in lowered for marker in BLOCK_URL_MARKERS)
+
+
+# Yandex's own domain (self-referential cards, video-carousel previews) — not a real external result.
+# Matches on a dot-separated hostname LABEL (e.g. "yandex.com", "video.yandex.com"), not a raw
+# substring check, so a real external domain like "notyandex.com" is never misclassified.
+def _is_self_referential(url: str) -> bool:
+    host = urlparse(url).hostname or ""
+    return SELF_DOMAIN_LABEL in host.split(".")
+
+
+# Poll for result containers up to MAX_WAIT_CYCLES x WAIT_INTERVAL seconds, return True when found
+async def _wait_for_results(tab) -> bool:
+    for _ in range(MAX_WAIT_CYCLES):
+        raw = await tab.execute_script(_JS_WAIT)
+        count = _extract_value(raw)
+        if count and int(count) > 0:
+            return True
+        await asyncio.sleep(WAIT_INTERVAL)
+    return False
+
+
+# Build SearchResult list from parsed li.serp-item items, dropping yandex.com self-links (pure)
+def _build_results(items: list[dict], max_results: int) -> list[SearchResult]:
+    results = []
+    for item in items:
+        if len(results) >= max_results:
+            break
+        url = item.get("url", "")
+        if not url or _is_self_referential(url):
+            continue
+        results.append(SearchResult(
+            url=url, title=item.get("title", ""), snippet=item.get("snippet", ""),
+            engine="yandex", position=len(results) + 1,
+        ))
+    return results
+
+
+# Query DOM for li.serp-item containers and return SearchResult list (direct hrefs, no unwrap needed)
+async def _parse_results(tab, max_results: int) -> list[SearchResult]:
+    raw = await tab.execute_script(_JS_PARSE)
+    value = _extract_value(raw)
+    if not value:
+        return []
+    try:
+        items = json.loads(value)
+    except (json.JSONDecodeError, TypeError):
+        return []
+    return _build_results(items, max_results)
+
+
+# Classify a diagnosis snapshot into an EMPTY sub-status (pure — no browser access)
+# Priority: block marker -> CONCURRENT_RACE (page still loading) -> NO_CONTAINER
+def _classify_diagnosis(marker: str | None, url: str, ready_state: str) -> str:
+    if marker or _is_block_url(url):
+        return S.EMPTY_BLOCK
+    if ready_state != "complete":
+        return S.EMPTY_CONCURRENT_RACE
+    return S.EMPTY_NO_CONTAINER
+
+
+# Diagnose why Yandex returned zero li.serp-item after _wait_for_results failed; tab is still open
+async def _diagnose_empty(tab) -> str:
+    raw = await tab.execute_script(_JS_DIAGNOSE)
+    val = _extract_value(raw)
+    diag = {"marker": None, "url": "", "ready_state": ""}
+    if val:
+        try:
+            diag.update(json.loads(val))
+        except (json.JSONDecodeError, TypeError):
+            pass
+    return _classify_diagnosis(diag["marker"], diag["url"], diag["ready_state"])
