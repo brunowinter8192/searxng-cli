@@ -213,6 +213,14 @@ Smoke tests, selector-drift probes, ranking-method eval harness, and bee-investi
 **Called by:** CLI only.
 **Calls out:** `pydoll` (Chrome, ChromiumOptions, BrowserProcessManager), macOS `open` CLI.
 
+### 28_bing_probe.py (400 LOC)
+
+**Purpose:** Go/no-go scrapeability probe for bing.com (self-contained — no `src/` import) as a SECOND, independent access path to the Bing web index, redundant to DuckDuckGo's surrogate coverage. Runs 10 queries via pydoll stealth stack, headless. Result: CANDIDATE — 10/10 OK, 0 blocks, median 691ms (fastest browser-scraped engine probed to date). Confirms the old `#b_results .b_algo` selector had NOT structurally drifted (still live); new handling need: every organic href is wrapped in a `bing.com/ck/a?...&u=<prefixed-base64>&...` tracking redirect, unwrapped via `_clean_url` (parse `u` param, strip 2-char prefix, base64url-decode with padding, graceful fallback to raw href on failure).
+**Reads:** none (live run against production bing.com).
+**Writes:** `md/bing_probe_<ts>.md`.
+**Called by:** CLI only.
+**Calls out:** `pydoll` (Chrome, ChromiumOptions, TargetCommands) — inline copy of the `src/search/browser.py` session-setup shape, not a shared import.
+
 ### _capture_sorry.py (231 LOC)
 
 **Purpose:** Captures Google `/sorry/` block page — helper script, not a numbered experiment. Navigates to a search URL, checks if redirected to `/sorry/`, saves HTML + screenshot + MD summary.
