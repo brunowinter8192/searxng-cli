@@ -1,0 +1,184 @@
+# INFRASTRUCTURE
+import asyncio
+import json
+import logging
+
+from src.search.browser import new_tab, kill_tab
+from src.search.engines.base import BaseEngine
+from src.search.rate_limiter import RateLimiter, _limiters
+from src.search.result import SearchResult
+from src.search import status as S
+
+logger = logging.getLogger(__name__)
+
+HOME_URL = "https://www.startpage.com/"
+EXPECTED_RESULT_PATH = "/sp/search"
+MAX_WAIT_CYCLES = 25
+WAIT_INTERVAL = 0.3
+
+_JS_WAIT = "return document.querySelectorAll('div.result').length"
+
+_JS_PARSE = """
+var _cs = document.querySelectorAll('div.result');
+var _out = [];
+for (var _i = 0; _i < _cs.length; _i++) {
+    var _c = _cs[_i];
+    var _a = _c.querySelector('a.result-title');
+    var _h2 = _c.querySelector('h2.wgl-title');
+    var _desc = _c.querySelector('p.description');
+    if (!_a || !_a.href) continue;
+    _out.push({
+        url: _a.href,
+        title: _h2 ? _h2.textContent.trim() : (_a.textContent || '').trim(),
+        snippet: _desc ? _desc.textContent.trim() : ''
+    });
+}
+return JSON.stringify(_out);
+"""
+
+_JS_DIAGNOSE = """
+var body = document.body ? document.body.innerText.toLowerCase() : '';
+var title = document.title.toLowerCase();
+var markers = ['captcha', 'unusual traffic', 'verify you are human', 'are you a robot',
+               'access denied', 'checking your browser', 'temporarily blocked',
+               'too many requests', 'rate limit exceeded', 'automated queries'];
+var hit = null;
+for (var _i = 0; _i < markers.length; _i++) {
+    if (body.indexOf(markers[_i]) !== -1 || title.indexOf(markers[_i]) !== -1) { hit = markers[_i]; break; }
+}
+var iframeChallenge = document.querySelector('iframe[src*="recaptcha"], iframe[src*="hcaptcha"], iframe[src*="challenge"]');
+return JSON.stringify({
+    marker: hit,
+    iframe_challenge: !!iframeChallenge,
+    url: window.location.href,
+    ready_state: document.readyState
+});
+"""
+
+# Uniform 4 req/min across all engines (Google-Baseline, normalized 2026-05-04)
+_limiters["startpage"] = RateLimiter(max_requests=4, window_seconds=60)
+
+
+# ORCHESTRATOR
+
+# Startpage web search via pydoll stealth browser (Google-index frontend, homepage-driven search form)
+class StartpageEngine(BaseEngine):
+    name = "startpage"
+
+    # Full search logic with empty-reason diagnosis; exceptions propagate to _engine_with_timing
+    async def search_with_reason(self, query: str, language: str = "en", max_results: int = 10) -> tuple[list[SearchResult], str | None]:
+        logger.info("Startpage search: %s", query)
+        tab = await new_tab()
+        try:
+            await _submit_search(tab, query)
+            if not await _wait_for_results(tab):
+                reason = await _diagnose_empty(tab)
+                logger.debug("Startpage empty (%s) for: %s", reason, query)
+                return [], reason
+            results = await _parse_results(tab, max_results)
+            return results, (None if results else S.EMPTY_NO_RESULTS)
+        finally:
+            await kill_tab(tab)
+
+    # Legacy thin wrapper — delegates to search_with_reason; swallows exceptions for dev-script compat
+    async def search(self, query: str, language: str = "en", max_results: int = 10) -> list[SearchResult]:
+        try:
+            results, _ = await self.search_with_reason(query, language, max_results)
+            return results
+        except Exception as e:
+            logger.error("Startpage search failed: %s", e)
+            return []
+
+
+# FUNCTIONS
+
+# Extract primitive value from CDP execute_script result dict
+def _extract_value(result):
+    try:
+        return result["result"]["result"]["value"]
+    except (KeyError, TypeError):
+        return None
+
+
+# Build the JS snippet that sets #q via the native input setter (React controlled component —
+# plain `.value =` assignment does not update React's internal state) and fires an input event
+def _js_set_query(query: str) -> str:
+    return f"""
+    var inp = document.querySelector('#q');
+    var nativeSetter = Object.getOwnPropertyDescriptor(window.HTMLInputElement.prototype, 'value').set;
+    nativeSetter.call(inp, {json.dumps(query)});
+    inp.dispatchEvent(new Event('input', {{bubbles: true}}));
+    """
+
+
+# Drive the real homepage search form to obtain a valid per-session `sc` token; a direct GET to
+# /sp/search?query=... skips this token and silently returns zero results (empirically verified —
+# see dev/search_pipeline/25_startpage_probe.py). form.submit() does NOT work — it bypasses the
+# React submit handler and just reloads the homepage; a real .click() on the search button is required.
+async def _submit_search(tab, query: str) -> None:
+    await tab.go_to(HOME_URL, timeout=10.0)
+    await asyncio.sleep(1.5)
+    await tab.execute_script(_js_set_query(query))
+    await asyncio.sleep(0.3)
+    await tab.execute_script("document.querySelector('button.search-btn').click();")
+
+
+# Poll for result containers up to MAX_WAIT_CYCLES x WAIT_INTERVAL seconds, return True when found
+async def _wait_for_results(tab) -> bool:
+    for _ in range(MAX_WAIT_CYCLES):
+        raw = await tab.execute_script(_JS_WAIT)
+        count = _extract_value(raw)
+        if count and int(count) > 0:
+            return True
+        await asyncio.sleep(WAIT_INTERVAL)
+    return False
+
+
+# Build SearchResult list from parsed div.result items (pure — no browser access)
+def _build_results(items: list[dict], max_results: int) -> list[SearchResult]:
+    results = []
+    for i, item in enumerate(items[:max_results]):
+        url = item.get("url", "")
+        if not url:
+            continue
+        results.append(SearchResult(
+            url=url, title=item.get("title", ""), snippet=item.get("snippet", ""),
+            engine="startpage", position=i + 1,
+        ))
+    return results
+
+
+# Query DOM for div.result containers and return SearchResult list
+async def _parse_results(tab, max_results: int) -> list[SearchResult]:
+    raw = await tab.execute_script(_JS_PARSE)
+    value = _extract_value(raw)
+    if not value:
+        return []
+    try:
+        items = json.loads(value)
+    except (json.JSONDecodeError, TypeError):
+        return []
+    return _build_results(items, max_results)
+
+
+# Classify a diagnosis snapshot into an EMPTY sub-status (pure — no browser access)
+# Priority: BLOCK marker/iframe-challenge -> CONCURRENT_RACE (page still loading) -> NO_CONTAINER
+def _classify_diagnosis(marker: str | None, iframe_challenge: bool, url: str, ready_state: str) -> str:
+    if marker or iframe_challenge:
+        return S.EMPTY_BLOCK
+    if ready_state != "complete":
+        return S.EMPTY_CONCURRENT_RACE
+    return S.EMPTY_NO_CONTAINER
+
+
+# Diagnose why Startpage returned zero div.result after _wait_for_results failed; tab is still open
+async def _diagnose_empty(tab) -> str:
+    raw = await tab.execute_script(_JS_DIAGNOSE)
+    val = _extract_value(raw)
+    diag = {"marker": None, "iframe_challenge": False, "url": "", "ready_state": ""}
+    if val:
+        try:
+            diag.update(json.loads(val))
+        except (json.JSONDecodeError, TypeError):
+            pass
+    return _classify_diagnosis(diag["marker"], diag["iframe_challenge"], diag["url"], diag["ready_state"])

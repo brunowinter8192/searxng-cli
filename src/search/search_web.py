@@ -16,6 +16,7 @@ from src.search.engines.google import GoogleEngine
 from src.search.engines.crossref import CrossRefEngine
 from src.search.engines.duckduckgo import DuckDuckGoEngine
 from src.search.engines.mojeek import MojeekEngine
+from src.search.engines.startpage import StartpageEngine
 from src.search.engines.lobsters import LobstersEngine
 from src.search.engines.openalex import OpenAlexEngine
 from src.search.engines.stack_exchange import StackExchangeEngine
@@ -40,6 +41,7 @@ ENGINE_WATCHDOG_OVERRIDE: dict[str, float] = {
     "open_library": 6.0,        # Server-dominated 1.4-5.8s latency; 3.6s cap caused ~35% timeouts
     "semantic_scholar": 5.0,    # CSR hydration 0.5-2.5s + go_to budget post-DOM-drift fix
     "crossref": 6.0,            # API response 1-5s range; 3.6s httpx cap races watchdog deadline
+    "startpage": 6.0,           # 2-step homepage+submit flow measured 2.7-4.1s (25_startpage_probe.py); 3.6s cap too tight
 }
 
 # Empirical per-engine ceilings (max_results_probe_20260507_024429.md)
@@ -53,6 +55,7 @@ ENGINE_MAX_RESULTS: dict[str, int] = {
     "stack_exchange": 100,  # pagesize= API param; hard cap 100
     "semantic_scholar": 10, # 10/page hardcoded by SS UI; no override param
     "open_library": 100,   # limit= API param; supports 1000+ but latency server-dominated (1.4-5.8s at 100)
+    "startpage": 10,        # no count param; 10/page fixed by DOM (25_startpage_probe.py)
 }
 
 ENGINES = {
@@ -65,6 +68,7 @@ ENGINES = {
     "stack_exchange": StackExchangeEngine(),
     "semantic_scholar": SemanticScholarEngine(),
     "open_library": OpenLibraryEngine(),
+    "startpage": StartpageEngine(),
 }
 
 # ORCHESTRATOR
