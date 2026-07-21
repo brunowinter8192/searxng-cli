@@ -74,6 +74,16 @@ Query string in → engine-specific fetch (pydoll tab navigation + JS extraction
 
 ---
 
+### bing.py (175 LOC)
+
+**Purpose:** Bing web search (direct path to the Bing index — DuckDuckGo is the existing surrogate) via pydoll Chrome tab, headless. Single GET `https://www.bing.com/search?q=<q>`, no consent/form step (a Microsoft cookie banner is present in the DOM but does not gate result rendering). Waits for `li.b_algo` containers, extracts title/href/snippet via injected JS parse script. Every organic href arrives wrapped in a `bing.com/ck/a?...&u=<prefixed-base64>&...` tracking redirect — `_clean_url` unwraps it: parses the `u` query param, strips its 2-char prefix (observed `a1`), base64url-decodes with padding restored, graceful fallback to the raw wrapped href on any failure or missing `u` param. Block detection via EN+DE title/body marker scan; `_build_results`/`_classify_diagnosis` factored out as pure functions (unit-tested in `tests/test_bing_engine.py`, including a real captured `ck/a` sample for the unwrap).
+**Reads:** none (network only).
+**Writes:** none (network only).
+**Called by:** `src/search/search_web.py`.
+**Calls out:** `src.search.browser` (`new_tab`, `kill_tab`).
+
+---
+
 ### lobsters.py (130 LOC)
 
 **Purpose:** Lobsters (lobste.rs) search via pydoll Chrome tab, `what=stories&order=relevance` endpoint. Waits for `li.story` containers, extracts direct hrefs — no CAPTCHA check (site has none).
@@ -139,11 +149,11 @@ Query string in → engine-specific fetch (pydoll tab navigation + JS extraction
 **Purpose:** Google Scholar search via `httpx` GET (no browser) — migrated off pydoll 2026-05-09. Detects concurrent-CAPTCHA via 30x redirect to `/sorry/`. Full logic lives in `search_with_reason`; `search()` is a legacy thin wrapper that swallows exceptions for dev-script compat.
 **Reads:** none (network only).
 **Writes:** none (network only).
-**Called by:** dev probe scripts only (`dev/search_pipeline/`) — NOT imported by `src/search/search_web.py`. Decoupled/parked from the production 11-engine pool.
+**Called by:** dev probe scripts only (`dev/search_pipeline/`) — NOT imported by `src/search/search_web.py`. Decoupled/parked from the production 12-engine pool.
 **Calls out:** `httpx`, `lxml.html`.
 
 ## Gotchas
 
-- All 11 production engines register a uniform `RateLimiter(max_requests=4, window_seconds=60)` into `_limiters` at module import time — adding a new engine requires this registration or `search_web._engine_with_timing` will KeyError on `get_limiter(name)`.
+- All 12 production engines register a uniform `RateLimiter(max_requests=4, window_seconds=60)` into `_limiters` at module import time — adding a new engine requires this registration or `search_web._engine_with_timing` will KeyError on `get_limiter(name)`.
 - `scholar.py` is fully wired (class, rate limiter, parse logic) but excluded from `search_web.py`'s imports — it is reachable code, not literally dead, but not part of any production call path. Re-enabling it means adding an import + entry to `_DEFAULT_ENGINES` in `filter_modes.py`.
 - pydoll-based engines (`google`, `duckduckgo`, `mojeek`, `lobsters`, `semantic_scholar`) all use `finally: await kill_tab(tab)` — NOT `tab.close()`, which caused 65s hangs on `TIMEOUT_NONCOOP` cases (`Page.close` via tab connection → hung renderer → 60s pydoll fallback).
