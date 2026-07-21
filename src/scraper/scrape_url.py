@@ -45,7 +45,15 @@ _GARBAGE_MESSAGES = {
     "http_error": "HTTP error page (404/403)",
     "nav_dump": "Navigation dump — page returned only links, no content",
     "crawl4ai_error": "Crawl4AI extraction error",
+    "browser_missing": "Browser binary missing — run `./venv/bin/python -m patchright install chromium` to install it",
 }
+
+# Substrings that mark an exception as a browser-launch/executable failure, not a per-URL scrape miss
+_BROWSER_LAUNCH_SIGNATURES = (
+    "executable doesn't exist",
+    "playwright install",
+    "browsertype.launch",
+)
 
 
 # ORCHESTRATOR
@@ -155,8 +163,17 @@ async def try_scrape(url: str) -> tuple[str, dict]:
             return "", {**meta, "garbage_type": garbage_type, "garbage_content": content}
         return content, meta
     except Exception as e:
+        if is_browser_launch_error(e):
+            logger.error("Browser binary missing/failed to launch for %s: %s", url, e)
+            return "", {**_empty_meta, "garbage_type": "browser_missing"}
         logger.warning("Failed to scrape %s: %s", url, e)
         return "", dict(_empty_meta)
+
+
+# Detect browser-launch/executable-missing failure (environment defect) vs. an ordinary per-URL error
+def is_browser_launch_error(exc: Exception) -> bool:
+    msg = str(exc).lower()
+    return any(sig in msg for sig in _BROWSER_LAUNCH_SIGNATURES)
 
 
 # Detect garbage content: error pages, cookie walls, login walls, navigation dumps

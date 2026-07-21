@@ -18,9 +18,9 @@ URL scraping for the `scrape_url` CLI subcommand and the shared garbage classifi
 
 ## Modules
 
-### scrape_url.py (235 LOC)
+### scrape_url.py (252 LOC)
 
-**Purpose:** Scrape orchestrator. One crawl4ai browser call with native anti-bot baseline (`enable_stealth` + `UndetectedAdapter` + `magic=True` + `wait_until="load"`, `page_timeout=60000`, `max_retries=0`, no phase escalation). Selects `fit_markdown` (PruningContentFilter 0.48) or `raw_markdown` fallback, classifies via `is_garbage_content` (7 categories), recovers cookie-wall pages via `strip_consent_prefix`, truncates to max length, returns markdown in `TextContent` or a per-type error message from `_GARBAGE_MESSAGES`. Also exports `is_garbage_content` as the shared classifier for batch crawl.
+**Purpose:** Scrape orchestrator. One crawl4ai browser call with native anti-bot baseline (`enable_stealth` + `UndetectedAdapter` + `magic=True` + `wait_until="load"`, `page_timeout=60000`, `max_retries=0`, no phase escalation). Selects `fit_markdown` (PruningContentFilter 0.48) or `raw_markdown` fallback, classifies via `is_garbage_content` (7 categories), recovers cookie-wall pages via `strip_consent_prefix`, truncates to max length, returns markdown in `TextContent` or a per-type error message from `_GARBAGE_MESSAGES`. The `except Exception` handler in `try_scrape` additionally distinguishes a browser-launch/executable-missing failure (`is_browser_launch_error`, matched on the exception message) from a genuine empty/blocked page, mapping it to its own `browser_missing` outcome instead of the generic empty-content message. Also exports `is_garbage_content` as the shared classifier for batch crawl.
 **Reads:** `url` arg + optional `max_content_length` (default 15000 = `DEFAULT_MAX_CONTENT_LENGTH`).
 **Writes:** result content + metadata via scrape_logger (no direct file writes).
 **Called by:** `cli.py` (scrape_url_workflow); `src/crawler/crawl_site.py` (is_garbage_content).
@@ -47,3 +47,4 @@ No shared in-memory state — each `scrape_url_workflow` call is independent. Th
 - `strip_consent_prefix` only fires when CONSENT_WORDS density in the first 3000 chars exceeds `CONSENT_DENSITY_THRESHOLD` (5); it searches for the first heading after `CONSENT_SKIP_OFFSET` (300 chars).
 - crawl4ai captures stdout — write debug to files, never `print()`.
 - `get_plugin_hint` is a stub returning `""` (domain blocking removed).
+- Missing/failed patchright chromium binary looks IDENTICAL to a genuinely empty page unless caught: launch fails in ~300ms with `http_status:null`, `bytes_raw_markdown:null` — exactly the same shape as a blocked/empty scrape. `is_browser_launch_error` guards against this by matching launch-exception substrings (`executable doesn't exist`, `playwright install`, `browsertype.launch`); on match the outcome is `browser_missing` (logged at ERROR, not WARNING) with a message naming the fix: `./venv/bin/python -m patchright install chromium`.
