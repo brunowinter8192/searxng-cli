@@ -197,6 +197,14 @@ Smoke tests, selector-drift probes, ranking-method eval harness, and bee-investi
 **Called by:** CLI only.
 **Calls out:** `pydoll` (Chrome, ChromiumOptions, TargetCommands) — inline copy of the `src/search/browser.py` session-setup shape, not a shared import.
 
+### 26_brave_probe.py (378 LOC)
+
+**Purpose:** Go/no-go 3-condition gate probe for Brave Search (self-contained — no `src/` import, dev-isolation guardrail): real result rows + no PoW/CAPTCHA + per-query wall latency ≤5s, run one query at a time (no gather-special-casing) via the pydoll stealth stack (`src/search/browser.py` shape, inlined). Runs 10 queries, detects PoW/CAPTCHA via title/body marker scan + `a[href*="pow-captcha"]` presence, records per-query latency. Result: DROP — 4/10 OK then persistent PoW block from query 5 onward.
+**Reads:** none (live run against production search.brave.com).
+**Writes:** `md/brave_probe_<ts>.md`.
+**Called by:** CLI only.
+**Calls out:** `pydoll` (Chrome, ChromiumOptions, TargetCommands) — inline copy of the `src/search/browser.py` session-setup shape, not a shared import.
+
 ### _capture_sorry.py (231 LOC)
 
 **Purpose:** Captures Google `/sorry/` block page — helper script, not a numbered experiment. Navigates to a search URL, checks if redirected to `/sorry/`, saves HTML + screenshot + MD summary.
