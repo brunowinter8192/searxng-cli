@@ -154,16 +154,26 @@ Query string in → engine-specific fetch (pydoll tab navigation + JS extraction
 
 ---
 
+### marginalia.py (64 LOC)
+
+**Purpose:** Marginalia Search — independent index (own crawler, "small/old/text-heavy/non-commercial web", new coverage on a different axis from the mainstream engines) — via `httpx` GET against `api2.marginalia-search.com/search` (JSON API, no browser), header `API-Key: public` (shared free key, no signup). Same 429/403 -> `None` -> `[]` rate-limit shape as `crossref.py`/`openalex.py`/`stack_exchange.py`/`open_library.py`, `logger.warning` on rate-limit exactly matching that precedent.
+**Reads:** none (network only).
+**Writes:** none (network only).
+**Called by:** `src/search/search_web.py`.
+**Calls out:** `httpx`.
+
+---
+
 ### scholar.py (119 LOC)
 
 **Purpose:** Google Scholar search via `httpx` GET (no browser) — migrated off pydoll 2026-05-09. Detects concurrent-CAPTCHA via 30x redirect to `/sorry/`. Full logic lives in `search_with_reason`; `search()` is a legacy thin wrapper that swallows exceptions for dev-script compat.
 **Reads:** none (network only).
 **Writes:** none (network only).
-**Called by:** dev probe scripts only (`dev/search_pipeline/`) — NOT imported by `src/search/search_web.py`. Decoupled/parked from the production 13-engine pool.
+**Called by:** dev probe scripts only (`dev/search_pipeline/`) — NOT imported by `src/search/search_web.py`. Decoupled/parked from the production 14-engine pool.
 **Calls out:** `httpx`, `lxml.html`.
 
 ## Gotchas
 
-- All 13 production engines register a uniform `RateLimiter(max_requests=4, window_seconds=60)` into `_limiters` at module import time — adding a new engine requires this registration or `search_web._engine_with_timing` will KeyError on `get_limiter(name)`.
+- All 14 production engines register a uniform `RateLimiter(max_requests=4, window_seconds=60)` into `_limiters` at module import time — adding a new engine requires this registration or `search_web._engine_with_timing` will KeyError on `get_limiter(name)`.
 - `scholar.py` is fully wired (class, rate limiter, parse logic) but excluded from `search_web.py`'s imports — it is reachable code, not literally dead, but not part of any production call path. Re-enabling it means adding an import + entry to `_DEFAULT_ENGINES` in `filter_modes.py`.
 - pydoll-based engines (`google`, `duckduckgo`, `mojeek`, `lobsters`, `semantic_scholar`) all use `finally: await kill_tab(tab)` — NOT `tab.close()`, which caused 65s hangs on `TIMEOUT_NONCOOP` cases (`Page.close` via tab connection → hung renderer → 60s pydoll fallback).
