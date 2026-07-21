@@ -229,6 +229,14 @@ Smoke tests, selector-drift probes, ranking-method eval harness, and bee-investi
 **Called by:** CLI only.
 **Calls out:** `pydoll` (Chrome, ChromiumOptions, TargetCommands) — inline copy of the `src/search/browser.py` session-setup shape, not a shared import.
 
+### 30_marginalia_probe.py (255 LOC)
+
+**Purpose:** Go/no-go scrapeability probe for Marginalia Search — a genuine NEW-COVERAGE candidate on a DIFFERENT axis (small/old/text-heavy/non-commercial web, own crawler), not redundancy like bing/startpage. Discovers and uses a FREE public JSON API (no browser/stealth needed — plain `httpx`, mirrors the HTTP-API engine pattern of crossref/openalex/stack_exchange/open_library rather than the pydoll browser engines): `https://api2.marginalia-search.com/search?query=<q>&count=10`, header `API-Key: public` (literal shared key, no signup). Runs 10 gently-paced queries (5 niche/text-heavy + 5 standard mainstream/local). Result: CANDIDATE — 8/10 OK, 2 genuine HTTP-429 rate-limits on the shared public key; excellent quality on the niche axis, honestly mixed on mainstream/local (German local-biz was fully irrelevant, English mainstream/docs reasonable). Fastest engine probed all week (median ~74ms).
+**Reads:** none (live run against production api2.marginalia-search.com).
+**Writes:** `md/marginalia_probe_<ts>.md`.
+**Called by:** CLI only.
+**Calls out:** `httpx`.
+
 ### _capture_sorry.py (231 LOC)
 
 **Purpose:** Captures Google `/sorry/` block page — helper script, not a numbered experiment. Navigates to a search URL, checks if redirected to `/sorry/`, saves HTML + screenshot + MD summary.
