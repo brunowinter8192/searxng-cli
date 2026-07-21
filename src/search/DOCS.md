@@ -2,7 +2,7 @@
 
 ## Role
 
-pydoll-based parallel web-search pipeline behind the `search_web` and `search_engine_drilldown` CLI subcommands. Fans a single query out across 10 engines concurrently, dedups URLs into per-engine pools, caches the pools to disk, and returns an engine-breakdown table; the drilldown subcommand re-reads the cache to emit one engine's URLs. Touch this package when changing engine fan-out, dedup/pool-building, the disk cache, rate-limiting, or the three filter flags. Individual engine parsers live one level down in `engines/`.
+pydoll-based parallel web-search pipeline behind the `search_web` and `search_engine_drilldown` CLI subcommands. Fans a single query out across 11 engines concurrently, dedups URLs into per-engine pools, caches the pools to disk, and returns an engine-breakdown table; the drilldown subcommand re-reads the cache to emit one engine's URLs. Touch this package when changing engine fan-out, dedup/pool-building, the disk cache, rate-limiting, or the three filter flags. Individual engine parsers live one level down in `engines/`.
 
 ## Public Interface
 
@@ -19,13 +19,13 @@ pydoll-based parallel web-search pipeline behind the `search_web` and `search_en
 
 ## Modules
 
-### search_web.py (340 LOC)
+### search_web.py (344 LOC)
 
-**Purpose:** Search orchestrator. Fans out across the 10 active engines via `asyncio.gather`, then filters → builds pools → caps → formats → caches. Post-dedup pool cap: K = `len(pools['google'])` if >0 else 10, each pool trimmed to `pool[:K]` (prevents CrossRef/OpenAlex/StackExchange/OpenLibrary drilldown floods). Three-tier timeout: `ENGINE_WATCHDOG_TIMEOUT=3.6s` default, `ENGINE_WATCHDOG_OVERRIDE` per-engine (open_library 6.0, semantic_scholar 5.0, crossref 6.0, startpage 6.0), `RATE_WAIT_TIMEOUT=60.0s` acquire cap → RATE_SKIP. `_engine_with_timing` returns a 5-tuple `(results, rate_wait_ms, search_ms, status, drop_reason)` with sub-classified TIMEOUT/ERROR statuses. Two-record logging: `engine_run` after fanout, `workflow_summary` after pool-build. `fetch_search_results` is a sync dev wrapper (raw list, no pools).
+**Purpose:** Search orchestrator. Fans out across the 11 active engines via `asyncio.gather`, then filters → builds pools → caps → formats → caches. Post-dedup pool cap: K = `len(pools['google'])` if >0 else 10, each pool trimmed to `pool[:K]` (prevents CrossRef/OpenAlex/StackExchange/OpenLibrary drilldown floods). Three-tier timeout: `ENGINE_WATCHDOG_TIMEOUT=3.6s` default, `ENGINE_WATCHDOG_OVERRIDE` per-engine (open_library 6.0, semantic_scholar 5.0, crossref 6.0, startpage 6.0, brave 6.0), `RATE_WAIT_TIMEOUT=60.0s` acquire cap → RATE_SKIP. `_engine_with_timing` returns a 5-tuple `(results, rate_wait_ms, search_ms, status, drop_reason)` with sub-classified TIMEOUT/ERROR statuses. Two-record logging: `engine_run` after fanout, `workflow_summary` after pool-build. `fetch_search_results` is a sync dev wrapper (raw list, no pools).
 **Reads:** query + params; per-engine caps in `ENGINE_MAX_RESULTS`; default set via `_DEFAULT_ENGINES`.
 **Writes:** disk cache `~/.cache/searxng/<key>.json` (via cache_write); query log (via log_query).
 **Called by:** `cli.py` (search_web_workflow); dev scripts (fetch_search_results).
-**Calls out:** `httpx`, `pydoll.exceptions`, `websockets.exceptions`, `mcp.types.TextContent`; `engines/` (all 10 engine classes); `cache` (cache_key, cache_write), `rate_limiter` (get_limiter), `merge` (build_engine_pools), `result` (SearchResult), `status`, `query_logger` (log_query), `filter_modes` (apply_filter_mode, filter_urls_by_mode, _DEFAULT_ENGINES).
+**Calls out:** `httpx`, `pydoll.exceptions`, `websockets.exceptions`, `mcp.types.TextContent`; `engines/` (all 11 engine classes); `cache` (cache_key, cache_write), `rate_limiter` (get_limiter), `merge` (build_engine_pools), `result` (SearchResult), `status`, `query_logger` (log_query), `filter_modes` (apply_filter_mode, filter_urls_by_mode, _DEFAULT_ENGINES).
 
 ### merge.py (36 LOC)
 
